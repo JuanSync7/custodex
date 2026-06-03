@@ -1,0 +1,91 @@
+# Golden multi-language example for code-doc-monitor.
+#
+# One small "greeter" tool implemented across FIVE source languages, each mapped
+# onto a managed document so a single `cdmon check` keeps every doc honest:
+#
+#   greeter.py   (Python library)   -> library.md  (eng-guide, symbol table)
+#   cli.py       (argparse CLI)     -> cli.md       (user-guide, options table)
+#   flags.json   (flag rules)       -> flags.md     (user-guide, flags table)
+#   batch.sh     (shell getopts)    -> tools.md     (user-guide, switch table)
+#   gui.tcl      (tcl switches)     -> tools.md     (user-guide, switch table)
+#
+# Nothing here is engine code — every language-specific detail is config (K0).
+# Run:  cdmon check   (warn on drift)
+#       cdmon monitor --apply   (auto-close drift)
+#       cdmon build   (render the .html twins)
+
+version: "1.0.0"
+root: "."
+
+# Declarative table renderers, referenced by region id below.
+region_templates:
+  # argparse options (records of kind "option")
+  options:
+    source: records
+    kind: option
+    columns:
+      - {header: Option, field: name}
+      - {header: Default, field: default}
+      - {header: Help, field: help}
+  # flag-translation rules (generic JSON rows)
+  flags:
+    source: records
+    columns:
+      - {header: Flag, field: name}
+      - {header: Replaced by, field: flag name replacement}
+      - {header: Action, field: action}
+      - {header: Comment, field: comment}
+  # CLI switches harvested from shell + tcl tools (records of kind "switch")
+  switches:
+    source: records
+    kind: switch
+    columns:
+      - {header: Switch, field: name}
+
+documents:
+  # ---- Python library: eng-guide, built-in symbol table --------------------
+  - id: library
+    path: docs/library.md
+    audience: eng-guide
+    html: true
+    region_keys: [symbols]
+    code_refs:
+      - path: code/greeter.py
+
+  # ---- argparse CLI: user-guide, options table -----------------------------
+  - id: cli
+    path: docs/cli.md
+    audience: user-guide
+    html: true
+    region_keys: [options]
+    code_refs:
+      - path: code/cli.py
+        extract: records
+        lang: python
+
+  # ---- JSON flag rules: user-guide, flags table ----------------------------
+  - id: flags
+    path: docs/flags.md
+    audience: user-guide
+    html: true
+    region_keys: [flags]
+    code_refs:
+      - path: code/flags.json
+        extract: records
+        lang: json
+        json_records: "*"
+        record_name_field: "flag name"
+
+  # ---- shell + tcl tools: user-guide, one switch table over BOTH -----------
+  - id: tools
+    path: docs/tools.md
+    audience: user-guide
+    html: true
+    region_keys: [switches]
+    code_refs:
+      - path: code/batch.sh
+        extract: switches
+        lang: shell
+      - path: code/gui.tcl
+        extract: switches
+        lang: tcl

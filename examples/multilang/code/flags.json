@@ -1,0 +1,16 @@
+{
+  "greeter flag translations": [
+    {
+      "flag name": "--loud",
+      "flag name replacement": "--shout",
+      "action": "replace",
+      "comment": "legacy alias for --shout"
+    },
+    {
+      "flag name": "--silent",
+      "flag name replacement": "",
+      "action": "error",
+      "comment": "not supported; use --repeat 0"
+    }
+  ]
+}

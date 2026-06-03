@@ -1,93 +1,128 @@
 # code-doc-monitor
 
+A **standardized, reusable** system that keeps documentation in sync with the
+code it describes — and, when it drifts, asks an LLM to **fix or invalidate** the
+drift while logging every decision for human review.
 
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+It generalizes the `docsync` pattern (extract a code surface → fingerprint it →
+detect drift against the docs) into a project-agnostic tool, and closes the loop
+with automatic, auditable remediation.
 
 ```
-cd existing_repo
-git remote add origin https://git.aionsilicon.local/software/code-doc-monitor.git
-git branch -M main
-git push -uf origin main
+config ──> extract ──> drift ──┬─> clean → exit 0
+                               └─> LLM backend → FIX | INVALIDATE | ESCALATE
+                                        │
+                                        ├─ apply fix to the doc (opt-in, idempotent)
+                                        ├─ append a ReviewRecord to the JSONL review log
+                                        └─ emit the record to a central monitoring system
 ```
 
-## Integrate with your tools
+## Why
 
-* [Set up project integrations](https://git.aionsilicon.local/software/code-doc-monitor/-/settings/integrations)
+A detector that only **warns** still needs a human to act; a fixer that acts
+**silently** can't be trusted. code-doc-monitor detects, auto-remediates with an
+LLM, and records the **original drift + the proposed fix** so a person (or a
+central dashboard) can audit what changed and why — a self-healing monitor that
+still keeps a human in the review seat.
 
-## Collaborate with your team
+## How a project adopts it
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Write one config (`cdmon.yaml`) that maps groups of code files — down to
+functions, line ranges, or variables — onto **logical documents**, each tagged
+with an **audience**:
 
-## Test and Deploy
+- `user-guide` — only the externally-visible surface matters; comment / local /
+  private changes are *invalidated* (not drift).
+- `eng-guide` — the implementation surface matters too; those changes *are*
+  flagged.
 
-Use the built-in continuous integration in GitLab.
+```bash
+cdmon init                 # write a config template
+cdmon new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
+cdmon surface              # dump the extracted per-document surface (debug)
+cdmon lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter
+cdmon check                # detect *content* drift; non-zero exit on drift (the warning)
+cdmon monitor --apply      # detect → LLM verdict → record → apply fix → re-check
+cdmon report               # summarize the review log
+cdmon schema               # emit the public ReviewRecord JSON schema
+```
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+## Document Layout Standard
 
-***
+Beyond keeping content in sync, code-doc-monitor standardizes **how a managed
+doc is written** so every adopting project lays its docs out the same way: a
+canonical skeleton (front matter → `#` title → `>` purpose → prose →
+`CDM:BEGIN/END` regions), a managed front-matter schema
+(`cdm.schema_version` / `audience` / `fingerprint`), and an HTML-twin pairing
+rule (`X.md` → `X.html`, derived-not-edited, carrying an embedded source hash).
+helium's `HELIUM:AUTOGEN … START/END` markers are a documented alias of the same
+grammar. The standard is **machine-checked** — `cdmon lint` is a structure gate
+orthogonal to `check`'s content gate (run both in CI) — and `cdmon new-doc`
+scaffolds a conformant file. See [`docs/LAYOUT_STANDARD.md`](docs/LAYOUT_STANDARD.md).
 
-# Editing this README
+## Backends (pluggable, offline by default)
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+The LLM backend is chosen entirely by config:
 
-## Suggestions for a good README
+- `mock` — deterministic, offline; the default, and what the test suite uses.
+- `claude-code` — runs a headless `claude -p` session as a subprocess.
+- `api` — calls the Anthropic Messages API.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Switching between them is a config edit, never a code change. The engine is
+backend-agnostic: all three return the same `BackendResult` JSON contract.
 
-## Name
-Choose a self-explaining name for your project.
+## Public schema
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Every handled drift becomes a versioned `ReviewRecord` (the public contract for
+the central monitoring system). The JSON Schema is generated from the model —
+`cdmon schema` — and a snapshot lives at
+[`docs/REVIEW_RECORD_SCHEMA.json`](docs/REVIEW_RECORD_SCHEMA.json).
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Dogfooding
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+code-doc-monitor monitors **its own** source against its own engineering docs:
+the shipped [`cdmon.yaml`](cdmon.yaml) maps this package's modules onto the docs
+under `docs/api/` (with `schema.py` as a shared, multiply-referenced file). Run
+`cdmon check` here to see it in action; the dogfood is asserted in
+`tests/test_dogfood.py`.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+## Status
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+**Complete.** All slices CDM-00…CDM-08 are done: config + audience-aware
+extraction + drift detection + heal + public schema + review log + central sinks
++ pluggable backends (mock / claude-code / api) + the monitor orchestration and
+`cdmon` CLI + the Document Layout Standard (`lint` / `new-doc`), with system/e2e
+tests and dogfooding. The suite is offline (mock backend, no network), ruff +
+mypy clean, coverage ≥ 90% (224 tests). See `.project/`
+for the spec, the binding constraints (K0–K10), the architecture, and the
+slice-by-slice status board.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## Development
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```bash
+python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+.venv/bin/ruff format --check . && .venv/bin/ruff check .
+.venv/bin/mypy code_doc_monitor
+.venv/bin/pytest -q --cov=code_doc_monitor --cov-branch
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+### Testing against a real LLM (CI/CD)
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+The default suite is **offline** (K4): a bare `pytest` excludes the `live_llm`
+marker, so it never spawns a model. One opt-in end-to-end test
+(`tests/test_live_llm.py`) drives a **real** backend — resolved from a config
+file exactly like production — and asserts `monitor --apply` self-heals a doc in
+a single pass:
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```bash
+# backend.kind comes from the config the test writes (CDMON_LIVE_BACKEND)
+CDMON_LIVE_LLM=1 CDMON_LIVE_BACKEND=claude-code .venv/bin/pytest -m live_llm
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+[`.gitlab-ci.yml`](.gitlab-ci.yml) wires this as a two-gate pipeline: `tests:offline`
+runs on every push/MR, and `tests:live-llm` runs the real-LLM test on a schedule
+(and on-demand), gated on an `ANTHROPIC_API_KEY` CI/CD variable. This guards a
+real-vs-mock divergence the offline suite can't see: a live model may return a
+fix that fills *both* the region and whole-doc shapes at once, so `apply_fix`
+prefers the whole-doc text (the only shape that refreshes the fingerprint) to
+keep `monitor --apply` single-pass idempotent.

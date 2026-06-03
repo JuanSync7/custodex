@@ -1,31 +1,87 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/user/application_security/sast/#available-cicd-variables
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure/
-# Dependency Scanning customization: https://docs.gitlab.com/user/application_security/dependency_scanning/dependency_scanning_sbom/#customizing-analyzer-behavior
-# Container Scanning customization: https://docs.gitlab.com/user/application_security/container_scanning/#customizing-analyzer-behavior
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ci/variables/#cicd-variable-precedence
+# GitLab CI/CD for code-doc-monitor.
+#
+# Replaces the initial Auto-DevOps scaffold (build/deploy/dast/canary/k8s — not
+# applicable to this Python library) with a pipeline matched to the project,
+# while KEEPING the org's security scanning (SAST + Secret Detection) via their
+# dedicated templates.
+#
+# Gates, mirroring the binding constraints (.project/spec/CONSTRAINTS.md):
+#
+#   tests:offline   The default, OFFLINE suite (K4: no network, no LLM). Runs on
+#                   every push / MR: ruff format + lint, mypy, pytest + coverage.
+#                   The `live_llm` marker is excluded by `addopts`, so nothing
+#                   here ever spawns a model.
+#
+#   tests:live-llm  Opt-in REAL-LLM end-to-end. Runs `pytest -m live_llm`, which
+#                   drives a real backend RESOLVED FROM THE CONFIG FILE
+#                   (CDMON_LIVE_BACKEND -> the fixture's backend.kind) and proves
+#                   `monitor --apply`, driven by a live model, self-heals a doc
+#                   in one pass. Requires ANTHROPIC_API_KEY as a protected +
+#                   masked CI/CD variable; runs on a schedule (a gate) and
+#                   on-demand (manual), never on a bare push — so normal CI
+#                   spends no tokens.
+#
+#   sast / secret_detection   GitLab security scanning, preserved from the
+#                   project's initial configuration.
+
 stages:
-- build
-- test
-- deploy
-- review
-- dast
-- staging
-- canary
-- production
-- incremental rollout 10%
-- incremental rollout 25%
-- incremental rollout 50%
-- incremental rollout 100%
-- performance
-- cleanup
-- secret-detection
-sast:
-  stage: test
+  - test
+  - live
+
 include:
-- template: Auto-DevOps.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
 variables:
-  SECRET_DETECTION_ENABLED: 'true'
-secret_detection:
-  stage: secret-detection
+  SECRET_DETECTION_ENABLED: "true"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+default:
+  image: python:3.11-slim
+
+cache:
+  key: "$CI_JOB_NAME"
+  paths:
+    - .cache/pip
+
+tests:offline:
+  stage: test
+  script:
+    - python -m venv .venv
+    - .venv/bin/pip install -e '.[dev]'
+    - .venv/bin/ruff format --check .
+    - .venv/bin/ruff check .
+    - .venv/bin/mypy code_doc_monitor
+    - .venv/bin/pytest --cov=code_doc_monitor --cov-branch
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+
+tests:live-llm:
+  stage: live
+  needs: ["tests:offline"]
+  variables:
+    CDMON_LIVE_LLM: "1"
+    # The backend is taken from the config file the test writes; set its kind
+    # here. "claude-code" exercises the headless `claude -p` CLI; switch to
+    # "api" to hit the Anthropic Messages API directly (drop the npm install).
+    CDMON_LIVE_BACKEND: "claude-code"
+  before_script:
+    # Headless `claude -p` CLI; authenticates non-interactively from
+    # $ANTHROPIC_API_KEY. Skip this whole block if CDMON_LIVE_BACKEND=api.
+    - apt-get update && apt-get install -y --no-install-recommends nodejs npm
+    - npm install -g @anthropic-ai/claude-code
+  script:
+    - python -m venv .venv
+    - .venv/bin/pip install -e '.[dev]'
+    # `-m live_llm` overrides the default `-m "not live_llm"` from addopts.
+    - .venv/bin/pytest -m live_llm
+  rules:
+    # Without the key the live test would only skip — don't bother scheduling it.
+    - if: '$ANTHROPIC_API_KEY == null'
+      when: never
+    # Scheduled pipeline -> a real gate (a regression fails the pipeline).
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    # Otherwise available on-demand from the pipeline UI; non-blocking.
+    - when: manual
+      allow_failure: true

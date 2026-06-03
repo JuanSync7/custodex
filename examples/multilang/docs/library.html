@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="code-doc-md-sha256" content="19835324e190d446">
+<title>Greeter library</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 60rem; margin: 0 auto;
+  padding: 2rem; line-height: 1.5; display: grid; grid-template-columns: 16rem 1fr;
+  gap: 2rem; }
+nav { font-size: 0.9rem; } nav ul { list-style: none; padding-left: 0; }
+main { min-width: 0; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid #ccc; padding: 0.3rem 0.6rem; text-align: left; }
+code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; }
+</style>
+</head>
+<body>
+<nav><ul>
+<li><a href="library.html">Greeter library</a> <strong>(this page)</strong></li>
+<li><a href="cli.html">greet — command line</a></li>
+<li><a href="flags.html">Flag aliases</a></li>
+<li><a href="tools.html">Companion tools</a></li>
+</ul></nav>
+<main>
+<h1>Greeter library</h1>
+<blockquote>The Python greeter library — its public functions and classes.</blockquote>
+<p>This is an <strong>engineering guide</strong>: because the audience is <code>eng-guide</code>, the managed symbol table below tracks the full implementation surface (docstrings included), so an internal change is flagged as drift.</p>
+<table>
+<thead><tr><th>symbol</th><th>kind</th><th>signature</th></tr></thead>
+<tbody>
+<tr><td>DEFAULT_GREETING</td><td>variable</td><td>DEFAULT_GREETING = 'Hello'</td></tr>
+<tr><td>Greeter</td><td>class</td><td>class Greeter</td></tr>
+<tr><td>Greeter.__init__</td><td>method</td><td>def __init__(self, greeting: str = DEFAULT_GREETING) -&gt; None</td></tr>
+<tr><td>Greeter.greet</td><td>method</td><td>def greet(self, name: str) -&gt; str</td></tr>
+<tr><td>greet</td><td>function</td><td>def greet(name: str, *, shout: bool = False) -&gt; str</td></tr>
+</tbody>
+</table>
+</main>
+</body>
+</html>

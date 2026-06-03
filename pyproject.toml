@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code-doc-monitor"
+version = "0.1.0"
+description = "Standardized code→documentation drift monitor: detect drift, let an LLM fix or invalidate it, log every verdict for human review, and emit a public schema to a central system."
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2",
+    "typer",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "types-PyYAML",
+]
+
+[project.scripts]
+cdmon = "code_doc_monitor.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["code_doc_monitor*"]
+exclude = ["tests*"]
+
+# ----------------------------------------------------------------------------
+# Ruff — lint + format
+# ----------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Typer's option/argument defaults are calls by design (B008).
+"code_doc_monitor/cli.py" = ["B008"]
+
+# ----------------------------------------------------------------------------
+# mypy — strict-ish
+# ----------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+check_untyped_defs = true
+exclude = ["\\.venv"]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+# ----------------------------------------------------------------------------
+# pytest + coverage
+# ----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+# The default suite is offline (K4): the real-LLM tests are excluded unless a
+# job opts in with `-m live_llm` (see .gitlab-ci.yml's `tests:live-llm` job).
+addopts = '-q -m "not live_llm"'
+testpaths = ["tests"]
+markers = [
+    "live_llm: spawns a real LLM backend (resolved from the config file); opt-in, excluded by default.",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true

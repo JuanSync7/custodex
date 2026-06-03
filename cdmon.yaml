@@ -1,0 +1,63 @@
+# code-doc-monitor's own configuration — it monitors ITS OWN source against its
+# own engineering docs (dogfooding). `schema.py` is a SHARED file: the foundation
+# doc references just its public verdict/fix types (sub-file `symbols` selection),
+# while the remediation doc references the whole module. Run `cdmon check` to see
+# drift, `cdmon monitor --apply` to auto-close it.
+version: "1.0.0"
+root: "."
+apply_default: false
+
+backend:
+  kind: mock            # swap to "claude-code" or "api" with no code change
+
+central:
+  sink: none            # set to "file" + path, or "http" + url, to ship records
+
+# A `source: index` region lists OTHER documents (a collection/landing page).
+# Columns map per-doc synthetic fields: title (linked), summary, audience, ...
+region_templates:
+  api-index:
+    source: index
+    columns:
+      - {header: "Document", field: "title"}
+      - {header: "What it covers", field: "summary"}
+
+documents:
+  # A landing page indexing the engineering docs below (no code_refs of its own).
+  - id: api-index
+    path: docs/api/index.md
+    audience: eng-guide
+    region_keys: [api-index]
+
+
+  - id: foundation
+    path: docs/api/foundation.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: code_doc_monitor/config.py
+      - path: code_doc_monitor/errors.py
+      - path: code_doc_monitor/schema.py     # SHARED — only the public types here
+        symbols: [Verdict, ProposedFix]
+
+  - id: pipeline
+    path: docs/api/pipeline.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: code_doc_monitor/extract.py
+      - path: code_doc_monitor/manifest.py
+      - path: code_doc_monitor/blocks.py
+      - path: code_doc_monitor/drift.py
+
+  - id: remediation
+    path: docs/api/remediation.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: code_doc_monitor/backends.py
+      - path: code_doc_monitor/monitor.py
+      - path: code_doc_monitor/heal.py
+      - path: code_doc_monitor/sinks.py
+      - path: code_doc_monitor/reviewlog.py
+      - path: code_doc_monitor/schema.py      # SHARED — whole module here

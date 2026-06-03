@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="code-doc-md-sha256" content="e6a8a3354526403a">
+<title>Flag aliases</title>
+<style>
+body { font-family: system-ui, sans-serif; max-width: 60rem; margin: 0 auto;
+  padding: 2rem; line-height: 1.5; display: grid; grid-template-columns: 16rem 1fr;
+  gap: 2rem; }
+nav { font-size: 0.9rem; } nav ul { list-style: none; padding-left: 0; }
+main { min-width: 0; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid #ccc; padding: 0.3rem 0.6rem; text-align: left; }
+code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 3px; }
+pre { background: #f4f4f4; padding: 0.8rem; overflow-x: auto; }
+</style>
+</head>
+<body>
+<nav><ul>
+<li><a href="library.html">Greeter library</a></li>
+<li><a href="cli.html">greet — command line</a></li>
+<li><a href="flags.html">Flag aliases</a> <strong>(this page)</strong></li>
+<li><a href="tools.html">Companion tools</a></li>
+</ul></nav>
+<main>
+<h1>Flag aliases</h1>
+<blockquote>Legacy flags the greeter rewrites or rejects.</blockquote>
+<p>These rules come from <code>flags.json</code>. A <code>replace</code> flag is rewritten to its replacement; an <code>error</code> flag is refused.</p>
+<table>
+<thead><tr><th>Flag</th><th>Replaced by</th><th>Action</th><th>Comment</th></tr></thead>
+<tbody>
+<tr><td>--loud</td><td>--shout</td><td>replace</td><td>legacy alias for --shout</td></tr>
+<tr><td>--silent</td><td></td><td>error</td><td>not supported; use --repeat 0</td></tr>
+</tbody>
+</table>
+<p>Back to the <a href="cli.html">command-line options</a>.</p>
+</main>
+</body>
+</html>
