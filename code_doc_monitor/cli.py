@@ -20,13 +20,13 @@ import typer
 
 from .build import build as build_twins
 from .config import MonitorConfig, load_config, write_template
-from .errors import CodeDocMonitorError
+from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
 from .layout import lint_config, scaffold_doc, stamp_doc_meta
 from .manifest import parse_doc
 from .monitor import DEFAULT_LOG_PATH, Monitor
-from .reviewlog import read_all, summarize
-from .schema import review_record_schema
+from .reviewlog import read_all, select_by_verdict, summarize
+from .schema import Verdict, review_record_schema
 
 app = typer.Typer(
     name="cdmon",
@@ -183,17 +183,67 @@ def monitor(
 
 
 @app.command()
-def report(config: Path = _CONFIG_OPTION) -> None:
-    """Summarize the review log (counts by verdict/audience/doc)."""
+def report(
+    config: Path = _CONFIG_OPTION,
+    verdict: str | None = typer.Option(
+        None,
+        "--verdict",
+        help="List the individual records with this verdict (e.g. ESCALATE) "
+        "instead of the aggregate summary.",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON (records when --verdict is set).",
+    ),
+) -> None:
+    """Summarize the review log, or list records of one verdict (``--verdict``).
+
+    With no ``--verdict`` it prints aggregate counts (by verdict/audience/doc).
+    With ``--verdict ESCALATE`` it lists the actual records a human must act on —
+    the audit detail counts alone can't give (K5).
+    """
     try:
         _cfg, config_dir = _load(config)
         log_path = config_dir / DEFAULT_LOG_PATH
         records = read_all(log_path)
+        wanted = _parse_verdict(verdict) if verdict is not None else None
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    typer.echo(json.dumps(summarize(records), indent=2, sort_keys=True))
+    if wanted is None:
+        typer.echo(json.dumps(summarize(records), indent=2, sort_keys=True))
+        return
+
+    selected = select_by_verdict(records, wanted)
+    if as_json:
+        typer.echo(
+            json.dumps([r.model_dump() for r in selected], indent=2, sort_keys=True)
+        )
+        return
+    if not selected:
+        typer.echo(f"no {wanted.value} records in the review log")
+        return
+    typer.echo(f"{len(selected)} {wanted.value} record(s):")
+    for rec in selected:
+        typer.echo(
+            f"  {rec.record_id} {rec.doc_id} [{rec.audience.value}] "
+            f"{rec.drift_kind} @ {rec.resolved_at}"
+        )
+        typer.echo(f"      drift: {rec.drift_detail}")
+        typer.echo(f"      cause: {rec.cause}")
+
+
+def _parse_verdict(value: str) -> Verdict:
+    """Resolve a ``--verdict`` argument to a :class:`Verdict` (case-insensitive)."""
+    try:
+        return Verdict(value.upper())
+    except ValueError as exc:
+        choices = ", ".join(v.value for v in Verdict)
+        raise SchemaError(
+            f"unknown verdict {value!r} (choose from: {choices})"
+        ) from exc
 
 
 @app.command()

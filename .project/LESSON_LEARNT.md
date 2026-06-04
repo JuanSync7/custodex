@@ -194,3 +194,42 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   Files (config.py, drift.py) changed under me repeatedly; re-reading each seam
   immediately before editing — and re-healing the dogfood after every code
   change — was the only safe way to land changes on top of a moving codebase.
+
+## CDM-11 — LangGraph remediation agent + separated .md artifacts
+
+- **A new orchestration style is additive when it honors the existing seam.**
+  The agent did not replace `build_prompt`/the single-shot backends; it became a
+  fourth `backend.kind` whose `AgentBackend.propose` satisfies the *same*
+  `Backend` Protocol. So `Monitor`, the review-log, the sinks, and every system
+  test were untouched (K9) — the LangGraph graph slots in exactly where a
+  one-shot call did. → When adding a richer engine, conform to the narrowest
+  existing interface (here, one `propose` method) before reaching for a wider one.
+- **A heavy optional dep stays optional via a lazy import + an extra.** K0 pins
+  the core to `pydantic`/`typer`/`pyyaml`; `langgraph` would break that as a hard
+  dependency. Putting it behind a `[agent]` extra AND importing the subpackage
+  lazily inside `make_backend`'s `kind == "agent"` branch (with a typed
+  BackendError if the extra is absent) means the default `mock` path imports
+  nothing new, while the agent path gets a real langgraph graph. The constraint
+  text (K0) was updated deliberately, not silently. → Reconcile an explicit
+  feature request against a dependency constraint by making the feature opt-in at
+  *both* the packaging and the import boundary, and amend the constraint on the record.
+- **"Load the .md only when needed" is a graph decision, not a loader trick.**
+  The `select` node returns the artifact list per drift (TOOL only when the drift
+  is healable, PERSONA only when enabled+present); `compose` then asks the
+  `PromptLibrary` for exactly those, which reads+caches each file on first use.
+  Separating *which artifacts* (graph policy) from *how to load one* (library
+  mechanics) made both trivially testable: `select_artifacts` is a pure function,
+  and the lazy/cached/loud-missing behaviour is three small library tests. → Push
+  conditional-resource decisions up into the workflow and keep the loader dumb.
+- **The inject-the-leaf discipline (CDM-04/05) extends straight to a graph.** The
+  graph is deterministic; only the `invoke` node calls the `Driver`, and the
+  driver is the single injected boundary. Reusing `backends._default_process_runner`
+  / `_anthropic_messages_call` as the claude-code/api leaves (and one new
+  `_openai_chat_call` for `local`) kept the only `# pragma: no cover` lines the
+  real syscalls, so the whole workflow — retry loop, re-ask nudge, fail-raise —
+  hit 100% offline. The mypy gotcha: a value narrowed by `if not x: raise` is
+  re-widened to `str | None` when captured by a nested closure, so bind it to a
+  freshly-annotated local (`api_key: str = raw_key`) before the closure, and use
+  distinct names across driver branches or the first `: str` annotation leaks. →
+  A deterministic graph over an injected leaf is testable to 100% with no network;
+  watch closure-capture re-widening when a node closes over a narrowed local.

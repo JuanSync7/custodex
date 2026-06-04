@@ -82,7 +82,7 @@ class Monitor:
         self.config = config
         self.config_dir = config_dir
         self.root = config_dir / config.root
-        self._backend: Backend = backend or make_backend(config.backend)
+        self._backend: Backend = backend or make_backend(config.backend, config.agent)
         self._sink: Sink = sink or make_sink(config.central)
         self._now: Callable[[], str] = now or _default_now
         self._log_path = log_path or (config_dir / DEFAULT_LOG_PATH)

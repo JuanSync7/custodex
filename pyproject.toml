@@ -14,12 +14,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The LangGraph remediation agent (backend.kind: agent). Optional so the core
+# engine's default `mock` path keeps a minimal dependency surface (K0).
+agent = [
+    "langgraph>=1,<2",
+]
 dev = [
     "pytest",
     "pytest-cov",
     "ruff",
     "mypy",
     "types-PyYAML",
+    "langgraph>=1,<2",
 ]
 
 [project.scripts]
@@ -28,6 +34,10 @@ cdmon = "code_doc_monitor.cli:app"
 [tool.setuptools.packages.find]
 include = ["code_doc_monitor*"]
 exclude = ["tests*"]
+
+# Ship the agent's Markdown artifacts (AGENT/PROTOCOL/TOOL/PERSONA) with the wheel.
+[tool.setuptools.package-data]
+"code_doc_monitor.agent" = ["prompts/*.md"]
 
 # ----------------------------------------------------------------------------
 # Ruff — lint + format

@@ -32,7 +32,7 @@ from typing import Protocol, runtime_checkable
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .blocks import expected_region, symbol_table
-from .config import Audience, BackendConfig, RegionTemplate
+from .config import AgentConfig, Audience, BackendConfig, RegionTemplate
 from .drift import Drift, DriftKind
 from .errors import BackendError
 from .extract import DocumentSurface
@@ -542,8 +542,14 @@ class ApiBackend:
 # ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
-def make_backend(cfg: BackendConfig) -> Backend:
-    """Resolve a :class:`BackendConfig` to a backend (one factory, K4)."""
+def make_backend(cfg: BackendConfig, agent: AgentConfig | None = None) -> Backend:
+    """Resolve a :class:`BackendConfig` to a backend (one factory, K4).
+
+    ``kind == "agent"`` builds the LangGraph remediation workflow from ``agent``
+    (the :class:`AgentConfig`, defaulted when ``None``); it lives behind a lazy
+    import so the optional ``langgraph`` dependency is only required when the
+    agent backend is actually selected (K0).
+    """
     if cfg.kind == "mock":
         return MockBackend()
     if cfg.kind == "claude-code":
@@ -554,4 +560,13 @@ def make_backend(cfg: BackendConfig) -> Backend:
         return ApiBackend(
             model=cfg.model or _DEFAULT_API_MODEL, timeout_s=cfg.timeout_s
         )
+    if cfg.kind == "agent":
+        try:
+            from .agent import make_agent_backend
+        except ImportError as exc:  # pragma: no cover - only without the extra
+            raise BackendError(
+                "the 'agent' backend needs the optional 'langgraph' dependency; "
+                "install code-doc-monitor[agent]"
+            ) from exc
+        return make_agent_backend(agent or AgentConfig())
     raise BackendError(f"unknown backend kind {cfg.kind!r}")  # pragma: no cover

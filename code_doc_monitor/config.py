@@ -22,6 +22,7 @@ __all__ = [
     "Audience",
     "CodeRef",
     "BackendConfig",
+    "AgentConfig",
     "CentralConfig",
     "RegionColumn",
     "RegionTemplate",
@@ -80,15 +81,60 @@ class CodeRef(BaseModel):
 
 
 class BackendConfig(BaseModel):
-    """Which LLM backend produces verdicts. Offline ``mock`` by default (K4)."""
+    """Which LLM backend produces verdicts. Offline ``mock`` by default (K4).
+
+    ``mock``/``claude-code``/``api`` are the single-shot backends. ``agent``
+    selects the deterministic LangGraph remediation workflow (see
+    :class:`AgentConfig` and :mod:`code_doc_monitor.agent`), whose *runtime* (the
+    process/network leaf that talks to a model) is in turn chosen by
+    ``agent.driver`` — so the engine is the same whether the agent drives the
+    Claude Code CLI headless, the Anthropic API, or a local model.
+    """
 
     model_config = _MODEL_CONFIG
 
-    kind: Literal["mock", "claude-code", "api"] = "mock"
+    kind: Literal["mock", "claude-code", "api", "agent"] = "mock"
     model: str | None = None
     command: tuple[str, ...] | None = None  # claude-code argv template
     timeout_s: int = 120
     extra: dict[str, str] = {}
+
+
+class AgentConfig(BaseModel):
+    """The LangGraph remediation-agent runtime (used when ``backend.kind`` is
+    ``agent``).
+
+    This is the single, top-level knob the SPEC calls for: *"the agent is using
+    the Claude Code CLI headless, and can instead be pointed at an API key or an
+    API connection for a local model."* ``driver`` picks the runtime leaf and
+    the rest configure it:
+
+    * ``claude-code`` (default) — a headless ``claude -p`` subprocess. ``command``
+      overrides the argv template (a ``{prompt}`` token is substituted, else the
+      prompt is appended); ``model`` adds ``--model``.
+    * ``api`` — the Anthropic Messages API; the key is read from ``api_key_env``
+      and ``base_url`` overrides the endpoint.
+    * ``local`` — any OpenAI-compatible chat endpoint (a local model server);
+      ``base_url`` is required and ``api_key_env`` is optional.
+
+    ``prompts_dir`` overrides where the ``AGENT.md`` / ``PROTOCOL.md`` /
+    ``TOOL.md`` / ``PERSONA.md`` artifacts are read from (default: the packaged
+    ones). ``use_persona`` gates loading ``PERSONA.md`` at all (it is composed
+    into the prompt *only when needed*). ``max_parse_retries`` bounds the graph's
+    re-ask loop when a reply is not valid JSON (K8).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    driver: Literal["claude-code", "api", "local"] = "claude-code"
+    model: str | None = None
+    command: tuple[str, ...] | None = None  # claude-code argv template
+    api_key_env: str = "ANTHROPIC_API_KEY"
+    base_url: str | None = None  # api/local endpoint override (required for local)
+    prompts_dir: str | None = None  # override the packaged .md artifacts
+    use_persona: bool = True  # compose PERSONA.md when present
+    max_parse_retries: int = 1  # bounded re-ask on a non-JSON reply (K8)
+    timeout_s: int = 120
 
 
 class CentralConfig(BaseModel):
@@ -161,6 +207,7 @@ class MonitorConfig(BaseModel):
     documents: tuple[DocumentSpec, ...]
     region_templates: dict[str, RegionTemplate] = {}  # region id -> table template
     backend: BackendConfig = BackendConfig()
+    agent: AgentConfig = AgentConfig()  # runtime for backend.kind == "agent"
     central: CentralConfig = CentralConfig()
     apply_default: bool = False  # monitor auto-applies FIX by default?
 
@@ -259,10 +306,29 @@ documents:
 #   mock        -> deterministic, offline (default; used in CI/tests)
 #   claude-code -> headless `claude -p` subprocess (set `command`)
 #   api         -> Anthropic Messages API (key from env)
+#   agent       -> the deterministic LangGraph remediation workflow; its runtime
+#                  (CLI / API / local model) is chosen by the `agent:` block below
 backend:
   kind: "mock"
   # model: "claude-sonnet-4"
   # command: ["claude", "-p"]
+  timeout_s: 120
+
+# The LangGraph remediation agent's runtime (only used when backend.kind: agent).
+# This is the one knob to point the agent at a different model host:
+#   claude-code -> headless `claude -p` CLI (the default)
+#   api         -> Anthropic Messages API (key from $api_key_env)
+#   local       -> any OpenAI-compatible chat endpoint (set base_url) for a
+#                  locally-served model
+agent:
+  driver: "claude-code"
+  # model: "claude-sonnet-4"
+  # command: ["claude", "-p"]          # claude-code argv template ({prompt} token)
+  api_key_env: "ANTHROPIC_API_KEY"      # api/local key (optional for local)
+  # base_url: "http://localhost:11434/v1"   # required for driver: local
+  # prompts_dir: "agent-prompts"        # override the packaged AGENT/PROTOCOL/...md
+  use_persona: true                     # compose PERSONA.md when present
+  max_parse_retries: 1                  # bounded re-ask on a non-JSON reply
   timeout_s: 120
 
 # Where handled-drift review records are emitted.

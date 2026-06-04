@@ -1,7 +1,7 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 0e78535dfd49a547
+  fingerprint: b39b7bc43bed3af6
   schema_version: 1.0.0
 ---
 # code-doc-monitor — foundation (engineering reference)
@@ -12,6 +12,7 @@ cdm:
 <!-- CDM:BEGIN symbols -->
 | symbol | kind | signature |
 |--------|------|-----------|
+| AgentConfig | class | class AgentConfig(BaseModel) |
 | Audience | class | class Audience(str, Enum) |
 | BackendConfig | class | class BackendConfig(BaseModel) |
 | BackendError | class | class BackendError(CodeDocMonitorError) |

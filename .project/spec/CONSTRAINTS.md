@@ -5,8 +5,13 @@ tickets, commits, and the STATUS log.
 
 - **K0 — Standardized & reusable.** Nothing about any specific target codebase
   (helium, genbuild, …) may be hard-coded in the engine. All target knowledge
-  enters through the config. The package depends only on `pydantic`, `typer`,
-  `pyyaml` (plus dev tools).
+  enters through the config. The **core** package depends only on `pydantic`,
+  `typer`, `pyyaml` (plus dev tools); the default `mock` path and the
+  single-shot `claude-code`/`api` backends import nothing else. The LangGraph
+  remediation agent (`backend.kind: agent`, the `code_doc_monitor.agent`
+  subpackage) is the one optional, opt-in extra: it adds `langgraph` under the
+  `[agent]` extra and is imported lazily, only when that backend is selected, so
+  installing without the extra leaves the core dependency surface intact.
 - **K1 — Detect-only `check`.** `cdmon check` and the `drift` module never mutate
   files or call a backend. Detection is pure and side-effect free.
 - **K2 — Single source of truth = the code.** A document's machine-managed

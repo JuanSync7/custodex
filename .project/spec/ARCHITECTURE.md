@@ -28,11 +28,22 @@ class CodeRef(BaseModel):           # a pointer into one code file
     names: tuple[str, ...] = ()     # select named module-level variables
 
 class BackendConfig(BaseModel):
-    kind: Literal["mock","claude-code","api"] = "mock"
+    kind: Literal["mock","claude-code","api","agent"] = "mock"
     model: str | None = None
     command: tuple[str,...] | None = None   # claude-code argv template
     timeout_s: int = 120
     extra: dict[str, str] = {}
+
+class AgentConfig(BaseModel):              # runtime for backend.kind == "agent"
+    driver: Literal["claude-code","api","local"] = "claude-code"
+    model: str | None = None
+    command: tuple[str,...] | None = None  # claude-code argv template
+    api_key_env: str = "ANTHROPIC_API_KEY"
+    base_url: str | None = None            # api/local endpoint (required for local)
+    prompts_dir: str | None = None         # override the packaged .md artifacts
+    use_persona: bool = True               # compose PERSONA.md when present
+    max_parse_retries: int = 1             # bounded re-ask on a non-JSON reply
+    timeout_s: int = 120
 
 class CentralConfig(BaseModel):
     sink: Literal["none","file","http"] = "none"
@@ -52,6 +63,7 @@ class MonitorConfig(BaseModel):
     root: str = "."                 # repo root, relative to the config file
     documents: tuple[DocumentSpec,...]
     backend: BackendConfig = BackendConfig()
+    agent: AgentConfig = AgentConfig()   # runtime for backend.kind == "agent"
     central: CentralConfig = CentralConfig()
     apply_default: bool = False     # monitor auto-applies FIX by default?
 
@@ -169,12 +181,38 @@ class MockBackend:        # deterministic: user-guide+comment-only -> INVALIDATE
 class ClaudeCodeBackend:  # builds a prompt, runs `claude -p <prompt>` (argv from
                           # config.command), parses a JSON verdict from stdout
 class ApiBackend:         # Anthropic Messages API; key from env; same JSON contract
-def make_backend(cfg: BackendConfig) -> Backend
-def build_prompt(req: FixRequest) -> str        # shared, audience-aware
+class AgentBackend:       # the LangGraph workflow (see agent/) behind the same Protocol
+def make_backend(cfg: BackendConfig, agent: AgentConfig | None = None) -> Backend
+def build_prompt(req: FixRequest) -> str        # shared, audience-aware (single-shot)
 ```
 Backends return the SAME `BackendResult` JSON contract, so the orchestrator is
 backend-agnostic. Subprocess/HTTP are injected (a `runner`/`client` param) so
-tests mock them without monkeypatching globals.
+tests mock them without monkeypatching globals. `make_backend` resolves
+`kind == "agent"` via a lazy import of the `agent` subpackage (the optional
+`langgraph` extra, K0); `Monitor` passes `config.agent` through to it.
+
+## `agent/`  (LangGraph remediation workflow — optional `[agent]` extra, K0/K4/K10)
+A deterministic LangGraph `StateGraph` whose prompt is composed from **separated
+Markdown artifacts** loaded only when needed, behind the same `Backend` Protocol.
+```python
+# agent/prompts/{AGENT,PROTOCOL,TOOL,PERSONA}.md   the composable prompt artifacts
+class PromptLibrary:                       # lazy, cached loader; loud on missing (K8)
+    def get(self, name: str) -> str        # body (front matter stripped)
+    def exists(self, name: str) -> bool
+Driver = Callable[[str], str]              # prompt -> raw reply; the only side effect
+def resolve_driver(cfg: AgentConfig) -> Driver   # claude-code | api | local (K4)
+def select_artifacts(req, cfg, library) -> list[str]   # "only when needed"
+def render_context(req: FixRequest) -> str             # the per-drift context block
+def build_graph(driver, library, cfg) -> CompiledStateGraph
+class AgentBackend:  def propose(self, req: FixRequest) -> BackendResult
+def make_agent_backend(cfg: AgentConfig, *, driver: Driver | None = None) -> AgentBackend
+```
+Graph: `START -> select -> compose -> invoke -> parse -[done]-> END`, with a
+bounded `parse -[retry]-> compose` loop (≤ `max_parse_retries`) and a
+`parse -[fail]->` node that raises `BackendError` (K8). The graph is fully
+deterministic; only the injected `Driver` touches a process/socket, so the whole
+workflow runs offline in tests (K4). The driver leaf is the single uncovered
+syscall (subprocess / urllib), mirroring the `backends.py` inject-the-leaf rule.
 
 ## `monitor.py`  (orchestration)
 ```python

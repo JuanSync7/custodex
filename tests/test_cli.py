@@ -151,6 +151,55 @@ def test_report_empty_log(tmp_path: Path, monkeypatch) -> None:
     assert json.loads(result.stdout)["total"] == 0
 
 
+def test_report_verdict_lists_matching_records(tmp_path: Path, monkeypatch) -> None:
+    _make_fixture(tmp_path, clean=False)
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["monitor", "--apply"])
+    result = runner.invoke(app, ["report", "--verdict", "FIX"])
+    assert result.exit_code == 0, result.stdout
+    assert "FIX record(s)" in result.stdout
+    assert "guide" in result.stdout
+    assert "cause:" in result.stdout
+
+
+def test_report_verdict_is_case_insensitive(tmp_path: Path, monkeypatch) -> None:
+    _make_fixture(tmp_path, clean=False)
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["monitor", "--apply"])
+    result = runner.invoke(app, ["report", "--verdict", "fix"])
+    assert result.exit_code == 0, result.stdout
+    assert "FIX record(s)" in result.stdout
+
+
+def test_report_verdict_no_match_is_clean(tmp_path: Path, monkeypatch) -> None:
+    _make_fixture(tmp_path, clean=False)
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["monitor", "--apply"])
+    result = runner.invoke(app, ["report", "--verdict", "ESCALATE"])
+    assert result.exit_code == 0, result.stdout
+    assert "no ESCALATE records" in result.stdout
+
+
+def test_report_verdict_json_emits_full_records(tmp_path: Path, monkeypatch) -> None:
+    _make_fixture(tmp_path, clean=False)
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, ["monitor", "--apply"])
+    result = runner.invoke(app, ["report", "--verdict", "FIX", "--json"])
+    assert result.exit_code == 0, result.stdout
+    records = json.loads(result.stdout)
+    assert records and records[0]["verdict"] == "FIX"
+    assert records[0]["doc_id"] == "guide"
+
+
+def test_report_bad_verdict_clean_error(tmp_path: Path, monkeypatch) -> None:
+    _make_fixture(tmp_path, clean=True)
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["report", "--verdict", "BOGUS"])
+    assert result.exit_code == 1
+    assert "unknown verdict" in result.output
+    assert "Traceback" not in result.output
+
+
 def test_schema_prints_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["schema"])

@@ -1,7 +1,7 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 85a1f1925416f0ad
+  fingerprint: 9f74b5914723b334
   schema_version: 1.0.0
 ---
 # code-doc-monitor — remediation (engineering reference)
@@ -63,7 +63,7 @@ cdm:
 | _Templates | variable | _Templates = Mapping[str, RegionTemplate] \| None |
 | _UrllibClient | class | class _UrllibClient |
 | _UrllibClient.post | method | def post(self, url: str, *, data: bytes, headers: dict[str, str]) -> None |
-| __all__ | variable | __all__ = ['append', 'read_all', 'summarize'] |
+| __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
@@ -77,7 +77,7 @@ cdm:
 | append | function | def append(path: Path, record: ReviewRecord) -> None |
 | apply_fix | function | def apply_fix(doc_path: Path, fix: ProposedFixLike) -> bool |
 | build_prompt | function | def build_prompt(req: FixRequest) -> str |
-| make_backend | function | def make_backend(cfg: BackendConfig) -> Backend |
+| make_backend | function | def make_backend(cfg: BackendConfig, agent: AgentConfig \| None = None) -> Backend |
 | make_sink | function | def make_sink(cfg: CentralConfig) -> Sink |
 | new_record_id | function | def new_record_id(doc_id: str, surface_hash: str, detected_at: str) -> str |
 | parse_backend_json | function | def parse_backend_json(text: str) -> BackendResult |
@@ -85,5 +85,6 @@ cdm:
 | regenerate_regions | function | def regenerate_regions(doc_path: Path, surface: DocumentSurface, templates: _Templates = None) -> bool |
 | render_corrected | function | def render_corrected(doc_text: str, surface: DocumentSurface, templates: _Templates = None) -> str |
 | review_record_schema | function | def review_record_schema() -> dict |
+| select_by_verdict | function | def select_by_verdict(records: list[ReviewRecord], verdict: Verdict) -> list[ReviewRecord] |
 | summarize | function | def summarize(records: list[ReviewRecord]) -> dict |
 <!-- CDM:END symbols -->

@@ -15,9 +15,9 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .errors import SchemaError
-from .schema import ReviewRecord
+from .schema import ReviewRecord, Verdict
 
-__all__ = ["append", "read_all", "summarize"]
+__all__ = ["append", "read_all", "summarize", "select_by_verdict"]
 
 
 def append(path: Path, record: ReviewRecord) -> None:
@@ -70,3 +70,17 @@ def summarize(records: list[ReviewRecord]) -> dict:
         "by_audience": _counts([r.audience.value for r in records]),
         "by_doc_id": _counts([r.doc_id for r in records]),
     }
+
+
+def select_by_verdict(
+    records: list[ReviewRecord], verdict: Verdict
+) -> list[ReviewRecord]:
+    """Return the records with ``verdict``, preserving the log's append order.
+
+    Aggregate counts (:func:`summarize`) tell a reviewer *how many* drifts a
+    verdict covers; this surfaces *which* records they are — the audit detail
+    needed to act on, e.g., the ``ESCALATE`` entries that need a human (K5).
+    Pure and order-stable: the log is appended chronologically, so the returned
+    slice is oldest-first and deterministic (K10).
+    """
+    return [r for r in records if r.verdict == verdict]

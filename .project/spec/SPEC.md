@@ -48,7 +48,11 @@ central dashboard) can audit what changed and why.
   content / patch), `INVALIDATE` (with a reason), or `ESCALATE` (needs a human).
 * **Backend** — the thing that produces a verdict. Pluggable: `mock` (default,
   deterministic, offline), `claude-code` (headless `claude -p` subprocess),
-  `api` (Anthropic API). Selected entirely by config.
+  `api` (Anthropic API), and `agent` (a deterministic **LangGraph** workflow
+  whose prompt is composed from separated Markdown artifacts and whose runtime
+  is itself chosen by an `agent:` config block — the headless Claude Code CLI by
+  default, or an API key, or a local model endpoint). Selected entirely by
+  config; the `agent` backend is an opt-in `[agent]` extra (K0).
 * **Review record** — the public, versioned payload for one handled drift:
   the drift, the cause, the proposed fix, the verdict, an audience+config
   snapshot, hashes, and timestamps. Appended to a local JSONL review log and
@@ -74,8 +78,12 @@ central dashboard) can audit what changed and why.
 7. **Public schema** — review records serialize to a versioned, documented JSON
    schema; the schema is exportable (`cdmon schema`) and records are emittable to
    a central system (HTTP sink, or file sink for offline/tests).
-8. **Backend-agnostic** — switching `claude-code` ↔ `api` ↔ `mock` is a config
-   edit, no code change.
+8. **Backend-agnostic** — switching `claude-code` ↔ `api` ↔ `mock` ↔ `agent` is
+   a config edit, no code change. The `agent` backend runs a deterministic
+   LangGraph workflow built from separated `AGENT.md` / `PROTOCOL.md` /
+   `TOOL.md` / `PERSONA.md` artifacts (composed only when needed), and its model
+   runtime is a second config-only choice (`agent.driver`: the Claude Code CLI
+   headless, an Anthropic API key, or a local OpenAI-compatible endpoint).
 9. **Offline-testable** — the default backend and central sink are offline; the
    whole pipeline (incl. `monitor`) runs in CI with zero network and no LLM.
 10. **Dogfooding** — code-doc-monitor ships a config that maps *its own* source
@@ -89,7 +97,7 @@ central dashboard) can audit what changed and why.
 | `cdmon surface [--config ...]` | dump the extracted per-document surface (debug) |
 | `cdmon check [--config ...]` | detect drift; exit non-zero on drift (warn) |
 | `cdmon monitor [--config ...] [--apply/--no-apply]` | detect → backend verdict → record → (apply) → re-check |
-| `cdmon report [--config ...]` | summarize the review log |
+| `cdmon report [--config ...] [--verdict V] [--json]` | summarize the review log; `--verdict` lists the individual records of that verdict (e.g. the `ESCALATE`s needing a human) |
 | `cdmon schema [--out FILE]` | emit the public review-record JSON schema |
 
 ## Acceptance (system level, all offline)

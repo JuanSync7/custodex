@@ -13,7 +13,12 @@ import pytest
 
 from code_doc_monitor.config import Audience
 from code_doc_monitor.errors import SchemaError
-from code_doc_monitor.reviewlog import append, read_all, summarize
+from code_doc_monitor.reviewlog import (
+    append,
+    read_all,
+    select_by_verdict,
+    summarize,
+)
 from code_doc_monitor.schema import ProposedFix, ReviewRecord, Verdict
 
 
@@ -109,6 +114,23 @@ def test_summarize_empty_is_zeroed() -> None:
     assert summary["by_verdict"] == {}
     assert summary["by_audience"] == {}
     assert summary["by_doc_id"] == {}
+
+
+def test_select_by_verdict_filters_and_preserves_order() -> None:
+    records = [
+        _record("r1", "user-guide", Audience.USER_GUIDE, Verdict.FIX),
+        _record("r2", "eng-guide", Audience.ENG_GUIDE, Verdict.ESCALATE),
+        _record("r3", "user-guide", Audience.USER_GUIDE, Verdict.INVALIDATE),
+        _record("r4", "eng-guide", Audience.ENG_GUIDE, Verdict.ESCALATE),
+    ]
+    escalations = select_by_verdict(records, Verdict.ESCALATE)
+    # Only ESCALATE records, in append (chronological) order.
+    assert [r.record_id for r in escalations] == ["r2", "r4"]
+
+
+def test_select_by_verdict_no_match_is_empty() -> None:
+    records = [_record("r1", verdict=Verdict.FIX)]
+    assert select_by_verdict(records, Verdict.ESCALATE) == []
 
 
 def test_summarize_ordering_is_deterministic() -> None:

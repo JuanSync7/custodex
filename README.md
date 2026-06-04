@@ -43,7 +43,7 @@ cdmon surface              # dump the extracted per-document surface (debug)
 cdmon lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter
 cdmon check                # detect *content* drift; non-zero exit on drift (the warning)
 cdmon monitor --apply      # detect → LLM verdict → record → apply fix → re-check
-cdmon report               # summarize the review log
+cdmon report               # summarize the review log (--verdict ESCALATE lists those records)
 cdmon schema               # emit the public ReviewRecord JSON schema
 ```
 
@@ -67,9 +67,43 @@ The LLM backend is chosen entirely by config:
 - `mock` — deterministic, offline; the default, and what the test suite uses.
 - `claude-code` — runs a headless `claude -p` session as a subprocess.
 - `api` — calls the Anthropic Messages API.
+- `agent` — a deterministic **LangGraph** remediation workflow (see below).
 
 Switching between them is a config edit, never a code change. The engine is
-backend-agnostic: all three return the same `BackendResult` JSON contract.
+backend-agnostic: all four return the same `BackendResult` JSON contract.
+
+## The LangGraph remediation agent
+
+`backend.kind: agent` runs remediation as a deterministic LangGraph
+`StateGraph` (`select → compose → invoke → parse`, with a bounded re-ask loop)
+instead of a single monolithic prompt. Its prompt is **composed from separated
+Markdown artifacts**, loaded *only when a node needs them*:
+
+- [`AGENT.md`](code_doc_monitor/agent/prompts/AGENT.md) — the recipe + audience-aware judgement rules,
+- [`PROTOCOL.md`](code_doc_monitor/agent/prompts/PROTOCOL.md) — the strict JSON verdict contract,
+- [`TOOL.md`](code_doc_monitor/agent/prompts/TOOL.md) — the two fix shapes (loaded only for a healable drift),
+- [`PERSONA.md`](code_doc_monitor/agent/prompts/PERSONA.md) — voice (loaded only when `use_persona`).
+
+The agent's **runtime** is a second config-only choice — *the one knob the brief
+asked for*: the agent uses the headless Claude Code CLI by default, and can be
+pointed at an Anthropic API key or a local model endpoint with no code change:
+
+```yaml
+backend:
+  kind: agent
+agent:
+  driver: claude-code            # headless `claude -p` (default)
+  # driver: api                  # Anthropic API; key from $api_key_env
+  # driver: local                # any OpenAI-compatible endpoint
+  #   base_url: http://localhost:11434/v1
+  model: claude-sonnet-4
+  use_persona: true
+  max_parse_retries: 1
+```
+
+The graph is fully deterministic (K10); only the injected runtime *driver*
+touches a process or socket, so the whole workflow runs offline in tests (K4).
+The agent ships behind an opt-in extra: `pip install -e '.[agent]'` (or `[dev]`).
 
 ## Public schema
 
@@ -88,23 +122,26 @@ under `docs/api/` (with `schema.py` as a shared, multiply-referenced file). Run
 
 ## Status
 
-**Complete.** All slices CDM-00…CDM-08 are done: config + audience-aware
+**Complete.** All slices CDM-00…CDM-10 are done: config + audience-aware
 extraction + drift detection + heal + public schema + review log + central sinks
-+ pluggable backends (mock / claude-code / api) + the monitor orchestration and
-`cdmon` CLI + the Document Layout Standard (`lint` / `new-doc`), with system/e2e
-tests and dogfooding. The suite is offline (mock backend, no network), ruff +
-mypy clean, coverage ≥ 90% (224 tests). See `.project/`
-for the spec, the binding constraints (K0–K10), the architecture, and the
-slice-by-slice status board.
++ pluggable backends (mock / claude-code / api / **LangGraph agent**) + the
+monitor orchestration and `cdmon` CLI + the Document Layout Standard (`lint` /
+`new-doc`), with system/e2e tests and dogfooding. The suite is offline (mock
+backend, no network), ruff + mypy clean, coverage ≥ 90% (322 tests). See
+`.project/` for the spec, the binding constraints (K0–K10), the architecture, and
+the slice-by-slice status board.
 
 ## Development
 
 ```bash
-python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'  # [dev] includes langgraph
 .venv/bin/ruff format --check . && .venv/bin/ruff check .
 .venv/bin/mypy code_doc_monitor
 .venv/bin/pytest -q --cov=code_doc_monitor --cov-branch
 ```
+
+The LangGraph agent backend is an opt-in extra; for a runtime-only install use
+`pip install -e '.[agent]'` (the core engine and its `mock` default need neither).
 
 ### Testing against a real LLM (CI/CD)
 
