@@ -124,6 +124,21 @@ def test_run_apply_fixes_and_records(tmp_path: Path) -> None:
     assert rec.config_snapshot["backend"] == "mock"
 
 
+def test_run_attaches_ticket_to_each_record(tmp_path: Path) -> None:
+    """T-01: every record carries a DriftTicket with a CDM-<id> ticket_id."""
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    monitor = Monitor(config, cfg_dir, now=_now, sink=NullSink())
+
+    result = monitor.run(apply=False)
+
+    assert result.records
+    for rec in result.records:
+        assert rec.ticket is not None
+        assert rec.ticket.ticket_id == f"CDM-{rec.record_id}"
+        assert rec.ticket.verdict == rec.verdict.value
+        assert rec.ticket.doc_id == rec.doc_id
+
+
 def test_record_id_deterministic_across_runs(tmp_path: Path) -> None:
     config, cfg_dir, _, _ = _make_fixture(tmp_path)
     log_path = cfg_dir / ".cdmon" / "review-log.jsonl"
@@ -259,8 +274,246 @@ def test_custom_log_path(tmp_path: Path) -> None:
     assert read_all(custom)
 
 
+def test_source_sha_defaults_none_on_every_record(tmp_path: Path) -> None:
+    """C-05: with no source_sha passed, every record's source_sha is None (K6)."""
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    result = Monitor(config, cfg_dir, now=_now, sink=NullSink()).run(apply=False)
+    assert result.records
+    assert all(rec.source_sha is None for rec in result.records)
+
+
+def test_source_sha_stamped_on_every_record(tmp_path: Path) -> None:
+    """C-05: a passed source_sha is stamped onto every emitted record."""
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    monitor = Monitor(config, cfg_dir, now=_now, sink=NullSink(), source_sha="deadbeef")
+    result = monitor.run(apply=True)
+    assert result.records
+    assert all(rec.source_sha == "deadbeef" for rec in result.records)
+
+
 @pytest.fixture(autouse=True)
 def _no_network() -> None:
     # Offline guarantee is structural (MockBackend default); this fixture is a
     # readable marker that these tests never touch the network (K4).
     return None
+
+
+# ---------------------------------------------------------------------------
+# D-04 — opt-in exemplar retrieval (default OFF = byte-identical to today)
+# ---------------------------------------------------------------------------
+class _RecordingBackend:
+    """Wraps MockBackend, capturing the FixRequest it was handed (for exemplars)."""
+
+    def __init__(self) -> None:
+        self._inner = MockBackend()
+        self.seen: list = []
+
+    def propose(self, req):
+        self.seen.append(req)
+        return self._inner.propose(req)
+
+
+def _seed_resolved_history(cfg_dir: Path, *, doc_id: str, surface_hash: str) -> None:
+    """Append a RESOLVED past record (same doc + surface) so retrieval finds it."""
+    from code_doc_monitor.reviewlog import (
+        DEFAULT_RESOLUTIONS_PATH,
+        append,
+        append_resolution,
+    )
+    from code_doc_monitor.schema import (
+        ProposedFix,
+        Resolution,
+        ResolutionRecord,
+        ReviewRecord,
+    )
+
+    past = ReviewRecord(
+        record_id="past1",
+        doc_id=doc_id,
+        doc_path=f"{doc_id}.md",
+        audience=Audience.ENG_GUIDE,
+        drift_kind="REGION",
+        drift_detail="region 'symbols' is out of date",
+        cause="surface moved",
+        verdict=Verdict.FIX,
+        fix=ProposedFix(
+            region_id="symbols",
+            new_region_body="| past |",
+            new_doc_text=None,
+            rationale="regenerated",
+        ),
+        surface_hash=surface_hash,
+        backend_kind="mock",
+        detected_at="2026-05-01T00:00:00Z",
+        resolved_at="2026-05-01T00:00:01Z",
+        config_snapshot={},
+    )
+    append(cfg_dir / ".cdmon" / "review-log.jsonl", past)
+    append_resolution(
+        cfg_dir / DEFAULT_RESOLUTIONS_PATH,
+        ResolutionRecord(
+            record_id="past1",
+            resolution=Resolution.OVERRIDDEN,
+            resolved_text="| the human body |",
+            resolved_at="2026-05-02T00:00:00Z",
+        ),
+    )
+
+
+def test_default_off_no_exemplars_and_no_resolution_read(tmp_path: Path) -> None:
+    # Even with a seeded resolved history, default use_exemplars=False attaches NO
+    # exemplars (byte-identical to pre-D-04 behavior).
+    config, cfg_dir, _, spec = _make_fixture(tmp_path)
+    surface = build_document_surface(spec, cfg_dir)
+    _seed_resolved_history(cfg_dir, doc_id="guide", surface_hash=surface.surface_hash())
+    backend = _RecordingBackend()
+    Monitor(config, cfg_dir, now=_now, sink=NullSink(), backend=backend).run(
+        apply=False
+    )
+    assert backend.seen
+    assert all(req.exemplars == () for req in backend.seen)
+
+
+def test_use_exemplars_attaches_ranked_exemplars(tmp_path: Path) -> None:
+    config, cfg_dir, _, spec = _make_fixture(tmp_path)
+    surface = build_document_surface(spec, cfg_dir)
+    _seed_resolved_history(cfg_dir, doc_id="guide", surface_hash=surface.surface_hash())
+    backend = _RecordingBackend()
+    Monitor(
+        config,
+        cfg_dir,
+        now=_now,
+        sink=NullSink(),
+        backend=backend,
+        use_exemplars=True,
+    ).run(apply=False)
+    # The seeded resolved record (same doc + surface_hash) is retrieved as an
+    # exemplar on the FixRequest handed to the backend.
+    seen_with_ex = [req for req in backend.seen if req.exemplars]
+    assert seen_with_ex
+    ex = seen_with_ex[0].exemplars[0]
+    assert ex.record.record_id == "past1"
+    assert ex.resolution.resolved_text == "| the human body |"
+
+
+def test_use_exemplars_empty_history_attaches_nothing(tmp_path: Path) -> None:
+    # use_exemplars=True but NO resolved history -> no exemplars (graceful).
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    backend = _RecordingBackend()
+    Monitor(
+        config,
+        cfg_dir,
+        now=_now,
+        sink=NullSink(),
+        backend=backend,
+        use_exemplars=True,
+    ).run(apply=False)
+    assert backend.seen
+    assert all(req.exemplars == () for req in backend.seen)
+
+
+# ---------------------------------------------------------------------------
+# D-06 — opt-in promoted rules (default () = byte-identical; matched = 0 calls)
+# ---------------------------------------------------------------------------
+class _SpyBackend:
+    """Counts `propose` calls; a matched-rule drift must NEVER reach it (D-06)."""
+
+    def __init__(self) -> None:
+        self._inner = MockBackend()
+        self.calls = 0
+
+    def propose(self, req):
+        self.calls += 1
+        return self._inner.propose(req)
+
+
+def test_matched_rule_resolves_with_zero_backend_calls(tmp_path: Path) -> None:
+    from code_doc_monitor.promotion import PromotionRule
+
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    log_path = cfg_dir / ".cdmon" / "review-log.jsonl"
+    spy = _SpyBackend()
+    # The fixture raises a single REGION drift for doc 'guide' (eng-guide).
+    rule = PromotionRule(
+        doc_id="guide",
+        drift_kind=DriftKind.REGION.value,
+        audience=Audience.ENG_GUIDE,
+        verdict=Verdict.INVALIDATE,
+    )
+    result = Monitor(
+        config, cfg_dir, now=_now, sink=NullSink(), backend=spy, rules=(rule,)
+    ).run(apply=True)
+
+    # The validable goal: the rule resolved the drift with ZERO backend calls.
+    assert spy.calls == 0
+    assert len(result.handled) == 1
+    assert result.handled[0].result.verdict is Verdict.INVALIDATE
+    assert result.handled[0].result.fix is None
+    assert result.handled[0].applied is False  # INVALIDATE never applies a fix
+
+    # Recorded for human audit (K5) with the rule verdict + a rule-sourced marker.
+    records = read_all(log_path)
+    assert len(records) == 1
+    assert records[0].verdict is Verdict.INVALIDATE
+    assert records[0].config_snapshot.get("resolved_by") == "rule"
+    assert records[0].cause.lower().startswith("promoted rule")
+
+
+def test_nonmatching_drift_still_hits_backend(tmp_path: Path) -> None:
+    from code_doc_monitor.promotion import PromotionRule
+
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    spy = _SpyBackend()
+    # A rule for a DIFFERENT shape -> the real drift does not match it.
+    rule = PromotionRule(
+        doc_id="other-doc",
+        drift_kind=DriftKind.HASH.value,
+        audience=Audience.USER_GUIDE,
+        verdict=Verdict.INVALIDATE,
+    )
+    Monitor(config, cfg_dir, now=_now, sink=NullSink(), backend=spy, rules=(rule,)).run(
+        apply=False
+    )
+
+    assert spy.calls == 1  # the non-matching drift went to the backend as usual
+
+
+def test_default_no_rules_calls_backend_for_everything(tmp_path: Path) -> None:
+    config, cfg_dir, _, _ = _make_fixture(tmp_path)
+    spy = _SpyBackend()
+    # Default rules=() -> additive: every drift still goes to the backend.
+    Monitor(config, cfg_dir, now=_now, sink=NullSink(), backend=spy).run(apply=False)
+    assert spy.calls == 1
+
+
+# --------------------------------------------------------------------------- #
+# P-02: a HASH record carries which surface tier(s) moved (drifted_tiers)       #
+# --------------------------------------------------------------------------- #
+def test_record_carries_drifted_tiers_for_body_change(tmp_path: Path) -> None:
+    """A body-only change (flag ON) records drift_kind HASH with tiers ('body',)."""
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    spec = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols",),
+    )
+    config = MonitorConfig(root=".", documents=(spec,), fingerprint_body_tier=True)
+    # Scaffold a fully-synced doc (composite + per-tier digests stamped, flag ON).
+    from code_doc_monitor.layout import scaffold_doc
+
+    surface = build_document_surface(spec, tmp_path)
+    (tmp_path / "guide.md").write_text(
+        scaffold_doc(spec, surface, include_body=True), encoding="utf-8"
+    )
+    assert Monitor(config, tmp_path, now=_now, sink=NullSink()).check().ok
+
+    # A pure body change to a public function: signature/docstring unchanged.
+    (tmp_path / "code.py").write_text(
+        CODE.replace("return x * 2", "return x * 3"), encoding="utf-8"
+    )
+    result = Monitor(config, tmp_path, now=_now, sink=NullSink()).run(apply=False)
+    hash_recs = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
+    assert hash_recs, "expected a HASH record for the body-only change"
+    assert hash_recs[0].drifted_tiers == ("body",)

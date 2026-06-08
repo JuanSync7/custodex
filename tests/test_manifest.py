@@ -12,13 +12,22 @@ from pathlib import Path
 import pytest
 
 from code_doc_monitor.errors import DriftError
+from code_doc_monitor.extract import SurfaceFingerprint
 from code_doc_monitor.manifest import (
+    Doc,
     parse_doc,
+    parse_text,
+    region_body_hash,
+    region_is_locked,
     regions,
     render_doc,
     set_fingerprint,
+    set_fingerprint_tiers,
     set_region,
+    set_region_hash,
     stored_fingerprint,
+    stored_fingerprint_tiers,
+    stored_region_hash,
 )
 
 WITH_FM = """\
@@ -202,3 +211,120 @@ def test_set_region_end_without_begin_raises() -> None:
 def test_set_region_mismatched_end_raises() -> None:
     with pytest.raises(DriftError, match="does not match"):
         set_region("<!-- CDM:BEGIN a -->\n<!-- CDM:END b -->\n", "a", "x")
+
+
+# --- B-03: per-region content hash (the lock) -------------------------------
+
+
+def test_region_body_hash_is_deterministic_and_short() -> None:
+    h = region_body_hash("some body\nlines")
+    assert h == region_body_hash("some body\nlines")
+    assert len(h) == 16
+    assert all(c in "0123456789abcdef" for c in h)
+
+
+def test_region_body_hash_normalizes_line_endings() -> None:
+    """CRLF-normalized like layout.md_source_hash, for portability (K10)."""
+    assert region_body_hash("a\r\nb") == region_body_hash("a\nb")
+    assert region_body_hash("a\rb") == region_body_hash("a\nb")
+    # different content -> different hash
+    assert region_body_hash("a\nb") != region_body_hash("a\nc")
+
+
+def test_region_body_hash_matches_layout_md_source_hash() -> None:
+    """Mirrors the layout standard's md_source_hash algorithm exactly."""
+    from code_doc_monitor.layout import md_source_hash
+
+    assert region_body_hash("x\r\ny\n") == md_source_hash("x\r\ny\n")
+
+
+def test_set_and_stored_region_hash_round_trip(tmp_path: Path) -> None:
+    meta = set_region_hash({}, "symbols", "deadbeef00112233")
+    doc = parse_text(render_doc(meta, "# body\n"))
+    assert stored_region_hash(doc, "symbols") == "deadbeef00112233"
+    assert stored_region_hash(doc, "absent") is None
+
+
+def test_stored_region_hash_absent_returns_none(tmp_path: Path) -> None:
+    doc = parse_doc(_write(tmp_path, WITH_FM))
+    assert stored_region_hash(doc, "symbols") is None
+
+
+def test_set_region_hash_is_additive_under_cdm() -> None:
+    """region_hashes lives under cdm and preserves siblings (fingerprint etc.)."""
+    meta = set_fingerprint({"title": "X"}, "fp123")
+    meta = set_region_hash(meta, "a", "h_a")
+    meta = set_region_hash(meta, "b", "h_b")
+    assert meta["cdm"]["fingerprint"] == "fp123"
+    assert meta["title"] == "X"
+    assert meta["cdm"]["region_hashes"] == {"a": "h_a", "b": "h_b"}
+
+
+def test_set_fingerprint_preserves_region_hashes() -> None:
+    """The whole cdm map (incl. region_hashes) survives a fingerprint heal."""
+    meta = set_region_hash({}, "symbols", "hh")
+    meta = set_fingerprint(meta, "newfp")
+    assert meta["cdm"]["fingerprint"] == "newfp"
+    assert meta["cdm"]["region_hashes"] == {"symbols": "hh"}
+
+
+def test_region_is_locked_predicate() -> None:
+    body = "the engine wrote this\n"
+    meta = set_region_hash({}, "symbols", region_body_hash(body))
+    doc = parse_text(render_doc(meta, "# x\n"))
+    # body unchanged from the stamp -> NOT locked.
+    assert region_is_locked(doc, "symbols", body) is False
+    # body diverged (a human edited it) -> LOCKED.
+    assert region_is_locked(doc, "symbols", "a human changed it\n") is True
+    # no stored hash at all -> never locked.
+    doc2 = parse_text("# x\n")
+    assert region_is_locked(doc2, "symbols", body) is False
+
+
+# --------------------------------------------------------------------------- #
+# P-02: tiered fingerprint front-matter accessors (additive)                   #
+# --------------------------------------------------------------------------- #
+def _doc_with_meta(meta: dict) -> Doc:
+    return Doc(path=Path("d.md"), meta=meta, body="", raw="")
+
+
+def test_fingerprint_tiers_round_trip() -> None:
+    fp = SurfaceFingerprint(
+        signature="aaaaaaaaaaaaaaaa",
+        docstring="bbbbbbbbbbbbbbbb",
+        body="cccccccccccccccc",
+        composite="dddddddddddddddd",
+    )
+    meta = set_fingerprint_tiers({}, fp)
+    assert stored_fingerprint_tiers(_doc_with_meta(meta)) == fp
+
+
+def test_fingerprint_tiers_absent_returns_none() -> None:
+    assert stored_fingerprint_tiers(parse_text("# x\n")) is None
+    # An old doc with a composite fingerprint but no tiers block -> None.
+    assert (
+        stored_fingerprint_tiers(_doc_with_meta({"cdm": {"fingerprint": "x"}})) is None
+    )
+
+
+def test_fingerprint_tiers_none_subtiers_round_trip() -> None:
+    """A user-guide fingerprint (docstring/body None) round-trips faithfully."""
+    fp = SurfaceFingerprint(
+        signature="aaaaaaaaaaaaaaaa",
+        docstring=None,
+        body=None,
+        composite="aaaaaaaaaaaaaaaa",
+    )
+    meta = set_fingerprint_tiers({}, fp)
+    assert stored_fingerprint_tiers(_doc_with_meta(meta)) == fp
+
+
+def test_set_fingerprint_tiers_is_additive() -> None:
+    """Stamping tiers preserves the composite fingerprint and region hashes."""
+    fp = SurfaceFingerprint(signature="s", docstring="d", body="b", composite="comp")
+    meta = {"cdm": {"fingerprint": "comp", "region_hashes": {"symbols": "rh"}}}
+    out = set_fingerprint_tiers(meta, fp)
+    assert stored_fingerprint(_doc_with_meta(out)) == "comp"
+    assert stored_region_hash(_doc_with_meta(out), "symbols") == "rh"
+    assert stored_fingerprint_tiers(_doc_with_meta(out)) == fp
+    assert meta["cdm"] == {"fingerprint": "comp", "region_hashes": {"symbols": "rh"}}
