@@ -23,16 +23,18 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .blocks import expected_region
-from .config import DocumentSpec, MonitorConfig
+from .blocks import expected_region, known_region_ids
+from .config import DocumentSpec, MonitorConfig, RegionMode
 from .errors import DriftError
 from .extract import DocumentSurface
 from .manifest import (
     Doc,
     parse_doc,
+    region_is_locked,
     regions,
     render_doc,
     set_fingerprint,
+    set_fingerprint_tiers,
     stamp_standard_meta,
 )
 
@@ -40,11 +42,14 @@ __all__ = [
     "LAYOUT_VERSION",
     "LayoutCode",
     "LayoutIssue",
+    "RegionState",
     "md_source_hash",
     "embedded_md_hash",
     "lint_doc",
     "lint_html_twin",
     "lint_config",
+    "region_states",
+    "config_region_states",
     "scaffold_doc",
     "stamp_doc_meta",
     "html_twin_path",
@@ -353,18 +358,119 @@ def lint_config(config: MonitorConfig, config_dir: Path) -> list[LayoutIssue]:
     return issues
 
 
-def scaffold_doc(spec: DocumentSpec, surface: DocumentSurface) -> str:
+class RegionState(BaseModel):
+    """The authority STATE of one managed region (B-05, data not a gate).
+
+    A read-only surface over a region's declared :class:`RegionMode` plus the
+    lock/advisory state derived from the per-region content hash (B-03). It is
+    NOT a lint *issue*: the modes map is already validated at config-load, so
+    this re-reports state and never re-validates. ``cdmon lint --modes`` prints
+    these; lint's structural pass/fail is unaffected.
+
+    * ``mode`` — ``spec.mode_for(region_id)``.
+    * ``has_renderer`` — the engine can mechanically render this id (built-in or
+      a config template). A renderer-backed ``llm`` region behaves like
+      ``generated`` (B-04); a NO-renderer ``llm`` region is backend-authored prose
+      (B-06), while a no-renderer non-``llm`` region is unhealable.
+    * ``locked`` — an ``llm-seeded`` region a human has edited (the shared
+      :func:`region_is_locked` predicate diverges).
+    * ``advisory`` — the engine will NOT author this region: a ``human`` region,
+      or a locked ``llm-seeded`` one. Such a region's code drift is reported for
+      review, never auto-edited.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    doc_id: str
+    region_id: str
+    mode: RegionMode
+    has_renderer: bool
+    locked: bool
+    advisory: bool
+
+
+def region_states(
+    doc: Doc, spec: DocumentSpec, *, known: frozenset[str]
+) -> list[RegionState]:
+    """Per-region authority state for one parsed document (pure, B-05).
+
+    One :class:`RegionState` per region that is BOTH present in ``doc`` and
+    declared in ``spec.region_keys``, in ``region_keys`` order (deterministic,
+    K10). ``known`` is the set of region ids the engine can render — pass
+    :func:`code_doc_monitor.blocks.known_region_ids(config.region_templates)`.
+    Pure: uses ``spec.mode_for`` + the public manifest hash helpers, no I/O and
+    no re-validation (the modes map was validated at config-load).
+    """
+    present = regions(doc)
+    out: list[RegionState] = []
+    for region_id in spec.region_keys:
+        if region_id not in present:
+            continue
+        body = present[region_id]
+        mode = spec.mode_for(region_id)
+        locked = mode is RegionMode.LLM_SEEDED and region_is_locked(
+            doc, region_id, body
+        )
+        advisory = mode is RegionMode.HUMAN or locked
+        out.append(
+            RegionState(
+                doc_id=spec.id,
+                region_id=region_id,
+                mode=mode,
+                has_renderer=region_id in known,
+                locked=locked,
+                advisory=advisory,
+            )
+        )
+    return out
+
+
+def config_region_states(config: MonitorConfig, config_dir: Path) -> list[RegionState]:
+    """Collect :func:`region_states` across every existing document (B-05).
+
+    The file-reading driver behind ``cdmon lint --modes``: ``root = config_dir /
+    config.root``; a missing doc file or malformed structure is skipped (the same
+    policy as :func:`lint_config` — those are reported by the structural pass).
+    Returns one :class:`RegionState` per managed region, in document then
+    ``region_keys`` order.
+    """
+    root = config_dir / config.root
+    known = known_region_ids(config.region_templates)
+    out: list[RegionState] = []
+    for spec in config.documents:
+        doc_path = root / spec.path
+        if not doc_path.is_file():
+            continue
+        try:
+            doc = parse_doc(doc_path)
+            out.extend(region_states(doc, spec, known=known))
+        except DriftError:
+            continue  # malformed structure is reported by lint_doc
+    return out
+
+
+def scaffold_doc(
+    spec: DocumentSpec, surface: DocumentSurface, *, include_body: bool = False
+) -> str:
     """Render a fully-conformant, in-sync document for ``spec`` (pure).
 
     Front matter carries the standard's static keys (``schema_version`` /
     ``audience``) plus the current ``fingerprint``; the body has a title, a
     placeholder purpose blockquote, and each declared region filled from the
     code surface. The result passes both :func:`lint_doc` and ``cdmon check``.
+
+    ``include_body`` (P-01) must match ``MonitorConfig.fingerprint_body_tier`` so
+    the scaffolded fingerprint agrees with what ``cdmon check`` will compute —
+    default False keeps the stamp byte-identical to the pre-P1 contract.
     """
     meta = stamp_standard_meta(
         {}, schema_version=LAYOUT_VERSION, audience=spec.audience.value
     )
-    meta = set_fingerprint(meta, surface.surface_hash())
+    # One-shared-truth (P2): stamp both the composite identity and the per-tier
+    # digests from a single fingerprint() call (matches heal.py).
+    fp = surface.fingerprint(include_body=include_body)
+    meta = set_fingerprint(meta, fp.composite)
+    meta = set_fingerprint_tiers(meta, fp)
     parts = [
         f"# {spec.id}",
         "",

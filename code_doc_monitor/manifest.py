@@ -13,6 +13,7 @@ file I/O for :func:`parse_doc`; everything else is string-in/string-out.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from .errors import DriftError
+from .extract import SurfaceFingerprint
 
 __all__ = [
     "Doc",
@@ -29,9 +31,15 @@ __all__ = [
     "set_region",
     "stored_fingerprint",
     "set_fingerprint",
+    "stored_fingerprint_tiers",
+    "set_fingerprint_tiers",
     "stamp_standard_meta",
     "render_doc",
     "parse_text",
+    "region_body_hash",
+    "stored_region_hash",
+    "set_region_hash",
+    "region_is_locked",
 ]
 
 # A front-matter block is a leading "---\n ... \n---\n" fence.
@@ -204,6 +212,112 @@ def set_fingerprint(meta: dict[str, Any], value: str) -> dict[str, Any]:
     cdm["fingerprint"] = value
     out["cdm"] = cdm
     return out
+
+
+def stored_fingerprint_tiers(doc: Doc) -> SurfaceFingerprint | None:
+    """Return the per-tier fingerprint from ``cdm.fingerprint_tiers`` (P2), or None.
+
+    None when the block is absent — an OLD doc stamped before P2 carries only the
+    composite ``cdm.fingerprint``, so drift falls back to the composite-only
+    message. Absent ``docstring``/``body`` sub-keys decode to ``None`` (a
+    user-guide / flag-off surface omits them; the round-trip stays faithful).
+    """
+    cdm = doc.meta.get("cdm")
+    if not isinstance(cdm, dict):
+        return None
+    tiers = cdm.get("fingerprint_tiers")
+    if not isinstance(tiers, dict):
+        return None
+    signature = tiers.get("signature")
+    composite = tiers.get("composite")
+    if not isinstance(signature, str) or not isinstance(composite, str):
+        return None
+    docstring = tiers.get("docstring")
+    body = tiers.get("body")
+    return SurfaceFingerprint(
+        signature=signature,
+        docstring=docstring if isinstance(docstring, str) else None,
+        body=body if isinstance(body, str) else None,
+        composite=composite,
+    )
+
+
+def set_fingerprint_tiers(
+    meta: dict[str, Any], fp: SurfaceFingerprint
+) -> dict[str, Any]:
+    """Return a copy of ``meta`` with ``cdm.fingerprint_tiers`` set (P2, additive).
+
+    Additive to the ``cdm:`` mapping — every other key (the composite
+    ``fingerprint``, ``region_hashes``, …) is preserved. ``None`` sub-tiers are
+    omitted so the front matter stays compact; :func:`stored_fingerprint_tiers`
+    decodes a missing sub-key back to ``None``.
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    tiers: dict[str, str] = {"signature": fp.signature, "composite": fp.composite}
+    if fp.docstring is not None:
+        tiers["docstring"] = fp.docstring
+    if fp.body is not None:
+        tiers["body"] = fp.body
+    cdm["fingerprint_tiers"] = tiers
+    out["cdm"] = cdm
+    return out
+
+
+def region_body_hash(body: str) -> str:
+    """Deterministic sha256[:16] of a region body, CRLF-normalized (K10).
+
+    Mirrors :func:`code_doc_monitor.layout.md_source_hash` exactly (line endings
+    normalized to ``\\n``, first 16 hex chars of the digest) so a stamped
+    per-region hash is portable and stable across runs and platforms. This is
+    the basis of the B-03 lock: the engine stamps it when it authors a region,
+    and a human edit moves the body's hash away from the stored value.
+    """
+    normalized = body.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def stored_region_hash(doc: Doc, region_id: str) -> str | None:
+    """Return ``meta["cdm"]["region_hashes"][region_id]`` if present, else ``None``."""
+    cdm = doc.meta.get("cdm")
+    if isinstance(cdm, dict):
+        hashes = cdm.get("region_hashes")
+        if isinstance(hashes, dict):
+            value = hashes.get(region_id)
+            if isinstance(value, str):
+                return value
+    return None
+
+
+def set_region_hash(meta: dict[str, Any], region_id: str, value: str) -> dict[str, Any]:
+    """Return a copy of ``meta`` with ``cdm.region_hashes[region_id]`` set.
+
+    Additive to the ``cdm:`` mapping — every other key (including
+    ``fingerprint`` and sibling region hashes) is preserved, and because
+    :func:`set_fingerprint` copies the whole ``cdm`` map, a stamped region hash
+    survives a later fingerprint heal (B-03, zero blast radius).
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    hashes = dict(cdm.get("region_hashes") or {})
+    hashes[region_id] = value
+    cdm["region_hashes"] = hashes
+    out["cdm"] = cdm
+    return out
+
+
+def region_is_locked(doc: Doc, region_id: str, current_body: str) -> bool:
+    """The SHARED lock predicate consumed by drift + heal (CDM-07 one truth).
+
+    A region is *locked* iff it carries a stored region hash AND the current
+    body's hash differs from it — i.e. a human edited the body since the engine
+    last stamped it. With no stored hash a region is never locked (the engine
+    still owns it). drift and heal MUST agree by calling this one helper.
+    """
+    stored = stored_region_hash(doc, region_id)
+    if stored is None:
+        return False
+    return region_body_hash(current_body) != stored
 
 
 def stamp_standard_meta(

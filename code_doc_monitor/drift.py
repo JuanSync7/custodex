@@ -27,10 +27,17 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from .blocks import expected_region, known_region_ids
-from .config import Audience, MonitorConfig
+from .config import Audience, MonitorConfig, RegionMode, resolve_repo_root
 from .extract import build_document_surface
 from .index import render_index
-from .manifest import parse_doc, regions, stored_fingerprint
+from .manifest import (
+    parse_doc,
+    region_is_locked,
+    regions,
+    stored_fingerprint,
+    stored_fingerprint_tiers,
+    stored_region_hash,
+)
 
 __all__ = ["DriftKind", "Drift", "DriftReport", "detect"]
 
@@ -57,6 +64,10 @@ class Drift(BaseModel):
     healable: bool = True
     audience: Audience
     diff: str = ""
+    # P2: on a HASH drift, which surface tier(s) moved ("signature"/"docstring"/
+    # "body"). Empty when not applicable or unknowable (an OLD doc carrying only a
+    # composite fingerprint, with no stored per-tier digests to diff against).
+    drifted_tiers: tuple[str, ...] = ()
 
 
 class DriftReport(BaseModel):
@@ -99,10 +110,12 @@ def _short_diff(expected: str, actual: str, region_id: str) -> str:
 def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
     """Detect drift for every document in ``config`` (pure, K1).
 
-    ``root = config_dir / config.root``. Doc and code paths are resolved under
-    that root. Returns a :class:`DriftReport`; the file system is never mutated.
+    The repo root is ``resolve_repo_root(config_dir, config.root)`` (N-06: the
+    ONE shared formula = ``normpath(config_dir / root)``). Doc and code paths are
+    resolved under that root. Returns a :class:`DriftReport`; the file system is
+    never mutated.
     """
-    root = config_dir / config.root
+    root = resolve_repo_root(config_dir, config.root)
     templates = config.region_templates
     known = known_region_ids(templates)
     drifts: list[Drift] = []
@@ -127,18 +140,32 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
         doc = parse_doc(doc_path)
 
         stored = stored_fingerprint(doc)
-        current = surface.surface_hash()
+        current_fp = surface.fingerprint(include_body=config.fingerprint_body_tier)
+        current = current_fp.composite
         if stored != current:
+            # P2: when the doc carries stored per-tier digests, report WHICH tier
+            # moved; otherwise (an OLD doc with only the composite) fall back to the
+            # composite-only message with empty drifted_tiers.
+            stored_tiers = stored_fingerprint_tiers(doc)
+            drifted_tiers = (
+                current_fp.drifted_against(stored_tiers) if stored_tiers else ()
+            )
+            if drifted_tiers:
+                detail = (
+                    f"surface drifted in {', '.join(drifted_tiers)} tier(s); "
+                    f"fingerprint {stored!r} != current surface hash {current!r}"
+                )
+            else:
+                detail = f"fingerprint {stored!r} != current surface hash {current!r}"
             drifts.append(
                 Drift(
                     kind=DriftKind.HASH,
                     doc_id=spec.id,
                     doc_path=spec.path,
-                    detail=(
-                        f"fingerprint {stored!r} != current surface hash {current!r}"
-                    ),
+                    detail=detail,
                     healable=True,
                     audience=spec.audience,
+                    drifted_tiers=drifted_tiers,
                 )
             )
 
@@ -148,7 +175,47 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                 # Present in the doc but not declared by the spec — ignore it;
                 # the spec governs which regions this doc manages.
                 continue
+            mode = spec.mode_for(region_id)
+            # B-03: an `llm-seeded` region is engine-owned until a human edits it
+            # — a stored per-region hash diverges from the current body (the
+            # SHARED lock predicate). Once locked it is treated exactly like a
+            # `human` region (engine will not author it).
+            locked = mode is RegionMode.LLM_SEEDED and region_is_locked(
+                doc, region_id, current_body
+            )
+            is_human = mode is RegionMode.HUMAN
+            owned = is_human or locked  # engine will not author this body
             if region_id not in known:
+                if owned:
+                    # Intentionally human-/locked-owned region the engine cannot
+                    # render — not an error, and not auto-healable (B-02/B-03).
+                    continue
+                if mode is RegionMode.LLM:
+                    # B-06: a pure-`llm` region (no mechanical renderer) is
+                    # backend-AUTHORED prose, not unknown. Its body legitimately
+                    # differs from any render, so it is NOT graded against one.
+                    # It is re-authored only when the code surface it documents
+                    # MOVES (the whole-doc fingerprint diverges); while the
+                    # surface is unchanged the prose stands (no drift). When the
+                    # code moved, surface a healable REGION drift — the backend
+                    # re-authors it from the current surface (offline by default
+                    # via the deterministic MockBackend prose rule, K4/K10).
+                    if stored != current:
+                        drifts.append(
+                            Drift(
+                                kind=DriftKind.REGION,
+                                doc_id=spec.id,
+                                doc_path=spec.path,
+                                detail=(
+                                    f"llm-authored region {region_id!r} is stale; "
+                                    "backend will re-author from the current surface"
+                                ),
+                                region_id=region_id,
+                                healable=True,
+                                audience=spec.audience,
+                            )
+                        )
+                    continue
                 drifts.append(
                     Drift(
                         kind=DriftKind.UNHEALABLE,
@@ -171,14 +238,42 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
             else:
                 expected = expected_region(region_id, surface, template)
             if expected is not None and current_body != expected:
+                if owned:
+                    # B-02 retrofit (B-03): a human region's advisory PERSISTS
+                    # across a fingerprint heal until the body actually changes.
+                    # It carries a stored per-region hash stamped when last
+                    # reviewed; while the current body still matches that stamp
+                    # (the human has not acknowledged) the advisory keeps firing,
+                    # even though the fingerprint may now be in sync. With no
+                    # stamp yet, fall back to the code-moved (fingerprint) signal.
+                    human_advisory_pending = (
+                        is_human
+                        and stored_region_hash(doc, region_id) is not None
+                        and not region_is_locked(doc, region_id, current_body)
+                    )
+                    code_moved = stored != current
+                    if not code_moved and not human_advisory_pending:
+                        # A human/locked body differs from the generated render by
+                        # definition; with the code unchanged and the human still
+                        # at the reviewed body, this is NOT drift.
+                        continue
+                # A human-/locked-owned region whose code HAS moved is REPORTED for
+                # review but never auto-edited (healable=False) — the human owns it.
+                detail = (
+                    f"managed region {region_id!r} is human-owned (mode="
+                    f"{'llm-seeded, locked' if locked else 'human'}); "
+                    "engine will not auto-edit — review manually"
+                    if owned
+                    else f"managed region {region_id!r} is out of date"
+                )
                 drifts.append(
                     Drift(
                         kind=DriftKind.REGION,
                         doc_id=spec.id,
                         doc_path=spec.path,
-                        detail=f"managed region {region_id!r} is out of date",
+                        detail=detail,
                         region_id=region_id,
-                        healable=True,
+                        healable=not owned,
                         audience=spec.audience,
                         diff=_short_diff(expected, current_body, region_id),
                     )

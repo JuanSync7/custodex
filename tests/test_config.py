@@ -9,12 +9,17 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
+from code_doc_monitor import inventory
 from code_doc_monitor.config import (
     CONFIG_TEMPLATE,
     Audience,
     BackendConfig,
     CentralConfig,
+    CoverageConfig,
+    DocumentSpec,
     MonitorConfig,
+    RegionMode,
+    WaiverEntry,
     load_config,
     write_template,
 )
@@ -235,3 +240,206 @@ def test_template_is_documented_yaml() -> None:
     assert "#" in CONFIG_TEMPLATE
     assert "user-guide" in CONFIG_TEMPLATE
     assert "eng-guide" in CONFIG_TEMPLATE
+
+
+# --------------------------------------------------------------------------
+# A-04 — coverage: section + waivers
+# --------------------------------------------------------------------------
+
+
+def test_coverage_defaults_match_inventory() -> None:
+    # config inlines the scan-scope defaults (to avoid an import cycle); they
+    # must stay in lock-step with inventory's own defaults.
+    assert CoverageConfig().include == inventory.DEFAULT_INCLUDE
+    assert CoverageConfig().exclude == inventory.DEFAULT_EXCLUDE
+
+
+def test_coverage_defaults_when_section_absent(tmp_path: Path) -> None:
+    # An old config WITHOUT a coverage: block still loads (additive — K6).
+    cfg = load_config(_write_yaml(tmp_path, VALID_CONFIG))
+    assert cfg.coverage == CoverageConfig()
+    assert cfg.coverage.include == inventory.DEFAULT_INCLUDE
+    assert cfg.coverage.exclude == inventory.DEFAULT_EXCLUDE
+    assert cfg.coverage.waive == ()
+
+
+def test_coverage_section_round_trips_yaml(tmp_path: Path) -> None:
+    data = dict(
+        VALID_CONFIG,
+        coverage={
+            "include": ["src/**/*.py"],
+            "exclude": ["**/tests/**"],
+            "waive": [
+                {"path": "src/legacy/*.py", "reason": "deprecated, scheduled removal"},
+                {
+                    "path": "src/app.py",
+                    "symbol": "_internal",
+                    "reason": "internal helper",
+                },
+            ],
+        },
+    )
+    cfg = load_config(_write_yaml(tmp_path, data))
+    cov = cfg.coverage
+    assert cov.include == ("src/**/*.py",)
+    assert cov.exclude == ("**/tests/**",)
+    assert cov.waive == (
+        WaiverEntry(path="src/legacy/*.py", reason="deprecated, scheduled removal"),
+        WaiverEntry(path="src/app.py", symbol="_internal", reason="internal helper"),
+    )
+    # whole-file waiver has symbol=None
+    assert cov.waive[0].symbol is None
+
+
+def test_coverage_section_round_trips_json(tmp_path: Path) -> None:
+    data = dict(
+        VALID_CONFIG,
+        coverage={
+            "waive": [{"path": "x/*.py", "reason": "r"}],
+        },
+    )
+    cfg = load_config(_write_json(tmp_path, data))
+    assert cfg.coverage.waive == (WaiverEntry(path="x/*.py", reason="r"),)
+    # include/exclude fall back to the inventory defaults
+    assert cfg.coverage.include == inventory.DEFAULT_INCLUDE
+
+
+def test_waiver_missing_reason_raises_config_error(tmp_path: Path) -> None:
+    bad = dict(VALID_CONFIG, coverage={"waive": [{"path": "x/*.py"}]})
+    with pytest.raises(ConfigError):
+        load_config(_write_yaml(tmp_path, bad))
+
+
+def test_unknown_key_under_coverage_raises_config_error(tmp_path: Path) -> None:
+    bad = dict(VALID_CONFIG, coverage={"waive": [], "surprise": 1})
+    with pytest.raises(ConfigError):
+        load_config(_write_yaml(tmp_path, bad))
+
+
+def test_unknown_key_under_waiver_raises_config_error(tmp_path: Path) -> None:
+    bad = dict(
+        VALID_CONFIG,
+        coverage={"waive": [{"path": "x/*.py", "reason": "r", "wat": 1}]},
+    )
+    with pytest.raises(ConfigError):
+        load_config(_write_yaml(tmp_path, bad))
+
+
+def test_coverage_models_frozen() -> None:
+    w = WaiverEntry(path="x/*.py", reason="r")
+    with pytest.raises(ValidationError):
+        w.reason = "z"  # type: ignore[misc]
+    c = CoverageConfig()
+    with pytest.raises(ValidationError):
+        c.waive = ()  # type: ignore[misc]
+
+
+def test_template_round_trips_with_coverage_section(tmp_path: Path) -> None:
+    # The commented coverage: example in the template still round-trips, and the
+    # defaulted coverage config is present.
+    p = tmp_path / "cdmon.yaml"
+    write_template(p)
+    cfg = load_config(p)
+    assert isinstance(cfg.coverage, CoverageConfig)
+    assert "coverage:" in CONFIG_TEMPLATE
+    assert "waive:" in CONFIG_TEMPLATE
+
+
+# --------------------------------------------------------------------------
+# B-01 — region authority modes (schema + validation + accessor)
+# --------------------------------------------------------------------------
+
+
+def test_region_mode_enum_values() -> None:
+    # The four declared authority modes (str-valued for clean YAML/JSON).
+    assert RegionMode.GENERATED == "generated"
+    assert RegionMode.LLM == "llm"
+    assert RegionMode.HUMAN == "human"
+    assert RegionMode.LLM_SEEDED == "llm-seeded"
+    assert {m.value for m in RegionMode} == {
+        "generated",
+        "llm",
+        "human",
+        "llm-seeded",
+    }
+
+
+def test_region_modes_round_trips_yaml(tmp_path: Path) -> None:
+    data = json.loads(json.dumps(VALID_CONFIG))
+    data["documents"][0]["region_keys"] = ["symbols", "intro"]
+    data["documents"][0]["region_modes"] = {"symbols": "generated", "intro": "human"}
+    cfg = load_config(_write_yaml(tmp_path, data))
+    ug = cfg.documents[0]
+    assert ug.region_modes == {
+        "symbols": RegionMode.GENERATED,
+        "intro": RegionMode.HUMAN,
+    }
+
+
+def test_region_modes_round_trips_json(tmp_path: Path) -> None:
+    data = json.loads(json.dumps(VALID_CONFIG))
+    data["documents"][0]["region_keys"] = ["symbols", "notes"]
+    data["documents"][0]["region_modes"] = {"notes": "llm-seeded"}
+    cfg = load_config(_write_json(tmp_path, data))
+    assert cfg.documents[0].region_modes == {"notes": RegionMode.LLM_SEEDED}
+
+
+def test_region_modes_absent_defaults_to_generated(tmp_path: Path) -> None:
+    # An old config WITHOUT region_modes still loads (additive — K6).
+    cfg = load_config(_write_yaml(tmp_path, VALID_CONFIG))
+    ug = cfg.documents[0]
+    assert ug.region_modes == {}
+    # mode_for returns GENERATED for any region when unspecified.
+    assert ug.mode_for("symbols") is RegionMode.GENERATED
+    assert ug.mode_for("anything") is RegionMode.GENERATED
+
+
+def test_mode_for_returns_declared_mode() -> None:
+    spec = DocumentSpec(
+        id="d",
+        path="docs/d.md",
+        audience=Audience.ENG_GUIDE,
+        region_keys=("a", "b"),
+        region_modes={"a": RegionMode.HUMAN},
+    )
+    assert spec.mode_for("a") is RegionMode.HUMAN
+    # a declared region with no mode falls back to GENERATED.
+    assert spec.mode_for("b") is RegionMode.GENERATED
+
+
+def test_unknown_region_mode_raises_config_error(tmp_path: Path) -> None:
+    bad = json.loads(json.dumps(VALID_CONFIG))
+    bad["documents"][0]["region_modes"] = {"symbols": "telepathy"}
+    with pytest.raises(ConfigError):
+        load_config(_write_yaml(tmp_path, bad))
+
+
+def test_region_mode_for_undeclared_region_raises_config_error(
+    tmp_path: Path,
+) -> None:
+    # K8: a region_modes key naming a region not in region_keys is loud.
+    bad = json.loads(json.dumps(VALID_CONFIG))
+    bad["documents"][0]["region_keys"] = ["symbols"]
+    bad["documents"][0]["region_modes"] = {"ghost": "human"}
+    with pytest.raises(ConfigError):
+        load_config(_write_yaml(tmp_path, bad))
+
+
+def test_region_modes_frozen() -> None:
+    spec = DocumentSpec(
+        id="d",
+        path="docs/d.md",
+        audience=Audience.ENG_GUIDE,
+        region_keys=("a",),
+        region_modes={"a": RegionMode.HUMAN},
+    )
+    with pytest.raises(ValidationError):
+        spec.region_modes = {}  # type: ignore[misc]
+
+
+def test_template_round_trips_with_region_modes_example(tmp_path: Path) -> None:
+    p = tmp_path / "cdmon.yaml"
+    write_template(p)
+    cfg = load_config(p)
+    assert isinstance(cfg, MonitorConfig)
+    assert "region_modes:" in CONFIG_TEMPLATE

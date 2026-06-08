@@ -27,17 +27,26 @@ import json
 import os
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .blocks import expected_region, symbol_table
-from .config import AgentConfig, Audience, BackendConfig, RegionTemplate
+from .config import (
+    AgentConfig,
+    Audience,
+    BackendConfig,
+    ContextRef,
+    RegionMode,
+    RegionTemplate,
+)
 from .drift import Drift, DriftKind
-from .errors import BackendError
-from .extract import DocumentSurface
+from .errors import BackendError, ExtractionError
+from .extract import DocumentSurface, extract_file
 from .heal import render_corrected
 from .schema import ProposedFix, Verdict
+from .similar import Exemplar
 
 __all__ = [
     "FixRequest",
@@ -66,6 +75,34 @@ _PROMPT_TOKEN = "{prompt}"
 #: "this doesn't affect the public surface" judgement).
 _INVALIDATE_MARKERS = ("docstring", "comment", "private")
 
+#: The audience-aware clause appended to an LLM backend's prompt for a no-renderer
+#: `llm` REGION request (B-06). Real backends only; the mock authors prose
+#: deterministically in code and never sees this.
+_LLM_PROSE_CLAUSE = (
+    "This region is LLM-authored PROSE (it has no mechanical renderer): write a "
+    "clear, audience-appropriate prose description of the surface below; do NOT "
+    "emit a symbol table."
+)
+
+
+def _authored_prose(surface: DocumentSurface) -> str:
+    """A deterministic, idempotent prose body authored from ``surface`` (B-06).
+
+    The offline stand-in for "what an LLM would write" for a no-renderer ``llm``
+    region (mirrors how MockBackend rule 3 stands in for whole-doc prose). It is
+    a stable, audience-aware sentence enumerating the PUBLIC symbols the section
+    covers, derived purely from the code surface (K2) — same surface ⇒ identical
+    body (K10), so a re-author is a clean no-op (K7).
+    """
+    audience = surface.audience.value
+    names = sorted(s.name for s in surface.symbols if s.is_public)
+    covered = ", ".join(f"`{n}`" for n in names) if names else "no public symbols"
+    return (
+        f"This {audience} section is authored from the code surface "
+        "(the single source of truth) and is re-authored whenever that surface "
+        f"changes. It covers the public API: {covered}."
+    )
+
 
 class FixRequest(BaseModel):
     """Everything a backend needs to judge one drift (immutable)."""
@@ -83,6 +120,39 @@ class FixRequest(BaseModel):
     # so the engine renders it with all-docs context and passes it in). None
     # unless the drifted region is an index region.
     index_body: str | None = None
+    # B-06 (ADDITIVE, K6): the authority mode of the drifted region, so a backend
+    # knows a no-renderer `llm` REGION is PROSE it must author (vs a `generated`
+    # region it mechanically renders). Defaults to GENERATED ⇒ every pre-B-06
+    # FixRequest/test is unchanged; `monitor.run` sets it from `spec.mode_for(...)`.
+    region_mode: RegionMode = RegionMode.GENERATED
+    # D-04 few-shot exemplars (ADDITIVE, K6): the most-similar PAST RESOLVED drifts
+    # (from `similar.rank_similar`). Default empty ⇒ every pre-D-04 FixRequest and
+    # backend test is unchanged. Only the agent backend renders them; the mock and
+    # the single-shot `build_prompt` IGNORE them (the mock stays deterministic).
+    exemplars: tuple[Exemplar, ...] = ()
+    # N-05 (ADDITIVE, K6): writing-style guidance for AUTHORING a no-renderer
+    # `llm` region's prose — the four selected `templates/writing/` bodies,
+    # already composed by `docstyle.read_style_guidance`. Default None ⇒ the
+    # agent's composed prompt is BYTE-IDENTICAL to today (no style map => no
+    # change). Only the agent backend's `render_context` injects it; the mock
+    # (which authors prose deterministically in code) ignores it (K4/K10).
+    style_guidance: str | None = None
+    # E-02 (ADDITIVE, K6): the document's `context_refs` — "glance-through"
+    # sub-documents / sub-source-files the author should refer to (EDITOR §3).
+    # They are NOT coverage and NOT the documented surface; they are rendered as
+    # a reference block in the authoring prompt. `repo_root` is the repo-root
+    # path used to read source-file context refs for a deterministic public-symbol
+    # glance (K10). Default empty ⇒ every pre-E-02 FixRequest/test is unchanged:
+    # no context_refs ⇒ no reference block at all. The mock backend ignores them
+    # (it authors prose deterministically in code).
+    context_refs: tuple[ContextRef, ...] = ()
+    repo_root: str | None = None
+    # P-01 (ADDITIVE, K6): the opt-in body-AST fingerprint tier. The backend MUST
+    # stamp the whole-doc fix's fingerprint with the SAME tier `drift.detect` used
+    # (one shared truth), else a re-stamp the engine then re-detects diverges into
+    # a permanent HASH drift. Default False ⇒ every pre-P-01 FixRequest/test is
+    # byte-identical; `monitor.run` sets it from `config.fingerprint_body_tier`.
+    fingerprint_body_tier: bool = False
 
 
 class BackendResult(BaseModel):
@@ -105,6 +175,58 @@ class Backend(Protocol):
 # Injected process/HTTP shapes (K4): tests pass a fake, no real subprocess/net.
 ProcessRunner = Callable[[list[str], str, int], str]
 ApiClient = Callable[..., str]
+
+
+#: Header for the E-02 reference-material block (EDITOR §3). Present only when a
+#: document declares `context_refs`; absent otherwise ⇒ pre-E-02 byte-identical.
+_CONTEXT_REFS_HEADER = (
+    "# Reference material (glance through; do NOT duplicate — refer/link as needed)"
+)
+
+
+def _context_ref_symbol_glance(path: str, repo_root: str | None) -> str:
+    """A short, deterministic public-symbol glance for a SOURCE-file context ref.
+
+    Reuses :func:`~code_doc_monitor.extract.extract_file` (the same AST-only,
+    import-free machinery the surface uses, K0/K10) to list the file's PUBLIC
+    symbol names so the author can refer to them. Returns a ``(not found)``
+    marker when the file is absent on disk (a context ref MAY point at a
+    not-yet-created file — never raise, EDITOR §3). The repo-root-relative
+    ``path`` is resolved against ``repo_root`` when given (else the cwd).
+    """
+    base = Path(repo_root) if repo_root is not None else Path()
+    target = base / path
+    if not target.is_file():
+        return "  (not found — refer to it once it exists)"
+    try:
+        symbols = extract_file(target)
+    except ExtractionError:
+        return "  (could not parse — refer to it by path)"
+    names = sorted(s.name for s in symbols if s.is_public)
+    if not names:
+        return "  public symbols: (none)"
+    return "  public symbols: " + ", ".join(names)
+
+
+def _render_context_refs(req: FixRequest) -> str:
+    """Render the E-02 reference-material block, or ``""`` when there are none.
+
+    Lists each :class:`~code_doc_monitor.config.ContextRef` by ``path`` (+ its
+    ``note`` when present). For a SOURCE-file ref (``.py``) it ALSO appends a
+    short public-symbol glance derived deterministically from the file (K10);
+    doc (``.md``) refs are listed by path + note only. Returns the empty string
+    for a context-ref-free request so the prompt is byte-identical to pre-E-02
+    (additive, K6).
+    """
+    if not req.context_refs:
+        return ""
+    lines: list[str] = ["", _CONTEXT_REFS_HEADER]
+    for ref in req.context_refs:
+        note = f" — {ref.note}" if ref.note else ""
+        lines.append(f"- {ref.path}{note}")
+        if ref.path.endswith(".py"):
+            lines.append(_context_ref_symbol_glance(ref.path, req.repo_root))
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +281,20 @@ def build_prompt(req: FixRequest) -> str:
             '"region_id" and "new_region_body" null. Fill exactly one fix shape.'
         )
 
+    # B-06: a no-renderer `llm` REGION is authored PROSE (real backends only —
+    # the mock authors prose deterministically in code). Append a prose clause so
+    # the model writes a description, not a symbol table.
+    prose_clause = (
+        f"\n\n{_LLM_PROSE_CLAUSE}"
+        if drift.kind is DriftKind.REGION and req.region_mode is RegionMode.LLM
+        else ""
+    )
+
+    # E-02: the document's glance-through context refs (sub-docs / sub-source
+    # files) as a labeled reference block. Empty for a context-ref-free request
+    # ⇒ byte-identical to pre-E-02 (additive, K6).
+    context_block = _render_context_refs(req)
+
     return (
         "You are a documentation-drift remediation assistant. A monitor detected "
         "that a document is out of sync with the code it describes. Decide whether "
@@ -184,6 +320,7 @@ def build_prompt(req: FixRequest) -> str:
         "<<<SURFACE\n"
         f"{symbol_table(req.surface)}\n"
         "SURFACE\n"
+        f"{context_block}"
         "\n"
         f"Decision rule: {rule}\n"
         "\n"
@@ -194,6 +331,7 @@ def build_prompt(req: FixRequest) -> str:
         "Use null for fix when the verdict is INVALIDATE or ESCALATE.\n"
         "\n"
         f"Fix shape: {shape}"
+        f"{prose_clause}"
     )
 
 
@@ -284,6 +422,13 @@ class MockBackend:
        region id has a known renderer, regenerate its body from the surface via
        :func:`~code_doc_monitor.blocks.expected_region` and return ``FIX``. This
        is the path that makes the auto-heal loop deterministic.
+    1b. **No-renderer `llm` region drift -> FIX (authored prose).** If
+       ``drift.kind == REGION`` and ``req.region_mode == LLM`` and the id has NO
+       renderer (rule 1 produced no body), author a DETERMINISTIC, IDEMPOTENT
+       prose body from the surface via :func:`_authored_prose` and return ``FIX``
+       (B-06). This is the offline stand-in for "what an LLM would write" for a
+       pure-prose region — same surface ⇒ identical body (K10), so a re-author is
+       a clean no-op (K7).
     2. **User-guide comment/docstring/private HASH drift -> INVALIDATE.** If the
        audience is ``user-guide``, the drift is a ``HASH`` drift, and its
        ``detail`` mentions a non-public marker (docstring/comment/private), the
@@ -329,6 +474,29 @@ class MockBackend:
                         ),
                     ),
                 )
+            # B-06: a no-renderer `llm` REGION (rule-1 `body` was None) is authored
+            # PROSE, not mechanically rendered. Author a deterministic, idempotent
+            # body from the surface (K2/K10) — the offline stand-in for what an LLM
+            # would write, exactly as rule 3 is for whole-doc.
+            if req.region_mode is RegionMode.LLM:
+                prose = _authored_prose(req.surface)
+                return BackendResult(
+                    verdict=Verdict.FIX,
+                    cause=(
+                        f"llm-authored region {drift.region_id!r} has no mechanical "
+                        "renderer; authoring its prose from the current code surface"
+                    ),
+                    fix=ProposedFix(
+                        region_id=drift.region_id,
+                        new_region_body=prose,
+                        new_doc_text=None,
+                        rationale=(
+                            "authored the region's prose from the code surface "
+                            "(the single source of truth); deterministic stand-in "
+                            "for an LLM"
+                        ),
+                    ),
+                )
 
         if (
             req.drift.audience is Audience.USER_GUIDE
@@ -346,7 +514,10 @@ class MockBackend:
 
         if drift.kind is DriftKind.HASH:
             corrected = render_corrected(
-                req.doc_text, req.surface, req.region_templates
+                req.doc_text,
+                req.surface,
+                req.region_templates,
+                include_body=req.fingerprint_body_tier,
             )
             return BackendResult(
                 verdict=Verdict.FIX,

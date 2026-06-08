@@ -25,7 +25,7 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,7 +35,12 @@ from .errors import ExtractionError
 __all__ = [
     "Symbol",
     "Record",
+    "SurfaceFingerprint",
     "DocumentSurface",
+    "Extractor",
+    "PythonAstExtractor",
+    "register_extractor",
+    "get_extractor",
     "extract_file",
     "extract_json_records",
     "extract_switches",
@@ -65,6 +70,10 @@ class Symbol(BaseModel):
     # ``arg_signature`` selection; deliberately NOT part of surface_hash (the
     # signature string already captures parameter changes for hashing).
     arg_names: tuple[str, ...] = ()
+    # Body-AST digest for functions/methods (``None`` for class/variable). Feeds
+    # the OPT-IN body tier of ``surface_hash`` (P-01); insensitive to comments,
+    # formatting and the docstring, so it moves only on an implementation change.
+    body_hash: str | None = None
 
 
 class Record(BaseModel):
@@ -82,6 +91,49 @@ class Record(BaseModel):
     fields: tuple[tuple[str, str], ...] = ()
 
 
+def _hash_payload(payload: dict[str, object]) -> str:
+    """Deterministic ``sha256[:16]`` over a sorted, clock-free JSON payload (K10)."""
+    blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+class SurfaceFingerprint(BaseModel):
+    """A tiered fingerprint of a code surface (P2).
+
+    ``composite`` IS :meth:`DocumentSurface.surface_hash` — the single identity
+    stored in ``cdm.fingerprint`` (unchanged across P2, so no re-baseline). The
+    three per-tier digests are DIAGNOSTIC: they let drift report WHICH tier moved
+    without affecting the identity. ``signature`` (the structural surface:
+    signature-only symbols + ``records``) is always present; ``docstring`` is
+    ``None`` unless the audience folds docstrings in (eng-guide); ``body`` is
+    ``None`` unless the opt-in body tier is on and a function/method contributes
+    a body digest. Frozen + ``extra="forbid"``: an immutable, normalized snapshot.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    signature: str
+    docstring: str | None
+    body: str | None
+    composite: str
+
+    def drifted_against(self, other: SurfaceFingerprint) -> tuple[str, ...]:
+        """Return the tier name(s) whose digest differs from ``other``, sorted (K10).
+
+        A ``None`` tier (absent for this audience/flag) compares equal to ``None``
+        and unequal to a present digest, so turning a tier on/off registers as a
+        move of that tier.
+        """
+        moved: list[str] = []
+        if self.signature != other.signature:
+            moved.append("signature")
+        if self.docstring != other.docstring:
+            moved.append("docstring")
+        if self.body != other.body:
+            moved.append("body")
+        return tuple(sorted(moved))
+
+
 class DocumentSurface(BaseModel):
     """The audience-filtered, selected surface a document is graded against."""
 
@@ -92,7 +144,7 @@ class DocumentSurface(BaseModel):
     symbols: tuple[Symbol, ...]
     records: tuple[Record, ...] = ()
 
-    def surface_hash(self) -> str:
+    def surface_hash(self, *, include_body: bool = False) -> str:
         """Return a stable ``sha256[:16]`` over an audience-normalized payload.
 
         Deterministic (K10): symbols/records are sorted, keys are sorted, and no
@@ -102,36 +154,98 @@ class DocumentSurface(BaseModel):
         the payload so the two audiences never collide. Records (CLI switches,
         JSON rows) are externally-visible by nature and are hashed for both
         audiences.
+
+        ``include_body`` (P-01, opt-in via ``MonitorConfig.fingerprint_body_tier``)
+        folds each function/method's body-AST digest into the hash so an
+        implementation change is detectable. It follows the same additive-key
+        discipline as ``records``: the ``body_hash`` key only enters the payload
+        when the tier is on AND a symbol has one, so with ``include_body=False``
+        (the default) the digest is byte-identical to the pre-P1 contract for
+        every audience — previously-stored fingerprints stay valid. The body tier
+        is NEVER applied to ``user-guide``: a body change is a non-event for the
+        externally-visible API (K3), so user-guide bytes never move under the flag.
+        """
+        return self.fingerprint(include_body=include_body).composite
+
+    def fingerprint(self, *, include_body: bool = False) -> SurfaceFingerprint:
+        """Return the tiered :class:`SurfaceFingerprint` for this surface (P2).
+
+        ``composite`` is byte-identical to :meth:`surface_hash` (the unchanged
+        identity); the per-tier digests are diagnostic. The ``signature`` tier
+        hashes the structural surface (signature-only symbols + ``records``) so a
+        records-only change is attributed to it; ``docstring`` and ``body`` are the
+        orthogonal additive tiers, ``None`` when the audience/flag excludes them.
+        Deterministic (K10): every payload is sorted and clock-free, and the
+        composite payload is constructed exactly as the pre-P2 hash was, so stored
+        ``cdm.fingerprint`` values stay valid.
         """
         include_docstrings = self.audience is Audience.ENG_GUIDE
-        items = []
+        include_body_tier = include_body and self.audience is not Audience.USER_GUIDE
+
+        items: list[dict[str, object]] = []
+        sig_items: list[dict[str, object]] = []
+        doc_items: list[dict[str, object]] = []
+        body_items: list[dict[str, object]] = []
         for sym in self.symbols:
-            entry: dict[str, object] = {
+            base: dict[str, object] = {
                 "name": sym.name,
                 "kind": sym.kind,
                 "signature": sym.signature,
                 "is_public": sym.is_public,
             }
+            entry = dict(base)
             if include_docstrings:
                 entry["docstring"] = sym.docstring
+                doc_items.append({"name": sym.name, "docstring": sym.docstring})
+            if include_body_tier and sym.body_hash is not None:
+                entry["body_hash"] = sym.body_hash
+                body_items.append({"name": sym.name, "body_hash": sym.body_hash})
             items.append(entry)
+            sig_items.append(base)
         # Sort by the same key used for symbol ordering so the payload is
         # independent of insertion order.
         items.sort(key=lambda e: (str(e["name"]),))
-        payload: dict[str, object] = {
-            "audience": self.audience.value,
-            "symbols": items,
-        }
-        # Backward compatible (K10): a symbols-only surface hashes exactly as it
-        # did before records existed, so previously-stored fingerprints stay
-        # valid. The ``records`` key only enters the payload when present.
+        sig_items.sort(key=lambda e: (str(e["name"]),))
+        doc_items.sort(key=lambda e: (str(e["name"]),))
+        body_items.sort(key=lambda e: (str(e["name"]),))
+
+        # Backward compatible (K10): the ``records`` key only enters the payload
+        # when present, so a symbols-only surface hashes exactly as it did before
+        # records existed. Records are part of the externally-visible structural
+        # surface, so they fold into the signature tier.
+        records_payload: list[dict[str, object]] | None = None
         if self.records:
-            payload["records"] = [
+            records_payload = [
                 {"name": r.name, "kind": r.kind, "fields": [list(f) for f in r.fields]}
                 for r in sorted(self.records, key=lambda r: (r.kind, r.name))
             ]
-        blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+        composite_payload: dict[str, object] = {
+            "audience": self.audience.value,
+            "symbols": items,
+        }
+        sig_payload: dict[str, object] = {
+            "audience": self.audience.value,
+            "symbols": sig_items,
+        }
+        if records_payload is not None:
+            composite_payload["records"] = records_payload
+            sig_payload["records"] = records_payload
+
+        docstring = (
+            _hash_payload({"docstrings": doc_items}) if include_docstrings else None
+        )
+        body = (
+            _hash_payload({"bodies": body_items})
+            if include_body_tier and body_items
+            else None
+        )
+        return SurfaceFingerprint(
+            signature=_hash_payload(sig_payload),
+            docstring=docstring,
+            body=body,
+            composite=_hash_payload(composite_payload),
+        )
 
 
 def _is_public(name: str) -> bool:
@@ -224,6 +338,28 @@ def _positional_names(args: ast.arguments) -> tuple[str, ...]:
     return tuple(a.arg for a in posonly + list(args.args))
 
 
+def _body_ast_hash(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """Return a ``sha256[:16]`` digest of a function/method's body AST (K10).
+
+    The leading docstring statement is stripped so the body tier stays orthogonal
+    to the docstring tier. Each remaining statement is rendered with
+    :func:`ast.dump` with ``include_attributes=False`` — line/column positions are
+    dropped, so the digest is insensitive to formatting, comments and line moves
+    and moves only when the body's *structure* changes. Deterministic: the digest
+    depends only on the parsed tree, never on the clock or source layout.
+    """
+    body = node.body
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        body = body[1:]  # drop the docstring statement
+    blob = "\x00".join(ast.dump(stmt, include_attributes=False) for stmt in body)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
 def _func_symbol(
     node: ast.FunctionDef | ast.AsyncFunctionDef,
     *,
@@ -240,6 +376,7 @@ def _func_symbol(
         is_public=_is_public(name),
         docstring=ast.get_docstring(node),
         arg_names=_positional_names(node.args),
+        body_hash=_body_ast_hash(node),
     )
 
 
@@ -308,7 +445,7 @@ def _variable_symbols(
     return out
 
 
-def extract_file(path: Path) -> list[Symbol]:
+def _extract_python_symbols(path: Path) -> list[Symbol]:
     """Extract the symbol surface of one Python file via ``ast`` only (K0).
 
     Captures module-level functions (``def``/``async def``), classes and their
@@ -366,6 +503,66 @@ def extract_file(path: Path) -> list[Symbol]:
             symbols.extend(_variable_symbols(node))
 
     return symbols
+
+
+# --------------------------------------------------------------------------- #
+# Pluggable extractor seam (P-01, K0)                                          #
+# --------------------------------------------------------------------------- #
+
+
+@runtime_checkable
+class Extractor(Protocol):
+    """Pluggable code-surface extractor for one language family (K0).
+
+    An extractor turns one source file into a list of :class:`Symbol` facts via
+    static analysis only — it MUST NOT import or execute the target (K0). The
+    engine holds no target-specific knowledge; supporting a new language is a new
+    registration, never an edit to the engine's control flow.
+    """
+
+    language: str
+
+    def extract(self, path: Path) -> list[Symbol]: ...
+
+
+class PythonAstExtractor:
+    """The default extractor: Python symbols via ``ast``, import-free (K0)."""
+
+    language = "python"
+
+    def extract(self, path: Path) -> list[Symbol]:
+        return _extract_python_symbols(path)
+
+
+# language -> extractor. Resolution is by language string only; no target- or
+# path-specific branching lives here (K0). P-01 ships the Python default; other
+# languages register through :func:`register_extractor` (P-03).
+_EXTRACTORS: dict[str, Extractor] = {"python": PythonAstExtractor()}
+
+
+def register_extractor(extractor: Extractor) -> None:
+    """Register (or override) the extractor for ``extractor.language`` (K0)."""
+    _EXTRACTORS[extractor.language] = extractor
+
+
+def get_extractor(language: str) -> Extractor:
+    """Resolve the extractor for ``language``; loud on an unknown one (K8)."""
+    try:
+        return _EXTRACTORS[language]
+    except KeyError:
+        raise ExtractionError(
+            f"no extractor registered for language {language!r}"
+        ) from None
+
+
+def extract_file(path: Path) -> list[Symbol]:
+    """Extract one Python file's symbol surface via the default extractor.
+
+    A thin, behaviour-preserving wrapper over the registered ``python`` extractor
+    so existing callers are unchanged. Raises :class:`ExtractionError` (K8) if
+    ``path`` cannot be read or contains a syntax error.
+    """
+    return get_extractor("python").extract(path)
 
 
 # --------------------------------------------------------------------------- #
