@@ -1012,3 +1012,38 @@ def test_which_tier_moved_reported_and_stamped_e2e(tmp_path: Path) -> None:
     )
     assert eng_hash.drifted_tiers == ("body",)
     assert "body" in eng_hash.detail  # the human-readable message names the tier
+
+
+def test_anchors_stamped_and_classify_change_e2e(tmp_path: Path) -> None:
+    """P4 e2e: heal stamps region anchors; drift tells a body change (anchors
+    stable) from a removed public symbol (anchor removed)."""
+    from code_doc_monitor.extract import anchor_id
+    from code_doc_monitor.manifest import parse_doc, stored_region_anchors
+
+    root, cfg = _make_repo_body_tier(tmp_path)
+    # The baseline heal stamped the symbol-table region's anchor set.
+    anchors = stored_region_anchors(parse_doc(root / "docs" / "eng.md"), "symbols")
+    assert anchors and anchor_id("compute") in anchors
+
+    # A body-only change → same identities (re-bind), no anchor delta.
+    (root / "shared.py").write_text(
+        _SHARED_V1.replace("return a + b", "return b + a"), encoding="utf-8"
+    )
+    eng_hash = next(
+        d
+        for d in _monitor(root, cfg).check().drifts
+        if d.doc_id == "eng" and d.kind is DriftKind.HASH
+    )
+    assert eng_hash.anchors_added == () and eng_hash.anchors_removed == ()
+
+    # Re-heal, then DROP the public `compute` → the anchor is reported removed.
+    _monitor(root, cfg).run(apply=True)
+    (root / "shared.py").write_text(
+        "def _private_helper(x):\n    return x\n", encoding="utf-8"
+    )
+    eng_hash2 = next(
+        d
+        for d in _monitor(root, cfg).check().drifts
+        if d.doc_id == "eng" and d.kind is DriftKind.HASH
+    )
+    assert anchor_id("compute") in eng_hash2.anchors_removed

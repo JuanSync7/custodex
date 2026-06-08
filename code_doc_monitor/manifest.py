@@ -39,6 +39,8 @@ __all__ = [
     "region_body_hash",
     "stored_region_hash",
     "set_region_hash",
+    "stored_region_anchors",
+    "set_region_anchors",
     "region_is_locked",
 ]
 
@@ -302,6 +304,42 @@ def set_region_hash(meta: dict[str, Any], region_id: str, value: str) -> dict[st
     hashes = dict(cdm.get("region_hashes") or {})
     hashes[region_id] = value
     cdm["region_hashes"] = hashes
+    out["cdm"] = cdm
+    return out
+
+
+def stored_region_anchors(doc: Doc, region_id: str) -> tuple[str, ...] | None:
+    """Return ``cdm.region_anchors[region_id]`` as a tuple, or None (P4).
+
+    None when the region has no stamped anchor set (an OLD doc predating P4), so
+    drift falls back to no anchor classification. The stored list is the sorted
+    ``anchor_id``s of the symbols the region documents.
+    """
+    cdm = doc.meta.get("cdm")
+    if isinstance(cdm, dict):
+        anchors = cdm.get("region_anchors")
+        if isinstance(anchors, dict):
+            value = anchors.get(region_id)
+            if isinstance(value, list) and all(isinstance(a, str) for a in value):
+                return tuple(value)
+    return None
+
+
+def set_region_anchors(
+    meta: dict[str, Any], region_id: str, anchors: tuple[str, ...]
+) -> dict[str, Any]:
+    """Return a copy of ``meta`` with ``cdm.region_anchors[region_id]`` set (P4).
+
+    Additive to the ``cdm:`` mapping (like :func:`set_region_hash`) — every other
+    key (``fingerprint``, ``fingerprint_tiers``, ``region_hashes``, sibling
+    anchors) is preserved, so the anchor set survives later heals. Stored sorted
+    for a deterministic, diff-stable front matter (K10).
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    region_anchors = dict(cdm.get("region_anchors") or {})
+    region_anchors[region_id] = sorted(anchors)
+    cdm["region_anchors"] = region_anchors
     out["cdm"] = cdm
     return out
 

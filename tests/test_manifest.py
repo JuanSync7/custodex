@@ -328,3 +328,48 @@ def test_set_fingerprint_tiers_is_additive() -> None:
     assert stored_region_hash(_doc_with_meta(out), "symbols") == "rh"
     assert stored_fingerprint_tiers(_doc_with_meta(out)) == fp
     assert meta["cdm"] == {"fingerprint": "comp", "region_hashes": {"symbols": "rh"}}
+
+
+# --------------------------------------------------------------------------- #
+# P-04: region anchors (stable symbol-identity set per region, additive)       #
+# --------------------------------------------------------------------------- #
+def test_region_anchors_round_trip() -> None:
+    from code_doc_monitor.manifest import set_region_anchors, stored_region_anchors
+
+    meta = set_region_anchors({}, "symbols", ("bbbb", "aaaa"))
+    # Stored sorted for diff-stable front matter (K10).
+    assert stored_region_anchors(_doc_with_meta(meta), "symbols") == ("aaaa", "bbbb")
+
+
+def test_region_anchors_absent_returns_none() -> None:
+    from code_doc_monitor.manifest import stored_region_anchors
+
+    assert stored_region_anchors(parse_text("# x\n"), "symbols") is None
+    assert (
+        stored_region_anchors(_doc_with_meta({"cdm": {"fingerprint": "x"}}), "symbols")
+        is None
+    )
+
+
+def test_set_region_anchors_is_additive() -> None:
+    """Stamping anchors preserves the composite fingerprint, tiers, region hashes."""
+    from code_doc_monitor.manifest import (
+        set_region_anchors,
+        stored_region_anchors,
+        stored_region_hash,
+    )
+
+    meta = {
+        "cdm": {
+            "fingerprint": "comp",
+            "fingerprint_tiers": {"signature": "s", "composite": "comp"},
+            "region_hashes": {"symbols": "rh"},
+        }
+    }
+    out = set_region_anchors(meta, "symbols", ("a1", "a2"))
+    d = _doc_with_meta(out)
+    assert stored_fingerprint(d) == "comp"
+    assert stored_region_hash(d, "symbols") == "rh"
+    assert stored_fingerprint_tiers(d) is not None
+    assert stored_region_anchors(d, "symbols") == ("a1", "a2")
+    assert "region_anchors" not in meta["cdm"]  # original untouched

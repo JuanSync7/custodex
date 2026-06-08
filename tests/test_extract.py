@@ -842,3 +842,40 @@ def test_symbols_python_still_default_for_auto(tmp_path: Path) -> None:
     doc = _doc(Audience.ENG_GUIDE, CodeRef(path="sample.py"))
     surface = build_document_surface(doc, tmp_path)
     assert "foo" in {s.name for s in surface.symbols}
+
+
+# --------------------------------------------------------------------------- #
+# P-04: stable symbol anchors (lineno-free identity)                           #
+# --------------------------------------------------------------------------- #
+def test_anchor_id_is_deterministic_and_short() -> None:
+    from code_doc_monitor.extract import anchor_id
+
+    a = anchor_id("pkg.Widget.render")
+    assert a == anchor_id("pkg.Widget.render")
+    assert len(a) == 16 and all(c in "0123456789abcdef" for c in a)
+
+
+def test_anchor_id_changes_on_rename() -> None:
+    from code_doc_monitor.extract import anchor_id
+
+    assert anchor_id("foo") != anchor_id("bar")
+
+
+def test_symbol_anchor_id_matches_function(tmp_path: Path) -> None:
+    from code_doc_monitor.extract import anchor_id
+
+    syms = _by_name(extract_file(_write(tmp_path)))
+    assert syms["foo"].anchor_id == anchor_id("foo")
+    assert syms["Widget.render"].anchor_id == anchor_id("Widget.render")
+
+
+def test_anchor_id_survives_a_code_move(tmp_path: Path) -> None:
+    """A pure move (different lineno, same name) keeps the anchor identical."""
+    a = tmp_path / "a.py"
+    a.write_text("def foo(x):\n    return x\n", encoding="utf-8")
+    b = tmp_path / "b.py"
+    b.write_text("\n\n\n# pushed down\ndef foo(x):\n    return x\n", encoding="utf-8")
+    sa = _by_name(extract_file(a))["foo"]
+    sb = _by_name(extract_file(b))["foo"]
+    assert sa.lineno != sb.lineno  # it genuinely moved
+    assert sa.anchor_id == sb.anchor_id  # but the identity is stable (P4)

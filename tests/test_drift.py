@@ -25,6 +25,7 @@ from code_doc_monitor.manifest import (
     set_fingerprint,
     set_fingerprint_tiers,
     set_region,
+    set_region_anchors,
 )
 
 CODE_V1 = '''\
@@ -745,3 +746,93 @@ def test_hash_drift_without_stored_tiers_falls_back(tmp_path: Path) -> None:
     drift = _hash_drift(report)
     assert drift.drifted_tiers == ()
     assert "fingerprint" in drift.detail  # the composite-only fallback message
+
+
+# --------------------------------------------------------------------------- #
+# P-04: anchor delta on a HASH drift (symbol moved/stable vs added/removed)     #
+# --------------------------------------------------------------------------- #
+from code_doc_monitor.extract import anchor_id  # noqa: E402
+
+# CODE_V1 + a NEW public function (signature tier moves → HASH drift).
+CODE_PLUS_SYMBOL = '''\
+def greet(name: str) -> str:
+    """Say hello."""
+    return f"hi {name}"
+
+
+def farewell(name: str) -> str:
+    """Say bye."""
+    return f"bye {name}"
+
+
+def _hidden(x):
+    """Internal."""
+    return x
+'''
+
+
+def _synced_anchored(spec: DocumentSpec, root: Path, *, include_body: bool) -> str:
+    """Synced doc text stamping composite + per-tier digests + region anchors."""
+    surface = build_document_surface(spec, root)
+    body = "# Title\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n"
+    body, _ = set_region(body, "symbols", symbol_table(surface))
+    fp = surface.fingerprint(include_body=include_body)
+    meta = set_fingerprint({}, fp.composite)
+    meta = set_fingerprint_tiers(meta, fp)
+    meta = set_region_anchors(
+        meta, "symbols", tuple(s.anchor_id for s in surface.symbols)
+    )
+    return render_doc(meta, body)
+
+
+def test_body_only_change_keeps_anchors_stable(tmp_path: Path) -> None:
+    """Re-bind: the SAME symbol identities, only a body changed (P4 + P2 tiers)."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_BODY_ONLY)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=True), encoding="utf-8"
+    )
+    _write_code(root, CODE_BODY_EDIT)  # greet body only
+    drift = _hash_drift(detect(_config_on(root, (spec,)), tmp_path))
+    assert drift.drifted_tiers == ("body",)
+    assert drift.anchors_added == ()  # no symbol added/removed/renamed
+    assert drift.anchors_removed == ()
+
+
+def test_added_symbol_reports_anchor_added(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_PLUS_SYMBOL)  # adds public `farewell`
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.anchors_added == (anchor_id("farewell"),)
+    assert drift.anchors_removed == ()
+
+
+def test_removed_symbol_reports_anchor_removed(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_PLUS_SYMBOL)  # greet + farewell + _hidden
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_V1)  # drops `farewell`
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.anchors_removed == (anchor_id("farewell"),)
+    assert drift.anchors_added == ()
+
+
+def test_old_doc_without_anchors_has_no_delta(tmp_path: Path) -> None:
+    """A pre-P4 doc (composite only, no stored anchors) → empty anchor delta."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(_synced_doc_text(spec, root), encoding="utf-8")
+    _write_code(root, CODE_PLUS_SYMBOL)
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.anchors_added == ()
+    assert drift.anchors_removed == ()

@@ -1452,3 +1452,23 @@ have ballooned the slice and added a heavy dep for no extra contractual evidence
 To validate "you can plug X in", the test-registered stub IS the evidence; defer the
 real plugin (and its optional dependency) to a follow-on. Restore global registry
 state in `finally` so the stub never leaks into another test.
+
+**[P-04] Identity is the thing you DON'T hash into the digest — surface it as a
+separate axis.** Line numbers were already excluded from `surface_hash`, so a pure
+code move was already drift-invisible — which made the naive "anchors stop moves
+from drifting" framing trivially-already-true and untestable. The real value of an
+anchor is a SECOND, orthogonal axis: not "did the hash move" (P2 tiers answer
+*what kind* of change) but "is it the SAME symbol" (anchors answer *whose*). On a
+drift, an empty anchor delta + a body-tier move = "the same function's body
+changed"; a nonempty delta = "a different set of symbols." → When a feature sounds
+like it duplicates existing behaviour, find the axis the existing behaviour DOESN'T
+capture; if you can't name one, the feature is a no-op and the slice scope is wrong.
+
+**[P-04] A rename is honestly removed+added — don't build a tracker to hide it.**
+`anchor_id` is derived from the qualified name, so renaming `foo`→`bar` yields a
+removed anchor and an added one. Tempting to "track" the rename (match by
+signature/body so it reads as one symbol that moved), but that guesses intent and
+silently masks a real API change a doc owner must see. The lossless signal —
+"`foo` is gone, `bar` is new" — is the correct one; let the human decide they're
+the same. → Prefer a faithful, decomposable signal over a clever inference that can
+be wrong; identity tracking across renames is a separate, opt-in concern.

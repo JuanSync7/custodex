@@ -23,7 +23,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .blocks import expected_region, known_region_ids
+from .blocks import REGION_KEYS, expected_region, known_region_ids
 from .config import DocumentSpec, MonitorConfig, RegionMode
 from .errors import DriftError
 from .extract import DocumentSurface
@@ -35,6 +35,7 @@ from .manifest import (
     render_doc,
     set_fingerprint,
     set_fingerprint_tiers,
+    set_region_anchors,
     stamp_standard_meta,
 )
 
@@ -483,6 +484,12 @@ def scaffold_doc(
         parts.extend(
             [f"<!-- CDM:BEGIN {key} -->", inner, f"<!-- CDM:END {key} -->", ""]
         )
+        if key in REGION_KEYS:
+            # P4: anchor the symbol-table region to the stable symbol identities
+            # it documents (matches heal.py one-shared-truth stamping).
+            meta = set_region_anchors(
+                meta, key, tuple(s.anchor_id for s in surface.symbols)
+            )
     return render_doc(meta, "\n".join(parts))
 
 

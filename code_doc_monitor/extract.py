@@ -35,6 +35,7 @@ from .errors import ExtractionError
 __all__ = [
     "Symbol",
     "Record",
+    "anchor_id",
     "SurfaceFingerprint",
     "DocumentSurface",
     "Extractor",
@@ -52,6 +53,17 @@ SymbolKind = Literal["function", "class", "method", "variable"]
 
 # Frozen + extra="forbid": surfaces are immutable, normalized snapshots (K10).
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+
+
+def anchor_id(qualified_name: str) -> str:
+    """Return a stable ``sha256[:16]`` identity for a symbol's qualified name (P4).
+
+    The anchor is derived from the qualified name ONLY — never the line number — so
+    it is invariant under a pure code move/reorder and identifies the symbol a
+    managed region is bound to. A rename changes the anchor (it is a different
+    symbol identity). Deterministic (K10): depends only on the name.
+    """
+    return hashlib.sha256(qualified_name.encode("utf-8")).hexdigest()[:16]
 
 
 class Symbol(BaseModel):
@@ -74,6 +86,11 @@ class Symbol(BaseModel):
     # the OPT-IN body tier of ``surface_hash`` (P-01); insensitive to comments,
     # formatting and the docstring, so it moves only on an implementation change.
     body_hash: str | None = None
+
+    @property
+    def anchor_id(self) -> str:
+        """Stable, lineno-free identity of this symbol (P4) — see :func:`anchor_id`."""
+        return anchor_id(self.name)
 
 
 class Record(BaseModel):

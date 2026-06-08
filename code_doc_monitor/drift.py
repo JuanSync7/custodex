@@ -26,7 +26,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .blocks import expected_region, known_region_ids
+from .blocks import REGION_KEYS, expected_region, known_region_ids
 from .config import Audience, MonitorConfig, RegionMode, resolve_repo_root
 from .extract import build_document_surface
 from .index import render_index
@@ -36,6 +36,7 @@ from .manifest import (
     regions,
     stored_fingerprint,
     stored_fingerprint_tiers,
+    stored_region_anchors,
     stored_region_hash,
 )
 
@@ -68,6 +69,13 @@ class Drift(BaseModel):
     # "body"). Empty when not applicable or unknowable (an OLD doc carrying only a
     # composite fingerprint, with no stored per-tier digests to diff against).
     drifted_tiers: tuple[str, ...] = ()
+    # P4: anchor delta on a HASH drift — anchor_ids documented now but not in the
+    # stored region anchor set (added), and vice-versa (removed). Both empty ⇒ the
+    # SAME symbol identities (a move/reorder or an internal body/docstring change,
+    # i.e. re-bind, not a structural change); nonempty ⇒ a symbol was added /
+    # removed / renamed. Empty when the doc predates P4 (no stored anchors).
+    anchors_added: tuple[str, ...] = ()
+    anchors_removed: tuple[str, ...] = ()
 
 
 class DriftReport(BaseModel):
@@ -157,6 +165,33 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                 )
             else:
                 detail = f"fingerprint {stored!r} != current surface hash {current!r}"
+            # P4: classify the change by symbol IDENTITY. Compare the anchor set the
+            # symbol-table region documents now against the stamped set; a delta
+            # means a symbol was added/removed/renamed (structural), while an empty
+            # delta means the SAME symbols changed internally (a re-bind, not a
+            # structural move). Empty when the doc has no stamped anchors (pre-P4).
+            current_anchors = {sym.anchor_id for sym in surface.symbols}
+            stored_anchors: set[str] | None = None
+            for region_id in spec.region_keys:
+                if region_id not in REGION_KEYS:
+                    continue
+                stamped = stored_region_anchors(doc, region_id)
+                if stamped is not None:
+                    stored_anchors = (
+                        set(stamped)
+                        if stored_anchors is None
+                        else stored_anchors | set(stamped)
+                    )
+            anchors_added: tuple[str, ...] = ()
+            anchors_removed: tuple[str, ...] = ()
+            if stored_anchors is not None:
+                anchors_added = tuple(sorted(current_anchors - stored_anchors))
+                anchors_removed = tuple(sorted(stored_anchors - current_anchors))
+                if anchors_added or anchors_removed:
+                    detail += (
+                        f" (anchored symbols changed: +{len(anchors_added)}/"
+                        f"-{len(anchors_removed)})"
+                    )
             drifts.append(
                 Drift(
                     kind=DriftKind.HASH,
@@ -166,6 +201,8 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                     healable=True,
                     audience=spec.audience,
                     drifted_tiers=drifted_tiers,
+                    anchors_added=anchors_added,
+                    anchors_removed=anchors_removed,
                 )
             )
 

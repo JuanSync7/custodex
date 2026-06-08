@@ -344,10 +344,27 @@ valid until a deliberate re-baseline.
   `.project/slices/P-03.md`.
 
 **P4 — Anchors (region ⇄ symbol identity)**
-- ☐ **P-04** anchor a managed region to a stable symbol identity (`anchor_id` from
-  qualified name, not lineno) in front matter, so a region survives a code move;
-  drift distinguishes "symbol moved" (re-bind, no drift) from "body changed" (real
-  drift) using P2's per-tier digests.
+- ✅ **P-04** `extract.anchor_id(name)` + `Symbol.anchor_id` (sha256[:16] of the
+  qualified name, lineno-free → stable across a code move); heal/layout stamp
+  `cdm.region_anchors[id]` (additive) for the symbol-table region; `drift.detect`
+  adds `Drift.anchors_added`/`anchors_removed` on a HASH drift — an EMPTY delta =
+  same symbol identities (a move/reorder or an internal change, re-bind; combine
+  with P2 `drifted_tiers` to see "body changed"), a nonempty delta = a symbol
+  added/removed/renamed. Pre-P4 docs (no stored anchors) → empty delta. See
+  `.project/slices/P-04.md`. **EPIC P COMPLETE.**
+
+**EPIC P COMPLETE** (P-01…P-04). The opaque single-hash, Python-only fingerprint is
+now a pluggable, tiered, anchored model — every step additive and holding the
+composite (`surface_hash`) bytes constant so no stored `cdm.fingerprint` was
+invalidated: **P-01** seam (`Extractor` Protocol + registry) and opt-in body-AST
+tier; **P-02** structured `SurfaceFingerprint` (signature/docstring/body +
+composite) with which-tier-moved reporting and the `schema_version` 1.1.0 bump;
+**P-03** symbol extraction routed through the registry by `CodeRef.lang` (a new
+language is a registration, not an engine edit — K0); **P-04** stable lineno-free
+`anchor_id`s recorded per region so drift tells a structural symbol add/remove/
+rename from an internal (body/docstring) change. Real heavy non-Python parsers
+(tree-sitter/regex) and `lines`-ref re-binding remain follow-on registrations
+behind the now-stable seam.
 
 ---
 

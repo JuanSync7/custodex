@@ -371,6 +371,11 @@ class Symbol(BaseModel):
     docstring: str | None
     body_hash: str | None = None    # P1: function/method body-AST digest (sha256[:16]);
                                     # None for class/variable. Feeds the opt-in body tier.
+    @property
+    def anchor_id(self) -> str      # P4: sha256[:16] of the qualified name (lineno-free) —
+                                    # stable symbol IDENTITY a region binds to across moves.
+
+def anchor_id(qualified_name: str) -> str   # P4: the same stable identity digest (K10)
 
 class SurfaceFingerprint(BaseModel):     # P2: frozen; the tiered fingerprint
     signature: str                       # sha256[:16] of {audience, sig-only symbols, records}
@@ -594,6 +599,10 @@ def set_fingerprint(meta: dict, value: str) -> dict
 # `cdm.fingerprint`, the unchanged identity). Stamped beside the composite.
 def stored_fingerprint_tiers(doc: Doc) -> SurfaceFingerprint | None   # None on old docs
 def set_fingerprint_tiers(meta: dict, fp: SurfaceFingerprint) -> dict  # additive under cdm
+# P4 region anchors — additive `cdm.region_anchors` (id -> sorted anchor_ids the
+# region documents), so drift can tell a symbol add/remove/rename from an internal change.
+def stored_region_anchors(doc: Doc, region_id: str) -> tuple[str, ...] | None  # None pre-P4
+def set_region_anchors(meta: dict, region_id: str, anchors: tuple[str, ...]) -> dict
 ```
 Per-region content hash (B-03) — the mode-agnostic **lock** living additively in
 `cdm.region_hashes` (id -> hash), which `set_fingerprint` already copies forward,
@@ -627,6 +636,10 @@ class Drift(BaseModel):
     audience: Audience; diff: str = ""
     drifted_tiers: tuple[str, ...] = ()   # P2: which tier(s) moved on a HASH drift;
                                           # () when unknown (old doc, no stored tiers)
+    anchors_added: tuple[str, ...] = ()   # P4: anchor_ids present now but not in the
+    anchors_removed: tuple[str, ...] = () # stored set / vice-versa. Both () = same symbol
+                                          # identities (a move/internal change, re-bind);
+                                          # nonempty = a symbol was added/removed/renamed.
 class DriftReport(BaseModel):
     drifts: tuple[Drift,...]
     @property

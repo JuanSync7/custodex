@@ -22,7 +22,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from .blocks import expected_region, known_region_ids
+from .blocks import REGION_KEYS, expected_region, known_region_ids
 from .config import RegionMode, RegionTemplate
 from .extract import DocumentSurface
 from .manifest import (
@@ -36,6 +36,7 @@ from .manifest import (
     set_fingerprint,
     set_fingerprint_tiers,
     set_region,
+    set_region_anchors,
     set_region_hash,
 )
 
@@ -114,6 +115,14 @@ def _corrected(
         if expected is None:
             continue
         body, _ = set_region(body, region_id, expected)
+        if region_id in REGION_KEYS:
+            # P4: anchor this symbol-table region to the STABLE identities it
+            # documents (lineno-free), so drift can tell a symbol add/remove/rename
+            # from an internal (body/docstring) change. Stamped whenever the engine
+            # authors the region, independent of B-03 mode tracking.
+            meta = set_region_anchors(
+                meta, region_id, tuple(s.anchor_id for s in surface.symbols)
+            )
         if modes is not None:
             # The engine authored this region (generated or unlocked llm-seeded)
             # — stamp the written body so a future human edit diverges (B-03).
