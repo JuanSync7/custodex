@@ -69,9 +69,7 @@ def test_demo_returns_documents_with_code_refs() -> None:
     assert "src/taskflow/core/engine.py" in core_refs
 
     # getting-started carries symbol-selective code_refs.
-    gs_refs = {
-        r["path"]: r["symbols"] for r in docs["getting-started"]["code_refs"]
-    }
+    gs_refs = {r["path"]: r["symbols"] for r in docs["getting-started"]["code_refs"]}
     assert gs_refs["src/taskflow/core/model.py"] == ["Task"]
 
     # context_refs is present on every document (defaults to [] in the demo,

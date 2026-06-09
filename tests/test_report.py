@@ -17,6 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from code_doc_monitor.cli import app
@@ -793,7 +794,7 @@ def test_models_frozen() -> None:
         uncovered_files=0,
         percent=100.0,
     )
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         s.scanned_files = 2  # type: ignore[misc]
 
 

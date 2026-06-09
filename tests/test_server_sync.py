@@ -236,9 +236,7 @@ def test_sync_local_then_git_are_separate_scopes(
     assert latest["sync_kind"] == "local"
 
 
-def test_documents_tree_nests_code_refs(
-    client: TestClient, tmp_path: Path
-) -> None:
+def test_documents_tree_nests_code_refs(client: TestClient, tmp_path: Path) -> None:
     repo = _build_git_repo(tmp_path)
     _register(client, repo)
     client.post(f"/repos/{_REPO}/sync", json={"mode": "git"}, headers=_auth())
@@ -269,9 +267,7 @@ def test_resync_replaces_scope(client: TestClient, tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_sync_state_null_before_any_sync(
-    client: TestClient, tmp_path: Path
-) -> None:
+def test_sync_state_null_before_any_sync(client: TestClient, tmp_path: Path) -> None:
     repo = _build_git_repo(tmp_path)
     _register(client, repo)
     resp = client.get(f"/repos/{_REPO}/sync-state")
@@ -315,9 +311,7 @@ def test_sync_missing_local_path_is_400(client: TestClient, tmp_path: Path) -> N
 
 
 def test_sync_unknown_repo_is_404(client: TestClient) -> None:
-    resp = client.post(
-        "/repos/ghost/sync", json={"mode": "git"}, headers=_auth()
-    )
+    resp = client.post("/repos/ghost/sync", json={"mode": "git"}, headers=_auth())
     assert resp.status_code == 404
 
 

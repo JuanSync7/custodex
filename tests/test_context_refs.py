@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from code_doc_monitor.config import (
     Audience,
@@ -66,7 +67,7 @@ def test_context_refs_loads_into_document_spec(tmp_path: Path) -> None:
 def test_context_ref_note_is_optional() -> None:
     """``note`` defaults to None and ``extra`` keys are forbidden (K8)."""
     assert ContextRef(path="x.md").note is None
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         ContextRef(path="x.md", bogus="y")  # type: ignore[call-arg]
 
 

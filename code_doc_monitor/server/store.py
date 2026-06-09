@@ -439,8 +439,7 @@ class InMemoryStore:
         return [
             d
             for d in self._config_documents
-            if d.repo_id == repo_id
-            and (sync_kind is None or d.sync_kind == sync_kind)
+            if d.repo_id == repo_id and (sync_kind is None or d.sync_kind == sync_kind)
         ]
 
     def code_refs_for(
@@ -472,8 +471,7 @@ class InMemoryStore:
         return [
             r
             for r in self._sync_runs
-            if r.repo_id == repo_id
-            and (sync_kind is None or r.sync_kind == sync_kind)
+            if r.repo_id == repo_id and (sync_kind is None or r.sync_kind == sync_kind)
         ]
 
     # --- EDITOR E-03: pending config edits ----------------------------------
@@ -507,6 +505,4 @@ class InMemoryStore:
         rows = self._config_edits.get(repo_id, [])
         for i, row in enumerate(rows):
             if row.edit_id in targets:
-                rows[i] = row.model_copy(
-                    update={"status": status, "applied_at": at}
-                )
+                rows[i] = row.model_copy(update={"status": status, "applied_at": at})

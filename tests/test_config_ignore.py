@@ -20,11 +20,10 @@ from pathlib import Path
 import pytest
 
 from code_doc_monitor.config import (
+    _DEFAULT_EXCLUDE,
     CoverageConfig,
     IgnoreFile,
-    IgnoreFrontmatter,
     WaiverEntry,
-    _DEFAULT_EXCLUDE,
     effective_coverage,
     gitignore_to_globs,
     load_bundle,
@@ -294,7 +293,9 @@ def _build_repo(
     (agent / "__pycache__").mkdir(parents=True)
     (agent / "backend.py").write_text("def run():\n    return 1\n", encoding="utf-8")
     (agent / "sub").mkdir()
-    (agent / "sub" / "deep.py").write_text("def deep():\n    return 2\n", encoding="utf-8")
+    (agent / "sub" / "deep.py").write_text(
+        "def deep():\n    return 2\n", encoding="utf-8"
+    )
     (agent / "run.log").write_text("log\n", encoding="utf-8")
     (agent / "build.rpt").write_text("rpt\n", encoding="utf-8")
     (agent / "__pycache__" / "x.pyc").write_text("bytecode\n", encoding="utf-8")
@@ -375,7 +376,9 @@ def test_gitignore_false_does_not_exclude(tmp_path: Path) -> None:
 
 def test_gitignore_true_but_no_file(tmp_path: Path) -> None:
     """gitignore: true but no .gitignore on disk → no crash, nothing added."""
-    repo, cfg = _build_repo(tmp_path, ignore_text=_IGNORE_GITIGNORE_ON, gitignore_text=None)
+    repo, cfg = _build_repo(
+        tmp_path, ignore_text=_IGNORE_GITIGNORE_ON, gitignore_text=None
+    )
     cov = effective_coverage(load_bundle(cfg), repo)
     assert "**/*.log" not in cov.exclude
 
@@ -386,7 +389,6 @@ def test_gitignore_unreadable_is_loud(tmp_path: Path, monkeypatch) -> None:
     bundle = load_bundle(cfg)
     # load_bundle already derived coverage once (reading .gitignore fine); now
     # make the read fail and re-derive to exercise the error path.
-    import code_doc_monitor.config as cfgmod
 
     orig_read = Path.read_text
 

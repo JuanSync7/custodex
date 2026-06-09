@@ -284,9 +284,7 @@ def _stage_link_edit(client: TestClient, repo_id: str = _REPO) -> str:
         "doc_id": "core-api",
         "ref": {"path": _SCHEDULER, "symbols": [], "lines": None},
     }
-    resp = client.post(
-        f"/repos/{repo_id}/config/edits", json=body, headers=_auth()
-    )
+    resp = client.post(f"/repos/{repo_id}/config/edits", json=body, headers=_auth())
     assert resp.status_code == 201, resp.text
     return resp.json()["edit_id"]
 
@@ -296,9 +294,7 @@ def test_generate_makes_link_live(client: TestClient, tmp_path: Path) -> None:
     _register(client, repo)
     edit_id = _stage_link_edit(client)
 
-    resp = client.post(
-        f"/repos/{_REPO}/config/generate", json={}, headers=_auth()
-    )
+    resp = client.post(f"/repos/{_REPO}/config/generate", json={}, headers=_auth())
     assert resp.status_code == 201, resp.text
     body = resp.json()
 
@@ -331,9 +327,7 @@ def test_generate_no_pending_is_noop(client: TestClient, tmp_path: Path) -> None
     repo = _demo_git_repo(tmp_path)
     _register(client, repo)
 
-    resp = client.post(
-        f"/repos/{_REPO}/config/generate", json={}, headers=_auth()
-    )
+    resp = client.post(f"/repos/{_REPO}/config/generate", json={}, headers=_auth())
     assert resp.status_code == 201, resp.text
     body = resp.json()
     assert body["applied"] == []
@@ -365,15 +359,11 @@ def test_generate_requires_token(client: TestClient, tmp_path: Path) -> None:
 
 
 def test_generate_unknown_repo_is_404(client: TestClient) -> None:
-    resp = client.post(
-        "/repos/nope/config/generate", json={}, headers=_auth()
-    )
+    resp = client.post("/repos/nope/config/generate", json={}, headers=_auth())
     assert resp.status_code == 404
 
 
-def test_generate_only_selected_edit_ids(
-    client: TestClient, tmp_path: Path
-) -> None:
+def test_generate_only_selected_edit_ids(client: TestClient, tmp_path: Path) -> None:
     repo = _demo_git_repo(tmp_path)
     _register(client, repo)
     link_id = _stage_link_edit(client)

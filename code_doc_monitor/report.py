@@ -223,9 +223,7 @@ def build_coverage_rpt(
     except for the engine's reads; ``ref`` is provenance only (K7).
     """
     cov = effective_coverage(bundle, repo_root)
-    inv = inventory.discover_files(
-        repo_root, include=cov.include, exclude=cov.exclude
-    )
+    inv = inventory.discover_files(repo_root, include=cov.include, exclude=cov.exclude)
     sym = inventory.discover_symbols(inv, repo_root)
     report = coverage_mod.resolve_coverage(bundle.config, sym)
 
@@ -322,9 +320,7 @@ def _build_units(
 
     units: list[RptUnit] = []
     for unit, ref in zip(bundle.units, bundle.index.units, strict=True):
-        scanned = [
-            f.path for f in report.files if owner_of[f.path] is unit
-        ]
+        scanned = [f.path for f in report.files if owner_of[f.path] is unit]
         doc_n = sum(1 for p in scanned if p in documented_paths)
         waived_n = sum(1 for p in scanned if p in waived_paths)
         uncovered = tuple(sorted(p for p in scanned if p in gap_paths))

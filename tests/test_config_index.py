@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor import config as config_mod
 from code_doc_monitor import cli as cli_mod
+from code_doc_monitor import config as config_mod
 from code_doc_monitor.cli import app
 from code_doc_monitor.config import (
     load_bundle,
@@ -31,7 +31,6 @@ from code_doc_monitor.errors import ConfigError
 from tests.test_config_v2 import (
     _AGENT_YAML,
     _FOUNDATION_YAML,
-    _INDEX_YAML,
     _write_tree,
 )
 
@@ -136,7 +135,9 @@ def test_indexed_units_in_sync_loads_clean(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_regenerate_sorts_units_alphabetically(tmp_path: Path, frozen_clock: str) -> None:
+def test_regenerate_sorts_units_alphabetically(
+    tmp_path: Path, frozen_clock: str
+) -> None:
     """units: is rebuilt sorted by filename regardless of on-disk index order."""
     d = _write_tree(tmp_path)  # index lists foundation then agent-workflow
     text = regenerate_index(d)
@@ -144,7 +145,9 @@ def test_regenerate_sorts_units_alphabetically(tmp_path: Path, frozen_clock: str
     assert [u.file for u in idx.units] == ["agent-workflow.yaml", "foundation.yaml"]
 
 
-def test_regenerate_includes_new_on_disk_unit(tmp_path: Path, frozen_clock: str) -> None:
+def test_regenerate_includes_new_on_disk_unit(
+    tmp_path: Path, frozen_clock: str
+) -> None:
     """A new on-disk unit absent from the index is added to the regenerated list."""
     d = _write_tree(tmp_path)
     (d / "zeta.yaml").write_text(
@@ -172,7 +175,9 @@ def test_regenerate_excludes_reserved_stems(tmp_path: Path, frozen_clock: str) -
     assert files == ["agent-workflow.yaml", "foundation.yaml"]
 
 
-def test_regenerate_refreshes_updated_via_clock(tmp_path: Path, frozen_clock: str) -> None:
+def test_regenerate_refreshes_updated_via_clock(
+    tmp_path: Path, frozen_clock: str
+) -> None:
     """The frontmatter ``updated`` is refreshed via the injected clock seam (K10)."""
     d = _write_tree(tmp_path)
     text = regenerate_index(d)
@@ -299,9 +304,9 @@ def test_integration_unindexed_then_regenerate_fixes(
     """3 units on disk, one missing from index → load raises; regenerate fixes."""
     d = _write_tree(tmp_path)
     (d / "third.yaml").write_text(
-        _AGENT_YAML.replace("unit: agent-workflow", "unit: third", 1).replace(
-            "id: agent-workflow", "id: third-doc", 1
-        ).replace("code_doc_monitor/agent", "code_doc_monitor/third", 1),
+        _AGENT_YAML.replace("unit: agent-workflow", "unit: third", 1)
+        .replace("id: agent-workflow", "id: third-doc", 1)
+        .replace("code_doc_monitor/agent", "code_doc_monitor/third", 1),
         encoding="utf-8",
     )
     with pytest.raises(ConfigError):
@@ -381,7 +386,9 @@ def test_cli_index_check_exits_0_when_synced(
     assert (d / "index.yaml").read_text(encoding="utf-8") == synced
 
 
-def test_cli_index_default_config_dir(tmp_path: Path, monkeypatch, frozen_clock: str) -> None:
+def test_cli_index_default_config_dir(
+    tmp_path: Path, monkeypatch, frozen_clock: str
+) -> None:
     """With no --config-dir, the default config/cdmon under cwd is used."""
     d = _write_tree(tmp_path)
     (d / "auto.yaml").write_text(
@@ -442,10 +449,8 @@ def test_cli_index_missing_dir_is_loud(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def load_index_file_from_text(text: str) -> "config_mod.IndexFile":
+def load_index_file_from_text(text: str) -> config_mod.IndexFile:
     """Parse index text in-memory (mirror load_index_file without a file read)."""
     meta, body = config_mod._split_frontmatter(text, Path("<mem>/index.yaml"))
     data = config_mod._parse_v2_body(body, Path("<mem>/index.yaml"))
-    return config_mod.IndexFile(
-        frontmatter=config_mod.IndexFrontmatter(**meta), **data
-    )
+    return config_mod.IndexFile(frontmatter=config_mod.IndexFrontmatter(**meta), **data)

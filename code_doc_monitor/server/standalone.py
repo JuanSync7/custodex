@@ -139,9 +139,7 @@ def build_standalone_store(
         )
     except CodeDocMonitorError:
         return store
-    store.replace_config(
-        resolved_id, "git", list(git.documents), list(git.code_refs)
-    )
+    store.replace_config(resolved_id, "git", list(git.documents), list(git.code_refs))
     store.add_sync_run(git.run)
     return store
 

@@ -65,8 +65,12 @@ def test_create_doc_minimal_payload_defaults() -> None:
 
 def test_add_code_ref_validates() -> None:
     edit = _ADAPTER.validate_python(
-        {"action": "add_code_ref", "unit": "core", "doc_id": "g",
-         "ref": {"path": "src/x.py"}}
+        {
+            "action": "add_code_ref",
+            "unit": "core",
+            "doc_id": "g",
+            "ref": {"path": "src/x.py"},
+        }
     )
     assert isinstance(edit, AddCodeRefEdit)
     assert edit.ref == EditCodeRef(path="src/x.py")
@@ -74,8 +78,7 @@ def test_add_code_ref_validates() -> None:
 
 def test_remove_code_ref_validates() -> None:
     edit = _ADAPTER.validate_python(
-        {"action": "remove_code_ref", "unit": "core", "doc_id": "g",
-         "path": "src/x.py"}
+        {"action": "remove_code_ref", "unit": "core", "doc_id": "g", "path": "src/x.py"}
     )
     assert isinstance(edit, RemoveCodeRefEdit)
     assert edit.path == "src/x.py"
@@ -83,8 +86,12 @@ def test_remove_code_ref_validates() -> None:
 
 def test_set_context_refs_validates() -> None:
     edit = _ADAPTER.validate_python(
-        {"action": "set_context_refs", "unit": "core", "doc_id": "g",
-         "context_refs": [{"path": "docs/a.md"}]}
+        {
+            "action": "set_context_refs",
+            "unit": "core",
+            "doc_id": "g",
+            "context_refs": [{"path": "docs/a.md"}],
+        }
     )
     assert isinstance(edit, SetContextRefsEdit)
     assert edit.context_refs == (EditContextRef(path="docs/a.md"),)
@@ -92,8 +99,11 @@ def test_set_context_refs_validates() -> None:
 
 def test_set_doc_style_validates() -> None:
     edit = _ADAPTER.validate_python(
-        {"action": "set_doc_style", "doc_id": "g",
-         "doc_style": {"document_type": "tutorial", "vocabulary": "plain"}}
+        {
+            "action": "set_doc_style",
+            "doc_id": "g",
+            "doc_style": {"document_type": "tutorial", "vocabulary": "plain"},
+        }
     )
     assert isinstance(edit, SetDocStyleEdit)
     assert edit.doc_style == EditDocStyle(document_type="tutorial", vocabulary="plain")
@@ -112,8 +122,13 @@ def test_missing_action_is_loud() -> None:
 def test_extra_field_forbidden() -> None:
     with pytest.raises(ValidationError):
         _ADAPTER.validate_python(
-            {"action": "remove_code_ref", "unit": "core", "doc_id": "g",
-             "path": "src/x.py", "rogue": "nope"}
+            {
+                "action": "remove_code_ref",
+                "unit": "core",
+                "doc_id": "g",
+                "path": "src/x.py",
+                "rogue": "nope",
+            }
         )
 
 
@@ -121,8 +136,7 @@ def test_wrong_payload_for_action_is_loud() -> None:
     # set_doc_style has no `unit` field — supplying one trips extra="forbid".
     with pytest.raises(ValidationError):
         _ADAPTER.validate_python(
-            {"action": "set_doc_style", "doc_id": "g", "unit": "core",
-             "doc_style": {}}
+            {"action": "set_doc_style", "doc_id": "g", "unit": "core", "doc_style": {}}
         )
 
 

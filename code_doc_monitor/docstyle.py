@@ -73,9 +73,7 @@ class DocStyleFrontmatter(BaseModel):
                 f"got {self.cdmon_config_version!r}"
             )
         if self.kind != "doc-style-map":
-            raise ValueError(
-                f"kind must be 'doc-style-map', got {self.kind!r}"
-            )
+            raise ValueError(f"kind must be 'doc-style-map', got {self.kind!r}")
         return self
 
 
@@ -163,9 +161,7 @@ def resolve_style_files(
     }
 
 
-def read_style_guidance(
-    selection: DocStyleSelection, templates_root: Path
-) -> str:
+def read_style_guidance(selection: DocStyleSelection, templates_root: Path) -> str:
     """Concatenate the four selected template bodies under category headers (K10).
 
     Deterministic order: document-type, tone, writing-style, vocabulary. Each
@@ -182,9 +178,7 @@ def read_style_guidance(
         try:
             body = path.read_text(encoding="utf-8").strip()
         except OSError as exc:
-            raise ConfigError(
-                f"Cannot read writing template {path}: {exc}"
-            ) from exc
+            raise ConfigError(f"Cannot read writing template {path}: {exc}") from exc
         blocks.append(f"## Writing guidance — {subdir}\n\n{body}")
     return "\n\n".join(blocks)
 

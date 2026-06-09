@@ -538,9 +538,7 @@ class SqlStore:
         if sync_kind is not None:
             stmt = stmt.where(SyncRunRow.sync_kind == sync_kind)
         with self._session() as session:
-            row = session.scalars(
-                stmt.order_by(SyncRunRow.id.desc())
-            ).first()
+            row = session.scalars(stmt.order_by(SyncRunRow.id.desc())).first()
             return None if row is None else SyncRun.model_validate(row.run)
 
     def sync_runs_for(

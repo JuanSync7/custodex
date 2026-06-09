@@ -53,7 +53,9 @@ def _unit() -> UnitFile:
         region_modes={"symbols": RegionMode.GENERATED},
         code_refs=(
             CodeRef(path="code_doc_monitor/config.py"),
-            CodeRef(path="code_doc_monitor/schema.py", symbols=("Verdict", "ProposedFix")),
+            CodeRef(
+                path="code_doc_monitor/schema.py", symbols=("Verdict", "ProposedFix")
+            ),
             CodeRef(path="code_doc_monitor/blocks.py", lines=((1, 10), (20, 25))),
         ),
         context_refs=(

@@ -13,12 +13,10 @@ from pathlib import Path
 import pytest
 
 from code_doc_monitor.config import (
-    CDMON_CONFIG_VERSION,
     Audience,
     ConfigBundle,
     IndexFile,
     MonitorConfig,
-    UnitFile,
     _split_frontmatter,
     load_bundle,
     load_config_dir,
@@ -268,8 +266,10 @@ def test_unit_unknown_key_is_loud(tmp_path: Path) -> None:
 
 def test_unit_body_not_a_mapping_is_loud(tmp_path: Path) -> None:
     """A unit body that is a list, not a mapping, is loud."""
-    bad = "---\ncdmon-config-version: \"2.0.0\"\nunit: foundation\n" \
+    bad = (
+        '---\ncdmon-config-version: "2.0.0"\nunit: foundation\n'
         "title: t\nowner: o\ncreated: x\nupdated: y\n---\n- a\n- b\n"
+    )
     d = _write_tree(tmp_path, foundation=bad)
     with pytest.raises(ConfigError, match="must be a mapping"):
         load_unit_file(d / "foundation.yaml")
@@ -370,7 +370,8 @@ def test_identical_dir_covered_normalized_spelling_is_loud(tmp_path: Path) -> No
     """An equivalent spelling (trailing slash / ./) of the same dir is still loud."""
     identical = _FOUNDATION_YAML.replace(
         "  - code_doc_monitor/config.py",
-        "  - ./code_doc_monitor/agent/",  # same dir as agent-workflow, spelled differently
+        # same dir as agent-workflow, spelled differently
+        "  - ./code_doc_monitor/agent/",
         1,
     )
     d = _write_tree(tmp_path, foundation=identical)
@@ -548,7 +549,7 @@ def test_resolve_config_explicit_file_wins_over_autodetect(
     _write_tree(tmp_path)
     cfg_path = tmp_path / "cdmon.yaml"
     cfg_path.write_text(
-        "version: \"1.0.0\"\nroot: \".\"\ndocuments:\n"
+        'version: "1.0.0"\nroot: "."\ndocuments:\n'
         "  - {id: solo, path: docs/s.md, audience: eng-guide}\n",
         encoding="utf-8",
     )
@@ -560,9 +561,7 @@ def test_resolve_config_explicit_file_wins_over_autodetect(
 
 def test_unit_whitespace_dir_covered_entry_is_loud(tmp_path: Path) -> None:
     """A blank dir-covered entry → loud ConfigError."""
-    bad = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py", '  - "   "', 1
-    )
+    bad = _FOUNDATION_YAML.replace("  - code_doc_monitor/config.py", '  - "   "', 1)
     d = _write_tree(tmp_path, foundation=bad)
     with pytest.raises(ConfigError, match="non-empty"):
         load_unit_file(d / "foundation.yaml")

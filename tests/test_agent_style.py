@@ -158,10 +158,9 @@ def test_monitor_style_guidance_only_for_no_renderer_llm_region(
     """_style_guidance_for fires for a no-renderer llm REGION; None otherwise."""
     from code_doc_monitor.config import load_bundle
 
-    from tests.test_docstyle import _DOC_STYLE_WITH_MAPPING
-
     # A real bundle so doc_style is a genuine DocStyleMap.
     from tests.test_config_v2 import _write_tree
+    from tests.test_docstyle import _DOC_STYLE_WITH_MAPPING
 
     d = _write_tree(tmp_path)
     repo_root = d.parent.parent
@@ -208,7 +207,7 @@ def test_monitor_renderer_backed_llm_region_gets_no_guidance(tmp_path: Path) -> 
         RegionColumn,
         RegionTemplate,
     )
-    from code_doc_monitor.docstyle import DocStyleMap, DocStyleFrontmatter
+    from code_doc_monitor.docstyle import DocStyleFrontmatter, DocStyleMap
     from code_doc_monitor.monitor import Monitor
 
     root = _write_templates(tmp_path)

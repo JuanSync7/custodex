@@ -117,7 +117,9 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def _seed_docs(config_dir: Path) -> None:
-    result = CliRunner().invoke(app, ["monitor", "--config", str(config_dir), "--apply"])
+    result = CliRunner().invoke(
+        app, ["monitor", "--config", str(config_dir), "--apply"]
+    )
     assert result.exit_code == 0, result.output
 
 
@@ -306,7 +308,12 @@ def _server_run(*, fully_synced: bool = True) -> dict:
         "fully_synced": fully_synced,
         "document_count": 3,
         "code_ref_count": 5,
-        "drift": {"ok": True, "drift_count": 0, "by_kind": {}, "coverage_percent": 100.0},
+        "drift": {
+            "ok": True,
+            "drift_count": 0,
+            "by_kind": {},
+            "coverage_percent": 100.0,
+        },
         "started_at": _NOW,
         "finished_at": _NOW,
     }

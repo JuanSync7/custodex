@@ -158,15 +158,11 @@ def test_status_filter_includes_pending_excludes_applied(client: TestClient) -> 
     _register(client)
     client.post(f"/repos/{_REPO}/config/edits", json=_CREATE_DOC, headers=_auth())
 
-    pending = client.get(
-        f"/repos/{_REPO}/config/edits", params={"status": "pending"}
-    )
+    pending = client.get(f"/repos/{_REPO}/config/edits", params={"status": "pending"})
     assert pending.status_code == 200
     assert len(pending.json()) == 1
 
-    applied = client.get(
-        f"/repos/{_REPO}/config/edits", params={"status": "applied"}
-    )
+    applied = client.get(f"/repos/{_REPO}/config/edits", params={"status": "applied"})
     assert applied.status_code == 200
     assert applied.json() == []
 
@@ -187,9 +183,7 @@ def test_insertion_order_preserved(client: TestClient) -> None:
     _register(client)
     ids = []
     for body in _ALL_ACTIONS:
-        resp = client.post(
-            f"/repos/{_REPO}/config/edits", json=body, headers=_auth()
-        )
+        resp = client.post(f"/repos/{_REPO}/config/edits", json=body, headers=_auth())
         assert resp.status_code == 201, resp.text
         ids.append(resp.json()["edit_id"])
     rows = client.get(f"/repos/{_REPO}/config/edits").json()
@@ -214,9 +208,7 @@ def test_unknown_action_is_422(client: TestClient) -> None:
 def test_extra_field_is_422(client: TestClient) -> None:
     _register(client)
     body = {**_ADD_CODE_REF, "surprise": "value"}
-    resp = client.post(
-        f"/repos/{_REPO}/config/edits", json=body, headers=_auth()
-    )
+    resp = client.post(f"/repos/{_REPO}/config/edits", json=body, headers=_auth())
     assert resp.status_code == 422, resp.text
 
 
@@ -263,9 +255,7 @@ def test_edit_id_is_deterministic_under_fixed_clock(client: TestClient) -> None:
 
 
 def test_post_unknown_repo_is_404(client: TestClient) -> None:
-    resp = client.post(
-        "/repos/nope/config/edits", json=_CREATE_DOC, headers=_auth()
-    )
+    resp = client.post("/repos/nope/config/edits", json=_CREATE_DOC, headers=_auth())
     assert resp.status_code == 404
 
 

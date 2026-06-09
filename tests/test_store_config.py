@@ -460,8 +460,9 @@ def test_config_edits_for_unknown_repo_is_empty(store: Store) -> None:
 
 def test_config_edits_scoped_per_repo(store: Store) -> None:
     store.add_config_edit(_REPO, _create_doc_edit("a"), edit_id="e1", created_at=_NOW)
-    store.add_config_edit("other/repo", _create_doc_edit("b"), edit_id="e2",
-                          created_at=_NOW)
+    store.add_config_edit(
+        "other/repo", _create_doc_edit("b"), edit_id="e2", created_at=_NOW
+    )
     assert [r.edit_id for r in store.config_edits_for(_REPO)] == ["e1"]
     assert [r.edit_id for r in store.config_edits_for("other/repo")] == ["e2"]
 

@@ -22,6 +22,7 @@ from code_doc_monitor.config import (
     load_unit_file,
 )
 from code_doc_monitor.docstyle import load_doc_style
+from code_doc_monitor.errors import ConfigError
 from code_doc_monitor.templates_v2 import (
     DOC_STYLE_TEMPLATE,
     EXAMPLE_UNIT_STEM,
@@ -31,7 +32,6 @@ from code_doc_monitor.templates_v2 import (
     V2_TEMPLATES,
     scaffold_config_dir,
 )
-from code_doc_monitor.errors import ConfigError
 
 runner = CliRunner()
 
@@ -126,7 +126,12 @@ def test_scaffold_config_dir_is_load_bundle_valid(tmp_path: Path) -> None:
     scaffold_config_dir(config_dir, repo="my-repo", now="2026-06-07")
 
     # All four files exist.
-    for name in ("index.yaml", f"{EXAMPLE_UNIT_STEM}.yaml", "ignore.yaml", "doc-style.yaml"):
+    for name in (
+        "index.yaml",
+        f"{EXAMPLE_UNIT_STEM}.yaml",
+        "ignore.yaml",
+        "doc-style.yaml",
+    ):
         assert (config_dir / name).is_file()
 
     # Each individual loader accepts its scaffolded file.
@@ -183,7 +188,9 @@ def test_init_v2_scaffolds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert bundle.index.frontmatter.repo == "demo-repo"
 
 
-def test_init_v2_custom_config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_init_v2_custom_config_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(cli, "_now", lambda: "2026-06-07")
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(

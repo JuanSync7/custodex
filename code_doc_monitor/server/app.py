@@ -481,9 +481,7 @@ def _scan_doc_styles(templates_root: Path) -> DocStyleOptions:
     for attr, subdir in STYLE_CATEGORIES:
         category_dir = templates_root / subdir
         if category_dir.is_dir():
-            stems = sorted(
-                p.stem for p in category_dir.glob("*.md") if p.is_file()
-            )
+            stems = sorted(p.stem for p in category_dir.glob("*.md") if p.is_file())
         else:
             stems = []
         by_attr[attr] = tuple(stems)
@@ -550,9 +548,7 @@ def _disk_editable_parts(
         )
         sym = inventory.discover_symbols(inv, repo_root)
         report = resolve_coverage(bundle.config, sym)
-        undocumented = tuple(
-            sorted(f.path for f in report.undocumented_files)
-        )
+        undocumented = tuple(sorted(f.path for f in report.undocumented_files))
 
         # ignored_files: files UNDER the unit dir-covered dirs (ANY extension —
         # not just the source formats, so a sibling notes.log counts) that the
@@ -569,10 +565,9 @@ def _disk_editable_parts(
                 gitignore_path = repo_root / ".gitignore"
                 if gitignore_path.is_file():
                     ignore_globs.extend(
-                        gitignore_to_globs(
-                            gitignore_path.read_text(encoding="utf-8")
-                        )
+                        gitignore_to_globs(gitignore_path.read_text(encoding="utf-8"))
                     )
+
         def _dir_glob(d: str) -> str:
             return d.replace("\\", "/").strip("/") + "/**"
 
@@ -593,8 +588,7 @@ def _disk_editable_parts(
             ignored_all = []
         if len(ignored_all) > _IGNORED_FILES_CAP:
             _LOG.info(
-                "editable tree: %d ignored files for %s exceeds cap %d; "
-                "truncating",
+                "editable tree: %d ignored files for %s exceeds cap %d; truncating",
                 len(ignored_all),
                 local_path,
                 _IGNORED_FILES_CAP,
@@ -949,9 +943,7 @@ def create_app(
         for ref in refs:
             by_doc.setdefault(ref.doc_id, []).append(ref)
         editable_docs = tuple(
-            EditableDocument(
-                document=doc, code_refs=tuple(by_doc.get(doc.doc_id, []))
-            )
+            EditableDocument(document=doc, code_refs=tuple(by_doc.get(doc.doc_id, [])))
             for doc in documents
         )
         repo = store.get_repo(repo_id)
@@ -1108,9 +1100,7 @@ def create_app(
             undocumented_files=undocumented,
         )
 
-    @app.post(
-        "/repos/{repo_id:path}/records/{record_id}/apply-fix", status_code=201
-    )
+    @app.post("/repos/{repo_id:path}/records/{record_id}/apply-fix", status_code=201)
     def apply_record_fix_route(
         repo_id: str,
         record_id: str,

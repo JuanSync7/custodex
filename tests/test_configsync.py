@@ -112,7 +112,9 @@ def _seed_docs(config_dir: Path) -> None:
 
     from code_doc_monitor.cli import app
 
-    result = CliRunner().invoke(app, ["monitor", "--config", str(config_dir), "--apply"])
+    result = CliRunner().invoke(
+        app, ["monitor", "--config", str(config_dir), "--apply"]
+    )
     assert result.exit_code == 0, result.output
 
 
@@ -178,7 +180,7 @@ def test_clean_repo_local_mode_fully_synced(tmp_path: Path) -> None:
 
 
 def test_attribution_unit_sync_kind_ref(tmp_path: Path) -> None:
-    """Documents/code_refs carry unit, sync_kind=mode, ref=resolved commit, synced_at."""
+    """Documents/code_refs carry unit, sync_kind=mode, ref=commit, synced_at."""
     repo = _build_git_repo(tmp_path)
     head = _git(repo, "rev-parse", "HEAD").strip()
     result = run_sync(repo, "gitrepo", mode="git", default_branch="main", now=_NOW)
@@ -298,9 +300,7 @@ def test_git_failure_is_sync_error_no_leak(tmp_path: Path) -> None:
 def test_read_config_at_git_mode_cleans_up(tmp_path: Path) -> None:
     """The public read_config_at façade tears its git worktree down on return."""
     repo = _build_git_repo(tmp_path)
-    bundle, config_dir, git = read_config_at(
-        repo, mode="git", branch="main", now=_NOW
-    )
+    bundle, config_dir, git = read_config_at(repo, mode="git", branch="main", now=_NOW)
     assert bundle.config.documents[0].id == "api-guide"
     assert git.ref == git.main_commit
     _no_worktrees(repo)

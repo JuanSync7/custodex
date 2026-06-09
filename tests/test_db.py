@@ -419,7 +419,7 @@ def test_alembic_migration_up_then_down(tmp_path: Path) -> None:
 
 
 def test_alembic_migration_0003_config_sync_up_then_down(tmp_path: Path) -> None:
-    """0003 (Y-01) creates config_documents/config_code_refs/sync_runs; down drops them."""
+    """0003 (Y-01) creates config_documents/config_code_refs/sync_runs; down drops."""
     from alembic import command
 
     db = tmp_path / "migrate_0003.db"
@@ -466,8 +466,15 @@ def test_alembic_migration_0004_config_edits_up_then_down(tmp_path: Path) -> Non
     command.upgrade(cfg, "head")
     assert "config_edits" in set(inspect(engine).get_table_names())
     cols = {c["name"] for c in inspect(engine).get_columns("config_edits")}
-    assert {"id", "repo_id", "edit_id", "status", "created_at", "applied_at",
-            "edit"} <= cols
+    assert {
+        "id",
+        "repo_id",
+        "edit_id",
+        "status",
+        "created_at",
+        "applied_at",
+        "edit",
+    } <= cols
 
     # downgrade to 0003 -> config_edits dropped; the Y-01 tables remain.
     command.downgrade(cfg, "0003_config_sync")

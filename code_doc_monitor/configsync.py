@@ -123,9 +123,7 @@ class SyncResult(BaseModel):
     run: SyncRun
 
 
-def _git_info(
-    local_path: Path, default_branch: str, *, run_git: _GitRunner
-) -> GitInfo:
+def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> GitInfo:
     """Collect HEAD / default-branch / commits-ahead facts for the working tree.
 
     Pure reads (``rev-parse`` / ``rev-list``): never mutates the tree (K1). The
@@ -226,9 +224,7 @@ def _open_repo(
     or the default-branch tip (git).
     """
     if mode not in _MODES:
-        raise SyncError(
-            f"unknown sync mode {mode!r}: expected one of {list(_MODES)!r}"
-        )
+        raise SyncError(f"unknown sync mode {mode!r}: expected one of {list(_MODES)!r}")
     if not local_path.is_dir():
         raise SyncError(
             f"repo local_path does not exist or is not a directory: {local_path}"
@@ -250,9 +246,7 @@ def _open_repo(
     # the config from `<worktree>/<rel>/config/cdmon` with repo_root at
     # `<worktree>/<rel>`. When `local_path` IS the toplevel, `rel == "."` and this
     # is identical to a top-level checkout.
-    toplevel = Path(
-        run_git(["rev-parse", "--show-toplevel"], local_path).strip()
-    )
+    toplevel = Path(run_git(["rev-parse", "--show-toplevel"], local_path).strip())
     rel = local_path.resolve().relative_to(toplevel.resolve())
 
     tmp_root = tempfile.mkdtemp(prefix="cdmon-sync-")
@@ -375,9 +369,11 @@ def run_sync(
     # Run load + detect + coverage INSIDE the worktree scope: drift detection and
     # coverage read source files lazily off disk, so the git-mode checkout must
     # outlive them (the bug a premature teardown would cause). K1: read-only.
-    with _open_repo(
-        local_path, mode=mode, branch=default_branch, run_git=run_git
-    ) as (bundle, config_dir, git):
+    with _open_repo(local_path, mode=mode, branch=default_branch, run_git=run_git) as (
+        bundle,
+        config_dir,
+        git,
+    ):
         report = detect(bundle.config, config_dir)  # type: ignore[attr-defined]
         coverage_percent = _coverage_percent(bundle, config_dir)
         documents, code_refs = _build_rows(
@@ -385,9 +381,7 @@ def run_sync(
         )
     drift = _drift_summary(report, coverage_percent)
 
-    fully_synced = (
-        report.ok if mode == "git" else report.ok and git.commits_ahead == 0
-    )
+    fully_synced = report.ok if mode == "git" else report.ok and git.commits_ahead == 0
 
     run = SyncRun(
         repo_id=repo_id,

@@ -327,7 +327,5 @@ def test_apply_fix_route_requires_token(
 
 
 def test_apply_fix_route_unknown_repo_is_404(client: TestClient) -> None:
-    resp = client.post(
-        "/repos/nope/records/x/apply-fix", json={}, headers=_auth()
-    )
+    resp = client.post("/repos/nope/records/x/apply-fix", json={}, headers=_auth())
     assert resp.status_code == 404

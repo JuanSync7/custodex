@@ -143,9 +143,7 @@ def _build_repo(tmp_path: Path) -> tuple[Path, Path]:
 
 def _seed_in_sync(cfg_dir: Path) -> None:
     """Heal the docs to a clean baseline via ``cdmon monitor --apply``."""
-    result = runner.invoke(
-        app, ["monitor", "--config", str(cfg_dir), "--apply"]
-    )
+    result = runner.invoke(app, ["monitor", "--config", str(cfg_dir), "--apply"])
     assert result.exit_code == 0, result.output
 
 

@@ -25,7 +25,6 @@ from code_doc_monitor.docstyle import (
     resolve_style_files,
 )
 from code_doc_monitor.errors import ConfigError
-
 from tests.test_config_v2 import _write_tree
 
 # All template stems referenced by the fixtures below, per category.
@@ -244,7 +243,7 @@ def test_resolve_style_files_paths(tmp_path: Path) -> None:
 def test_read_style_guidance_contains_four_bodies_in_fixed_order(
     tmp_path: Path,
 ) -> None:
-    """All four bodies appear under category headers in document-type→vocabulary order."""
+    """All four bodies appear under category headers in doc-type→vocabulary order."""
     root = _write_templates(tmp_path)
     sel = DocStyleSelection(
         document_type="api-reference",
