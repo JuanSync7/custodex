@@ -1,0 +1,386 @@
+"""M-02 — the demo end-to-end through BOTH the central + standalone apps (offline).
+
+The demo (`demo/`, CONFIG-V2 §6) must be live and functional in every surface:
+
+* **central** — over the SEEDED app (:func:`scripts.seed_demo.build_seeded_store`):
+  ``demo-taskflow`` is listed; its Documents relationship tree matches
+  ``demo/config/cdmon``; a token-less ``POST /sync {local}`` succeeds + reports
+  counts; ``GET /sync-state`` returns the run.
+* **standalone** — over :func:`build_standalone_app` pointed at ``demo/``: one
+  repo, the same documents tree, a token-less sync, ``GET /`` 200.
+* **git-mode (committed fixture)** — a SEPARATE temp git repo that copies the demo
+  into a SUBDIR + commits it on ``main``: ``run_sync(mode="git")`` reads the
+  default branch correctly through configsync's NEW subdir-awareness, and leaves
+  no stray worktree behind (K1).
+* **demo CLI smoke** — from ``demo/``, ``cdmon check`` exits 0 and ``cdmon rpt``
+  re-renders byte-identical to the committed ``coverage.rpt`` (idempotent, K7),
+  with the per-unit waiver fix in place (per-unit ``percent: 100.00``).
+
+Everything is offline + deterministic (an injected ``now``, K10) and asserts
+behavior, not line counts.
+
+Features: FEAT-CLI-003, FEAT-CLI-005, FEAT-CONFIG-003, FEAT-CONFIGV2-001
+Features: FEAT-CONFIGV2-003, FEAT-CONFIGV2-006, FEAT-CONFIGV2-008
+Features: FEAT-CONFIGV2-012, FEAT-QUALITY-001, FEAT-QUALITY-005, FEAT-QUALITY-007
+Features: FEAT-SERVER-001, FEAT-SERVER-008, FEAT-SERVER-009, FEAT-SERVER-010
+Features: FEAT-SERVER-014, FEAT-SERVER-015
+"""
+
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from tests._repo import REPO_ROOT
+
+pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not installed")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from code_doc_monitor.config import load_bundle  # noqa: E402
+from code_doc_monitor.configsync import run_sync  # noqa: E402
+from code_doc_monitor.report import (  # noqa: E402
+    build_coverage_rpt,
+    parse_rpt,
+    render_rpt,
+)
+from code_doc_monitor.server.standalone import build_standalone_app  # noqa: E402
+
+_NOW = "2026-06-07T00:00:00Z"
+
+# The repo root (two up from tests/) + the committed demo content.
+_REPO_ROOT = REPO_ROOT
+_DEMO_DIR = _REPO_ROOT / "demo"
+
+# The six code refs the demo's documents reference, in load order (index units
+# order, then in-file documents order): core.yaml carries core-api then the
+# user-guide getting-started (symbol-selective refs over the same two core
+# files), then io.yaml carries io-api.
+_DEMO_CODE_REFS = (
+    "src/taskflow/core/model.py",
+    "src/taskflow/core/engine.py",
+    "src/taskflow/core/model.py",
+    "src/taskflow/core/engine.py",
+    "src/taskflow/io/storage.py",
+    "src/taskflow/io/report.py",
+)
+_DEMO_DOC_IDS = ("core-api", "getting-started", "io-api")
+
+
+# Make scripts/seed_demo importable (it lives outside the package, like the
+# launcher does at runtime) — mirrors how seed_demo is consumed in production.
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+from seed_demo import build_seeded_store  # noqa: E402
+
+
+def _git(repo: Path, *args: str) -> str:
+    out = subprocess.run(
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+    )
+    return out.stdout
+
+
+def _no_worktrees(repo: Path) -> None:
+    """Assert the repo has exactly its main working tree — no leaked worktrees."""
+    listed = _git(repo, "worktree", "list").strip().splitlines()
+    assert len(listed) == 1, f"leftover worktrees: {listed!r}"
+
+
+# --------------------------------------------------------------------------- #
+# central — the seeded app lists demo-taskflow + serves its documents + sync.
+# --------------------------------------------------------------------------- #
+
+
+def test_central_seeded_app_lists_demo_taskflow() -> None:
+    app = _seeded_app()
+    with TestClient(app) as client:
+        repos = client.get("/repos").json()
+    ids = [r["repo"]["repo_id"] for r in repos]
+    assert "demo-taskflow" in ids
+
+
+def test_central_documents_tree_matches_demo_config() -> None:
+    app = _seeded_app()
+    with TestClient(app) as client:
+        trees = client.get(
+            "/repos/demo-taskflow/documents", params={"sync_kind": "local"}
+        ).json()
+    assert [t["document"]["doc_id"] for t in trees] == list(_DEMO_DOC_IDS)
+    # The doc→code_refs relationship tree matches demo/config/cdmon's units.
+    refs = tuple(c["path"] for t in trees for c in t["code_refs"])
+    assert refs == _DEMO_CODE_REFS
+    # Units are attributed.
+    by_id = {t["document"]["doc_id"]: t for t in trees}
+    assert by_id["core-api"]["document"]["unit"] == "core"
+    assert by_id["getting-started"]["document"]["unit"] == "core"
+    assert by_id["io-api"]["document"]["unit"] == "io"
+
+
+def test_central_token_less_local_sync_succeeds_with_counts() -> None:
+    app = _seeded_app()
+    with TestClient(app) as client:
+        # No Authorization header: the demo repo is registered OPEN.
+        resp = client.post("/repos/demo-taskflow/sync", json={"mode": "local"})
+    assert resp.status_code == 201, resp.text
+    run = resp.json()
+    assert run["sync_kind"] == "local"
+    # The undocumented scheduler.py is a COVERAGE gap, NOT drift, so the demo
+    # stays fully synced.
+    assert run["fully_synced"] is True
+    assert run["document_count"] == 3
+    assert run["code_ref_count"] == 6
+
+
+def test_central_sync_state_returns_the_run() -> None:
+    app = _seeded_app()
+    with TestClient(app) as client:
+        state = client.get(
+            "/repos/demo-taskflow/sync-state", params={"sync_kind": "local"}
+        ).json()
+    assert state is not None
+    assert state["sync_kind"] == "local"
+    assert state["document_count"] == 3
+
+
+def test_central_seeded_demo_has_records_and_coverage() -> None:
+    """M-03: clicking demo-taskflow must SHOW content — the seed gives it its own
+    heal records (drift timeline) AND a real coverage snapshot with the gap."""
+    app = _seeded_app()
+    with TestClient(app) as client:
+        records = client.get("/repos/demo-taskflow/records").json()
+        coverage = client.get("/repos/demo-taskflow/coverage").json()
+    # Real heal records over the demo's OWN docs (not the generic fixture docs).
+    assert records, "demo-taskflow should have seeded heal records"
+    assert {r["doc_id"] for r in records} <= {"core-api", "getting-started"}
+    assert all(r["verdict"] == "FIX" for r in records)
+    # A coverage snapshot showing the deliberate scheduler.py gap (~80% files).
+    assert coverage, "demo-taskflow should have a seeded coverage snapshot"
+    latest = coverage[-1]
+    assert latest["percent_files"] == 80.0
+    undocumented = [f["path"] for f in latest["files"] if f["status"] == "undocumented"]
+    assert "src/taskflow/core/scheduler.py" in undocumented
+
+
+# --------------------------------------------------------------------------- #
+# standalone — build_standalone_app(<repo>/demo) serves the same one repo.
+# --------------------------------------------------------------------------- #
+
+
+def test_standalone_demo_app_one_repo_and_documents() -> None:
+    app = build_standalone_app(_DEMO_DIR, now=_NOW)
+    with TestClient(app) as client:
+        repos = client.get("/repos").json()
+        assert [r["repo"]["repo_id"] for r in repos] == ["demo-taskflow"]
+        trees = client.get(
+            "/repos/demo-taskflow/documents", params={"sync_kind": "local"}
+        ).json()
+    assert [t["document"]["doc_id"] for t in trees] == list(_DEMO_DOC_IDS)
+    refs = tuple(c["path"] for t in trees for c in t["code_refs"])
+    assert refs == _DEMO_CODE_REFS
+
+
+def test_demo_getting_started_loads_context_refs() -> None:
+    """EDITOR E-12: the demo's `getting-started` doc carries its `context_refs`
+    (generation glance-through references) via `load_bundle` — additive (K6),
+    distinct from its code_refs, and present in the loaded model."""
+    bundle = load_bundle(_DEMO_DIR / "config" / "cdmon")
+    spec = next(d for d in bundle.config.documents if d.id == "getting-started")
+    refs = {(r.path, r.note) for r in spec.context_refs}
+    assert refs == {
+        ("docs/api/core-api.md", "the full engine reference"),
+        ("src/taskflow/core/engine.py", "scheduling semantics referenced in the tour"),
+    }
+    # context_refs are NOT code_refs (the documented surface stays symbol-selective).
+    assert {r.path for r in spec.code_refs} == {
+        "src/taskflow/core/model.py",
+        "src/taskflow/core/engine.py",
+    }
+
+
+def test_standalone_editable_tree_shows_context_refs_and_unlinked_scheduler() -> None:
+    """EDITOR E-12: the editable tree (the Mapping page read) shows
+    `getting-started.context_refs` populated AND `scheduler.py` under
+    `undocumented_files` — the unlinked file you link → generate on the page."""
+    app = build_standalone_app(_DEMO_DIR, now=_NOW)
+    with TestClient(app) as client:
+        tree = client.get(
+            "/repos/demo-taskflow/config/editable",
+            params={"sync_kind": "local"},
+        ).json()
+    by_id = {d["document"]["doc_id"]: d for d in tree["documents"]}
+    gs = by_id["getting-started"]["document"]
+    crefs = {(c["path"], c["note"]) for c in gs["context_refs"]}
+    assert crefs == {
+        ("docs/api/core-api.md", "the full engine reference"),
+        ("src/taskflow/core/engine.py", "scheduling semantics referenced in the tour"),
+    }
+    # The deliberately-unlinked scheduler.py is the live link→generate target.
+    assert "src/taskflow/core/scheduler.py" in tree["undocumented_files"]
+    # context_refs are additive: the existing doc tree is unaffected.
+    assert list(by_id) == list(_DEMO_DOC_IDS)
+
+
+def test_standalone_demo_token_less_sync_and_root() -> None:
+    app = build_standalone_app(_DEMO_DIR, now=_NOW)
+    with TestClient(app) as client:
+        resp = client.post("/repos/demo-taskflow/sync", json={"mode": "local"})
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["sync_kind"] == "local"
+        root = client.get("/")
+    assert root.status_code == 200
+
+
+# --------------------------------------------------------------------------- #
+# git-mode — a committed fixture whose config/cdmon is in a SUBDIR (M-02 #1).
+# --------------------------------------------------------------------------- #
+
+
+def _commit_demo_in_subdir(tmp_path: Path) -> tuple[Path, Path]:
+    """Copy the demo into ``<repo>/demo`` of a fresh git repo, commit on ``main``.
+
+    The config thus lives TWO levels under the git toplevel
+    (``demo/config/cdmon``) — exactly the subdir layout configsync must handle.
+    Returns ``(toplevel, demo_subdir)``.
+    """
+    top = tmp_path / "outer"
+    top.mkdir()
+    sub = top / "demo"
+    shutil.copytree(_DEMO_DIR, sub)
+    _git(top, "init", "-q")
+    _git(top, "config", "user.email", "test@example.invalid")
+    _git(top, "config", "user.name", "tester")
+    _git(top, "add", "-A")
+    _git(top, "commit", "-q", "-m", "init")
+    _git(top, "branch", "-M", "main")
+    return top, sub
+
+
+def test_git_mode_reads_config_in_subdir(tmp_path: Path) -> None:
+    top, sub = _commit_demo_in_subdir(tmp_path)
+    result = run_sync(sub, "demo-taskflow", mode="git", default_branch="main", now=_NOW)
+    run = result.run
+    assert run.sync_kind == "git"
+    assert run.document_count == 3
+    assert run.code_ref_count == 6
+    assert run.commits_ahead == 0
+    # The committed demo docs are healed in-sync, so main is fully synced.
+    assert run.fully_synced is True
+    assert [r.path for r in result.code_refs] == list(_DEMO_CODE_REFS)
+    _no_worktrees(top)
+
+
+def test_git_mode_subdir_leaves_no_worktree(tmp_path: Path) -> None:
+    top, sub = _commit_demo_in_subdir(tmp_path)
+    run_sync(sub, "demo-taskflow", mode="git", default_branch="main", now=_NOW)
+    run_sync(sub, "demo-taskflow", mode="git", default_branch="main", now=_NOW)
+    _no_worktrees(top)
+
+
+def test_git_mode_uncommitted_subdir_is_loud(tmp_path: Path) -> None:
+    """A repo whose default branch lacks <rel>/config/cdmon raises a loud SyncError."""
+    from code_doc_monitor.errors import SyncError
+
+    top = tmp_path / "outer"
+    top.mkdir()
+    (top / "readme.md").write_text("hi\n", encoding="utf-8")
+    _git(top, "init", "-q")
+    _git(top, "config", "user.email", "test@example.invalid")
+    _git(top, "config", "user.name", "tester")
+    _git(top, "add", "-A")
+    _git(top, "commit", "-q", "-m", "init")
+    _git(top, "branch", "-M", "main")
+    # The demo subdir exists in the WORKING TREE but is not committed to main.
+    sub = top / "demo"
+    shutil.copytree(_DEMO_DIR, sub)
+    with pytest.raises(SyncError, match="config/cdmon"):
+        run_sync(sub, "demo-taskflow", mode="git", default_branch="main", now=_NOW)
+    _no_worktrees(top)
+
+
+# --------------------------------------------------------------------------- #
+# demo CLI smoke — `cdmon check` exit 0; `cdmon rpt` matches committed report.
+# --------------------------------------------------------------------------- #
+
+
+def test_demo_cli_check_exit_zero() -> None:
+    from typer.testing import CliRunner
+
+    from code_doc_monitor.cli import app
+
+    result = CliRunner().invoke(
+        app, ["check", "--config", str(_DEMO_DIR / "config" / "cdmon")]
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_demo_doc_style_exercises_all_four_categories() -> None:
+    """The user-guide doc maps every template CATEGORY to a non-default value, so
+    all four categories (document-type/tone/writing-style/vocabulary) are
+    exercised somewhere in the demo, not just api-reference/precise/etc."""
+    from code_doc_monitor.docstyle import load_doc_style
+
+    cfg = _DEMO_DIR / "config" / "cdmon"
+    style = load_doc_style(
+        cfg / "doc-style.yaml", templates_root=_DEMO_DIR / "templates" / "writing"
+    )
+
+    sel = style.style_for("getting-started")
+    assert sel.document_type == "tutorial"
+    assert sel.tone == "friendly"
+    assert sel.writing_style == "narrative"
+    assert sel.vocabulary == "general"
+
+    # Every category value the user-guide picks differs from the defaults, so the
+    # demo now uses a non-default value in all four categories.
+    defaults = style.defaults
+    assert sel.document_type != defaults.document_type
+    assert sel.tone != defaults.tone
+    assert sel.writing_style != defaults.writing_style
+    assert sel.vocabulary != defaults.vocabulary
+
+
+def test_demo_rpt_matches_committed_coverage_report() -> None:
+    """Re-rendering the demo report equals the committed file (idempotent, K7) and
+    reports the real coverage gap: scheduler.py is undocumented under `core`."""
+    cfg = _DEMO_DIR / "config" / "cdmon"
+    committed = parse_rpt((cfg / "coverage.rpt").read_text(encoding="utf-8"))
+
+    bundle = load_bundle(cfg)
+    from code_doc_monitor.report import report_repo_root
+
+    repo_root = report_repo_root(cfg, bundle)
+    rebuilt = build_coverage_rpt(bundle, repo_root, ref=None)
+
+    # The rebuilt report renders byte-identical to the committed file.
+    assert render_rpt(rebuilt) == (cfg / "coverage.rpt").read_text(encoding="utf-8")
+
+    # Overall coverage now reflects the one real gap: 4 of 5 eligible files
+    # documented (the 2 __init__.py are waived out of the denominator) = 80%.
+    assert committed.summary.percent == 80.0
+    by_unit = {u.unit: u for u in committed.units}
+    # The `core` unit carries the gap (scheduler.py): 2 of 3 documented = 66.67.
+    assert by_unit["core"].percent == 66.67
+    assert "src/taskflow/core/scheduler.py" in by_unit["core"].uncovered
+    # The `io` unit is still fully documented.
+    assert by_unit["io"].percent == 100.0
+
+    # scheduler.py surfaces as undocumented with `core` as its suggested unit.
+    gaps = {g.path: g for g in committed.undocumented}
+    assert "src/taskflow/core/scheduler.py" in gaps
+    assert gaps["src/taskflow/core/scheduler.py"].suggested_unit == "core.yaml"
+
+
+# --------------------------------------------------------------------------- #
+# helpers
+# --------------------------------------------------------------------------- #
+
+
+def _seeded_app() -> object:
+    """The central app over a freshly seeded store (no SPA mount needed here)."""
+    from code_doc_monitor.server import create_app
+
+    return create_app(build_seeded_store())

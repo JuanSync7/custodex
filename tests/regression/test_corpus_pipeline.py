@@ -5,6 +5,12 @@ points straight to the LESSON_LEARNT.md / problems writeup. These are the durabl
 pipeline guarantees: a learned failure with a corpus guard cannot silently return.
 
 See ``tests/regression/README.md`` for the case → lesson map.
+
+Features: FEAT-EXTRACT-001, FEAT-EXTRACT-002, FEAT-EXTRACT-004, FEAT-DRIFT-001
+Features: FEAT-DRIFT-004, FEAT-DRIFT-008, FEAT-MONITOR-001, FEAT-MONITOR-003
+Features: FEAT-MONITOR-006, FEAT-HEAL-001, FEAT-HEAL-004, FEAT-HEAL-005
+Features: FEAT-HEAL-007, FEAT-HEAL-008, FEAT-HEAL-009, FEAT-MANIFEST-003
+Features: FEAT-MANIFEST-006, FEAT-MANIFEST-007, FEAT-PR-003
 """
 
 from __future__ import annotations

@@ -6,6 +6,11 @@ module is detected as a gap — the most likely future self-gate regression per 
 H-01/H-04 lesson), and the checked-in dogfood docs stay in sync with the code.
 
 Each case names the lesson id it guards. See ``tests/regression/README.md``.
+
+Features: FEAT-CONFIGV2-001, FEAT-COVERAGE-001, FEAT-COVERAGE-005
+Features: FEAT-COVERAGE-006, FEAT-COVERAGE-007, FEAT-COVERAGE-008
+Features: FEAT-COVERAGE-009, FEAT-DRIFT-001, FEAT-MONITOR-002, FEAT-MONITOR-003
+Features: FEAT-HEAL-001, FEAT-LAYOUT-001, FEAT-LAYOUT-002
 """
 
 from __future__ import annotations
