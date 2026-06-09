@@ -353,7 +353,22 @@ valid until a deliberate re-baseline.
   added/removed/renamed. Pre-P4 docs (no stored anchors) → empty delta. See
   `.project/slices/P-04.md`. **EPIC P COMPLETE.**
 
-**EPIC P COMPLETE** (P-01…P-04). The opaque single-hash, Python-only fingerprint is
+**P5 — Additional real extractors behind the proven seam**
+- ✅ **P-05** the FIRST real, production-registered non-Python extractor:
+  `extract.ShellExtractor` (`language="shell"`) parses sh/bash function defs —
+  `name() {…}` and `function name {…}` — via the stdlib `re` module ONLY (no heavy
+  dep → core dep surface unchanged, offline gate intact; K0/K4). Each def →
+  `Symbol(kind="function", signature=f"{name}()", is_public=leaf-name rule,
+  docstring=leading `#` comment block (shebang excluded), brace-matched span,
+  body_hash=None)`; pure & import-free (read as text, never sourced). Registered by
+  DEFAULT (`register_extractor(ShellExtractor(), suffixes=(".sh", ".bash"))`), so a
+  `.sh`/`.bash` ref with `lang: shell` OR `lang: auto` resolves it with ZERO engine
+  edit (`_symbol_language`/`_symbols_for_ref`/`build_document_surface` untouched —
+  the K0 proof). K3 holds e2e: eng-guide folds the comment docstring in, user-guide
+  drops `_`-helpers + excludes docstrings. See `.project/slices/P-05.md`.
+  *(1390 passed, 97.48% branch; dogfood check/lint/coverage --fail-under 95 exit 0.)*
+
+**EPIC P COMPLETE** (P-01…P-05). The opaque single-hash, Python-only fingerprint is
 now a pluggable, tiered, anchored model — every step additive and holding the
 composite (`surface_hash`) bytes constant so no stored `cdm.fingerprint` was
 invalidated: **P-01** seam (`Extractor` Protocol + registry) and opt-in body-AST
@@ -362,9 +377,11 @@ composite) with which-tier-moved reporting and the `schema_version` 1.1.0 bump;
 **P-03** symbol extraction routed through the registry by `CodeRef.lang` (a new
 language is a registration, not an engine edit — K0); **P-04** stable lineno-free
 `anchor_id`s recorded per region so drift tells a structural symbol add/remove/
-rename from an internal (body/docstring) change. Real heavy non-Python parsers
-(tree-sitter/regex) and `lines`-ref re-binding remain follow-on registrations
-behind the now-stable seam.
+rename from an internal (body/docstring) change; **P-05** the first REAL non-Python
+extractor (`ShellExtractor`, stdlib-regex sh/bash) registered by default — proving
+a new language is a registration, not an engine edit (K0). A shell body tier, real
+heavy parsers (tcl/tree-sitter), and `lines`-ref re-binding remain follow-on
+registrations behind the now-proven seam.
 
 ---
 

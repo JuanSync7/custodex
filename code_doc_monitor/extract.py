@@ -40,6 +40,7 @@ __all__ = [
     "DocumentSurface",
     "Extractor",
     "PythonAstExtractor",
+    "ShellExtractor",
     "register_extractor",
     "get_extractor",
     "extract_file",
@@ -523,6 +524,104 @@ def _extract_python_symbols(path: Path) -> list[Symbol]:
 
 
 # --------------------------------------------------------------------------- #
+# Shell symbol extraction (P-05): regex over sh/bash, stdlib only (K0)         #
+# --------------------------------------------------------------------------- #
+
+#: A sh/bash function-definition header: ``name() {`` (POSIX) or
+#: ``function name {`` / ``function name() {`` (bash). The opening brace must sit
+#: on the header line (the conventional style); braces inside quotes/here-docs
+#: are a best-effort limitation (see ``.project/slices/P-05.md``).
+_SHELL_DEF_RE = re.compile(
+    r"[ \t]*"
+    r"(?:function[ \t]+(?P<fname>[A-Za-z_]\w*)[ \t]*(?:\([ \t]*\))?"
+    r"|(?P<pname>[A-Za-z_]\w*)[ \t]*\([ \t]*\))"
+    r"[ \t]*\{"
+)
+
+
+def _shell_block_end(lines: list[str], start_idx: int, start_col: int) -> int:
+    """Return the 0-based line index where the brace opened at ``start_col`` closes.
+
+    Brace-depth scan from just after the opening ``{`` (depth already 1).
+    Best-effort: braces inside quotes/here-docs are not special-cased; an
+    unbalanced block falls back to the header line (K10 — deterministic).
+    """
+    depth = 1
+    for j in range(start_idx, len(lines)):
+        for ch in lines[j][start_col if j == start_idx else 0 :]:
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return j
+    return start_idx
+
+
+def _shell_docstring(lines: list[str], header_idx: int) -> str | None:
+    """The contiguous ``#`` comment block directly above ``header_idx``.
+
+    Walks UP from the header collecting comment lines (one leading ``# ``
+    stripped, trailing whitespace normalized) until a blank/non-comment line;
+    the ``#!`` shebang is never documentation. ``None`` when there is none.
+    """
+    collected: list[str] = []
+    j = header_idx - 1
+    while j >= 0:
+        stripped = lines[j].lstrip()
+        if stripped.startswith("#!") or not stripped.startswith("#"):
+            break
+        text = stripped[1:]
+        if text.startswith(" "):
+            text = text[1:]
+        collected.append(text.rstrip())
+        j -= 1
+    if not collected:
+        return None
+    collected.reverse()
+    return "\n".join(collected)
+
+
+def _extract_shell_symbols(path: Path) -> list[Symbol]:
+    """Extract sh/bash function definitions via regex only — import-free (K0, P5).
+
+    Recognizes ``name() { … }`` and ``function name { … }`` headers; the script
+    is parsed as text, never sourced or executed. The docstring is the leading
+    ``#`` comment block (shebang excluded); ``body_hash`` is ``None`` (the opt-in
+    body tier is Python-AST-only). Deterministic (K10).
+
+    Raises :class:`ExtractionError` (K8) if ``path`` cannot be read.
+    """
+    try:
+        source = path.read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError as exc:
+        raise ExtractionError(f"Code reference not found: {path}") from exc
+    except OSError as exc:
+        raise ExtractionError(f"Cannot read code reference {path}: {exc}") from exc
+
+    lines = source.splitlines()
+    symbols: list[Symbol] = []
+    for idx, line in enumerate(lines):
+        match = _SHELL_DEF_RE.match(line)
+        if match is None:
+            continue
+        name = match.group("fname") or match.group("pname")
+        end_idx = _shell_block_end(lines, idx, match.end())
+        symbols.append(
+            Symbol(
+                name=name,
+                kind="function",
+                signature=f"{name}()",
+                lineno=idx + 1,
+                end_lineno=end_idx + 1,
+                is_public=_is_public(name),
+                docstring=_shell_docstring(lines, idx),
+            )
+        )
+    return symbols
+
+
+# --------------------------------------------------------------------------- #
 # Pluggable extractor seam (P-01, K0)                                          #
 # --------------------------------------------------------------------------- #
 
@@ -549,6 +648,21 @@ class PythonAstExtractor:
 
     def extract(self, path: Path) -> list[Symbol]:
         return _extract_python_symbols(path)
+
+
+class ShellExtractor:
+    """The first real non-Python extractor: sh/bash functions via regex (P5, K0).
+
+    Uses only the stdlib ``re`` module — no heavy parser, so the core dependency
+    surface is unchanged and the offline test gate is intact (K0/K4). Registered
+    by default (below) for ``.sh``/``.bash``, so a new language is a *registration*,
+    never an engine edit.
+    """
+
+    language = "shell"
+
+    def extract(self, path: Path) -> list[Symbol]:
+        return _extract_shell_symbols(path)
 
 
 # language -> extractor. Resolution is by language string only; no target- or
@@ -583,6 +697,12 @@ def get_extractor(language: str) -> Extractor:
         raise ExtractionError(
             f"no extractor registered for language {language!r}"
         ) from None
+
+
+# P5: ship the shell extractor as a DEFAULT registration — proves K0 (a new
+# language is a registration, not an engine edit). A `.sh`/`.bash` symbols ref
+# with `lang: auto` (or `lang: shell`) now resolves to it.
+register_extractor(ShellExtractor(), suffixes=(".sh", ".bash"))
 
 
 def extract_file(path: Path) -> list[Symbol]:

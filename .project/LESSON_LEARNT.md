@@ -1472,3 +1472,35 @@ silently masks a real API change a doc owner must see. The lossless signal —
 "`foo` is gone, `bar` is new" — is the correct one; let the human decide they're
 the same. → Prefer a faithful, decomposable signal over a clever inference that can
 be wrong; identity tracking across renames is a separate, opt-in concern.
+
+**[P-05] The seam was the feature; the extractor just proves it.** P-01/P-03 built
+the `Extractor` Protocol + language-keyed registry, but the only registered
+extractor was Python (the non-Python path was proven by a *test stub*). P-05's real
+work was almost nothing in the engine — a stdlib-regex `ShellExtractor` plus ONE
+module-level `register_extractor(..., suffixes=(".sh", ".bash"))`. `_symbol_language`,
+`_symbols_for_ref`, and `build_document_surface` were UNTOUCHED, and that
+untouched-ness IS the K0 proof: a new language is a registration, not an engine
+edit. → When a seam is well-built, its slices are tiny and the diff that DOESN'T
+appear (no edits to the routing code) is the headline evidence — assert it.
+
+**[P-05] A real extractor only needs to fill `Symbol`'s required fields — reuse the
+audience rules, don't reinvent them.** A non-Python language has no `is_public`
+convention of its own, but `Symbol.is_public` drives the K3 audience filter
+everywhere downstream. Reusing the shared leaf-name rule (`_is_public`) for shell
+made `user-guide` correctly drop `_helper` and `eng-guide` keep it with ZERO new
+audience logic — the filter lives in `build_document_surface`, not the extractor.
+Likewise the docstring (leading `#` comment block) flows into the eng-guide
+docstring tier for free. → An extractor's only job is to populate `Symbol`
+faithfully; audience/hashing/drift all compose on top. Keep target-specific parsing
+inside `extract()` and let the engine's invariants do the rest.
+
+**[P-05] Regex brace-matching is best-effort by design — make the fallback
+deterministic and document it.** `${var}` inside a shell body contributes a
+balanced `{`/`}` so depth-counting survives it, but a here-doc or a brace inside a
+quoted string can desync the count. Rather than chase shell-lexer correctness
+(which would pull in real parsing, against the stdlib-only K0 budget), the
+unbalanced case falls back to `end_lineno == lineno` and the limitation is written
+into the slice spec. `end_lineno` isn't part of any hash (signatures/docstrings/
+bodies are), so a wrong span degrades a display range, never the drift verdict. →
+Scope a lightweight extractor to what the hash actually consumes; for the rest,
+pick a deterministic fallback and name the limitation instead of hiding it.

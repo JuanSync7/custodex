@@ -405,6 +405,15 @@ class Extractor(Protocol):
 
 class PythonAstExtractor:            # the default; AST-only, import-free (K0)
     language = "python"
+
+class ShellExtractor:                # P5: the first REAL non-Python extractor —
+    language = "shell"               # regex over sh/bash, stdlib `re` only (K0-clean,
+    def extract(self, path: Path) -> list[Symbol]: ...   # NO heavy dep, offline gate intact)
+# P5: registered by DEFAULT at import → `register_extractor(ShellExtractor(), suffixes=(".sh", ".bash"))`
+#   so a `.sh`/`.bash` ref with `lang: auto` (or `lang: shell`) resolves it with zero engine edit.
+#   Extracts `name() {…}` and `function name {…}` defs → Symbol(kind="function",
+#   signature=f"{name}()", is_public=leaf-name rule, docstring=leading `#` comment block).
+#   body_hash stays None (the opt-in body tier is Python-AST-only; deferred for shell).
 def register_extractor(extractor: Extractor, *, suffixes: tuple[str, ...] = ()) -> None
     # P3: also maps each suffix → extractor.language for `lang: auto` symbol refs
 def get_extractor(language: str) -> Extractor      # loud on unknown language (K8)

@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d12c47c79d680e65
+  fingerprint: 8242a090b65a4375
   fingerprint_tiers:
-    composite: d12c47c79d680e65
-    docstring: 0163a5249fb17b53
-    signature: fcce331a718c4ff7
+    composite: 8242a090b65a4375
+    docstring: 1a4a1e5a6af645d6
+    signature: 5fb88207d63bea31
   region_anchors:
     symbols:
     - 004e9ebd1915d8c9
@@ -19,11 +19,13 @@ cdm:
     - 0c27f67f2c31b80d
     - 0e521d4fec62ad6d
     - 10025d4ecda1075d
+    - 113d887bd2c19dd6
     - 136d9c181ab496c9
     - 159e0d8feb35472d
     - 1a23f568636ee3df
     - 1e07ea56a9427118
     - 1ec4f05521a7e7b1
+    - 288dfcba0083016a
     - 2b6d39ab2be6b34d
     - 2d99c0e7975fe9ad
     - 302733cd18785ad9
@@ -31,6 +33,7 @@ cdm:
     - 35e3a6277907b11f
     - 364bbe729c337185
     - 3808bf2494e6a6d5
+    - 3b0ad2a2d6bcde10
     - 3e36acf3f35aaf6d
     - 40092567da6296d3
     - 43b3558a3373be6b
@@ -46,8 +49,10 @@ cdm:
     - 57c90323dcf86a86
     - 5943cd04645293aa
     - 59f467abbc21ec6e
+    - 5bd2d418572469ea
     - 5c782ed8831611b8
     - 6035b3d7a6bf2f06
+    - 69cde016e060557f
     - 6a0a75b77a742aa8
     - 6f3a5aa1e95b414e
     - 74ae6b0e62e83c24
@@ -84,6 +89,7 @@ cdm:
     - cd5653449960afec
     - cfa1c5fc66e83838
     - cfacfd3ec33b9608
+    - d196cdaed851bfc1
     - d2426a2018658d8f
     - d2b3e82b6f007167
     - d32e474046e5b6ed
@@ -102,7 +108,7 @@ cdm:
     - fa4842e3b1aaf938
     - fb7f1b86375d74b7
   region_hashes:
-    symbols: f6f20039e4041f96
+    symbols: e7105c6309853667
   schema_version: 1.0.0
 ---
 # code-doc-monitor — pipeline (engineering reference)
@@ -128,6 +134,8 @@ cdm:
 | PythonAstExtractor.extract | method | def extract(self, path: Path) -> list[Symbol] |
 | REGION_KEYS | variable | REGION_KEYS: frozenset[str] = frozenset({'symbols'}) |
 | Record | class | class Record(BaseModel) |
+| ShellExtractor | class | class ShellExtractor |
+| ShellExtractor.extract | method | def extract(self, path: Path) -> list[Symbol] |
 | SurfaceFingerprint | class | class SurfaceFingerprint(BaseModel) |
 | SurfaceFingerprint.drifted_against | method | def drifted_against(self, other: SurfaceFingerprint) -> tuple[str, ...] |
 | Symbol | class | class Symbol(BaseModel) |
@@ -139,6 +147,7 @@ cdm:
 | _FM_RE | variable | _FM_RE = ... |
 | _MAX_VALUE_LEN | variable | _MAX_VALUE_LEN = 48 |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |
+| _SHELL_DEF_RE | variable | _SHELL_DEF_RE = ... |
 | _SH_CASE_SWITCH | variable | _SH_CASE_SWITCH = re.compile('(--?[A-Za-z][\\\\w-]*)(?=[)\|])') |
 | _SH_GETOPTS | variable | _SH_GETOPTS = ... |
 | _SUFFIX_LANG | variable | _SUFFIX_LANG = ... |
@@ -156,6 +165,7 @@ cdm:
 | _class_signature | function | def _class_signature(node: ast.ClassDef) -> str |
 | _const_str | function | def _const_str(node: ast.expr \| None, max_len: int \| None = 80) -> str |
 | _extract_python_symbols | function | def _extract_python_symbols(path: Path) -> list[Symbol] |
+| _extract_shell_symbols | function | def _extract_shell_symbols(path: Path) -> list[Symbol] |
 | _format_args | function | def _format_args(args: ast.arguments) -> str |
 | _func_signature | function | def _func_signature(node: ast.FunctionDef \| ast.AsyncFunctionDef, display_name: str) -> str |
 | _func_symbol | function | def _func_symbol(node: ast.FunctionDef \| ast.AsyncFunctionDef, *, name: str, display_name: str, kind: SymbolKind) -> Symbol |
@@ -169,6 +179,8 @@ cdm:
 | _row | function | def _row(sym: Symbol) -> str |
 | _select | function | def _select(symbols: list[Symbol], ref_symbols: tuple[str, ...], ref_lines: tuple[tuple[int, int], ...], ref_names: tuple[str, ...]) -> list[Symbol] |
 | _sh_switches | function | def _sh_switches(text: str) -> set[str] |
+| _shell_block_end | function | def _shell_block_end(lines: list[str], start_idx: int, start_col: int) -> int |
+| _shell_docstring | function | def _shell_docstring(lines: list[str], header_idx: int) -> str \| None |
 | _short_diff | function | def _short_diff(expected: str, actual: str, region_id: str) -> str |
 | _switch_strings | function | def _switch_strings(node: ast.AST) -> list[str] |
 | _symbol_cell | function | def _symbol_cell(col: RegionColumn, sym: Symbol) -> str |

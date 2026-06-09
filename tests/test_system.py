@@ -1047,3 +1047,56 @@ def test_anchors_stamped_and_classify_change_e2e(tmp_path: Path) -> None:
         if d.doc_id == "eng" and d.kind is DriftKind.HASH
     )
     assert anchor_id("compute") in eng_hash2.anchors_removed
+
+
+_SHELL_V1 = """\
+#!/usr/bin/env bash
+
+# Build the project.
+build_all() {
+    echo "build"
+    _prepare
+}
+
+function _prepare {
+    mkdir -p build
+}
+"""
+
+
+def test_shell_extractor_drifts_and_heals_e2e(tmp_path: Path) -> None:
+    """P5 e2e: a doc over a REAL .sh file (the registered ShellExtractor) heals
+    to a clean baseline; renaming a shell function drifts it and ``monitor
+    --apply`` re-heals to clean & idempotent (K7) — zero engine edit (K0)."""
+    root = tmp_path
+    (root / "build.sh").write_text(_SHELL_V1, encoding="utf-8")
+    (root / "docs").mkdir()
+    (root / "docs" / "shell.md").write_text(
+        _DOC_STUB.format(title="Build scripts"), encoding="utf-8"
+    )
+    spec = DocumentSpec(
+        id="shell",
+        path="docs/shell.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="build.sh", lang="shell"),),
+        region_keys=("symbols",),
+    )
+    cfg = MonitorConfig(documents=(spec,))
+    regenerate_regions(root / spec.path, build_document_surface(spec, root))
+
+    # The rendered symbol region names the real shell functions.
+    rendered = (root / "docs" / "shell.md").read_text(encoding="utf-8")
+    assert "build_all()" in rendered and "_prepare()" in rendered
+    assert _monitor(root, cfg).check().ok  # clean baseline
+
+    # Rename a public shell function -> the surface moves -> HASH drift.
+    (root / "build.sh").write_text(
+        _SHELL_V1.replace("build_all()", "build_everything()"), encoding="utf-8"
+    )
+    drifts = _monitor(root, cfg).check().drifts
+    assert {d.doc_id for d in drifts} == {"shell"}
+
+    _monitor(root, cfg).run(apply=True)
+    assert _monitor(root, cfg).check().ok  # self-healed
+    # Idempotent: a second apply with no code change handles nothing (K7).
+    assert _monitor(root, cfg).run(apply=True).handled == ()

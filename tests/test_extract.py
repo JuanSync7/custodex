@@ -18,6 +18,7 @@ from code_doc_monitor.extract import (
     Extractor,
     PythonAstExtractor,
     Record,
+    ShellExtractor,
     SurfaceFingerprint,
     Symbol,
     build_document_surface,
@@ -834,6 +835,198 @@ def test_symbols_unknown_language_raises(tmp_path: Path) -> None:
     doc = _doc(Audience.ENG_GUIDE, CodeRef(path="z.py", lang="rust"))
     with pytest.raises(ExtractionError):
         build_document_surface(doc, tmp_path)
+
+
+# --------------------------------------------------------------------------- #
+# P-05: a REAL non-Python extractor (shell) registered behind the seam (K0)    #
+# --------------------------------------------------------------------------- #
+# A realistic sh/bash fixture exercising both def forms, a leading-comment
+# docstring, a private helper, and a comment INSIDE a body (line 7).
+SHELL_SAMPLE = """\
+#!/usr/bin/env bash
+
+# Build the project from a clean tree.
+# Usage: build_all <target>
+build_all() {
+    local target="$1"  # the build target
+    echo "building ${target}"
+    _prepare
+}
+
+# A private helper.
+function _prepare {
+    mkdir -p build
+}
+
+function deploy() {
+  rsync -a build/ "$1"
+}
+"""
+
+
+def _write_shell(tmp_path: Path, text: str = SHELL_SAMPLE) -> Path:
+    p = tmp_path / "build.sh"
+    p.write_text(text, encoding="utf-8")
+    return p
+
+
+def test_shell_extractor_is_registered_by_default() -> None:
+    ext = get_extractor("shell")
+    assert isinstance(ext, ShellExtractor)
+    assert isinstance(ext, Extractor)
+    assert ext.language == "shell"
+
+
+def test_shell_suffixes_map_to_shell() -> None:
+    from code_doc_monitor.extract import _SYMBOL_LANG_BY_SUFFIX
+
+    assert _SYMBOL_LANG_BY_SUFFIX[".sh"] == "shell"
+    assert _SYMBOL_LANG_BY_SUFFIX[".bash"] == "shell"
+
+
+def test_shell_extracts_both_def_forms(tmp_path: Path) -> None:
+    syms = _by_name(ShellExtractor().extract(_write_shell(tmp_path)))
+
+    assert set(syms) == {"build_all", "_prepare", "deploy"}
+    for s in syms.values():
+        assert s.kind == "function"
+        assert s.signature == f"{s.name}()"
+        assert s.arg_names == ()
+        assert s.body_hash is None
+
+
+def test_shell_linenos_and_span(tmp_path: Path) -> None:
+    syms = _by_name(ShellExtractor().extract(_write_shell(tmp_path)))
+
+    assert (syms["build_all"].lineno, syms["build_all"].end_lineno) == (5, 9)
+    assert (syms["_prepare"].lineno, syms["_prepare"].end_lineno) == (12, 14)
+    assert (syms["deploy"].lineno, syms["deploy"].end_lineno) == (16, 18)
+
+
+def test_shell_leading_comment_is_docstring(tmp_path: Path) -> None:
+    syms = _by_name(ShellExtractor().extract(_write_shell(tmp_path)))
+
+    assert (
+        syms["build_all"].docstring
+        == "Build the project from a clean tree.\nUsage: build_all <target>"
+    )
+    assert syms["_prepare"].docstring == "A private helper."
+    # deploy is preceded by `}` then a blank line — no doc comment.
+    assert syms["deploy"].docstring is None
+
+
+def test_shell_is_public_by_leaf_name_rule(tmp_path: Path) -> None:
+    syms = _by_name(ShellExtractor().extract(_write_shell(tmp_path)))
+
+    assert syms["build_all"].is_public is True
+    assert syms["deploy"].is_public is True
+    assert syms["_prepare"].is_public is False  # leading underscore = private (K3)
+
+
+def test_shell_oneliner_and_shebang_excluded(tmp_path: Path) -> None:
+    # A one-line function on line 2; its only preceding line is the shebang,
+    # which must NOT become a docstring.
+    p = _write_shell(tmp_path, "#!/bin/sh\nmain() { echo hi; }\n")
+    syms = _by_name(ShellExtractor().extract(p))
+
+    assert set(syms) == {"main"}
+    assert syms["main"].lineno == 2
+    assert syms["main"].end_lineno == 2  # one-liner: open+close on the same line
+    assert syms["main"].docstring is None
+
+
+def test_shell_is_deterministic(tmp_path: Path) -> None:
+    p = _write_shell(tmp_path)
+    assert ShellExtractor().extract(p) == ShellExtractor().extract(p)
+
+
+def test_shell_missing_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(ExtractionError):
+        ShellExtractor().extract(tmp_path / "nope.sh")
+
+
+def test_shell_surface_via_explicit_lang(tmp_path: Path) -> None:
+    _write_shell(tmp_path)
+    doc = _doc(Audience.ENG_GUIDE, CodeRef(path="build.sh", lang="shell"))
+    surface = build_document_surface(doc, tmp_path)
+    assert [s.name for s in surface.symbols] == ["_prepare", "build_all", "deploy"]
+
+
+def test_shell_surface_auto_infers_suffix(tmp_path: Path) -> None:
+    _write_shell(tmp_path)
+    doc = _doc(Audience.ENG_GUIDE, CodeRef(path="build.sh"))  # lang defaults to auto
+    surface = build_document_surface(doc, tmp_path)
+    assert {s.name for s in surface.symbols} == {"build_all", "_prepare", "deploy"}
+
+
+def test_shell_user_guide_drops_private(tmp_path: Path) -> None:
+    _write_shell(tmp_path)
+    doc = _doc(Audience.USER_GUIDE, CodeRef(path="build.sh", lang="shell"))
+    surface = build_document_surface(doc, tmp_path)
+    assert "_prepare" not in {s.name for s in surface.symbols}
+    assert {"build_all", "deploy"} <= {s.name for s in surface.symbols}
+
+
+def test_shell_doc_comment_moves_eng_hash_not_user_hash(tmp_path: Path) -> None:
+    # Editing build_all's LEADING doc comment changes the eng-guide docstring
+    # tier (K3) but is invisible to a user-guide (excludes docstrings).
+    edited = SHELL_SAMPLE.replace(
+        "# Build the project from a clean tree.",
+        "# Build the project from a pristine tree.",
+    )
+
+    def _hash(text: str, audience: Audience) -> str:
+        _write_shell(tmp_path, text)
+        doc = _doc(audience, CodeRef(path="build.sh", lang="shell"))
+        return build_document_surface(doc, tmp_path).surface_hash()
+
+    assert _hash(SHELL_SAMPLE, Audience.ENG_GUIDE) != _hash(edited, Audience.ENG_GUIDE)
+    assert _hash(SHELL_SAMPLE, Audience.USER_GUIDE) == _hash(
+        edited, Audience.USER_GUIDE
+    )
+
+
+def test_shell_unbalanced_brace_falls_back_to_header_line(tmp_path: Path) -> None:
+    # No closing brace (truncated file): best-effort end_lineno == the header.
+    p = _write_shell(tmp_path, "bad() {\n    echo hi\n")
+    syms = _by_name(ShellExtractor().extract(p))
+    assert syms["bad"].lineno == 1
+    assert syms["bad"].end_lineno == 1
+
+
+def test_shell_docstring_strips_only_one_leading_space(tmp_path: Path) -> None:
+    # A comment with NO space after `#` keeps its text verbatim (no over-strip).
+    p = _write_shell(tmp_path, "#tight comment\nrun() {\n    :\n}\n")
+    syms = _by_name(ShellExtractor().extract(p))
+    assert syms["run"].docstring == "tight comment"
+
+
+def test_shell_function_on_first_line_has_no_docstring(tmp_path: Path) -> None:
+    # Header at line 1: there is nothing above it to scan.
+    p = _write_shell(tmp_path, "top() {\n    :\n}\n")
+    syms = _by_name(ShellExtractor().extract(p))
+    assert syms["top"].lineno == 1
+    assert syms["top"].docstring is None
+
+
+def test_shell_unreadable_path_raises(tmp_path: Path) -> None:
+    # A directory is not FileNotFound — reading it raises an OSError (K8 loud).
+    (tmp_path / "adir.sh").mkdir()
+    with pytest.raises(ExtractionError):
+        ShellExtractor().extract(tmp_path / "adir.sh")
+
+
+def test_shell_body_comment_does_not_move_hash(tmp_path: Path) -> None:
+    # A comment INSIDE the body (line 6) is neither signature nor docstring →
+    # the surface is unchanged for both audiences.
+    edited = SHELL_SAMPLE.replace("# the build target", "# the deploy target")
+
+    def _hash(text: str) -> str:
+        _write_shell(tmp_path, text)
+        doc = _doc(Audience.ENG_GUIDE, CodeRef(path="build.sh", lang="shell"))
+        return build_document_surface(doc, tmp_path).surface_hash()
+
+    assert _hash(SHELL_SAMPLE) == _hash(edited)
 
 
 def test_symbols_python_still_default_for_auto(tmp_path: Path) -> None:
