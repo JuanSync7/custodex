@@ -2131,3 +2131,252 @@ the ticket form + Generate to watch it become documented live. `demo/walkthrough
 drives the apply-fix path + the link→generate path end-to-end (offline). `seed_demo.py`,
 the demo `core.yaml`/`doc-style.yaml`, the demo README, the demo e2e tests, and the
 dogfood config (cdmon's own) all exercise `context_refs`.
+
+## `featurecatalog.py`  (EPIC R — the golden feature catalog loader; pure, stdlib+pydantic+pyyaml only — K0/K1/K10)
+
+The machine-readable golden reference of every cdmon *feature*. The catalog
+lives in `feature-doc/catalog/*.yaml` (one file per subsystem, mirroring the
+`config/cdmon/` multi-file pattern); `feature-doc/FEATURES.md` is RENDERED from
+it (never hand-edited — the yaml is the single source of truth). Pure and
+deterministic (no clock, sorted output, K10); loud on any malformed input (K8).
+
+```python
+# Stable feature-id pattern: FEAT-<SUBSYSTEM>-<NNN>, SUBSYSTEM = [A-Z][A-Z0-9]+, NNN = \d{3}
+FEATURE_ID_RE: typing.Final = re.compile(r"^FEAT-[A-Z][A-Z0-9]*-\d{3}$")
+
+class Feature(pydantic.BaseModel):           # frozen=True, extra="forbid"
+    id: str                                  # matches FEATURE_ID_RE, globally unique
+    title: str                               # one-line human name
+    summary: str                             # 1-3 sentence description (the golden prose)
+    subsystem: str                           # logical grouping, lowercase (e.g. "extract")
+    modules: tuple[str, ...]                  # real code_doc_monitor modules implementing it (non-empty)
+    constraints: tuple[str, ...] = ()         # K-refs upheld (e.g. ("K0", "K3"))
+    status: Literal["implemented", "planned", "deprecated"] = "implemented"
+    demos: tuple[str, ...] = ()               # demo case ids (filled/checked in R3)
+    tests: tuple[str, ...] = ()               # test node-ids / ids (filled/checked in R5)
+
+class FeatureCatalog(pydantic.BaseModel):     # frozen=True
+    features: tuple[Feature, ...]             # sorted by id
+    def by_id(self, fid: str) -> Feature: ...        # loud KeyError->CatalogError on miss (K8)
+    def by_subsystem(self) -> dict[str, tuple[Feature, ...]]: ...   # deterministic grouping
+
+def load_catalog(catalog_dir: Path, *, known_modules: Collection[str] | None = None) -> FeatureCatalog: ...
+#   reads *.yaml (sorted), each file = {"features": [ {...}, ... ]}; aggregates.
+#   CatalogError (K8) on: malformed yaml, extra/missing key, bad id pattern,
+#   DUPLICATE id across files, a module ref not in known_modules (when provided),
+#   empty modules. Deterministic: features sorted by id.
+
+def render_features_md(catalog: FeatureCatalog) -> str: ...
+#   the human golden ref — grouped by subsystem, sorted, with a per-feature
+#   demo/test traceability column. Pure string build (K10); cdmon-managed-region
+#   compatible so `cdmon wiki` can re-stamp it idempotently (R7).
+```
+
+`errors.py` gains `CatalogError(CdmError)` (loud, K8). `known_modules` is sourced
+from `inventory`-style discovery so a typo'd module ref fails loud at load. No new
+dependency (pydantic+pyyaml already core, K0). This module is the foundation R3
+(demos), R5 (test wiki), R6 (source wiki), and R7 (`cdmon wiki`) all read from.
+
+## `traceability.py`  (EPIC R, R-03 — feature ⇄ demo/test/source coverage matrix; pure, stdlib+pydantic — K0/K1/K10)
+
+Proves the 1:1 mapping the golden reference promises: every feature has at least
+one demo AND at least one test. Reads the catalog (`featurecatalog.load_catalog`)
+and scans evidence files for an **inline feature-tag convention** — the single
+source of truth lives at the test/demo (no duplication, K-style): a line of the
+form `Feature: <id>[, <id>...]` or `Features: <id> ...` (case-insensitive marker)
+anywhere in a file (a Python docstring/comment or a Markdown line). A bare mention
+of a `FEAT-id` in prose (no `Feature:` marker) is NOT a reference — the marker
+disambiguates evidence from description (e.g. the catalog itself names ids).
+
+```python
+FEATURE_REF_RE: Final = re.compile(r"\bFEAT-[A-Z][A-Z0-9]*-\d{3}\b")
+# a tag line: an optional leading prose, the marker `Feature(s):`, then ids.
+_TAG_RE: Final = re.compile(r"(?im)\bFeatures?:\s*(?P<ids>FEAT-[A-Z0-9 ,\-]+)")
+
+class EvidenceKind(str, Enum):  # TEST | DEMO | SOURCE
+    ...
+
+class FeatureRef(BaseModel):    # frozen, extra=forbid
+    feature_id: str
+    path: str                   # repo-relative
+    kind: EvidenceKind
+    line: int                   # 1-based
+
+class TraceMatrix(BaseModel):   # frozen
+    catalog_ids: tuple[str, ...]      # sorted
+    refs: tuple[FeatureRef, ...]      # sorted (path, line)
+    def tests_for(self, fid: str) -> tuple[str, ...]: ...
+    def demos_for(self, fid: str) -> tuple[str, ...]: ...
+    def features_without_test(self) -> tuple[str, ...]: ...
+    def features_without_demo(self) -> tuple[str, ...]: ...
+    def unknown_refs(self) -> tuple[FeatureRef, ...]: ...   # tagged id NOT in catalog (loud gap)
+    def is_complete(self) -> bool:   # no missing-test, no missing-demo, no unknown refs
+
+def scan_refs(root: Path, kind: EvidenceKind, *, suffixes=(".py", ".md")) -> list[FeatureRef]: ...
+#   walk root (sorted), parse each matching file's `Feature:` tags → refs. Pure, no import (K1).
+
+def build_matrix(catalog: FeatureCatalog, *, tests_root: Path, demo_root: Path,
+                 source_root: Path | None = None) -> TraceMatrix: ...
+#   scan tests_root (TEST), demo_root (DEMO), optional source_root (SOURCE); combine with catalog ids.
+
+def render_matrix_md(matrix: TraceMatrix) -> str: ...
+#   the traceability wiki: per-feature demo/test columns + a gaps section. Pure (K10).
+```
+
+`cli.py` gains `cdmon trace` (`--json`, `--fail-on-gap`): loads `feature-doc/catalog`,
+scans `tests/` + `demo/`, prints the matrix summary; `--fail-on-gap` exits nonzero
+if any feature lacks a test or demo, or any unknown ref exists (K8). The catalog's
+`Feature.demos`/`tests` slots are an OPTIONAL secondary source (filled by R3/R5);
+the inline scan is the primary, drift-free evidence. No new dep (K0).
+
+## `testwiki.py`  (EPIC R, R-06 — the test wiki extractor; pure AST, never imports tests — K0/K1/K10)
+
+Turns the test tree into a navigable wiki WITHOUT a second source of truth: the
+test's own docstring is the "what it asserts", its directory is the boundary, and
+a `Feature:`/`Features:` tag line (in the test docstring OR inherited from the
+module docstring) is the feature link. Parsed with stdlib `ast` — the tests are
+NEVER imported or executed (K1) — so the wiki can't drift from the tests.
+
+```python
+class TestBoundary(str, Enum):  # UNIT | INTEGRATION | SYSTEM | SMOKE | REGRESSION | UNKNOWN
+    ...
+
+class TestCase(BaseModel):      # frozen, extra=forbid
+    nodeid: str                 # tests/<boundary>/<file>::<func> (or ::Class::func)
+    path: str                   # repo-relative posix
+    name: str                   # function name
+    boundary: TestBoundary      # from the path
+    summary: str                # first line of the test's docstring ("" if none)
+    features: tuple[str, ...]   # FEAT-ids from the test docstring + the module's `Features:` tag
+
+class TestModule(BaseModel):    # frozen
+    path: str
+    boundary: TestBoundary
+    module_features: tuple[str, ...]   # the module docstring's `Features:` tag (file-level coverage)
+    cases: tuple[TestCase, ...]
+
+def collect_tests(tests_root: Path) -> tuple[TestModule, ...]: ...
+#   walk tests_root (sorted), ast.parse each test_*.py, find top-level + class-nested
+#   `def test_*`, pull docstrings, resolve boundary from path, gather Feature tags.
+#   Pure, deterministic, never imports the file (K1). Loud (CatalogError-style) only
+#   on a genuinely unparseable test file (K8) — otherwise robust.
+
+def render_test_wiki_md(modules: tuple[TestModule, ...]) -> str: ...
+#   the test wiki: grouped by boundary → module, each case with its summary +
+#   feature links; plus a per-feature "tested by" index. Pure (K10).
+```
+
+The annotation CONVENTION (R-06): each `tests/.../test_*.py` carries a module-level
+`Features: FEAT-…` tag in its module docstring listing the catalog features that
+file exercises (file-level coverage — this is what makes the traceability TEST side
+complete, `features_without_test == []`). Per-test `Feature:` tags refine where
+valuable. The boundary comes from the R-05 directory, not a tag. `cdmon wiki` (R-08)
+renders `render_test_wiki_md` to disk. No new dependency (K0).
+
+## `srcindex.py`  (EPIC R, R-07 — the source index + source wiki; reuses inventory/coverage — K0/K1/K10)
+
+Indexes every public symbol of `code_doc_monitor` and ties each module to the
+catalog features it implements (the inverse of `Feature.modules`), so the source
+wiki and the traceability SOURCE view are complete and provably cover the whole
+public surface. Reuses `inventory.discover_files`/`discover_symbols` (no AST
+re-impl) and `featurecatalog` — pure, deterministic, no target import beyond the
+AST extraction inventory already does (K0/K1/K10).
+
+```python
+class ModuleIndex(BaseModel):          # frozen, extra=forbid
+    module: str                        # top-level module name (e.g. "extract")
+    path: str                          # repo-relative posix
+    public_symbols: tuple[str, ...]    # sorted public symbol names (from inventory)
+    features: tuple[str, ...]          # catalog feature ids whose `modules` include this module
+
+class SourceIndex(BaseModel):          # frozen
+    modules: tuple[ModuleIndex, ...]   # sorted by module
+    def features_without_module_match(self) -> tuple[str, ...]:  # catalog features naming a missing module (should be empty)
+    def modules_without_feature(self) -> tuple[str, ...]:        # public modules with NO catalog feature (a documentation gap)
+
+def build_source_index(pkg_root: Path, catalog: FeatureCatalog) -> SourceIndex: ...
+#   inventory the package, attach public symbols per module, join to catalog by module name.
+
+def render_source_wiki_md(index: SourceIndex) -> str: ...
+#   per-module: path, public symbols, implementing features (links); + a coverage
+#   summary (modules with no feature). Pure (K10).
+```
+
+`cdmon wiki` (R-08) renders this to `feature-doc/wiki/SOURCE_WIKI.md`. The
+`modules_without_feature` accessor is the deferred R-02 "no orphan public
+capability" check, now realizable: a public module with zero catalog features is a
+golden-reference gap, reported (and optionally gated). No new dependency (K0).
+
+## `cdmon wiki` + `cdmon trace` gate  (EPIC R, R-08 — regenerate all wikis from the single sources; CI freshness + traceability gate)
+
+`cli.py` gains `cdmon wiki` — the single regeneration entry point that renders ALL
+of EPIC R's derived artifacts from their sources (the catalog yaml + the tests'
+docstrings + the source AST), to a canonical set of paths:
+
+```
+feature-doc/FEATURES.md          ← featurecatalog.render_features_md(load_catalog)
+feature-doc/wiki/TEST_WIKI.md    ← testwiki.render_test_wiki_md(collect_tests(tests))
+feature-doc/wiki/SOURCE_WIKI.md  ← srcindex.render_source_wiki_md(build_source_index)
+feature-doc/wiki/TRACEABILITY.md ← traceability.render_matrix_md(build_matrix)
+```
+
+- `cdmon wiki` writes all four (idempotent — a second run is a no-op, K7;
+  deterministic content, K10) and echoes each path + whether it changed.
+- `cdmon wiki --check` renders in memory and compares to disk; exits 0 when all
+  fresh, nonzero listing every stale file when not (K8) — the CI freshness gate.
+  No write on `--check`.
+- A shared `WIKI_TARGETS` mapping (path → render thunk) is the single source of the
+  output set so `wiki` and `wiki --check` can never diverge.
+
+The `cdmon trace --fail-on-gap` command (R-03), now that the matrix is complete,
+becomes a CI gate: a new demo/feature without a test (or vice-versa) fails CI. Both
+`cdmon wiki --check` and `cdmon trace --fail-on-gap` are added to `.gitlab-ci.yml`
+(offline, no network — K4). No new dependency (K0). This closes EPIC R: the golden
+reference, its demo/test 1:1 mappings, and the source/test wikis all regenerate
+from one source each and are gated against drift — cdmon's own discipline applied
+to cdmon's own documentation.
+
+## `GET /wiki` + dashboard Wiki page  (EPIC R, R-09 — the wikis in the console)
+
+Surfaces the EPIC-R wikis inside the dashboard. The server gains a GLOBAL, public
+(no-auth, like `/config/templates`) read that serves the committed wikis rendered
+to HTML by the engine's OWN dependency-free renderer (`build.render_markdown`,
+FEAT-LAYOUT-008 — no new dep, K0):
+
+```python
+# server/app.py
+def create_app(store=None, *, static_dir=None, wiki_dir: Path | None = None, clock=...): ...
+#   wiki_dir defaults (None) to _wiki_dir() = <repo root>/feature-doc (mirrors _spa_dir()).
+
+WIKI_SECTIONS = (   # (id, title, repo-relative path under feature-doc/) — deterministic order
+    ("features",     "Feature Reference",   "FEATURES.md"),
+    ("traceability", "Traceability Matrix", "wiki/TRACEABILITY.md"),
+    ("tests",        "Test Wiki",           "wiki/TEST_WIKI.md"),
+    ("source",       "Source Wiki",         "wiki/SOURCE_WIKI.md"),
+)
+
+@app.get("/wiki")
+def wiki() -> dict:
+    """Public: the EPIC-R wikis rendered to HTML. {"sections":[{"id","title","html"}...]}.
+    Missing dir/file → that section omitted (graceful empty for a non-cdmon repo). K10 pure."""
+```
+
+Frontend (`dashboard/`):
+- **Nav (always visible):** AppShell adds a `Wiki` item under the **Reference** group
+  → `<Link to="/wiki">`; `pageLabel("/wiki")` = "Wiki". This is the "show Wiki first".
+- **Lazy switch on click:** `App.tsx` routes `/wiki` to a `React.lazy(() => import("./pages/Wiki"))`
+  page inside `<Suspense>`, so the wiki bundle + its fetch fire ONLY when Wiki is
+  clicked ("only when clicked does it switch to the full wiki frontend").
+- **`pages/Wiki.tsx`** (the full wiki frontend): on mount fetches `api.wiki()`, then
+  renders a docs layout — a left **section rail** (Feature Reference / Traceability /
+  Test Wiki / Source Wiki, the selected one active, with a per-section count badge) +
+  a readable **prose pane** rendering the selected section's HTML. Loading / error /
+  empty states; injectable `api?` prop (no network in tests). `api/client.ts` gains
+  `wiki(): Promise<{sections: {id,title,html}[]}>` (GET /wiki); `types.ts` gains
+  `WikiSection`/`WikiPayload`.
+
+`featurecatalog`: add **FEAT-SERVER-019** "Feature-wiki endpoint" (subsystem server,
+modules [server]) so the golden reference stays correct; tag it on the server test +
+a demo case so `cdmon trace` stays complete. After the endpoint lands, `cdmon wiki`
+is re-run (FEATURES/SOURCE/TEST wikis pick up the new feature) and the server api doc
+is rehealed. No new dependency anywhere (K0); the dashboard adds no npm package.

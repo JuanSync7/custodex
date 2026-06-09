@@ -385,6 +385,132 @@ registrations behind the now-proven seam.
 
 ---
 
+## EPIC R — Reference, Traceability & Wiki  (the golden feature catalog + 1:1 demo/test/source mapping, single-source-of-truth wikis)
+
+**North star.** Every *feature* of code-doc-monitor is cataloged exactly ONCE in
+`feature-doc/` (the golden reference, asserted correct against source). Demos,
+tests, and source symbols each carry an inline back-reference to the feature
+IDs they exercise; a traceability engine proves every feature has ≥1 demo AND
+≥1 test, and a deterministic exporter renders the human wikis from those inline
+annotations — so there is **no duplicated prose** to drift (the catalog entry,
+the test docstring, and the source docstring are the only sources of truth; the
+wikis are regenerated, never hand-edited). This is itself a code↔doc drift
+problem, so the whole epic is **dogfoodable** under `cdmon`'s own discipline
+(K7 idempotent, K10 deterministic, K8 loud, K0 no new heavy dep).
+
+Format decisions (proceeding on these; revisit on request): catalog is a
+**multi-file machine-readable layout** under `feature-doc/catalog/` (one file
+per subsystem, mirroring the `config/cdmon/` multi-file pattern) + a rendered
+`feature-doc/FEATURES.md`; wikis are **in-repo markdown** (deterministic,
+dogfoodable, zero external dep) — a Confluence/Atlassian export is a later
+follow-on, not a dependency. Tests are **physically reorganized** into boundary
+directories (the user asked for clear boundaries), done in gate-green sub-slices.
+
+**R1 — Feature catalog: schema + loader (golden-reference foundation)**
+- ✅ **R-01** `featurecatalog.py`: a pydantic `Feature` model (`extra=forbid`,
+  frozen) + `load_catalog(dir)` over `feature-doc/catalog/*.yaml`. Fields:
+  `id` (e.g. `FEAT-EXTRACT-001`, unique, pattern-checked), `title`, `summary`,
+  `subsystem`, `modules: [str]` (must name real `code_doc_monitor` modules),
+  `constraints: [str]` (K-refs), `status`, `demos: [str]`, `tests: [str]`. *Goal:*
+  loader parses a fixture catalog; duplicate ID → `CatalogError` (K8); unknown
+  module ref → `CatalogError`; malformed/extra key → loud; deterministic sorted
+  order (K10). unit + integration (loads real `feature-doc/`).
+- ✅ **R-02** populated the catalog per subsystem — **186 features across 18
+  subsystems** (agent 8, backends 8, cli 22, config 12, configv2 15, coverage 10,
+  drift 10, extract 6, heal 9, layout 9, learn 6, manifest 9, monitor 9, pr 11,
+  quality 9, record 13, reference 2, server 18). Orchestrated 16-subagent fan-out,
+  each source-verifying its symbols; whole-catalog load clean under the real module
+  set; `feature-doc/FEATURES.md` rendered. See `.project/slices/R-02.md`.
+  *(Deferred follow-on: an automated "no orphan public capability" check tying the
+  feature count to the enumerated public surface — lands with the R-06 source index.)*
+
+**R2 — Traceability engine**
+- ✅ **R-03** `traceability.py`: cross-reference catalog × demo tags × test
+  annotations × source index → a `TraceMatrix` + gap report; `cdmon trace`
+  (`--json`, `--fail-on-gap`). *Goal:* on a fixture, a feature with no demo/test
+  is reported as a gap with the right exit code; deterministic (K10).
+
+**R3 — Demo 1:1 mapping**
+- ✅ **R-04** `demo/DEMOS.md` — 51 demo cases across 12 user journeys, each
+  `Features:`-tagged; `build_matrix(...).features_without_demo() == ()` and zero
+  unknown refs (every feature has ≥1 demo, every subsystem ≥1 case). New
+  `tests/test_demo_traceability.py`; walkthrough stays offline/green. See
+  `.project/slices/R-04.md`.
+
+**R4 — Test taxonomy / boundaries**
+- ✅ **R-05** reorganized `tests/` into `tests/{unit(25),integration(24),system(15),
+  smoke(2)}/` + `regression(3)`; depth-independent `tests/_repo.py REPO_ROOT`
+  helper neutralized 16 `Path(__file__)` repo-root anchors before moving; root
+  `conftest.py` auto-marks by path; `tests/smoke/test_boundaries.py` marker-lint
+  (no stranded/unclassified test). Baseline 1440 → **1442 passed** (+2 lint), full
+  gate green, `cdmon` green; 62/65 git renames. See `.project/slices/R-05.md`.
+
+**R5 — Test annotation + test wiki**
+- ✅ **R-06** `testwiki.py` AST-parses the test tree (NEVER imports it — K1) →
+  `TestModule`/`TestCase` (nodeid, boundary-from-path, docstring summary, `Feature:`
+  refs); `render_test_wiki_md` → `feature-doc/wiki/TEST_WIKI.md` (70 modules, 1363
+  cases). All 70 test files annotated with module-level `Features:` tags (3-subagent
+  fan-out) + 2 new CLI tests (`cdmon build`, `cdmon serve` guard) so EVERY feature
+  has ≥1 test. **`build_matrix(...).is_complete() == True`** — `features_without_test`
+  AND `features_without_demo` both empty, 0 unknown refs. Full suite 1464 passed.
+  See `.project/slices/R-06.md`.
+
+**R6 — Source index + source wiki**
+- ✅ **R-07** `srcindex.py`: `build_source_index` (reuses inventory.discover_*)
+  → per-module public symbols + joined catalog features; `render_source_wiki_md`
+  → `feature-doc/wiki/SOURCE_WIKI.md` (38 modules). Realized the deferred R-02
+  orphan check: `modules_without_feature() == ()` and
+  `features_without_module_match() == ()` (added 4 `reference` features for the
+  EPIC-R machinery → catalog now **190**; matrix stays `is_complete()`). srcindex.py
+  100% covered. See `.project/slices/R-07.md`.
+
+**R7 — `cdmon wiki` CLI + dogfood + traceability gate**
+- ✅ **R-08** `code_doc_monitor/wiki.py` (`WIKI_TARGETS` + `regenerate`) + `cdmon wiki`
+  [`--check`]: one command regenerates `feature-doc/FEATURES.md` + `wiki/TEST_WIKI.md`
+  + `wiki/SOURCE_WIKI.md` + `wiki/TRACEABILITY.md` from their single sources;
+  idempotent (re-run = all unchanged, K7), deterministic (K10); `--check` exits
+  nonzero listing stale files (K8). `cdmon trace --fail-on-gap` + `cdmon wiki --check`
+  wired into `.gitlab-ci.yml` `docs:gate` (offline, K4). Added FEAT-REFERENCE-007
+  (catalog **191**, matrix stays complete — 191/191 have a test AND a demo). wiki.py
+  100% covered. See `.project/slices/R-08.md`.
+
+**EPIC R COMPLETE** (R-01…R-08). The golden feature reference, its 1:1 demo and test
+mappings, and the test/source wikis now all regenerate from ONE source each
+(`feature-doc/catalog/*.yaml`, the tests' own docstrings, the source AST) and are
+gated against drift: `cdmon wiki --check` (freshness) + `cdmon trace --fail-on-gap`
+(191/191 features have a test AND a demo) run offline in CI. cdmon's own
+code↔doc-drift discipline (K7/K8/K10) is now applied to cdmon's own documentation —
+191 features across 19 subsystems, every public module catalogued (no orphan
+capability), every feature demoed and tested, 1493 tests reorganized into clear
+unit/integration/system/smoke boundaries. Follow-on (not blocking): a Confluence/
+Atlassian export of the in-repo wikis; per-test prose enrichment for the test wiki.
+
+**R-09 — the wikis in the console (dashboard).** ✅ Surfaces the EPIC-R wikis in the
+cdmon frontend. **Server:** a global, public `GET /wiki` (`code_doc_monitor/server/app.py`)
+reads the committed `feature-doc/` wikis and renders each to HTML via the engine's
+own `build.render_markdown` (zero new dep, K0); `create_app` gains an injectable
+`wiki_dir` (defaults to the repo's `feature-doc/`); graceful `{"sections":[]}` when
+absent (K8); 6 server tests. **Frontend (`dashboard/`):** an always-visible **Wiki**
+nav item (Reference group) → a `React.lazy` `/wiki` route in `<Suspense>` (a separate
+`Wiki-*.js` chunk — loads ONLY on click), and `pages/Wiki.tsx` — a docs-style frontend
+(section rail with count badges + a prose pane rendering the selected section's HTML,
+loading/error/empty states); 7 new Vitest tests. Added **FEAT-SERVER-019**
+(catalog **192**, matrix stays complete; server api doc rehealed; wikis regenerated).
+Verified end to end in a real browser (Playwright): nav shows "Wiki" first → click
+lazy-loads + switches to the full wiki → client-side section switching renders the
+real catalog/traceability/test/source content. Python gate green (97.68%), dashboard
+`npm test:run` 141 passed + `build` OK, all 5 `cdmon` gates exit 0. See
+`.project/slices/R-09.md`. Follow-on (not blocking): the Test Wiki section payload is
+~1.4 MB (1363 cases) — a per-section `GET /wiki/{id}` fetch would trim the initial
+load; in-wiki full-text search.
+
+Each slice follows [PROCESS.md](PROCESS.md): TDD red-first, the green gate
+(ruff+mypy+pytest ≥90% branch), dogfood reheal, STATUS row + LESSON entries (+ a
+`problems/` note when warranted), architecture pinned before coding, and commits
+ONLY when explicitly requested.
+
+---
+
 ## Dependency order (high level)
 
 ```

@@ -1504,3 +1504,375 @@ into the slice spec. `end_lineno` isn't part of any hash (signatures/docstrings/
 bodies are), so a wrong span degrades a display range, never the drift verdict. →
 Scope a lightweight extractor to what the hash actually consumes; for the rest,
 pick a deterministic fallback and name the limitation instead of hiding it.
+
+**[R-01] EPIC R is the engine pointed at itself — the catalog is a tracked
+surface, not freeform docs.** The "golden feature reference" is built as a typed,
+loadable artifact (`featurecatalog.Feature`, frozen + `extra="forbid"`) with a
+single machine-readable source (`feature-doc/catalog/*.yaml`) and a *rendered*
+human view (`FEATURES.md`). That choice is deliberate: prose duplicated between a
+yaml entry, a test docstring, and a rendered wiki would drift exactly like
+code↔doc drift, so we keep ONE source per fact and render the rest. → When a
+deliverable is "documentation," ask whether it can be a typed source + a renderer
+instead of hand-written Markdown; if so, the whole project's drift discipline
+(K7/K10) applies to it for free.
+
+**[R-01] Loud-on-empty is a real K8 case, not just loud-on-malformed.** A catalog
+dir with no `*.yaml` raises `CatalogError`, not "an empty catalog of zero
+features." A silent empty result would make a typo'd path or an unmounted dir look
+like "everything is fine, nothing to check" — the most dangerous failure for a
+traceability gate that's supposed to PROVE coverage. → For any loader that feeds a
+gate, treat "found nothing" as suspicious-by-default and fail loud unless emptiness
+was explicitly requested.
+
+**[R-01] The golden reference must be verified against source, not asserted from
+memory.** The 6 seed `extract` features were each checked with a live
+`hasattr(code_doc_monitor.extract, ...)` probe before committing the prose
+(build_document_surface / surface_hash / Extractor / register_extractor /
+get_extractor / SurfaceFingerprint / anchor_id / ShellExtractor all confirmed to
+exist). A "golden" doc that's wrong is worse than no doc — it becomes the thing
+people trust. The R-02 population slices MUST keep this discipline: every named
+symbol/module probed real before its feature lands. → A reference's value is its
+correctness; bake a source-existence check into the slice loop, and (R-01b/R-07)
+into an automated traceability assertion so a stale claim fails the gate.
+
+**[R-02] Fan-out subagents to author, but make the LOADER the consistency gate —
+not the agents' agreement.** 16 independent subagents each wrote one
+`feature-doc/catalog/<subsystem>.yaml`; they could not see each other, so the only
+thing keeping 186 features coherent (unique ids, real module refs, valid schema)
+is `load_catalog(..., known_modules=<real set>)` run by the orchestrator over the
+whole dir. Each agent owning a DIFFERENT file (no shared-file writes) + a global
+validating load is what made the parallelism safe. → For a distributed authoring
+task, give each worker a disjoint write surface and a single deterministic
+validator that runs after; don't rely on N agents independently following a
+convention.
+
+**[R-02] "Self-verified by the subagent" still needs an orchestrator re-probe.**
+Each agent reported confirming its symbols via `hasattr`, yet a golden reference
+is too important to take on report alone. A consolidated headline-symbol probe at
+the orchestrator caught an apparent miss (`layout.render_markdown`) — which turned
+out to be a probe-key error (it lives in `build`, and the feature correctly says
+`modules: [build]`), but the only way to KNOW that was to look. The module-ref
+integrity is machine-enforced (known_modules); the symbol-name integrity is not
+yet (summaries are prose). → Until R-06 gives a source index to assert summaries
+against, treat catalog correctness as "verified by an independent re-probe + a
+spot read," and prioritize the automated source↔feature check in R-06.
+
+**[R-02] Normalize identity early: id-prefix should equal subsystem.** One cluster
+produced `FEAT-SERVER-*` ids under `subsystem: registry`. The loader doesn't force
+prefix==subsystem (and shouldn't — modules ≠ subsystems), but a golden reference
+reads wrong when they disagree. Folded the two client-side features into
+`subsystem: server`. → Decide the id-prefix⇄subsystem rule up front and state it in
+the subagent brief, or reconcile it in the orchestrator's merge pass.
+
+**[R-03] A new `cdmon <cmd>` ALWAYS drifts the cli api doc — reheal is part of the slice.**
+Adding `cdmon trace` to `cli.py` changed the cli module's public surface, so the
+dogfood suite (`test_dogfood`, `regression/test_corpus_selfcoverage`) went red with
+HASH/REGION drift on the cli api doc until `cdmon monitor --apply` rehealed it. This
+is expected and is step 6 of the slice contract — but it means the FULL gate can't be
+green BEFORE the reheal. Order: implement + new-module coverage waiver → `cdmon
+monitor --apply` → THEN the full pytest gate is clean. (The new module itself is
+waived from coverage, but the cli command that USES it is a real surface change.)
+
+**[R-03] The `Feature:` marker is the ONLY thing that makes a `FEAT-id` a reference.**
+The tag convention R-04/R-05 must follow: a line `Feature: FEAT-X-001` or
+`Features: FEAT-X-001, FEAT-Y-002` (case-insensitive marker, comma/space-separated
+ids) is evidence; a bare `FEAT-X-001` in prose is NOT (so the catalog yaml,
+docstrings, and STATUS/LESSON files that merely NAME ids don't pollute the matrix).
+`scan_refs` is FILE-level (one ref per tag line, 1-based line); R-05's AST refinement
+to test-function / demo-case nodes layers on top — it does not change the marker
+convention. Annotating a real demo/test = put one `Feature: <id>` line in its
+docstring or a top comment. `cdmon trace --fail-on-gap` is deliberately NOT in any CI
+gate yet (R-07 owns that) — on the real tree it reports 0/186 covered, which is
+correct until the demos/tests carry tags.
+
+**[R-04] DEMOS.md lives under demo/, NOT tracked source — so it never drifts the
+api docs.** Authoring `demo/DEMOS.md` is a pure-additive demo artifact: it is a
+markdown file under `demo/`, which is not in the dogfood `config/cdmon` coverage
+universe, so `cdmon check`/`lint` stayed at exit 0 with NO `cdmon monitor --apply`
+reheal (unlike R-03, where adding a `cdmon` subcommand changed the cli module's
+public surface and DID drift the cli api doc). Rule for R-05: a doc-only/test-only
+slice that touches no `code_doc_monitor/*` module skips the reheal step — only a
+real source-surface change needs it. The full gate can be green BEFORE any reheal
+when there's no source edit.
+
+**[R-04] Tag honestly per the feature SUMMARY, and audit cross-journey leakage.**
+The temptation when chasing `features_without_demo() == ()` is to sprinkle a
+missing id onto whatever case is nearest. Two safeguards mattered: (1) read each
+feature's catalog summary before tagging — e.g. FEAT-CLI-009 (`cdmon should-sync`)
+and FEAT-PR-003 (`should_sync`) are the docs-heal LOOP-BREAKER, not git-mode sync,
+so they belong on the PR-family case (DEMO-051), not the git-mode case (DEMO-031);
+(2) after the probe goes green, re-scan distinct-id vs ref counts (197 refs / 186
+distinct ids = 11 honest multi-tags) and per-subsystem coverage to confirm no
+subsystem is propped up by a single mis-tag. The probe proves COMPLETENESS, not
+HONESTY — honesty is a human read.
+
+**[R-04] Opt-in features → a DOCUMENTED reproducible recipe is a valid demo.** The
+offline walkthrough can't execute the live LLM backends (api/claude-code/agent),
+the Postgres SqlStore, or the authenticated server write routes (K4 keeps it
+offline). Per the slice spec, a demo case that DESCRIBES the exact observable
+steps (the `cdmon serve` + POST sequence, the `CDMON_DATABASE_URL` export, the
+`pip install [agent]` + config edit) counts as a demo — so these features are
+tagged on a self-contained "How to observe: reproducible recipe" case rather than
+a walkthrough step. No dishonest tagging, and the walkthrough stayed unchanged
+(no extension was needed — every honestly-tagged observable already had a
+walkthrough step, a checked-in artifact, or a documented recipe).
+
+## R-05 — physically reorganizing tests/ into boundary dirs (the path gotchas)
+
+The reorg is a high-blast-radius mechanical move, but only three things actually
+break when a `tests/test_X.py` drops one level deeper into `tests/<boundary>/`:
+
+1. **Repo-root anchors silently shift.** Any `Path(__file__).resolve().parents[1]`
+   (or `.parent.parent`) baked into a test resolved to the repo root only because
+   `tests/` was one level below root; move the file deeper and it now points at
+   `tests/` itself. The protocol's "depth-independence FIRST" step is the fix and
+   MUST precede the move: a `tests/_repo.py` with `REPO_ROOT` = upward search for
+   `pyproject.toml`, gated green BEFORE moving anything. 16 sites across ~15 files
+   (`test_syncpr` has 2). After substituting `REPO_ROOT`, the `from pathlib import
+   Path` import often goes unused — `ruff check --fix` removes it AND re-sorts the
+   new `from tests._repo import REPO_ROOT` into the first-party import group, so
+   run ruff fix immediately after the substitution (20 auto-fixes here).
+
+2. **Cross-test imports must point at the NEW path AND the import target's OWN
+   new home — which may differ from the importer's.** The trap: `test_docstyle`
+   (→ unit) and `test_config_index` (→ integration) both import shared helpers
+   (`_write_tree`) from `test_config_v2`. It's tempting to rewrite every
+   `from tests.test_config_v2 …` to `from tests.unit.test_config_v2 …` in one
+   pass — but `test_config_v2` is classified INTEGRATION, so the correct path is
+   `tests.integration.test_config_v2`. The rule: rewrite each cross-test import to
+   wherever the *imported* module landed, not wherever the *importer* landed. A
+   first pass that guessed `unit` produced 3 `ModuleNotFoundError` collection
+   errors; the fix was repointing to `tests.integration.test_config_v2`. Verify
+   with `grep -rn "from tests\.\(unit\|integration\|system\|smoke\)\.test_"`.
+
+3. **`git mv` only moves tracked files.** Newly-authored test files from
+   still-in-flight earlier slices (here `test_demo_traceability`,
+   `test_featurecatalog`, `test_traceability` — added by R-02..R-04 but not yet
+   committed) are untracked, so `git mv` fails fatally ("not under version
+   control") and a naive alphabetical loop *halts at the first one*, half-moving
+   the suite. Handle per-file: `git ls-files --error-unmatch` to test tracked-ness,
+   `git mv` if tracked else plain `mv`. These three correctly show as new files
+   (not renames) in `git status`; the other 62 show as `R`.
+
+**Marker-lint that reads the LIVE session, not the filesystem.** The "exactly one
+boundary marker per collected item" guarantee (K8) is enforced by snapshotting
+the markers in a root-conftest `pytest_collection_finish(trylast=True)` hook —
+`trylast` so it runs AFTER the regression conftest's `modifyitems`, capturing the
+FINAL marker set — into a module global the smoke test then asserts over. A pure
+filesystem walk ("every test_*.py is under a boundary dir") is a good *second*
+check but can't catch a mis-marked item; the session snapshot can. The path
+auto-marking hook itself skips `regression` (it has its own marker) so regression
+items deliberately carry exactly one marker too.
+
+**Counts as the proof.** Baseline (1440/3) + the 2 new lint tests = 1442 passed /
+3 deselected, identical pass SET — that exact arithmetic is the "no test lost"
+evidence. `addopts` is untouched; `testpaths=["tests"]` already recurses into the
+new dirs, so no pytest-config change beyond registering the 4 markers.
+
+## R-06 Part A — test-wiki extractor (`testwiki.py`)
+
+**`Test`-prefixed public classes confuse pytest collection.** The ARCHITECTURE
+pin names the records `TestBoundary`/`TestCase`/`TestModule`. The moment they are
+*imported into a test module* pytest tries to collect them as test classes and
+emits `PytestCollectionWarning` ("cannot collect ... has a __init__ constructor").
+Fix: set `__test__ = False` on each. For the Enum this is safe — a dunder name is
+NOT turned into an enum member (verified: `list(TestBoundary)` still has exactly
+the 6 members and `TestBoundary.__test__ is False`). For the pydantic models it
+sits beside `model_config` as a plain class attr. No rename needed, the pinned
+names are honored.
+
+**mypy can't narrow through an `isinstance` helper — use `TypeGuard`.** A
+predicate `def _is_test_func(node: ast.stmt) -> bool` that does the isinstance
+check does NOT narrow `node` at the call site, so passing it to a function typed
+`ast.FunctionDef | ast.AsyncFunctionDef` is an `[arg-type]` error. Annotate the
+helper's return as `TypeGuard[ast.FunctionDef | ast.AsyncFunctionDef]` and mypy
+narrows correctly. (Both sync `def` and `async def` test functions are accepted.)
+
+**Feature inheritance is a union, not an override.** A `TestCase.features` =
+`sorted(set(module_features) | set(per_test_tags))`. A module's `Features:` line
+is file-level coverage that EVERY case in that file inherits; a per-test
+`Feature:` tag ADDS to it. So a no-docstring test still carries the module's
+features (its row is the honest minimum) — this is the convention Part B relies on
+to make `features_without_test()` empty by tagging at the module-docstring level.
+
+**`testwiki.py` is intentionally not a tracked-doc module** (no api doc, no CLI
+command yet → `cdmon check` stays clean, no reheal). It is added to the
+`config/cdmon/index.yaml` coverage *waiver* (copy the featurecatalog/traceability
+pattern, reason "EPIC R test wiki; ... api doc owned by R-07 cdmon wiki") so
+`cdmon coverage --fail-under 95` still reports 100%/100%. Pure-render engines that
+R-07's `cdmon wiki` will own follow this same waiver convention.
+
+**[R-06] The test's docstring is the single source of truth; the wiki is a
+projection.** `testwiki` AST-parses tests and renders a wiki from their existing
+docstrings + a module-level `Features:` tag — it never imports the tests (K1) and
+never stores a second copy of "what this test asserts." So the wiki cannot drift
+from the tests: edit the docstring, regenerate, done. → When asked for "a wiki of
+X", prefer extracting from X's own in-place annotations over authoring a parallel
+document; the parallel document is the thing that rots.
+
+**[R-06] File-level feature tagging is the honest, tractable granularity for a
+1400-test suite.** Per-test `Feature:` tags for 1442 tests would be enormous churn
+and mostly redundant (a test file overwhelmingly tests one module's features).
+Tagging each test FILE's module docstring with the features it exercises — and
+letting every case inherit them — made "every feature has a test" provable in a
+3-subagent fan-out, while per-test `Feature:` lines stay available to refine a
+specific case. → Match annotation granularity to where the signal actually lives;
+don't pay per-item cost for file-level truth.
+
+**[R-06] "Tested via the underlying function" ≠ "the CLI command is tested."**
+Four features showed as untested; two were merely untagged, but `cdmon build` and
+`cdmon serve` genuinely had NO CliRunner test — only their `build()` /
+`build_standalone_app()` helpers were covered. The traceability gate caught the
+real gap a coverage % hid (the command wrappers were never invoked). → A feature
+defined as a user-facing command needs a test that invokes the COMMAND, not just
+its callee; the feature↔test matrix surfaces this where line/branch coverage won't.
+
+**[R-07] The "no orphan public capability" check is a join on TOP-LEVEL module
+names, not file paths.** Inventory yields file paths (`agent/graph.py`,
+`server/app.py`, `extract.py`) but the catalog's `Feature.modules` use top-level
+names (`agent`, `server`, `extract`). `build_source_index` folds each file into
+its first path component (stem for a top-level file) and aggregates public symbols
+per top-level module, so a subpackage's many files join to one catalog feature.
+The package's own `__init__.py` is skipped (pure re-export aggregator — same
+spirit as the `__init__` coverage waivers); a subpackage `__init__.py` folds into
+its parent module and is kept. → When joining an inventory to a module-named
+catalog, normalize BOTH sides to the catalog's naming granularity first.
+
+**[R-07] A module's "public surface" is its TOP-LEVEL public names — methods are
+nested, not surface.** `extract` emits method symbols with QUALIFIED names
+(`Class.method`), all `is_public`. Counting them as module symbols double-lists a
+class's internals. `srcindex` filters to public, dot-free names so the surface is
+the functions/classes/variables a reader navigates by; a class's methods belong to
+the class entry. → When summarizing a module surface, the qualified-name dot is the
+signal that a symbol is nested and not a top-level public capability.
+
+**[R-07] Carry the catalog join as a pydantic PrivateAttr, not a model field.**
+`SourceIndex.features_without_module_match()` needs the full (feature→modules) map,
+but that map is derivation state, not part of the serialized, byte-stable index.
+A `PrivateAttr(default_factory=dict)` set via `object.__setattr__` after
+construction keeps the frozen model's public surface clean (no spurious field in
+the wiki/JSON) while the accessor still reasons about the whole catalog. → Frozen
+snapshot models should expose only the normalized result; keep build-time joins in
+private attrs so determinism/serialization isn't polluted.
+
+**[R-07] EPIC-R closed its own loop: cdmon now provably covers its entire public
+surface.** Reconciling `modules_without_feature()` to empty forced honest catalog
+features for `traceability`, `testwiki`, and `srcindex` (the reference machinery
+that documents everything else was itself un-catalogued). Each new feature also
+needed a demo case + a test tag to keep `build_matrix(...).is_complete()` True — so
+the source-index completeness check and the demo/test traceability matrix are
+mutually reinforcing: you cannot add a public module without also catalogng,
+demonstrating, AND testing it. → A completeness gate is only honest once the gate's
+own implementing modules are inside the thing being gated.
+
+## R-08 — `cdmon wiki` regeneration + freshness gate (EPIC R close-out)
+
+- **One mapping, two modes — never two code paths.** `WIKI_TARGETS:
+  dict[Path, Callable[[Path], str]]` is the SINGLE source of the output set; both
+  `cdmon wiki` (write) and `cdmon wiki --check` call ONE `regenerate(repo_root, *,
+  write)` over it. Modelled on `cdmon index --check`: in write mode "changed" means
+  on-disk differs from the fresh render; in check mode the SAME boolean is
+  re-labelled "stale" (missing OR differs). One function, one comparison, so the
+  writer and the gate can never disagree about freshness.
+- **Render thunks take a `repo_root` arg — don't bake in `Path.cwd()`.** Making each
+  thunk `Callable[[Path], str]` (not zero-arg) is what let the unit tests render
+  against the real repo root but WRITE into an isolated tmp repo (seeded by
+  symlinking `feature-doc/catalog`, `tests`, `demo`, `code_doc_monitor`), proving
+  idempotency + the stale-detection + missing-file paths WITHOUT mutating the
+  committed tree. The CLI passes `Path.cwd()` — cdmon is always invoked from the
+  repo root.
+- **System tests that touch the real tree MUST snapshot+restore.** The CLI suite
+  runs `cdmon wiki`/`--check`/`trace` against the REAL repo (CliRunner, chdir to
+  repo root). A `restore_wikis` fixture snapshots the four files' text up front and
+  rewrites them verbatim in `finally`, so a deliberately-mutated wiki (to assert
+  `--check` exits 1) leaves the tree byte-identical + fresh afterwards. Without it a
+  failed assertion mid-test would leave a drifted wiki and redden the next run.
+- **The close-out feature must catalog ITSELF (R-07's lesson, again).** Adding
+  `cdmon wiki` introduced module `wiki.py`; the orphan check (`srcindex`) would flag
+  it, and the matrix would go incomplete, unless FEAT-REFERENCE-007 + a demo
+  (DEMO-054) + a test tag were added in the SAME slice. The regeneration command is
+  itself a catalogued, demonstrated, tested feature — the system documents the tool
+  that regenerates its documentation.
+- **Order of operations at the end of the slice:** add the feature/demo/test FIRST,
+  then run `cdmon wiki` (it regenerates FEATURES.md + the wikis to INCLUDE the new
+  reference feature), THEN reheal the dogfood (`monitor --apply` — the new CLI
+  command drifts the cli api doc), THEN `cdmon wiki --check` + `trace --fail-on-gap`
+  + the full gate. Rehealing before regenerating, or regenerating before adding the
+  feature, leaves one of FEATURES.md / docs/api / the matrix stale.
+
+## R-09a — global `GET /wiki` server endpoint (the server-side lessons)
+
+- **`create_app`'s default-`None` auto-resolve is what makes the live path "just
+  work" — but it HIDES the `_load_wiki_sections(None)` branch from coverage.** The
+  param resolves `wiki_dir if wiki_dir is not None else _wiki_dir()`, and `_wiki_dir()`
+  returns the REAL `feature-doc/` in this repo, so `_load_wiki_sections` is never
+  actually called with `None` through any in-repo test — the `if wiki_dir is None:
+  return []` line stayed uncovered even with five passing endpoint tests. Mirror the
+  helper's two branches with TWO different inputs: a tmp dir that exists (the happy
+  path) AND `monkeypatch.setattr(app_module, "_wiki_dir", lambda: None)` driving the
+  create_app default-resolution → `None` → empty payload, end-to-end through the route.
+  That single monkeypatched test covers BOTH the default-`None` resolution branch and
+  the helper's `None`-guard, and proves the real "non-cdmon repo → graceful empty (K8)"
+  contract rather than just hitting a line.
+- **A non-existent injected dir is NOT `None` — test both empties separately.** The
+  contract has two graceful-empty paths: (a) `wiki_dir` points at a dir that doesn't
+  exist (caller injected a bad path) and (b) `feature-doc/` is absent so the default
+  resolves to `None`. Path (a) flows through `_load_wiki_sections` with a real `Path`
+  whose `.is_file()` checks all fail → `[]`; path (b) short-circuits at the `None`
+  guard. Both must return `{"sections": []}` but they exercise different code; one test
+  each (the nonexistent-dir test does NOT cover the `None` guard).
+- **`render_markdown` already emits the assertable markup — assert on `<h1`/`<table`,
+  not byte-equality.** The engine's renderer gives headings an `id` (`<h1 id="...">`)
+  and renders GFM tables to `<table>`. A fixture with a heading + a pipe table lets the
+  endpoint test prove "the HTML is really rendered (not the raw markdown, not empty)"
+  with a substring check that is robust to the renderer's exact attributes — far less
+  brittle than pinning the full HTML string.
+- **Reuse the renderer LAZILY to keep `import app` cheap (mirror the module's existing
+  convention).** `build.render_markdown` pulls in `config`/`layout`/`manifest`; the
+  server module deliberately keeps every engine import inside the function body (the
+  TestClient path only needs fastapi). Importing `render_markdown` at module top would
+  have broken that and slowed `import code_doc_monitor.server.app`. Lazy import inside
+  `_load_wiki_sections` keeps the no-new-dep (K0) reuse without paying the cost at load.
+- **The dogfood ORDER for a new server route: catalog+demo+test tag → regenerate wikis
+  → reheal api doc → re-check wiki freshness.** Adding FEAT-SERVER-019 + tagging the
+  test changed the TEST_WIKI content, so a `cdmon wiki` run done BEFORE the final test
+  was added left `wiki --check` STALE. The new route + `create_app` param also drifted
+  the server api doc (HASH+REGION) needing `cdmon monitor --apply`. Sequence: finish ALL
+  code+test edits, THEN `cdmon wiki` (picks up the test-wiki delta), THEN reheal the api
+  doc, THEN re-run `wiki --check` + `check` to confirm both settled. Doing the regen too
+  early just means doing it twice.
+
+## R-09b — dashboard Wiki nav + lazy page (the frontend test gotchas)
+
+- **A `dangerouslySetInnerHTML` prose pane creates DUPLICATE headings — disambiguate
+  by `level`.** The Wiki page renders both a page `<h1>Feature Wiki</h1>` (so routing
+  tests can find the view by heading) AND a section title `<h2>` AND the injected
+  fragment's own `<h1>Feature Reference</h1>`. `findByRole("heading", { name: /…/i })`
+  then matches multiple nodes (or the wrong one). Always pin `{ name, level }` — the
+  page heading is `level: 1` named "Feature Wiki"; a section's fragment heading is
+  also `level: 1` but named differently; the pane title is `level: 2`. Tests that
+  forgot `level` flickered between "multiple elements" and "not found".
+- **`head` must be rendered in the READY branch too, not just loading/error/empty.**
+  Mirroring `Config.tsx`, I built `const head = <h1>…</h1>` and used it in the
+  loading/error/empty returns — but initially forgot it in the main data render, so
+  the routing test's `getByRole("heading", { name: /feature wiki/i, level: 1 })`
+  found only the section's `<h1>`. The page-level heading the router asserts on has
+  to be present in the SUCCESS state, which is the state the router actually lands in.
+- **Assert section-switching on text UNIQUE to each section.** The first wiki section
+  and the traceability table both legitimately mention `FEAT-SERVER-019`, so
+  `queryByText("FEAT-SERVER-019").not.toBeInTheDocument()` after switching failed —
+  the id was still on screen in the table. Give each fixture section a distinct
+  marker string (e.g. `FEAT-LAYOUT-008` only in the second) so "switched away from A,
+  now showing B" is provable without false overlaps.
+- **Lazy + Suspense: await the section CONTENT (the fetch), then read the heading
+  synchronously.** The `React.lazy(() => import("./pages/Wiki"))` route resolves the
+  bundle AND fires `api.wiki()` after the click. A bare `findByRole("heading", …)`
+  raced the lazy resolution under the full-suite run (passed in isolation, failed in
+  the suite). `await findByText(<section body>)` waits for the import + fetch + render
+  to settle; once it resolves, the page heading is reliably present for a synchronous
+  `getByRole`. The build proves the split is real: `dist/assets/Wiki-*.js` is a
+  separate ~2 kB chunk, not folded into the main bundle.
+- **Order the stubFetch URL branches by specificity.** In `App.routing.test.tsx`'s
+  fixture router, `GET /wiki` must be matched with `url.endsWith("/wiki")` placed
+  BEFORE the broad `url.includes("/…")` substring branches, or a generic branch (or
+  the default `[]`) swallows it and the page renders empty.
