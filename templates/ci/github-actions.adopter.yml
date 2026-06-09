@@ -1,0 +1,79 @@
+# Drop-in GitHub Actions workflow for repos ADOPTING code-doc-monitor (cdmon).
+#
+# Copy this into your repo as `.github/workflows/cdmon.yml` and adjust the install
+# line / config path. Two jobs mirror the GitLab adopter template:
+#
+#   cdmon-gate     An OFFLINE doc-drift gate on every push / PR: `cdmon doctor`
+#                  (preflight), then `cdmon check` (content drift, K1) and
+#                  `cdmon lint` (Layout Standard). Any failing fails the run, so
+#                  doc drift never lands silently. No network, no LLM.
+#
+#   cdmon-docs-pr  Post-default-branch heal: on a push to the default branch it
+#                  heals the docs and opens a docs PR (`cdmon open-docs-pr`),
+#                  GUARDED by `cdmon should-sync` (the structural loop-breaker):
+#                  the push's changed-file list is piped to `should-sync`, which
+#                  exits 1 (SKIP) when EVERY changed file is a managed doc path
+#                  (the bot's own doc-only commit) so the heal does NOT re-trigger.
+#                  Provenance is stamped via `--ref "$GITHUB_SHA"`.
+#
+# Reporting to a central server (optional): store the bearer token as a repo
+# SECRET (Settings -> Secrets) named CDMON_CENTRAL_TOKEN — NEVER commit it. The
+# central URL + repo_id live in your committed cdmon.yaml `central:` block; run
+# `cdmon register` once to announce the repo, then `cdmon monitor` reports.
+
+name: cdmon
+
+on:
+  pull_request:
+  push:
+
+env:
+  CDMON_CONFIG: cdmon.yaml
+
+jobs:
+  cdmon-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # Install cdmon. Pin to a release/tag in a real adopter (a Git URL or an
+      # internal index). The `[server]` extra is NOT needed on the client side.
+      - run: pip install code-doc-monitor
+      # Offline preflight, then the detect-only content gate (K1) + lint gate.
+      - run: cdmon doctor --config "$CDMON_CONFIG"
+      - run: cdmon check --config "$CDMON_CONFIG"
+      - run: cdmon lint --config "$CDMON_CONFIG"
+
+  cdmon-docs-pr:
+    runs-on: ubuntu-latest
+    # Default-branch pushes only — the heal opens a PR off the default branch.
+    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    env:
+      CDMON_CENTRAL_TOKEN: ${{ secrets.CDMON_CENTRAL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # so `git diff HEAD~1 HEAD` has the previous commit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install code-doc-monitor
+      # Announce this repo to the central server (idempotent). Drop if not reporting.
+      - run: cdmon register --config "$CDMON_CONFIG"
+      # Loop-safety guard: ask `should-sync` whether to heal. It exits 1 (SKIP)
+      # when EVERY changed file is a managed doc path (the bot's own doc-only
+      # commit), so this job opens NO new PR and the heal loop is broken.
+      - name: heal-and-open-docs-pr
+        run: |
+          CHANGED="$(git diff --name-only HEAD~1 HEAD || true)"
+          if ! printf '%s\n' "$CHANGED" | cdmon should-sync --config "$CDMON_CONFIG"; then
+            echo "doc-only commit (bot heal) — skipping heal to avoid re-triggering the loop"
+            exit 0
+          fi
+          # Real code change: heal (recording review records, reported to the
+          # central server when `central:` is wired) and open a docs PR, stamping
+          # provenance so the record's source_sha matches the PR ref.
+          cdmon monitor --apply --config "$CDMON_CONFIG" --ref "$GITHUB_SHA"
+          cdmon open-docs-pr --config "$CDMON_CONFIG" --ref "$GITHUB_SHA"

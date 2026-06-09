@@ -1,0 +1,32 @@
+# cdmon config for the EXTERNAL-REPO adopter example.
+#
+# A stand-in for "some other team's repo" adopting code-doc-monitor: one small
+# Python library (`src/widget.py`) mapped onto one engineering doc
+# (`docs/api.md`) whose managed `symbols` region tracks the public surface.
+#
+# The e2e test (tests/test_example_external.py) copies this tree under tmp_path,
+# runs `cdmon check` -> `monitor --apply` to heal it, then registers the repo +
+# reports the healed records to an in-process central server (TestClient),
+# proving the full adopter loop offline (K4). The `central:` block below is the
+# HTTP-reporting shape an adopter ships; the test injects a TestClient-backed
+# transport so nothing touches the network.
+
+version: "1.0.0"
+root: "."
+
+documents:
+  - id: api
+    path: docs/api.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: src/widget.py
+
+central:
+  sink: "http"
+  url: "https://central.example.com/ingest"
+  repo_id: "acme/widget"
+  repo_name: "widget"
+  repo_url: "https://example.invalid/acme/widget"
+  auth_env: "CDMON_CENTRAL_TOKEN"
+  outbox: ".cdmon/outbox.jsonl"
