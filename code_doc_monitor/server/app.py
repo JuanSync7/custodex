@@ -70,6 +70,57 @@ _IGNORED_FILES_CAP = 200
 
 _LOG = logging.getLogger("code_doc_monitor.server")
 
+# The EPIC-R wikis surfaced by `GET /wiki`, in deterministic display order
+# (features, traceability, tests, source). Each tuple is
+# ``(id, title, <feature-doc/-relative path>)`` — the SINGLE source of the
+# section set + order shared by the route and the dashboard Wiki page (R-09).
+WIKI_SECTIONS = (
+    ("features", "Feature Reference", "FEATURES.md"),
+    ("traceability", "Traceability Matrix", "wiki/TRACEABILITY.md"),
+    ("tests", "Test Wiki", "wiki/TEST_WIKI.md"),
+    ("source", "Source Wiki", "wiki/SOURCE_WIKI.md"),
+)
+
+
+def _wiki_dir() -> Path | None:
+    """The committed EPIC-R wikis dir shipped beside the package, if present.
+
+    Looks for ``feature-doc/`` at the repo root (two levels above this package,
+    beside ``dashboard/dist`` the SPA loader finds) so a single ``cdmon``-server
+    process can serve the rendered wikis on the same port as the API. Returns
+    ``None`` when ``feature-doc/`` is absent (a non-cdmon repo) so ``GET /wiki``
+    degrades to an empty payload rather than crashing (K8). Mirrors
+    :func:`_default_static_dir`.
+    """
+    root = Path(__file__).resolve().parents[2] / "feature-doc"
+    return root if root.is_dir() else None
+
+
+def _load_wiki_sections(wiki_dir: Path | None) -> list[dict[str, str]]:
+    """Render the committed EPIC-R wikis under ``wiki_dir`` to HTML sections (R-09).
+
+    For each ``(id, title, relpath)`` in :data:`WIKI_SECTIONS` (deterministic
+    order), if ``wiki_dir/relpath`` is a file, read it and append
+    ``{"id", "title", "html"}`` with the body rendered by the engine's OWN
+    dependency-free :func:`code_doc_monitor.build.render_markdown` (no new dep,
+    K0). A missing file → that section omitted; ``wiki_dir is None`` → ``[]``.
+    Pure (no clock, K10): the same bytes in, the same sections out. The renderer
+    is imported lazily so ``import app`` (the TestClient path) stays cheap.
+    """
+    if wiki_dir is None:
+        return []
+    from ..build import render_markdown
+
+    sections: list[dict[str, str]] = []
+    for section_id, title, relpath in WIKI_SECTIONS:
+        path = wiki_dir / relpath
+        if path.is_file():
+            text = path.read_text(encoding="utf-8")
+            sections.append(
+                {"id": section_id, "title": title, "html": render_markdown(text)}
+            )
+    return sections
+
 
 class CoverageIngest(BaseModel):
     """The ``POST /repos/{id}/coverage`` body — a permissive coverage snapshot (T-02).
@@ -614,6 +665,7 @@ def create_app(
     store: Store | None = None,
     *,
     static_dir: Path | None = None,
+    wiki_dir: Path | None = None,
     clock: Callable[[], str] = _default_now,
 ) -> FastAPI:
     """Build the central FastAPI app over ``store`` (DI; defaults to in-memory).
@@ -631,8 +683,15 @@ def create_app(
     deploy. The SPA uses a hash router, so its client routes never shadow the
     API's ``/repos/...`` paths. Omitted (the default, and in tests) -> ``/`` is a
     JSON landing payload instead.
+
+    ``wiki_dir`` (optional) is the committed EPIC-R wikis dir (``feature-doc/``)
+    served, rendered to HTML, by the public ``GET /wiki`` (R-09). ``None`` (the
+    default) auto-resolves to :func:`_wiki_dir` (the repo's ``feature-doc/``), so
+    the live ``cdmon serve`` path serves the wikis with no extra wiring; a tmp dir
+    is injected in tests. An absent dir → an empty ``/wiki`` payload (K8).
     """
     resolved: Store = store if store is not None else InMemoryStore()
+    resolved_wiki_dir: Path | None = wiki_dir if wiki_dir is not None else _wiki_dir()
     app = FastAPI(title="code-doc-monitor central server", version="0.1.0")
 
     spa_index: Path | None = None
@@ -710,6 +769,21 @@ def create_app(
         same bytes every call.
         """
         return dict(V2_TEMPLATES)
+
+    @app.get("/wiki")
+    def wiki() -> dict:
+        """The committed EPIC-R wikis rendered to HTML (R-09, GLOBAL + public).
+
+        Returns ``{"sections": [{"id", "title", "html"}, ...]}`` — the four
+        committed wikis (Feature Reference / Traceability / Test / Source) in the
+        deterministic :data:`WIKI_SECTIONS` order, each body rendered by the
+        engine's OWN dependency-free :func:`code_doc_monitor.build.render_markdown`
+        (no new dep, K0). No auth (a public reference like ``/config/templates``,
+        no ``_verify_token``). A missing section file is OMITTED; an absent
+        ``feature-doc/`` (a non-cdmon repo) → ``{"sections": []}`` — a graceful
+        empty payload, never a 500 (K8). Pure / deterministic (K10).
+        """
+        return {"sections": _load_wiki_sections(resolved_wiki_dir)}
 
     @app.post("/repos", status_code=201)
     def register_repo(

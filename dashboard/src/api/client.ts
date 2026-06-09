@@ -16,6 +16,7 @@ import type {
   StoredConfigEdit,
   SyncMode,
   SyncRun,
+  WikiPayload,
 } from "../types";
 
 /** Server-side query filters for `GET /repos/{id}/records` (all optional). */
@@ -213,6 +214,16 @@ export class ApiClient {
       ignore: string;
       doc_style: string;
     }>("/config/templates");
+  }
+
+  /**
+   * GET {base}/wiki → the EPIC-R feature wikis rendered to HTML (R-09). A GLOBAL,
+   * public reference (no auth, no repo), mirroring {@link configTemplates}: the
+   * `sections` (features, traceability, tests, source) the Wiki page renders.
+   * May be `{ sections: [] }` when no wikis are available (a non-cdmon repo).
+   */
+  wiki(): Promise<WikiPayload> {
+    return this.getJson<WikiPayload>("/wiki");
   }
 
   /**

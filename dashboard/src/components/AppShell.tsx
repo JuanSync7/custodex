@@ -20,6 +20,7 @@ function pageLabel(pathname: string): string {
   if (pathname.endsWith("/documents")) return "Documents";
   if (pathname.endsWith("/mapping")) return "Mapping";
   if (pathname === "/config") return "Config Format";
+  if (pathname === "/wiki") return "Wiki";
   if (pathname.startsWith("/repos")) return "Drift Timeline";
   return "Console";
 }
@@ -32,6 +33,7 @@ export function AppShell({ children }: AppShellProps) {
   const { pathname } = useLocation();
   const onFleet = pathname === "/" || pathname.startsWith("/repos");
   const onConfig = pathname === "/config";
+  const onWiki = pathname === "/wiki";
   const root = apiBase().replace(/\/$/, "");
   const docsHref = `${root}/docs`;
   const openApiHref = `${root}/openapi.json`;
@@ -68,6 +70,14 @@ export function AppShell({ children }: AppShellProps) {
           >
             <DocIcon className="nav__icon" aria-hidden />
             Format
+          </Link>
+          <Link
+            to="/wiki"
+            className={`nav__item${onWiki ? " nav__item--active" : ""}`}
+            aria-current={onWiki ? "page" : undefined}
+          >
+            <DocIcon className="nav__icon" aria-hidden />
+            Wiki
           </Link>
           <a className="nav__item" href={docsHref} target="_blank" rel="noreferrer">
             <DocIcon className="nav__icon" aria-hidden />

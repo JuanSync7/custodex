@@ -9,6 +9,10 @@ The whole module is gated on the optional ``[server]`` extra: if ``fastapi`` is
 not importable the file SKIPS, so the core suite still passes without the extra
 (mirrors how the optional ``[agent]`` extra is handled). ``.venv`` HAS fastapi so
 these tests RUN here.
+
+Features: FEAT-SERVER-001, FEAT-SERVER-002, FEAT-SERVER-003, FEAT-SERVER-004
+Features: FEAT-SERVER-005, FEAT-SERVER-008, FEAT-SERVER-015, FEAT-SERVER-019
+Features: FEAT-RECORD-010, FEAT-RECORD-006
 """
 
 from __future__ import annotations
@@ -169,6 +173,112 @@ def test_static_dir_with_index_but_no_assets_serves_spa_without_mount(
     assert root.headers["content-type"].startswith("text/html")
     assert client.get("/assets/app.js").status_code == 404  # no assets mount
     assert client.get("/repos").json() == []  # API intact
+
+
+def _seed_wiki(wiki_dir: Path, *, sections: tuple[str, ...]) -> None:
+    """Write fixture wiki markdown into ``wiki_dir`` for the named section ids.
+
+    Mirrors the committed ``feature-doc/`` layout: ``FEATURES.md`` at the root,
+    the rest under ``wiki/``. Each file carries a heading and a markdown table so
+    the rendered HTML is assertable (``<h1``/``<table``). Only the requested
+    sections are written so a test can prove a missing file is omitted.
+    """
+    layout = {
+        "features": ("FEATURES.md", "# Feature Reference\n"),
+        "traceability": ("wiki/TRACEABILITY.md", "# Traceability Matrix\n"),
+        "tests": ("wiki/TEST_WIKI.md", "# Test Wiki\n"),
+        "source": ("wiki/SOURCE_WIKI.md", "# Source Wiki\n"),
+    }
+    table = "\n| Feature | Test |\n| --- | --- |\n| FEAT-X | t_x |\n"
+    for sec in sections:
+        relpath, heading = layout[sec]
+        path = wiki_dir / relpath
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(heading + table, encoding="utf-8")
+
+
+def test_wiki_serves_all_committed_sections_rendered(tmp_path: Path) -> None:
+    # GET /wiki renders the four committed wikis to HTML in deterministic order
+    # (features, traceability, tests, source) via the engine's own render_markdown
+    # (no new dep, K0). Each section's html carries rendered markup (a heading +
+    # a table), and the ids/titles are the WIKI_SECTIONS contract.
+    wiki_dir = tmp_path / "feature-doc"
+    _seed_wiki(wiki_dir, sections=("features", "traceability", "tests", "source"))
+    client = TestClient(create_app(InMemoryStore(), wiki_dir=wiki_dir))
+
+    resp = client.get("/wiki")
+    assert resp.status_code == 200
+    body = resp.json()
+    sections = body["sections"]
+    assert [s["id"] for s in sections] == [
+        "features",
+        "traceability",
+        "tests",
+        "source",
+    ]
+    assert [s["title"] for s in sections] == [
+        "Feature Reference",
+        "Traceability Matrix",
+        "Test Wiki",
+        "Source Wiki",
+    ]
+    for s in sections:
+        assert "<h1" in s["html"]  # heading rendered
+        assert "<table" in s["html"]  # table rendered
+        assert set(s) == {"id", "title", "html"}  # exact contract
+
+
+def test_wiki_omits_a_missing_section_file(tmp_path: Path) -> None:
+    # Only FEATURES.md present → exactly one section; the absent wiki/*.md files
+    # are SKIPPED (not empty placeholders), preserving order over what exists.
+    wiki_dir = tmp_path / "feature-doc"
+    _seed_wiki(wiki_dir, sections=("features",))
+    client = TestClient(create_app(InMemoryStore(), wiki_dir=wiki_dir))
+
+    body = client.get("/wiki").json()
+    assert [s["id"] for s in body["sections"]] == ["features"]
+
+
+def test_wiki_empty_dir_yields_empty_sections(tmp_path: Path) -> None:
+    # A wiki_dir that exists but holds no wiki files → a graceful empty payload,
+    # not a crash (K8). The exact frontend contract: {"sections": []}.
+    empty = tmp_path / "feature-doc"
+    empty.mkdir()
+    client = TestClient(create_app(InMemoryStore(), wiki_dir=empty))
+    assert client.get("/wiki").json() == {"sections": []}
+
+
+def test_wiki_nonexistent_dir_yields_empty_sections(tmp_path: Path) -> None:
+    # An explicit wiki_dir pointing at a dir that does not exist → empty payload
+    # (graceful for a non-cdmon repo with no feature-doc/, K8) — never a 500.
+    missing = tmp_path / "feature-doc"  # never created
+    client = TestClient(create_app(InMemoryStore(), wiki_dir=missing))
+    assert client.get("/wiki").json() == {"sections": []}
+
+
+def test_wiki_absent_feature_doc_yields_empty_sections(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The live default path on a NON-cdmon repo: create_app left to auto-resolve
+    # wiki_dir, but feature-doc/ is absent so _wiki_dir() is None → the route
+    # returns {"sections": []} (graceful, K8) instead of 500ing. Drives the
+    # default-None resolution AND the _load_wiki_sections(None) branch end-to-end.
+    from code_doc_monitor.server import app as app_module
+
+    monkeypatch.setattr(app_module, "_wiki_dir", lambda: None)
+    client = TestClient(create_app(InMemoryStore()))  # no wiki_dir → auto-resolve
+    assert client.get("/wiki").json() == {"sections": []}
+
+
+def test_wiki_is_public_no_auth(tmp_path: Path) -> None:
+    # GLOBAL + public like /config/templates: no Authorization header → 200.
+    wiki_dir = tmp_path / "feature-doc"
+    _seed_wiki(wiki_dir, sections=("features",))
+    client = TestClient(create_app(InMemoryStore(), wiki_dir=wiki_dir))
+
+    resp = client.get("/wiki")  # no headers at all
+    assert resp.status_code == 200
+    assert resp.json()["sections"][0]["id"] == "features"
 
 
 def test_register_ingest_read_round_trip(client: TestClient) -> None:

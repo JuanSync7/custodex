@@ -10,6 +10,7 @@ import {
   statuses,
   storedConfigEdits,
   syncRunGit,
+  wikiPayload,
 } from "../test/fixtures";
 
 interface Captured {
@@ -195,6 +196,21 @@ describe("ApiClient", () => {
     const headers = calls[0].init?.headers as Record<string, string>;
     expect(headers.Authorization).toBeUndefined();
     expect(result).toEqual(configTemplates);
+  });
+
+  it("builds GET /wiki (global, no repo, no auth) and returns the payload", async () => {
+    const { fetchImpl, calls } = fakeFetch(wikiPayload);
+    const client = new ApiClient({ baseUrl: "/api", fetchImpl });
+
+    const result = await client.wiki();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("/api/wiki");
+    expect(calls[0].init?.method).toBe("GET");
+    // Reads are OPEN — no Authorization header is sent.
+    const headers = calls[0].init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(result).toEqual(wikiPayload);
   });
 
   it("POSTs a resolution with the bearer token and JSON body (F-04 write)", async () => {

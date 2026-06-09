@@ -484,3 +484,32 @@ export interface ApplyFixResponse {
   diff: string;
   sync_run: SyncRun | null;
 }
+
+// ── R-09: the feature wikis in the console (GET /wiki) ──────────────────────
+//
+// Mirrors the GLOBAL, public `GET /wiki` read (server: code_doc_monitor/server/
+// app.py::wiki / WIKI_SECTIONS). The server renders the four committed EPIC-R
+// wikis (Feature Reference / Traceability / Test Wiki / Source Wiki) to SAFE HTML
+// fragments with its OWN markdown renderer (build.render_markdown, K0). The
+// payload is a single fetch — the Wiki page switches sections client-side.
+
+/**
+ * One rendered wiki section (server: a WIKI_SECTIONS entry). `id` is the stable
+ * slug ("features" | "traceability" | "tests" | "source"); `title` is the human
+ * heading; `html` is the pre-rendered, server-sanitized HTML fragment the prose
+ * pane injects verbatim. A missing source file → that section is omitted.
+ */
+export interface WikiSection {
+  id: string;
+  title: string;
+  html: string;
+}
+
+/**
+ * The `GET /wiki` payload: the wikis in deterministic order (features,
+ * traceability, tests, source). `{"sections": []}` when no wikis are available
+ * (an absent `feature-doc/` on a non-cdmon repo — graceful, not a crash).
+ */
+export interface WikiPayload {
+  sections: WikiSection[];
+}

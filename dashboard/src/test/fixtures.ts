@@ -13,6 +13,7 @@ import type {
   ReviewRecord,
   StoredConfigEdit,
   SyncRun,
+  WikiPayload,
 } from "../types";
 
 export const repos: RegisteredRepo[] = [
@@ -405,4 +406,25 @@ export const applyFixResponse: ApplyFixResponse = {
   doc_path: "docs/guide/getting-started.md",
   diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
   sync_run: syncRunLocal,
+};
+
+// ── R-09 fixture (the GET /wiki payload — sections of pre-rendered HTML) ─────
+
+/**
+ * The `GET /wiki` payload: two sections of small, server-pre-rendered HTML in the
+ * deterministic order (features first). The HTML is what the prose pane injects.
+ */
+export const wikiPayload: WikiPayload = {
+  sections: [
+    {
+      id: "features",
+      title: "Feature Reference",
+      html: "<h1>Feature Reference</h1>\n<p>The catalog of <strong>FEAT-CORE-001</strong> and friends.</p>\n<ul>\n<li>FEAT-CORE-001</li>\n<li>FEAT-SERVER-019</li>\n</ul>",
+    },
+    {
+      id: "traceability",
+      title: "Traceability Matrix",
+      html: "<h1>Traceability Matrix</h1>\n<table>\n<thead><tr><th>Feature</th><th>Test</th></tr></thead>\n<tbody><tr><td>FEAT-LAYOUT-008</td><td>test_server.py</td></tr></tbody>\n</table>",
+    },
+  ],
 };

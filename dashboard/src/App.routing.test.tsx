@@ -11,6 +11,7 @@ import {
   repos,
   resolutions,
   statuses,
+  wikiPayload,
 } from "./test/fixtures";
 
 // App uses the shared `apiClient`, which calls the global `fetch`. We stub fetch
@@ -21,6 +22,7 @@ function stubFetch() {
     const url = String(input);
     let body: unknown = [];
     if (url.endsWith("/repos")) body = repos;
+    else if (url.endsWith("/wiki")) body = wikiPayload;
     else if (url.includes("/sync-state")) body = null;
     else if (url.includes("/status")) {
       const id = url.replace(/.*\/repos\//, "").replace(/\/status$/, "");
@@ -140,6 +142,32 @@ describe("App routing", () => {
         screen.getByText("index.yaml", { selector: "figcaption" }),
       ).toBeInTheDocument(),
     );
+  });
+
+  it("lazy-loads the Wiki page via the Wiki nav link (Suspense resolves)", async () => {
+    vi.stubGlobal("fetch", stubFetch());
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    // The Wiki nav link is present BEFORE any click (always-visible nav item),
+    // pointing at the lazy route.
+    const wikiLink = await screen.findByRole("link", { name: /wiki/i });
+    expect(wikiLink).toHaveAttribute("href", "/wiki");
+
+    fireEvent.click(wikiLink);
+
+    // Clicking it resolves the lazy bundle + fires api.wiki(): a section's
+    // rendered content appears (await the lazy import + the fetch)…
+    expect(await screen.findByText("FEAT-SERVER-019")).toBeInTheDocument();
+    // …and the page heading is now present (the full Wiki frontend, not the
+    // Suspense fallback). The page <h1> is distinct from the section's <h1>.
+    expect(
+      screen.getByRole("heading", { name: /feature wiki/i, level: 1 }),
+    ).toBeInTheDocument();
   });
 
   it("navigates to a repo's documents view via its documents link", async () => {
