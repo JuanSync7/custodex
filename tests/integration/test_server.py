@@ -171,8 +171,45 @@ def test_static_dir_with_index_but_no_assets_serves_spa_without_mount(
     assert root.status_code == 200
     assert "console" in root.text
     assert root.headers["content-type"].startswith("text/html")
-    assert client.get("/assets/app.js").status_code == 404  # no assets mount
+    assert client.get("/assets/app.js").status_code == 404  # not in the build
     assert client.get("/repos").json() == []  # API intact
+
+
+def test_serves_astro_underscore_assets_dir(tmp_path: Path) -> None:
+    # EPIC ASTRO: the built site's assets live under `_astro/` (Astro's default),
+    # served by the single catch-all StaticFiles mount — while the API routes
+    # (declared first) still win, proven by /health, /openapi.json and /repos.
+    dist = tmp_path / "dist"
+    (dist / "_astro").mkdir(parents=True)
+    (dist / "index.html").write_text(
+        "<!doctype html><div id='root'></div>", encoding="utf-8"
+    )
+    (dist / "_astro" / "island.abc123.js").write_text(
+        "console.log('island')", encoding="utf-8"
+    )
+    client = TestClient(create_app(InMemoryStore(), static_dir=dist))
+
+    assert client.get("/").status_code == 200
+    asset = client.get("/_astro/island.abc123.js")
+    assert asset.status_code == 200
+    assert "island" in asset.text
+    # The catch-all mount is LAST, so real API paths are never shadowed:
+    assert client.get("/health").json() == {"status": "ok"}
+    assert client.get("/openapi.json").status_code == 200
+    assert client.get("/repos").json() == []
+
+
+def test_default_static_dir_resolves_frontend_dist(tmp_path: Path) -> None:
+    # EPIC ASTRO (ASTRO-04): `_default_static_dir` resolves the built
+    # `frontend/dist` Astro app, or None when it has not been built.
+    from code_doc_monitor.server.app import _default_static_dir
+
+    assert _default_static_dir(tmp_path) is None  # not built
+
+    frontend = tmp_path / "frontend" / "dist"
+    frontend.mkdir(parents=True)
+    (frontend / "index.html").write_text("<html></html>", encoding="utf-8")
+    assert _default_static_dir(tmp_path) == frontend
 
 
 def _seed_wiki(wiki_dir: Path, *, sections: tuple[str, ...]) -> None:

@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 754f5ae255d2a04e
+  fingerprint: d15ecc8a04677da0
   fingerprint_tiers:
-    composite: 754f5ae255d2a04e
-    docstring: c84cf5fc44fde0ae
-    signature: ccdcf7f2c2d90fdd
+    composite: d15ecc8a04677da0
+    docstring: d1e4603faeb2775c
+    signature: 7f932884e9791180
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -148,7 +148,7 @@ cdm:
     - f7e36c5633592985
     - fa2f6597462ddabd
   region_hashes:
-    symbols: 3f34e6f88cbc0eb5
+    symbols: 928c789cee219f8a
   schema_version: 1.0.0
 ---
 # server
@@ -279,7 +279,7 @@ cdm:
 | _compute_status | function | def _compute_status(store: Store, repo_id: str) -> RepoStatus |
 | _compute_telemetry | function | def _compute_telemetry(store: Store, repo_id: str) -> RepoTelemetry |
 | _default_now | function | def _default_now() -> str |
-| _default_static_dir | function | def _default_static_dir() -> Path \| None |
+| _default_static_dir | function | def _default_static_dir(root: Path \| None = None) -> Path \| None |
 | _disk_editable_parts | function | def _disk_editable_parts(local_path: str \| None) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], DocStyleOptions] |
 | _json_type | function | def _json_type() -> TypeEngine[dict] |
 | _load_wiki_sections | function | def _load_wiki_sections(wiki_dir: Path \| None) -> list[dict[str, str]] |

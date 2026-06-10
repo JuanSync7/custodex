@@ -699,9 +699,10 @@ def create_app(
         candidate = Path(static_dir) / "index.html"
         if candidate.is_file():
             spa_index = candidate
-            assets = Path(static_dir) / "assets"
-            if assets.is_dir():
-                app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+            # The built site is mounted as a single catch-all at the END of
+            # create_app (after every API route), so the API always wins and the
+            # whole `dist/` — index.html, native `/wiki/*` pages, `/_astro/*`
+            # assets — is served. See the `app.mount("/", ...)` before `return`.
 
     def get_store() -> Store:
         return resolved
@@ -1297,17 +1298,31 @@ def create_app(
         _require_known_repo(store, repo_id)
         return store.latest_sync_run(repo_id, sync_kind)
 
+    # Single-origin static site (EPIC ASTRO): serve the built frontend at "/"
+    # AFTER every API route above, so the API always wins and any unclaimed path
+    # — index.html, the native `/wiki/*` pages, `/_astro/*` assets — falls through
+    # to the site. `html=True` serves index.html for "/" and directory paths. The
+    # mount is LAST so it can never shadow a route (K8/K10).
+    if spa_index is not None:
+        app.mount(
+            "/",
+            StaticFiles(directory=str(spa_index.parent), html=True),
+            name="site",
+        )
+
     return app
 
 
-def _default_static_dir() -> Path | None:
-    """The built dashboard SPA shipped beside the package, if present.
+def _default_static_dir(root: Path | None = None) -> Path | None:
+    """The built ``frontend/dist`` Astro app shipped beside the package, if present.
 
-    Looks for ``dashboard/dist`` at the repo root (two levels above this package)
-    so a single ``cdmon``-server process serves both the API and the console on
-    one port. Returns ``None`` when the dashboard has not been built.
+    Returns ``None`` when the frontend has not been built (the server still runs,
+    serving the JSON landing at ``/``). ``root`` defaults to the repo root (two
+    levels above this package); tests pass a tmp root. (EPIC ASTRO replaced the
+    legacy ``dashboard/dist`` SPA with this single Astro build.)
     """
-    dist = Path(__file__).resolve().parents[2] / "dashboard" / "dist"
+    base = root if root is not None else Path(__file__).resolve().parents[2]
+    dist = base / "frontend" / "dist"
     return dist if (dist / "index.html").is_file() else None
 
 
