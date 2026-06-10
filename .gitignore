@@ -26,7 +26,8 @@ coverage.xml
 # Generated HTML twins (produced by `cdmon build`; derived-not-edited)
 docs/**/*.html
 
-# Dashboard (EPIC-F) frontend build artifacts / deps (the dashboard has its own
-# .gitignore too; these mirror it at the root). package-lock.json IS committed.
-dashboard/node_modules/
-dashboard/dist/
+# frontend/ (EPIC ASTRO) Astro app build artifacts / deps. package-lock.json IS
+# committed; `frontend/dist/` is the served build, `.astro/` is generated types.
+frontend/node_modules/
+frontend/dist/
+frontend/.astro/

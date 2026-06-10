@@ -1,0 +1,190 @@
+---
+// The document shell for the whole frontend (EPIC ASTRO): the design system
+// (tokens, typography, base + .prose styles) plus a gradient-mesh background.
+// Pages slot their content; the console island (ASTRO-03) and the native wiki
+// pages (ASTRO-02) both render inside this.
+interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = "code-doc-monitor",
+  description = "Documentation drift, watched. The code-doc-monitor console.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    />
+  </head>
+  <body>
+    <div class="bg-mesh" aria-hidden="true"></div>
+    <slot />
+    <style is:global>
+      :root {
+        --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+        --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+        --bg: #0a0e14;
+        --surface: #11161f;
+        --surface-2: #161d29;
+        --border: #232c3b;
+        --border-soft: #1b2230;
+        --text: #e6edf3;
+        --text-dim: #8b97a7;
+        --text-faint: #5b6677;
+
+        --accent: #34d399;
+        --accent-cyan: #22d3ee;
+        --accent-ink: #042f23;
+        --warn: #fbbf24;
+        --danger: #f87171;
+
+        --radius: 14px;
+        --radius-sm: 9px;
+        --shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.8);
+        --ring: 0 0 0 1px var(--border);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      /* Atmosphere: two soft accent glows + a faint engineering grid. */
+      .bg-mesh {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            60rem 40rem at 12% -8%,
+            rgba(52, 211, 153, 0.1),
+            transparent 60%
+          ),
+          radial-gradient(
+            50rem 38rem at 100% 0%,
+            rgba(34, 211, 238, 0.08),
+            transparent 55%
+          ),
+          linear-gradient(transparent 0 1px, transparent 1px) 0 0 / 100% 64px,
+          linear-gradient(90deg, var(--border-soft) 0 1px, transparent 1px) 0 0 /
+            64px 100%;
+        mask-image: linear-gradient(to bottom, black, transparent 70%);
+        opacity: 0.5;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.12;
+        margin: 0 0 0.4em;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      code,
+      kbd,
+      pre {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+      }
+
+      ::selection {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+
+      /* The eyebrow/label treatment reused across the app chrome. */
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      /* Readable column for native-Astro wiki/doc pages (ASTRO-02). */
+      .prose {
+        max-width: 76ch;
+        color: var(--text);
+      }
+      .prose :where(p, li) {
+        color: #cdd6e2;
+      }
+      .prose :where(h1, h2, h3) {
+        scroll-margin-top: 5rem;
+      }
+      .prose pre {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 1rem 1.1rem;
+        overflow-x: auto;
+      }
+      .prose :not(pre) > code {
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: 5px;
+        padding: 0.12em 0.4em;
+      }
+      .prose table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.92rem;
+      }
+      .prose th,
+      .prose td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.7rem;
+        text-align: left;
+      }
+      .prose th {
+        background: var(--surface);
+        font-family: var(--font-mono);
+        font-weight: 600;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </body>
+</html>

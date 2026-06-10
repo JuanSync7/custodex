@@ -1,0 +1,142 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+
+// EPIC ASTRO (ASTRO-02): native-Astro rendering of the EPIC-R wikis. Each
+// `feature-doc/` markdown doc becomes a static `/wiki/*` page (the default
+// `/wiki` is the Feature Reference), rendered by Astro's markdown pipeline —
+// no `render_markdown`, no `dangerouslySetInnerHTML`. The left rail switches
+// sections with real navigation (full static pages, instant + cacheable).
+
+interface SectionMeta {
+  slug: string;
+  title: string;
+  order: number;
+}
+
+export async function getStaticPaths() {
+  // `metaFor` lives INSIDE getStaticPaths on purpose: Astro hoists this function
+  // into its own scope, so it cannot reference frontmatter-level helpers (they
+  // come out "not defined" at build). Map an entry id → slug/title by substring
+  // (robust to the glob loader's id casing: FEATURES / wiki/TEST_WIKI / …).
+  function metaFor(id: string): SectionMeta | null {
+    const u = id.toUpperCase();
+    if (u.includes("TRACEABILITY"))
+      return { slug: "traceability", title: "Traceability Matrix", order: 1 };
+    if (u.includes("TEST")) return { slug: "tests", title: "Test Wiki", order: 2 };
+    if (u.includes("SOURCE"))
+      return { slug: "source", title: "Source Wiki", order: 3 };
+    if (u.includes("FEATURES"))
+      return { slug: "features", title: "Feature Reference", order: 0 };
+    return null;
+  }
+  const entries = await getCollection("wiki");
+  const known = entries
+    .map((entry) => ({ entry, meta: metaFor(entry.id) }))
+    .filter((x): x is { entry: (typeof entries)[number]; meta: SectionMeta } =>
+      Boolean(x.meta),
+    );
+  const sections = known
+    .map(({ meta }) => meta)
+    .sort((a, b) => a.order - b.order);
+  return known.map(({ entry, meta }) => ({
+    params: { slug: meta.slug },
+    props: { entry, meta, sections },
+  }));
+}
+
+const { entry, meta, sections } = Astro.props;
+const { Content } = await render(entry);
+const href = (s: SectionMeta) => `/wiki/${s.slug}`;
+---
+
+<Layout title={`${meta.title} · code-doc-monitor wiki`}>
+  <header class="wiki-top">
+    <a class="back" href="/">← console</a>
+    <span class="eyebrow">feature wiki</span>
+  </header>
+
+  <div class="wiki">
+    <nav class="rail" aria-label="Wiki sections">
+      {
+        sections.map((s) => (
+          <a
+            class:list={["rail__item", { "rail__item--active": s.slug === meta.slug }]}
+            href={href(s)}
+            aria-current={s.slug === meta.slug ? "page" : undefined}
+          >
+            {s.title}
+          </a>
+        ))
+      }
+    </nav>
+
+    <article class="prose wiki-body">
+      <Content />
+    </article>
+  </div>
+</Layout>
+
+<style>
+  .wiki-top {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.1rem clamp(1.25rem, 4vw, 3rem);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .back {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+  .wiki {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    max-width: 80rem;
+    margin: 0 auto;
+    padding: 2rem clamp(1.25rem, 4vw, 3rem) 4rem;
+  }
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+  .rail__item {
+    padding: 0.6rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-weight: 500;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+  .rail__item:hover {
+    text-decoration: none;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .rail__item--active {
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--accent);
+  }
+  .wiki-body {
+    min-width: 0;
+  }
+  @media (max-width: 52rem) {
+    .wiki {
+      grid-template-columns: 1fr;
+    }
+    .rail {
+      position: static;
+      flex-direction: row;
+      flex-wrap: wrap;
+    }
+  }
+</style>
