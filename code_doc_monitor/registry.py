@@ -69,6 +69,15 @@ class RegistrationPayload(BaseModel):
     # payload JSON is sanitized of it). Default None keeps pre-E-06 payloads valid and
     # leaves that repo's writes open. Appended LAST so field order is untouched.
     auth_token: str | None = None
+    # GIT-02 per-repo PROVIDER credential (ADDITIVE, K6): a WRITE-ONLY plaintext git
+    # PAT/project-token the client mints at register so the central server can clone
+    # + open docs-PRs against this repo (EPIC GIT). Unlike ``auth_token`` (which the
+    # server hashes — it is only ever COMPARED), a git credential must be REPLAYED,
+    # so the server SEALS it at rest (AES-256-GCM, ``secrets.py``) and never stores
+    # or returns the plaintext: it is excluded from the stored payload JSON and from
+    # RegisteredRepo. Default None keeps pre-GIT-02 payloads valid (a repo synced
+    # only by ``local_path`` carries no provider secret). Appended LAST.
+    provider_secret: str | None = None
 
 
 @runtime_checkable

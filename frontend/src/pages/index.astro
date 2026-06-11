@@ -1,0 +1,13 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ConsoleApp from "../console/ConsoleApp.tsx";
+
+// The console (EPIC ASTRO). `/` hosts the ported React console as a single
+// `client:only="react"` island inside the Astro Layout (design system + chrome).
+// Hash-routed, so deep client routes (#/repos/…) never collide with the API the
+// same FastAPI process serves. Native `/wiki/*` pages (ASTRO-02) live alongside.
+---
+
+<Layout title="code-doc-monitor — console">
+  <ConsoleApp client:only="react" />
+</Layout>

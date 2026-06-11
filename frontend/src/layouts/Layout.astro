@@ -1,0 +1,170 @@
+---
+// The document shell for the whole frontend (EPIC ASTRO). Shares the console's
+// clean LIGHT design language (Linear/Vercel-style: near-white canvas, emerald
+// accent, Schibsted/Hanken type) so the native wiki pages look identical to the
+// main console — no dark theme, no background grid, just simple white.
+interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = "code-doc-monitor",
+  description = "Documentation drift, watched. The code-doc-monitor console.",
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Schibsted+Grotesk:wght@500;600;700;800&display=swap"
+    />
+  </head>
+  <body>
+    <slot />
+    <style is:global>
+      :root {
+        --font-display: "Schibsted Grotesk", "Hanken Grotesk", system-ui, sans-serif;
+        --font-sans: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+        /* Light surfaces (match the console's index.css palette). */
+        --bg: #fafbfc;
+        --surface: #ffffff;
+        --surface-2: #f4f6f8;
+        --surface-3: #eef1f4;
+        --border: #e7eaee;
+        --border-soft: #eef1f4;
+        --text: #111827;
+        --text-dim: #5b6573;
+        --text-faint: #939dab;
+
+        --accent: #0d9f6e;
+        --accent-strong: #0a7f57;
+        --accent-tint: #e8f7f0;
+
+        --radius: 10px;
+        --radius-sm: 8px;
+        --shadow: 0 1px 3px rgba(17, 24, 39, 0.08), 0 12px 28px -12px rgba(17, 24, 39, 0.16);
+
+        color-scheme: light;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4 {
+        font-family: var(--font-display);
+        font-weight: 700;
+        letter-spacing: -0.018em;
+        line-height: 1.15;
+        margin: 0 0 0.4em;
+        color: var(--text);
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      code,
+      kbd,
+      pre {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+      }
+      ::selection {
+        background: var(--accent-tint);
+        color: var(--accent-strong);
+      }
+
+      .eyebrow {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      /* Readable column for the native-Astro wiki/doc pages — light, like the
+         console: dark ink on white, hairline borders, soft code blocks. */
+      .prose {
+        max-width: 78ch;
+        color: var(--text);
+      }
+      .prose :where(p, li) {
+        color: #2b3340;
+      }
+      .prose :where(h1, h2, h3) {
+        scroll-margin-top: 5rem;
+      }
+      .prose a {
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .prose pre {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 1rem 1.1rem;
+        overflow-x: auto;
+      }
+      .prose :not(pre) > code {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 0.12em 0.4em;
+      }
+      .prose table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 0.92rem;
+      }
+      .prose th,
+      .prose td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.7rem;
+        text-align: left;
+      }
+      .prose th {
+        background: var(--surface-2);
+        font-family: var(--font-mono);
+        font-weight: 600;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </body>
+</html>

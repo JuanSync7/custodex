@@ -1,0 +1,101 @@
+# Feature catalog — `agent` subsystem (the optional LangGraph remediation agent).
+# Golden source of truth (EPIC R, slice R-02). Do not duplicate this prose
+# elsewhere; the rendered feature-doc/FEATURES.md and the R-07 source wiki read
+# from here. Owns the code_doc_monitor/agent/ subpackage (backend, graph,
+# prompts, runtime, state).
+features:
+  - id: FEAT-AGENT-001
+    title: LangGraph remediation backend
+    summary: >-
+      AgentBackend (built by make_agent_backend) drives a deterministic LangGraph
+      workflow behind the same Backend.propose(req) -> BackendResult contract as
+      the single-shot backends, so the Monitor orchestrator is unchanged whether
+      it runs the mock, a one-shot call, or the graph. Lives in the optional
+      [agent] extra (langgraph), keeping the core mock path dependency-free.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K0, K4]
+
+  - id: FEAT-AGENT-002
+    title: Deterministic remediation state graph
+    summary: >-
+      build_graph compiles a StateGraph of four nodes plus a bounded re-ask loop
+      (select -> compose -> invoke -> parse, retry back to compose, fail loudly)
+      over a RemediationState TypedDict. The graph itself is fully deterministic;
+      the only non-determinism is the injected Driver, so the whole workflow runs
+      offline with a fake driver in tests.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K4, K8, K10]
+
+  - id: FEAT-AGENT-003
+    title: Verdict production with bounded re-ask
+    summary: >-
+      The parse node validates the driver's raw reply into a BackendResult
+      (FIX / INVALIDATE / ESCALATE) via parse_backend_json; a malformed reply
+      routes back to compose with a strict-JSON nudge until max_parse_retries is
+      spent, then the fail node raises a typed BackendError rather than emitting a
+      silent or empty verdict.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K8]
+
+  - id: FEAT-AGENT-004
+    title: Composable Markdown prompt artifacts
+    summary: >-
+      PromptLibrary lazily loads and caches the agent's separated prompt
+      artifacts (Artifact.AGENT / PROTOCOL / TOOL / PERSONA / EXEMPLARS) from the
+      packaged prompts/ directory or an agent.prompts_dir override, stripping YAML
+      front matter from each body. A missing required artifact is a loud, typed
+      BackendError, never a silent empty prompt.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K8]
+
+  - id: FEAT-AGENT-005
+    title: Load-only-when-needed artifact selection
+    summary: >-
+      select_artifacts decides which artifacts a drift needs — AGENT and PROTOCOL
+      always, TOOL only for a healable (non-UNHEALABLE) drift, PERSONA only when
+      use_persona is enabled and the file exists, and EXEMPLARS only when the
+      request carries few-shot exemplars — so each .md is read from disk only when
+      a node actually composes it.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K6, K8]
+
+  - id: FEAT-AGENT-006
+    title: Drift-specific prompt context
+    summary: >-
+      render_context assembles the per-drift block appended after the artifacts —
+      audience, document id/path, detected drift, current document text, and the
+      code surface symbol_table as the single source of truth — and appends
+      optional index body, context refs, few-shot exemplars, and writing guidance
+      LAST so an exemplar-/style-free request is byte-identical to its prior output.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K2, K6, K9]
+
+  - id: FEAT-AGENT-007
+    title: Few-shot exemplar framing
+    summary: >-
+      When a FixRequest carries retrieved exemplars, render_context renders each
+      one (past drift shape, human resolution, and the committed resolved_text for
+      an overridden outcome) under the EXEMPLARS.md framing as precedent that the
+      live code surface still overrides; with no exemplars the selection and
+      rendered prompt are byte-identical to pre-exemplar output (additive).
+    subsystem: agent
+    modules: [agent]
+    constraints: [K2, K6, K9]
+
+  - id: FEAT-AGENT-008
+    title: Config-resolved runtime driver
+    summary: >-
+      resolve_driver turns an AgentConfig into the single side-effecting Driver
+      (a prompt -> raw-text callable) — the headless Claude Code CLI by default,
+      the Anthropic Messages API, or any OpenAI-compatible local endpoint — so
+      pointing the agent at a different model host is a config edit, never a code
+      change; a misconfigured or failing driver raises a typed BackendError.
+    subsystem: agent
+    modules: [agent]
+    constraints: [K0, K4, K8]

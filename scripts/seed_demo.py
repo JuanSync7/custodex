@@ -64,12 +64,13 @@ _NOW = "2026-06-01T00:00:00Z"
 
 _DEMO_TOKEN = "demo-token"  # the per-repo bearer token every demo repo mints
 
-# The demo repos shown in the dashboard. The LAST one (the dogfood repo) also
-# gets this repo's own real coverage snapshot attached.
+# The REAL repos shown in the dashboard. The synthetic ``acme-*`` placeholders
+# were removed — every row now maps to a real repo on disk. The dogfood
+# ``code-doc-monitor`` row gets this repo's own real coverage snapshot attached;
+# the self-contained adopter demo (``demo-taskflow``) is registered separately
+# below (``_register_demo_taskflow``) with its ``local_path`` so its Sync button
+# operates on the real ``demo/`` working tree.
 _DEMO_REPOS: tuple[tuple[str, str, str], ...] = (
-    ("acme-payments", "Acme Payments", "Billing + invoicing service"),
-    ("acme-gateway", "Acme Gateway", "Public API gateway"),
-    ("acme-search", "Acme Search", "Search + indexing service"),
     ("code-doc-monitor", "code-doc-monitor", "This very repo (dogfood)"),
 )
 

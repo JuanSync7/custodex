@@ -1,0 +1,98 @@
+# Feature catalog — `reference` subsystem (EPIC R: the golden reference machinery
+# itself — the feature catalog, traceability, and wiki export). Self-describing:
+# cdmon documents its own documentation system here.
+features:
+  - id: FEAT-REFERENCE-001
+    title: Golden feature catalog (typed, loadable)
+    summary: >-
+      featurecatalog.load_catalog aggregates feature-doc/catalog/*.yaml into a
+      validated, id-sorted FeatureCatalog of frozen Feature records (extra=forbid);
+      it is loud (CatalogError) on a missing/empty dir, malformed yaml, a bad id
+      pattern, a duplicate id across files, or a feature naming a non-existent
+      module — the single machine-readable source of truth for every cdmon feature.
+    subsystem: reference
+    modules: [featurecatalog]
+    constraints: [K0, K1, K8, K10]
+
+  - id: FEAT-REFERENCE-002
+    title: Rendered human feature reference
+    summary: >-
+      featurecatalog.render_features_md renders feature-doc/FEATURES.md from the
+      catalog — grouped by subsystem, sorted, with per-feature demo/test
+      traceability columns — as a pure, byte-stable function (no clock), so the
+      human reference is regenerated, never hand-edited.
+    subsystem: reference
+    modules: [featurecatalog]
+    constraints: [K7, K10]
+
+  - id: FEAT-REFERENCE-003
+    title: Feature traceability matrix engine
+    summary: >-
+      traceability.build_matrix crosses the golden catalog against the inline
+      Feature:/Features: tag convention scanned (as TEXT — never imported) from
+      tests/, demo/, and optionally source/, producing a TraceMatrix that reports
+      every feature lacking a test or a demo and every unknown ref (a tagged id
+      absent from the catalog — a loud gap). is_complete() is the 1:1
+      every-feature-has-a-demo-and-a-test guarantee; render_matrix_md emits the
+      byte-stable traceability wiki. Pure, sorted, clock-free.
+    subsystem: reference
+    modules: [traceability]
+    constraints: [K0, K1, K8, K10]
+
+  - id: FEAT-REFERENCE-004
+    title: Test-wiki AST extractor
+    summary: >-
+      testwiki.collect_tests AST-parses every test_*.py (NEVER importing or
+      executing it) into TestModule/TestCase records carrying each test's
+      docstring summary, its boundary resolved from the directory (unit /
+      integration / system / smoke / regression), and the union of its own and its
+      module's Feature: tags; render_test_wiki_md emits a byte-stable wiki grouped
+      by boundary with a per-feature "tested by" index. Loud only on a genuinely
+      unparseable test file.
+    subsystem: reference
+    modules: [testwiki]
+    constraints: [K0, K1, K8, K10]
+
+  - id: FEAT-REFERENCE-005
+    title: Source index + no-orphan-capability check
+    summary: >-
+      srcindex.build_source_index inventories a package (reusing
+      inventory.discover_files/discover_symbols — no AST re-impl), folds every
+      file into its top-level module, attaches each module's public symbols, and
+      joins each module to the catalog features whose modules name it.
+      SourceIndex.modules_without_feature is the deferred R-02 "no orphan public
+      capability" check (a public module with zero catalog features) and
+      features_without_module_match catches a catalog feature naming a module the
+      package no longer ships. Pure, deterministic, loud on a bad package root.
+    subsystem: reference
+    modules: [srcindex]
+    constraints: [K0, K1, K8, K10]
+
+  - id: FEAT-REFERENCE-006
+    title: Rendered source wiki
+    summary: >-
+      srcindex.render_source_wiki_md renders the source wiki from a SourceIndex —
+      per-module path, public symbols, and implementing-feature links, plus a
+      Coverage summary that counts the public modules and names any orphan
+      (un-catalogued) module — as a pure, byte-stable function (no clock), so the
+      SOURCE view of the golden reference is regenerated, never hand-edited.
+    subsystem: reference
+    modules: [srcindex]
+    constraints: [K7, K10]
+
+  - id: FEAT-REFERENCE-007
+    title: cdmon wiki regeneration + freshness gate
+    summary: >-
+      wiki.regenerate, driven by `cdmon wiki`, regenerates ALL of EPIC R's derived
+      artifacts from their single sources in one command — feature-doc/FEATURES.md
+      plus the test, source, and traceability wikis under feature-doc/wiki/ — via a
+      shared WIKI_TARGETS (path -> render thunk) that is the single source of the
+      output set, so write-mode and --check can never diverge. `cdmon wiki` writes
+      every changed target (a second run is a no-op — idempotent K7); `cdmon wiki
+      --check` is the read-only CI freshness gate that lists every stale file and
+      exits nonzero without writing (loud K8). Deterministic (K10), no new
+      dependency (K0). With `cdmon trace --fail-on-gap` wired into CI, the golden
+      reference can no longer silently drift from the code, demos, or tests.
+    subsystem: reference
+    modules: [wiki]
+    constraints: [K0, K7, K8, K10]

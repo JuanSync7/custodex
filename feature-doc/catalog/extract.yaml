@@ -1,0 +1,67 @@
+# Feature catalog — `extract` subsystem (audience-aware code-surface extraction).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-EXTRACT-001
+    title: Audience-aware code surface
+    summary: >-
+      build_document_surface derives a per-document DocumentSurface from a code
+      ref's symbols, filtered by audience: a user-guide surface drops private
+      (`_`-prefixed) symbols and excludes docstrings; an eng-guide surface keeps
+      all symbols and folds docstrings into the hash.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K0, K1, K3, K10]
+
+  - id: FEAT-EXTRACT-002
+    title: Deterministic surface fingerprint
+    summary: >-
+      DocumentSurface.surface_hash() returns a stable sha256[:16] over the
+      audience-filtered symbols (sorted keys, normalized whitespace, no
+      wall-clock), so an unchanged surface always hashes identically.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K6, K10]
+
+  - id: FEAT-EXTRACT-003
+    title: Pluggable extractor seam
+    summary: >-
+      An Extractor Protocol + language-keyed registry (register_extractor /
+      get_extractor) lets a new language be a registration, not an engine edit;
+      get_extractor is loud on an unknown language. The Python AST extractor is
+      the default registration.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K0, K8]
+
+  - id: FEAT-EXTRACT-004
+    title: Tiered fingerprint (signature / docstring / body)
+    summary: >-
+      SurfaceFingerprint decomposes the surface into per-tier digests plus a
+      composite, so drift can report which tier moved; an opt-in body-AST tier
+      lets an eng-guide detect an implementation change that leaves the signature
+      untouched.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K6, K10]
+
+  - id: FEAT-EXTRACT-005
+    title: Symbol anchor identity
+    summary: >-
+      anchor_id(name) is a lineno-free sha256[:16] of a symbol's qualified name,
+      stable across a code move, recorded per region so drift can tell a
+      structural symbol add/remove/rename from a purely internal change.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K10]
+
+  - id: FEAT-EXTRACT-006
+    title: Shell extractor (sh/bash)
+    summary: >-
+      ShellExtractor statically parses sh/bash function definitions (`name() {…}`
+      and `function name {…}`) via the stdlib re module only, registered by
+      default for .sh/.bash — proving a new language is a registration, never an
+      engine edit. Never sources or executes the script.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K0, K1, K3, K4]

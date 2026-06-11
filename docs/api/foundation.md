@@ -1,9 +1,133 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 083db089a2e0acf8
+  fingerprint: 85fb2f4ab3048aa9
+  fingerprint_tiers:
+    composite: 85fb2f4ab3048aa9
+    docstring: 1588ec1c15b1e7b4
+    signature: 2181990b0f92e89a
+  region_anchors:
+    symbols:
+    - 00652c5f721d5ef6
+    - 031af45574e9fb3e
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 083c4cd04ae0a9e0
+    - 08cabae98768bbac
+    - 091a998373c22ca9
+    - 09df7d93520d6632
+    - 0a12e5898c92bfc6
+    - 0b390c979393f83b
+    - 0d9808ab184991ce
+    - 0dad8198442ebc15
+    - 147fda13f62e8d29
+    - 16fa33fa4ac0dc4e
+    - 17019d426b379415
+    - 19599a22448b1545
+    - 19f17915412b7ce2
+    - 1c791cd5029fd0c8
+    - 1fc476fb39fc321a
+    - 203c45f1f1231235
+    - 204ae77992ce6f89
+    - 21366eab05e739b8
+    - 2315c3ba973d34e0
+    - 249c7e4c157119d2
+    - 28b7f5de5919f6f2
+    - 2a8f6ab973a376f0
+    - 2fc7b290292b119c
+    - 38527a9330f2dad5
+    - 3920de84732eea78
+    - 3920de84732eea78
+    - 3e00b4ad560e5de7
+    - 4054d8813d8e592f
+    - 4a2ca79bf708f89c
+    - 4a36f89dafb0a101
+    - 4f4f218b97d301a9
+    - 5164fe30f50e30c5
+    - 53878c6848eafd81
+    - 545c02357695a6ff
+    - 55c1a3c88cf92236
+    - 572b9f66ffa43300
+    - 582b027d421386db
+    - 5c4c5ccabaf45fe2
+    - 5f31511731a8d710
+    - 6509a508c42b1144
+    - 67280832bd5a56c8
+    - 67768f80fff0ce41
+    - 68abb78557da6b6c
+    - 6bf33eee2fe93f9a
+    - 6f1ffff66d35b774
+    - 70df2bfd15daec86
+    - 736a7fe906bf0129
+    - 75694f3fe0d8b961
+    - 7df536c744fd43fd
+    - 81ffd1cd4b050ef8
+    - 863a84e157e513f4
+    - 87f90da1f29b87a9
+    - 8ad81f9afab07be3
+    - 8afc54eff24079b4
+    - 8cf2490a5bab614d
+    - 91cd02faf8342f49
+    - 944fca707b7e57f5
+    - 949e83f48e041117
+    - 94aa6c378eb9283c
+    - 980311c056ae3045
+    - 98117ea616dd3e9f
+    - 991d9c74dd497040
+    - 9c1e4e21a8ba9712
+    - a36f1a6c53893358
+    - a47dddeeda46352d
+    - a6517d7d72f73eb9
+    - a8d0d1d4bb421622
+    - ad1d037438d946ee
+    - ad9f6cfd78f2c1ec
+    - ae498729cee35511
+    - ae5836c79fbf9808
+    - b0e0fabb95a65a96
+    - b40f2cf93387ebe8
+    - b74297b27cc94564
+    - c103ef8a6b38f57b
+    - c3101973fe2f73f3
+    - c3bae03d014fe39d
+    - c4d17477dd8645eb
+    - c64ffddedd066da9
+    - c6afc1df5b422222
+    - c78a0ec77c5ec1a2
+    - cb740b31a08869b1
+    - cbbde2c420898532
+    - cca68cf1f6eb5477
+    - ccf57d95e8d57977
+    - d28cf7729068ff29
+    - d31f855d5547d0fb
+    - d44082bccab4ddaa
+    - d51a1c2ad604ab2c
+    - d66e738995cfa86a
+    - d810ee574fcee4f5
+    - d97ca633fb31ebf6
+    - dbd044032a4e2c02
+    - dc6b6698decf6ed2
+    - debba00cbcfe4db9
+    - df2e40dd04dfb417
+    - e035339de5fa4542
+    - e11241b69221ac34
+    - e261f035d021125f
+    - e4efb0831dc07263
+    - e877dd6b99670aaa
+    - e999daf597dbc1db
+    - ea567e80184e4f05
+    - eb717b7c18f96b59
+    - ec27d28c8129e999
+    - ed1daf324b0105f2
+    - f1fa30154af56704
+    - f265a8df55f3cbef
+    - f73185493293c1ba
+    - fd87e7b303770609
+    - ff51b2032355ac8b
   region_hashes:
-    symbols: 892e08537c988511
+    symbols: 6944484155f08334
   schema_version: 1.0.0
 ---
 # code-doc-monitor — foundation (engineering reference)
@@ -20,6 +144,7 @@ cdm:
 | BackendError | class | class BackendError(CodeDocMonitorError) |
 | CDMON_CONFIG_VERSION | variable | CDMON_CONFIG_VERSION = '2.0.0' |
 | CONFIG_TEMPLATE | variable | CONFIG_TEMPLATE = ... |
+| CatalogError | class | class CatalogError(CodeDocMonitorError) |
 | CentralConfig | class | class CentralConfig(BaseModel) |
 | CodeDocMonitorError | class | class CodeDocMonitorError(Exception) |
 | CodeRef | class | class CodeRef(BaseModel) |
@@ -63,6 +188,7 @@ cdm:
 | RegionTemplate | class | class RegionTemplate(BaseModel) |
 | STYLE_CATEGORIES | variable | STYLE_CATEGORIES: tuple[tuple[str, str], ...] = ... |
 | SchemaError | class | class SchemaError(CodeDocMonitorError) |
+| SecretError | class | class SecretError(CodeDocMonitorError) |
 | SyncError | class | class SyncError(CodeDocMonitorError) |
 | TransportError | class | class TransportError(CodeDocMonitorError) |
 | UNIT_TEMPLATE | variable | UNIT_TEMPLATE = ... |

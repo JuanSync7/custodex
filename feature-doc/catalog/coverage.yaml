@@ -1,0 +1,118 @@
+# Feature catalog — `coverage` subsystem (lossless EPIC A coverage: repo
+# discovery, symbol inventory, document-ownership resolution + gap reporting).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-COVERAGE-001
+    title: Repo code-file discovery with glob scoping
+    summary: >-
+      discover_files walks a repo root and returns an Inventory of CodeFile
+      entries (repo-relative POSIX path + extension-derived language), keeping a
+      file iff it matches at least one include glob and zero exclude globs over
+      DEFAULT_INCLUDE / DEFAULT_EXCLUDE. Output is sorted by path and deduped.
+    subsystem: coverage
+    modules: [inventory]
+    constraints: [K0, K1, K10]
+
+  - id: FEAT-COVERAGE-002
+    title: In-house recursive glob translation
+    summary: >-
+      A private stdlib-only translator compiles each POSIX include/exclude glob
+      to a regex with true `**` semantics (`**/` = zero-or-more leading
+      segments, `**` crosses `/`, `*`/`?` stay within one segment), so glob
+      scoping needs no new dependency (fnmatch alone cannot express `**`).
+    subsystem: coverage
+    modules: [inventory]
+    constraints: [K0, K1]
+
+  - id: FEAT-COVERAGE-003
+    title: Lossless language tagging
+    summary: >-
+      _language_for maps a file extension via a deliberately small table
+      (.py/.pyi -> python) and labels anything matched-but-unmapped as
+      "unknown", so a discovered file is tracked with a coarse language and
+      never dropped for lack of a mapping.
+    subsystem: coverage
+    modules: [inventory]
+    constraints: [K1, K10]
+
+  - id: FEAT-COVERAGE-004
+    title: Loud invalid-root failure
+    summary: >-
+      discover_files raises a typed InventoryError when root is missing or is
+      not a directory, never returning a silent empty Inventory.
+    subsystem: coverage
+    modules: [inventory]
+    constraints: [K8]
+
+  - id: FEAT-COVERAGE-005
+    title: Symbol-level inventory
+    summary: >-
+      discover_symbols attaches each file's symbol surface as a SymbolInventory
+      of FileSymbols, calling extract.extract_file for every python file (AST
+      parsing reused, never re-implemented) and keeping non-python files with
+      symbols=() (lossless). Inventory file order and extract_file symbol order
+      are preserved; an unparseable file lets ExtractionError propagate loud.
+    subsystem: coverage
+    modules: [inventory]
+    constraints: [K0, K1, K8, K10]
+
+  - id: FEAT-COVERAGE-006
+    title: File- and symbol-level ownership resolution
+    summary: >-
+      resolve_coverage crosses a MonitorConfig's document code_refs against a
+      SymbolInventory to produce a lossless CoverageReport, marking each
+      OwnedFile and OwnedSymbol with the doc ids that own it (a file by path
+      match, a symbol by reusing extract._select). It is pure and ignores
+      audience; output is deterministic (files by path, symbols by path/name/kind).
+    subsystem: coverage
+    modules: [coverage]
+    constraints: [K0, K1, K10]
+
+  - id: FEAT-COVERAGE-007
+    title: Three coverage baskets and percentages
+    summary: >-
+      CoverageReport derives documented / undocumented / waived baskets at file
+      and symbol granularity, with percent_files and percent_public_symbols.
+      The gap-percentage universe is PUBLIC symbols only (private symbols are
+      tracked but never a documentation target), and an empty universe is
+      vacuously 100% (no zero-division).
+    subsystem: coverage
+    modules: [coverage]
+    constraints: [K1, K10]
+
+  - id: FEAT-COVERAGE-008
+    title: Coverage waivers with justifications
+    summary: >-
+      resolve_coverage folds config.coverage.waive entries: an unowned file or
+      unowned public symbol whose path (and, for a symbol, name) matches a
+      waiver is stamped with that entry's reason and reclassified out of the gap
+      basket into waived_files / waived_symbols. Waived items leave both the
+      numerator and denominator of the percentages.
+    subsystem: coverage
+    modules: [coverage]
+    constraints: [K0, K1, K10]
+
+  - id: FEAT-COVERAGE-009
+    title: Gap-to-suggested-owner heuristic
+    summary: >-
+      suggest_owners emits a deterministic OwnerSuggestion for every public,
+      unowned, non-waived symbol gap with no LLM or I/O: it reuses an existing
+      doc id when a document already owns a sibling symbol in the file, or
+      proposes a new path-derived doc id (drop .py/.pyi, "/" -> "-") for a
+      fully-unowned file. Output is sorted by (path, name).
+    subsystem: coverage
+    modules: [coverage]
+    constraints: [K0, K10]
+
+  - id: FEAT-COVERAGE-010
+    title: JSON-safe coverage snapshot
+    summary: >-
+      coverage_snapshot projects a CoverageReport into the deterministic,
+      JSON-safe wire shape the central server stores and the dashboard reads —
+      the file/symbol percentages, file basket counts, a per-file list with
+      documented/undocumented/waived status and owners, plus a back-compat
+      `ratio` (percent_public_symbols / 100).
+    subsystem: coverage
+    modules: [coverage]
+    constraints: [K0, K1, K10]

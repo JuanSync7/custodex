@@ -46,9 +46,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_config_documents_repo_id", "config_documents", ["repo_id"])
     op.create_index("ix_config_documents_doc_id", "config_documents", ["doc_id"])
-    op.create_index(
-        "ix_config_documents_sync_kind", "config_documents", ["sync_kind"]
-    )
+    op.create_index("ix_config_documents_sync_kind", "config_documents", ["sync_kind"])
 
     op.create_table(
         "config_code_refs",
@@ -62,9 +60,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_config_code_refs_repo_id", "config_code_refs", ["repo_id"])
     op.create_index("ix_config_code_refs_doc_id", "config_code_refs", ["doc_id"])
-    op.create_index(
-        "ix_config_code_refs_sync_kind", "config_code_refs", ["sync_kind"]
-    )
+    op.create_index("ix_config_code_refs_sync_kind", "config_code_refs", ["sync_kind"])
 
     op.create_table(
         "sync_runs",

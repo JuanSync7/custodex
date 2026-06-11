@@ -1,0 +1,105 @@
+# Feature catalog — `monitor` subsystem (the drift orchestration loop).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-MONITOR-001
+    title: End-to-end drift orchestration loop
+    summary: >-
+      Monitor.run runs the full pipeline per detected drift: detect (check) ->
+      per-drift backend verdict -> build + record a ReviewRecord -> optionally
+      apply a FIX -> re-detect, returning a MonitorResult of handled drifts,
+      remaining drifts, and records. Every collaborator (backend, sink, now
+      clock) is injected so the loop runs offline and deterministically.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K1, K4, K10]
+
+  - id: FEAT-MONITOR-002
+    title: Pure detect delegate
+    summary: >-
+      Monitor.check returns a DriftReport by delegating to drift.detect over the
+      config and config_dir, mutating nothing — the read-only detection step the
+      run loop opens and closes with.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K1]
+
+  - id: FEAT-MONITOR-003
+    title: Opt-in auto-apply heal path
+    summary: >-
+      run applies a fix only when apply is effectively true (overriding
+      config.apply_default) AND the backend returned a FIX with a non-null fix,
+      calling heal.apply_fix at the write boundary; otherwise it mutates nothing.
+      It computes the human-owned preserve set and per-region modes from the spec
+      so apply_fix cannot clobber human regions.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K5, K7]
+
+  - id: FEAT-MONITOR-004
+    title: Every verdict is always recorded and emitted
+    summary: >-
+      For every drift, run builds a ReviewRecord via _record_for, appends it to
+      the review log, and emits it to the central sink — regardless of verdict —
+      so INVALIDATE/ESCALATE are surfaced for a human and never silently dropped.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K5]
+
+  - id: FEAT-MONITOR-005
+    title: Self-describing record provenance snapshot
+    summary: >-
+      Each ReviewRecord carries a config_snapshot (backend kind, root) plus an
+      optional source_sha, a deterministic record_id, and a joinable ticket
+      (CDM-<record_id>); a rule-resolved record additionally stamps
+      resolved_by="rule" and a body-tier run records fingerprint_body_tier=True,
+      both additively.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K6, K10]
+
+  - id: FEAT-MONITOR-006
+    title: Recheck-after-apply remaining set
+    summary: >-
+      After processing all drifts, run performs a fresh check() and returns its
+      drifts as remaining, so a FIX'd drift drops out while ESCALATE or unapplied
+      drift persists — the idempotent recheck that proves a heal converged.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K7, K10]
+
+  - id: FEAT-MONITOR-007
+    title: Opt-in promoted-rule resolution (zero backend calls)
+    summary: >-
+      When rules are supplied, run resolves a matching drift via
+      promotion.rule_for with ZERO backend calls — the learned cost-curve win —
+      synthesizing a RULE_CAUSE_PREFIX cause, recording and emitting it marked
+      RULE-sourced, and applying nothing (rules carry no fix). The default empty
+      rules tuple keeps every drift going to the backend.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K4, K5, K6]
+
+  - id: FEAT-MONITOR-008
+    title: Opt-in few-shot exemplar retrieval
+    summary: >-
+      When use_exemplars is on, run reads the review log and resolutions log ONCE
+      up front and, per drift, ranks the most-similar past RESOLVED records via
+      similar.rank_similar (top_n) to attach as exemplars on the FixRequest; the
+      default OFF reads nothing and leaves exemplars empty.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K4, K6]
+
+  - id: FEAT-MONITOR-009
+    title: Region-authority-aware fix request
+    summary: >-
+      run builds each FixRequest with the drifted region's authority mode
+      (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body
+      for an index-sourced region, opt-in writing style_guidance for a
+      no-renderer llm region via _style_guidance_for, and the document's
+      context_refs + repo_root — so a backend authors prose vs renders
+      mechanically as the region dictates.
+    subsystem: monitor
+    modules: [monitor]
+    constraints: [K6]

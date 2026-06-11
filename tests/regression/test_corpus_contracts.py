@@ -3,6 +3,9 @@
 Durable, cross-cutting invariants that protect the public schema's back-compat,
 the report transport's never-raise guarantee, and the learned-rule cost win.
 Each case names the lesson id it guards. See ``tests/regression/README.md``.
+
+Features: FEAT-RECORD-001, FEAT-RECORD-002, FEAT-RECORD-003, FEAT-RECORD-006
+Features: FEAT-RECORD-012, FEAT-MONITOR-007, FEAT-LEARN-006
 """
 
 from __future__ import annotations

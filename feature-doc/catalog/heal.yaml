@@ -1,0 +1,115 @@
+# Feature catalog — `heal` subsystem (idempotent, region-only document healing).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-HEAL-001
+    title: Idempotent region-only heal
+    summary: >-
+      regenerate_regions rewrites every known managed region from the code
+      surface and refreshes the front-matter fingerprint, touching nothing else;
+      it returns True only when the file's bytes actually change, so a second
+      run with no underlying change writes nothing and returns False (K7).
+    subsystem: heal
+    modules: [heal]
+    constraints: [K2, K7]
+
+  - id: FEAT-HEAL-002
+    title: Region body rendered from the code surface
+    summary: >-
+      blocks.symbol_table renders the built-in deterministic symbol/kind/signature
+      table and render_template renders a config-declared symbols/records table;
+      expected_region resolves a region id (config template first, then the
+      built-in "symbols") to the body it should hold, returning None when the id
+      is unhealable. The body is always derived from the DocumentSurface, never
+      the other way round (K2, K10).
+    subsystem: heal
+    modules: [blocks]
+    constraints: [K2, K10]
+
+  - id: FEAT-HEAL-003
+    title: Config-template region extensibility
+    summary: >-
+      known_region_ids returns REGION_KEYS (the built-in "symbols") plus any
+      config-declared template ids, so a new managed table (genbuild flags,
+      switches, options) is a registered RegionTemplate rather than engine code,
+      keeping the heal engine reusable (K0).
+    subsystem: heal
+    modules: [blocks]
+    constraints: [K0]
+
+  - id: FEAT-HEAL-004
+    title: Human regions never authored (write-boundary preserve)
+    summary: >-
+      A region id in preserve is never regenerated and a region-shaped fix
+      targeting it is a no-op; for a whole-doc fix, apply_fix re-injects the
+      document's current body for every preserved region before writing, so the
+      B-02 guarantee that the engine never authors a human-owned region is
+      enforced at the write boundary even against a backend that returned
+      clobbering whole-doc text (K5).
+    subsystem: heal
+    modules: [heal]
+    constraints: [K2, K5]
+
+  - id: FEAT-HEAL-005
+    title: Authority-mode locking (llm-seeded fill-then-lock)
+    summary: >-
+      locked_region_ids derives, from the per-region modes map, the ids the
+      engine must not author: every human region, plus any llm-seeded region a
+      human has since edited (the shared manifest.region_is_locked predicate).
+      regenerate_regions and apply_fix auto-add these locked ids to preserve, so
+      an unlocked llm-seeded region is still filled by the engine while a locked
+      one is left untouched (B-03).
+    subsystem: heal
+    modules: [heal]
+    constraints: [K2, K5]
+
+  - id: FEAT-HEAL-006
+    title: Per-region hash and symbol-anchor stamping
+    summary: >-
+      When the engine authors a region it stamps cdm.region_hashes[id] with the
+      written body's hash so a later human edit is detectable, and a human region
+      is stamped with its current body so its review advisory persists across a
+      fingerprint heal; symbol-table regions additionally get cdm.region_anchors
+      stamped with the surface's lineno-free anchor ids. A locked llm-seeded
+      region keeps its existing stamp so re-stamping cannot falsely unlock it.
+    subsystem: heal
+    modules: [heal]
+    constraints: [K6, K10]
+
+  - id: FEAT-HEAL-007
+    title: One-shared-truth fingerprint stamping
+    summary: >-
+      _corrected computes the tiered surface fingerprint once and stamps both the
+      composite identity (cdm.fingerprint) and the per-tier digests
+      (cdm.fingerprint_tiers); heal, drift, layout and monitor pass the same
+      include_body flag so heal never stamps a fingerprint that detect will not
+      match (P2).
+    subsystem: heal
+    modules: [heal]
+    constraints: [K6, K10]
+
+  - id: FEAT-HEAL-008
+    title: Structurally-typed proposed fix with whole-doc precedence
+    summary: >-
+      apply_fix accepts any ProposedFixLike (a Protocol exposing region_id /
+      new_region_body / new_doc_text, so schema.ProposedFix need not be imported):
+      a region-shaped fix replaces one region, a whole-doc fix overwrites the
+      file, an empty fix is a no-op, and re-applying an applied fix returns False
+      (K7). When a fix carries both shapes the whole-doc text wins, since it is
+      the only shape that also refreshes the fingerprint and closes the drift in
+      one pass.
+    subsystem: heal
+    modules: [heal]
+    constraints: [K7]
+
+  - id: FEAT-HEAL-009
+    title: Pure whole-doc correction for backend FIX parity
+    summary: >-
+      render_corrected returns the corrected full document text (regions plus
+      fingerprint) from a document string without any I/O, reusing the same
+      region and fingerprint logic as regenerate_regions so a backend's whole-doc
+      FIX for a HASH drift and an in-engine heal agree byte-for-byte; preserve and
+      modes drive the same B-02 lock and B-03 hash stamping.
+    subsystem: heal
+    modules: [heal]
+    constraints: [K2, K10]

@@ -1,0 +1,132 @@
+# Feature catalog — `pr` subsystem (provider-agnostic remediation outputs:
+# docs-PR flow, coverage-gap issues, and the human-validatable drift ticket).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-PR-001
+    title: Doc-patch producer (sync_pr)
+    summary: >-
+      sync_pr orchestrates around a Monitor to answer "what would healing the
+      docs change?": it snapshots each document before, heals in place via the
+      existing apply pipeline, and returns a SyncResult carrying a deterministic
+      per-file difflib unified-diff patch plus the sorted changed_paths. It adds
+      no heal/backend logic of its own.
+    subsystem: pr
+    modules: [syncpr]
+    constraints: [K4, K5, K7, K10]
+
+  - id: FEAT-PR-002
+    title: dry-run patch with byte-for-byte tree restore
+    summary: >-
+      sync_pr(dry_run=True) computes the same patch but restores the document
+      tree to its starting bytes — rewriting each pre-existing doc to its
+      before-text and DELETING any file the run newly created (e.g. a missing-doc
+      stub) — so the working tree is untouched.
+    subsystem: pr
+    modules: [syncpr]
+    constraints: [K1, K10]
+
+  - id: FEAT-PR-003
+    title: Structural loop-breaker (should_sync)
+    summary: >-
+      should_sync is a pure, read-only predicate over a changed-file list and a
+      MonitorConfig: a bot doc-only commit (every changed path is a managed
+      document, normalized POSIX) returns False so the heal does not re-trigger
+      and open another docs PR; any file outside the managed-doc set returns True
+      and an empty set returns False.
+    subsystem: pr
+    modules: [syncpr]
+    constraints: [K1, K10]
+
+  - id: FEAT-PR-004
+    title: Deterministic merge-request plan
+    summary: >-
+      plan_docs_pr turns a SyncResult into a frozen MergeRequestPlan whose
+      source_branch is f"{branch_prefix}-{sha256(patch)[:12]}" (stable per
+      unchanged patch, unique per change), carrying the current on-disk content of
+      each changed doc; an empty sync returns None (no MR).
+    subsystem: pr
+    modules: [pr]
+    constraints: [K7, K10]
+
+  - id: FEAT-PR-005
+    title: Injected PR transport seam
+    summary: >-
+      PRTransport is a runtime-checkable Protocol with a submit(plan) method, so a
+      fake transport drives the docs-PR flow and tests assert the exact plan
+      without touching the network. open_docs_pr plans then (unless dry_run, which
+      returns the plan dict) submits through the injected transport.
+    subsystem: pr
+    modules: [pr]
+    constraints: [K4, K10]
+
+  - id: FEAT-PR-006
+    title: GitLab docs-MR transport (stdlib-only, env-built)
+    summary: >-
+      GitLabTransport.submit performs the canonical 3-call GitLab REST flow —
+      create the source branch off the target, commit every healed file as one
+      update action, then open the merge request — through one injected HTTP leaf
+      (a stdlib urllib client built lazily when none is supplied, no requests).
+      GitLabTransport.from_env builds it from CI env, raising a loud TransportError
+      when the project id or token is unset.
+    subsystem: pr
+    modules: [pr]
+    constraints: [K0, K4, K8]
+
+  - id: FEAT-PR-007
+    title: Coverage-gap issue plan
+    summary: >-
+      plan_coverage_issue turns a CoverageReport plus suggest_owners output into a
+      frozen IssuePlan whose body groups every undocumented public symbol under its
+      suggested owner (owners sorted ascending, a "(new doc)" marker and the
+      suggestion reason per group); no gaps returns None.
+    subsystem: pr
+    modules: [issues]
+    constraints: [K10]
+
+  - id: FEAT-PR-008
+    title: GitLab and GitHub issue transports
+    summary: >-
+      GitLabIssueTransport and GitHubIssueTransport each POST one coverage-gap
+      issue (to /projects/<id>/issues and /repos/<repo>/issues respectively)
+      through one injected HTTP leaf so tests never hit the network; each from_env
+      builds from CI env with a loud TransportError on a missing id/repo or token,
+      and open_coverage_issue plans then submits (or returns the plan dict on
+      dry_run).
+    subsystem: pr
+    modules: [issues]
+    constraints: [K0, K4, K8, K10]
+
+  - id: FEAT-PR-009
+    title: Jira-style DriftTicket artifact
+    summary: >-
+      DriftTicket is the frozen, immutable artifact that replaces the one-line
+      ProposedFix rationale: title, summary, severity, drift kind, affected public
+      symbols, root cause, proposed change + diff, change_kind, a verdict-aware
+      acceptance checklist of AcceptanceCheck items, recommended action, and a
+      schema_version.
+    subsystem: pr
+    modules: [ticket]
+    constraints: [K6, K8, K10]
+
+  - id: FEAT-PR-010
+    title: Pure deterministic ticket builder
+    summary: >-
+      build_ticket derives every DriftTicket field from a handled drift, its
+      verdict/cause/fix, and the code surface with no clock and no I/O — severity
+      from the verdict/healability, change_kind from the fix shape, and the
+      acceptance checklist from the verdict — so identical inputs always yield an
+      identical ticket.
+    subsystem: pr
+    modules: [ticket]
+    constraints: [K1, K10]
+
+  - id: FEAT-PR-011
+    title: Ticket status from human resolution
+    summary: >-
+      ticket_status maps a human ResolutionRecord outcome to a TicketStatus: None
+      to PROPOSED, accepted to VALIDATED, overridden to CHANGES_REQUESTED, and
+      rejected or invalidated both to REJECTED.
+    subsystem: pr
+    modules: [ticket]
+    constraints: [K1]

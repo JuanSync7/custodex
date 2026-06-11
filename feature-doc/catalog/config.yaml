@@ -1,0 +1,137 @@
+# Feature catalog — `config` subsystem (classic single-file config model,
+# loading, and the typed error hierarchy).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+# SCOPE: the classic single-file MonitorConfig model + load_config + errors.py.
+# The CONFIG-V2 multi-file config/cdmon/ dir layout is owned by `configv2`.
+features:
+  - id: FEAT-CONFIG-001
+    title: Frozen, typed config model
+    summary: >-
+      MonitorConfig is the single immutable model the whole engine reads a target
+      codebase through; every config model is frozen with extra="forbid", so a
+      typo or stale field is a loud, typed ConfigError rather than a silent pass.
+    subsystem: config
+    modules: [config]
+    constraints: [K0, K8]
+
+  - id: FEAT-CONFIG-002
+    title: Code reference selectors
+    summary: >-
+      CodeRef points a document at one code file and narrows the surface by
+      symbols, names (module variables), 1-based inclusive lines, or an exact
+      arg_signature; its extract field picks symbols / switches / records and
+      lang selects the parser, with no target codebase hard-coded.
+    subsystem: config
+    modules: [config]
+    constraints: [K0]
+
+  - id: FEAT-CONFIG-003
+    title: Generation context references
+    summary: >-
+      ContextRef is a glance-through generation reference added to a DocumentSpec
+      via context_refs; it feeds the generation prompt only and never enters
+      code_refs, coverage, or drift, is not resolved for existence at load, and
+      duplicate paths in one document are a loud ConfigError.
+    subsystem: config
+    modules: [config]
+    constraints: [K6, K8]
+
+  - id: FEAT-CONFIG-004
+    title: Document spec with audience policy
+    summary: >-
+      DocumentSpec binds a doc id and path to an Audience (user-guide vs
+      eng-guide via the Audience enum) plus its code_refs and managed
+      region_keys; the audience drives what counts as a documented surface and
+      what counts as drift.
+    subsystem: config
+    modules: [config]
+    constraints: [K0, K10]
+
+  - id: FEAT-CONFIG-005
+    title: Per-region authority modes
+    summary: >-
+      RegionMode (generated / llm / human / llm-seeded) plus a document's
+      region_modes map and mode_for accessor declare who owns each managed region
+      and how heal treats it; an absent mode defaults to generated, and a
+      region_modes key not in region_keys is a loud ConfigError.
+    subsystem: config
+    modules: [config]
+    constraints: [K6, K8]
+
+  - id: FEAT-CONFIG-006
+    title: Declarative region table templates
+    summary: >-
+      RegionTemplate (with RegionColumn) is a config-driven table renderer keyed
+      by region id on MonitorConfig.region_templates; its source (records /
+      symbols / index) and columns project a managed region with nothing
+      target-specific baked into the engine.
+    subsystem: config
+    modules: [config]
+    constraints: [K0, K10]
+
+  - id: FEAT-CONFIG-007
+    title: Coverage scope and justified waivers
+    summary: >-
+      CoverageConfig is the coverage: block giving include/exclude scan globs
+      (defaulting to the inventory defaults) plus a list of WaiverEntry
+      intentional documentation gaps; each waiver MUST carry a reason or load
+      fails with a loud ConfigError.
+    subsystem: config
+    modules: [config]
+    constraints: [K8]
+
+  - id: FEAT-CONFIG-008
+    title: Backend and central reporting config
+    summary: >-
+      BackendConfig (mock / claude-code / api / agent) selects which backend
+      produces verdicts, AgentConfig configures the LangGraph remediation runtime
+      when backend.kind is agent, and CentralConfig declares where review records
+      are emitted; all default to offline (mock / none).
+    subsystem: config
+    modules: [config]
+    constraints: [K4, K6]
+
+  - id: FEAT-CONFIG-009
+    title: Suffix-dispatched config loading
+    summary: >-
+      load_config reads a single YAML or JSON config (chosen by file suffix) and
+      validates it into a MonitorConfig; any unsupported suffix, read error,
+      parse error, non-mapping top level, or validation failure is wrapped in a
+      loud ConfigError with a clear message.
+    subsystem: config
+    modules: [config]
+    constraints: [K8]
+
+  - id: FEAT-CONFIG-010
+    title: Documented starter template
+    summary: >-
+      CONFIG_TEMPLATE is a documented starter config covering both audiences and
+      all selector kinds that round-trips through load_config; write_template
+      writes it (or supplied content) and central_config_template returns it with
+      the central: block wired for HTTP reporting against DEFAULT_CENTRAL_TOKEN_ENV.
+    subsystem: config
+    modules: [config]
+    constraints: [K0]
+
+  - id: FEAT-CONFIG-011
+    title: Opt-in body-tier fingerprint policy
+    summary: >-
+      MonitorConfig.fingerprint_body_tier is an opt-in flag, default OFF to keep
+      stored fingerprints valid, that folds function/method bodies into
+      non-user-guide surface hashes so an eng-guide can detect an implementation
+      change that leaves the signature untouched.
+    subsystem: config
+    modules: [config]
+    constraints: [K10]
+
+  - id: FEAT-CONFIG-012
+    title: Typed loud-error hierarchy
+    summary: >-
+      errors.py defines a single CodeDocMonitorError base carrying a human
+      message plus typed subclasses (ConfigError, ExtractionError, DriftError,
+      BackendError, SchemaError, InventoryError, TransportError, SyncError,
+      CatalogError) so every failure mode is a loud, classifiable exception.
+    subsystem: config
+    modules: [errors]
+    constraints: [K8]

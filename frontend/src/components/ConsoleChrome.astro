@@ -1,0 +1,109 @@
+---
+// Static replica of the console's AppShell chrome (the left instrument rail +
+// sticky topbar), for the native-Astro pages (the wiki) so they share the SAME
+// navigation sidebar as the main console. Reuses the console's own CSS classes
+// (imported below), so it is pixel-identical; nav items are REAL links (the
+// console is a separate SPA, reached via `/` and `/#/...`). The live connection
+// pill is the one small React island.
+import "../console/index.css";
+import ConnectionStatus from "../console/components/ConnectionStatus.tsx";
+
+interface Props {
+  /** Which rail item is active on this page. */
+  active?: "fleet" | "wiki";
+  /** The topbar breadcrumb (the current page). */
+  crumb: string;
+}
+const { active, crumb } = Astro.props;
+const item = (on: boolean) => `nav__item${on ? " nav__item--active" : ""}`;
+---
+
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="/" aria-label="code-doc-monitor console" style="text-decoration:none">
+      <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" stroke="var(--accent)" stroke-opacity="0.4" stroke-width="1.4"></rect>
+        <path d="M7 11c5 0 5 4 9 4M7 21c5 0 5-4 9-4" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"></path>
+        <circle cx="22.5" cy="15" r="3.2" fill="var(--sync)"></circle>
+        <circle cx="22.5" cy="15" r="6" stroke="var(--sync)" stroke-opacity="0.3" stroke-width="1.2"></circle>
+      </svg>
+      <span class="brand__text">
+        <span class="brand__title">drift console</span>
+        <span class="brand__sub">code · doc · monitor</span>
+      </span>
+    </a>
+
+    <div class="rail__label">Console</div>
+    <nav class="nav" aria-label="primary">
+      <a class={item(active === "fleet")} href="/">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"></path><path d="M3 12l9 4.5L21 12"></path><path d="M3 16.5 12 21l9-4.5"></path>
+        </svg>
+        Fleet
+      </a>
+    </nav>
+
+    <div class="rail__label">Reference</div>
+    <nav class="nav" aria-label="reference">
+      <a class="nav__item" href="/#/config">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
+        </svg>
+        Format
+      </a>
+      <a class={item(active === "wiki")} href="/wiki/features">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
+        </svg>
+        Wiki
+      </a>
+      <a class="nav__item" href="/docs" target="_blank" rel="noreferrer">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
+        </svg>
+        API Docs
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
+          <path d="M14 4h6v6"></path><path d="M20 4 11 13"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path>
+        </svg>
+      </a>
+      <a class="nav__item" href="/openapi.json" target="_blank" rel="noreferrer">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12h4l2-6 4 12 2-6h6"></path>
+        </svg>
+        OpenAPI
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
+          <path d="M14 4h6v6"></path><path d="M20 4 11 13"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path>
+        </svg>
+      </a>
+    </nav>
+
+    <div class="rail__spacer"></div>
+
+    <div class="rail__label">Central server</div>
+    <ConnectionStatus client:load />
+
+    <div class="rail__foot">
+      <span>v0.1.0</span>
+      <span>FastAPI · E-06</span>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumb">
+        <span class="crumb__root">code-doc-monitor</span>
+        <span class="crumb__sep">/</span>
+        <span class="crumb__here">{crumb}</span>
+      </div>
+      <a class="chip" href="/docs" target="_blank" rel="noreferrer" style="margin-left:auto">
+        View API
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="width:12px;height:12px">
+          <path d="M14 4h6v6"></path><path d="M20 4 11 13"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path>
+        </svg>
+      </a>
+    </header>
+    <main class="canvas">
+      <slot />
+    </main>
+  </div>
+</div>

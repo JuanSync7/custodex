@@ -46,6 +46,7 @@ from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
 from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
+from .featurecatalog import load_catalog
 from .issues import (
     GitHubIssueTransport,
     GitLabIssueTransport,
@@ -81,6 +82,7 @@ from .reviewlog import (
 from .schema import Resolution, ResolutionRecord, Verdict, review_record_schema
 from .syncpr import should_sync, sync_pr
 from .templates_v2 import scaffold_config_dir
+from .traceability import TraceMatrix, build_matrix
 
 app = typer.Typer(
     name="cdmon",
@@ -1479,6 +1481,157 @@ def new_doc(
         raise typer.Exit(code=1) from exc
 
     typer.echo(f"Wrote conformant doc scaffold to {spec.path}")
+
+
+def _known_modules() -> set[str]:
+    """The set of real top-level modules under ``code_doc_monitor`` (typo guard).
+
+    Mirrors the catalog's own module-existence check: a feature naming a module
+    not in this set is a loud :class:`CatalogError` at load time (K8). Discovered
+    via :func:`pkgutil.iter_modules` so it stays in lock-step with the package.
+    """
+    import pkgutil
+
+    from . import __path__ as pkg_path
+
+    return {m.name for m in pkgutil.iter_modules(pkg_path)}
+
+
+@app.command()
+def trace(
+    catalog: Path = typer.Option(
+        Path("feature-doc") / "catalog",
+        "--catalog",
+        help="The feature-doc/catalog directory of golden feature *.yaml files.",
+    ),
+    tests_root: Path = typer.Option(
+        Path("tests"),
+        "--tests-root",
+        help="Directory scanned for TEST evidence (inline `Feature:` tags).",
+    ),
+    demo_root: Path = typer.Option(
+        Path("demo"),
+        "--demo-root",
+        help="Directory scanned for DEMO evidence (inline `Feature:` tags).",
+    ),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the traceability matrix as JSON instead of the human summary.",
+    ),
+    fail_on_gap: bool = typer.Option(
+        False,
+        "--fail-on-gap",
+        help="Exit nonzero if ANY feature lacks a test or demo, or any unknown ref "
+        "exists (the CI gate, K8). Without it the command is informational "
+        "(always exits 0).",
+    ),
+) -> None:
+    """Prove every feature has a demo + test via inline `Feature:` tags (EPIC R).
+
+    Loads the golden catalog (``feature-doc/catalog``), scans ``tests/`` (TEST) and
+    ``demo/`` (DEMO) for the inline ``Feature: <id>`` tag convention — files read
+    as TEXT, never imported (K1) — and crosses them into a traceability matrix.
+    Prints a human summary (covered count + the test/demo/unknown-ref gaps);
+    ``--json`` emits the matrix; ``--fail-on-gap`` turns it into a gate (exit 1
+    when not complete). Pure + deterministic (K10). NOTE: real tests/demos are not
+    annotated until R-04/R-05, so on the real tree ``--fail-on-gap`` will (
+    correctly) report gaps — the CI gate is wired in R-07.
+    """
+    try:
+        cat = load_catalog(catalog, known_modules=_known_modules())
+        matrix = build_matrix(cat, tests_root=tests_root, demo_root=demo_root)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        payload = {
+            "catalog_ids": list(matrix.catalog_ids),
+            "refs": [r.model_dump(mode="json") for r in matrix.refs],
+            "features_without_test": list(matrix.features_without_test()),
+            "features_without_demo": list(matrix.features_without_demo()),
+            "unknown_refs": [r.model_dump(mode="json") for r in matrix.unknown_refs()],
+            "is_complete": matrix.is_complete(),
+        }
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        for line in _trace_lines(matrix):
+            typer.echo(line)
+
+    if fail_on_gap and not matrix.is_complete():
+        raise typer.Exit(code=1)
+    raise typer.Exit(code=0)
+
+
+def _trace_lines(matrix: TraceMatrix) -> list[str]:
+    """Deterministic, scannable human render of a traceability matrix (K10)."""
+    no_test = matrix.features_without_test()
+    no_demo = matrix.features_without_demo()
+    unknown = matrix.unknown_refs()
+    covered = sum(
+        1
+        for fid in matrix.catalog_ids
+        if matrix.tests_for(fid) and matrix.demos_for(fid)
+    )
+    status = "COMPLETE" if matrix.is_complete() else "INCOMPLETE"
+    lines = [
+        f"traceability: {status} — {covered}/{len(matrix.catalog_ids)} feature(s) "
+        "have both a test and a demo",
+        f"features missing a test: {len(no_test)}",
+    ]
+    lines.extend(f"  {fid}" for fid in no_test)
+    lines.append(f"features missing a demo: {len(no_demo)}")
+    lines.extend(f"  {fid}" for fid in no_demo)
+    lines.append(f"unknown refs (tagged id not in catalog): {len(unknown)}")
+    lines.extend(
+        f"  {r.feature_id} @ {r.path}:{r.line} ({r.kind.value})" for r in unknown
+    )
+    return lines
+
+
+@app.command()
+def wiki(
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="Verify the wikis are fresh; exit nonzero if any is stale (no write).",
+    ),
+) -> None:
+    """Regenerate every EPIC-R wiki from its single source (or --check freshness).
+
+    Renders the four canonical artifacts — ``feature-doc/FEATURES.md`` and the
+    test/source/traceability wikis under ``feature-doc/wiki/`` — from the catalog
+    yaml, the tests' docstrings, and the source AST via the shared
+    :data:`~code_doc_monitor.wiki.WIKI_TARGETS` set. Default mode WRITES every
+    changed target and echoes each path + ``wrote``/``unchanged``; a second run is
+    a no-op (idempotent, K7). ``--check`` is read-only (K1): it renders in memory,
+    lists every STALE file, and exits 1 when any is stale — the CI freshness gate
+    (K8) — else prints ``wikis fresh`` and exits 0. Deterministic (K10); loud on a
+    render error (K8).
+    """
+    from .wiki import regenerate
+
+    repo_root = Path.cwd()
+    try:
+        results = regenerate(repo_root, write=not check)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if not check:
+        for path, changed in results:
+            typer.echo(f"{path}: {'wrote' if changed else 'unchanged'}")
+        raise typer.Exit(code=0)
+
+    stale = [path for path, is_stale in results if is_stale]
+    if stale:
+        for path in stale:
+            typer.echo(f"{path}: STALE — run `cdmon wiki` to regenerate", err=True)
+        typer.echo(f"{len(stale)} wiki(s) stale", err=True)
+        raise typer.Exit(code=1)
+    typer.echo("wikis fresh")
+    raise typer.Exit(code=0)
 
 
 @app.command()

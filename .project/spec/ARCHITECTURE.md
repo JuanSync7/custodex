@@ -2131,3 +2131,432 @@ the ticket form + Generate to watch it become documented live. `demo/walkthrough
 drives the apply-fix path + the link→generate path end-to-end (offline). `seed_demo.py`,
 the demo `core.yaml`/`doc-style.yaml`, the demo README, the demo e2e tests, and the
 dogfood config (cdmon's own) all exercise `context_refs`.
+
+## `featurecatalog.py`  (EPIC R — the golden feature catalog loader; pure, stdlib+pydantic+pyyaml only — K0/K1/K10)
+
+The machine-readable golden reference of every cdmon *feature*. The catalog
+lives in `feature-doc/catalog/*.yaml` (one file per subsystem, mirroring the
+`config/cdmon/` multi-file pattern); `feature-doc/FEATURES.md` is RENDERED from
+it (never hand-edited — the yaml is the single source of truth). Pure and
+deterministic (no clock, sorted output, K10); loud on any malformed input (K8).
+
+```python
+# Stable feature-id pattern: FEAT-<SUBSYSTEM>-<NNN>, SUBSYSTEM = [A-Z][A-Z0-9]+, NNN = \d{3}
+FEATURE_ID_RE: typing.Final = re.compile(r"^FEAT-[A-Z][A-Z0-9]*-\d{3}$")
+
+class Feature(pydantic.BaseModel):           # frozen=True, extra="forbid"
+    id: str                                  # matches FEATURE_ID_RE, globally unique
+    title: str                               # one-line human name
+    summary: str                             # 1-3 sentence description (the golden prose)
+    subsystem: str                           # logical grouping, lowercase (e.g. "extract")
+    modules: tuple[str, ...]                  # real code_doc_monitor modules implementing it (non-empty)
+    constraints: tuple[str, ...] = ()         # K-refs upheld (e.g. ("K0", "K3"))
+    status: Literal["implemented", "planned", "deprecated"] = "implemented"
+    demos: tuple[str, ...] = ()               # demo case ids (filled/checked in R3)
+    tests: tuple[str, ...] = ()               # test node-ids / ids (filled/checked in R5)
+
+class FeatureCatalog(pydantic.BaseModel):     # frozen=True
+    features: tuple[Feature, ...]             # sorted by id
+    def by_id(self, fid: str) -> Feature: ...        # loud KeyError->CatalogError on miss (K8)
+    def by_subsystem(self) -> dict[str, tuple[Feature, ...]]: ...   # deterministic grouping
+
+def load_catalog(catalog_dir: Path, *, known_modules: Collection[str] | None = None) -> FeatureCatalog: ...
+#   reads *.yaml (sorted), each file = {"features": [ {...}, ... ]}; aggregates.
+#   CatalogError (K8) on: malformed yaml, extra/missing key, bad id pattern,
+#   DUPLICATE id across files, a module ref not in known_modules (when provided),
+#   empty modules. Deterministic: features sorted by id.
+
+def render_features_md(catalog: FeatureCatalog) -> str: ...
+#   the human golden ref — grouped by subsystem, sorted, with a per-feature
+#   demo/test traceability column. Pure string build (K10); cdmon-managed-region
+#   compatible so `cdmon wiki` can re-stamp it idempotently (R7).
+```
+
+`errors.py` gains `CatalogError(CdmError)` (loud, K8). `known_modules` is sourced
+from `inventory`-style discovery so a typo'd module ref fails loud at load. No new
+dependency (pydantic+pyyaml already core, K0). This module is the foundation R3
+(demos), R5 (test wiki), R6 (source wiki), and R7 (`cdmon wiki`) all read from.
+
+## `traceability.py`  (EPIC R, R-03 — feature ⇄ demo/test/source coverage matrix; pure, stdlib+pydantic — K0/K1/K10)
+
+Proves the 1:1 mapping the golden reference promises: every feature has at least
+one demo AND at least one test. Reads the catalog (`featurecatalog.load_catalog`)
+and scans evidence files for an **inline feature-tag convention** — the single
+source of truth lives at the test/demo (no duplication, K-style): a line of the
+form `Feature: <id>[, <id>...]` or `Features: <id> ...` (case-insensitive marker)
+anywhere in a file (a Python docstring/comment or a Markdown line). A bare mention
+of a `FEAT-id` in prose (no `Feature:` marker) is NOT a reference — the marker
+disambiguates evidence from description (e.g. the catalog itself names ids).
+
+```python
+FEATURE_REF_RE: Final = re.compile(r"\bFEAT-[A-Z][A-Z0-9]*-\d{3}\b")
+# a tag line: an optional leading prose, the marker `Feature(s):`, then ids.
+_TAG_RE: Final = re.compile(r"(?im)\bFeatures?:\s*(?P<ids>FEAT-[A-Z0-9 ,\-]+)")
+
+class EvidenceKind(str, Enum):  # TEST | DEMO | SOURCE
+    ...
+
+class FeatureRef(BaseModel):    # frozen, extra=forbid
+    feature_id: str
+    path: str                   # repo-relative
+    kind: EvidenceKind
+    line: int                   # 1-based
+
+class TraceMatrix(BaseModel):   # frozen
+    catalog_ids: tuple[str, ...]      # sorted
+    refs: tuple[FeatureRef, ...]      # sorted (path, line)
+    def tests_for(self, fid: str) -> tuple[str, ...]: ...
+    def demos_for(self, fid: str) -> tuple[str, ...]: ...
+    def features_without_test(self) -> tuple[str, ...]: ...
+    def features_without_demo(self) -> tuple[str, ...]: ...
+    def unknown_refs(self) -> tuple[FeatureRef, ...]: ...   # tagged id NOT in catalog (loud gap)
+    def is_complete(self) -> bool:   # no missing-test, no missing-demo, no unknown refs
+
+def scan_refs(root: Path, kind: EvidenceKind, *, suffixes=(".py", ".md")) -> list[FeatureRef]: ...
+#   walk root (sorted), parse each matching file's `Feature:` tags → refs. Pure, no import (K1).
+
+def build_matrix(catalog: FeatureCatalog, *, tests_root: Path, demo_root: Path,
+                 source_root: Path | None = None) -> TraceMatrix: ...
+#   scan tests_root (TEST), demo_root (DEMO), optional source_root (SOURCE); combine with catalog ids.
+
+def render_matrix_md(matrix: TraceMatrix) -> str: ...
+#   the traceability wiki: per-feature demo/test columns + a gaps section. Pure (K10).
+```
+
+`cli.py` gains `cdmon trace` (`--json`, `--fail-on-gap`): loads `feature-doc/catalog`,
+scans `tests/` + `demo/`, prints the matrix summary; `--fail-on-gap` exits nonzero
+if any feature lacks a test or demo, or any unknown ref exists (K8). The catalog's
+`Feature.demos`/`tests` slots are an OPTIONAL secondary source (filled by R3/R5);
+the inline scan is the primary, drift-free evidence. No new dep (K0).
+
+## `testwiki.py`  (EPIC R, R-06 — the test wiki extractor; pure AST, never imports tests — K0/K1/K10)
+
+Turns the test tree into a navigable wiki WITHOUT a second source of truth: the
+test's own docstring is the "what it asserts", its directory is the boundary, and
+a `Feature:`/`Features:` tag line (in the test docstring OR inherited from the
+module docstring) is the feature link. Parsed with stdlib `ast` — the tests are
+NEVER imported or executed (K1) — so the wiki can't drift from the tests.
+
+```python
+class TestBoundary(str, Enum):  # UNIT | INTEGRATION | SYSTEM | SMOKE | REGRESSION | UNKNOWN
+    ...
+
+class TestCase(BaseModel):      # frozen, extra=forbid
+    nodeid: str                 # tests/<boundary>/<file>::<func> (or ::Class::func)
+    path: str                   # repo-relative posix
+    name: str                   # function name
+    boundary: TestBoundary      # from the path
+    summary: str                # first line of the test's docstring ("" if none)
+    features: tuple[str, ...]   # FEAT-ids from the test docstring + the module's `Features:` tag
+
+class TestModule(BaseModel):    # frozen
+    path: str
+    boundary: TestBoundary
+    module_features: tuple[str, ...]   # the module docstring's `Features:` tag (file-level coverage)
+    cases: tuple[TestCase, ...]
+
+def collect_tests(tests_root: Path) -> tuple[TestModule, ...]: ...
+#   walk tests_root (sorted), ast.parse each test_*.py, find top-level + class-nested
+#   `def test_*`, pull docstrings, resolve boundary from path, gather Feature tags.
+#   Pure, deterministic, never imports the file (K1). Loud (CatalogError-style) only
+#   on a genuinely unparseable test file (K8) — otherwise robust.
+
+def render_test_wiki_md(modules: tuple[TestModule, ...]) -> str: ...
+#   the test wiki: grouped by boundary → module, each case with its summary +
+#   feature links; plus a per-feature "tested by" index. Pure (K10).
+```
+
+The annotation CONVENTION (R-06): each `tests/.../test_*.py` carries a module-level
+`Features: FEAT-…` tag in its module docstring listing the catalog features that
+file exercises (file-level coverage — this is what makes the traceability TEST side
+complete, `features_without_test == []`). Per-test `Feature:` tags refine where
+valuable. The boundary comes from the R-05 directory, not a tag. `cdmon wiki` (R-08)
+renders `render_test_wiki_md` to disk. No new dependency (K0).
+
+## `srcindex.py`  (EPIC R, R-07 — the source index + source wiki; reuses inventory/coverage — K0/K1/K10)
+
+Indexes every public symbol of `code_doc_monitor` and ties each module to the
+catalog features it implements (the inverse of `Feature.modules`), so the source
+wiki and the traceability SOURCE view are complete and provably cover the whole
+public surface. Reuses `inventory.discover_files`/`discover_symbols` (no AST
+re-impl) and `featurecatalog` — pure, deterministic, no target import beyond the
+AST extraction inventory already does (K0/K1/K10).
+
+```python
+class ModuleIndex(BaseModel):          # frozen, extra=forbid
+    module: str                        # top-level module name (e.g. "extract")
+    path: str                          # repo-relative posix
+    public_symbols: tuple[str, ...]    # sorted public symbol names (from inventory)
+    features: tuple[str, ...]          # catalog feature ids whose `modules` include this module
+
+class SourceIndex(BaseModel):          # frozen
+    modules: tuple[ModuleIndex, ...]   # sorted by module
+    def features_without_module_match(self) -> tuple[str, ...]:  # catalog features naming a missing module (should be empty)
+    def modules_without_feature(self) -> tuple[str, ...]:        # public modules with NO catalog feature (a documentation gap)
+
+def build_source_index(pkg_root: Path, catalog: FeatureCatalog) -> SourceIndex: ...
+#   inventory the package, attach public symbols per module, join to catalog by module name.
+
+def render_source_wiki_md(index: SourceIndex) -> str: ...
+#   per-module: path, public symbols, implementing features (links); + a coverage
+#   summary (modules with no feature). Pure (K10).
+```
+
+`cdmon wiki` (R-08) renders this to `feature-doc/wiki/SOURCE_WIKI.md`. The
+`modules_without_feature` accessor is the deferred R-02 "no orphan public
+capability" check, now realizable: a public module with zero catalog features is a
+golden-reference gap, reported (and optionally gated). No new dependency (K0).
+
+## `cdmon wiki` + `cdmon trace` gate  (EPIC R, R-08 — regenerate all wikis from the single sources; CI freshness + traceability gate)
+
+`cli.py` gains `cdmon wiki` — the single regeneration entry point that renders ALL
+of EPIC R's derived artifacts from their sources (the catalog yaml + the tests'
+docstrings + the source AST), to a canonical set of paths:
+
+```
+feature-doc/FEATURES.md          ← featurecatalog.render_features_md(load_catalog)
+feature-doc/wiki/TEST_WIKI.md    ← testwiki.render_test_wiki_md(collect_tests(tests))
+feature-doc/wiki/SOURCE_WIKI.md  ← srcindex.render_source_wiki_md(build_source_index)
+feature-doc/wiki/TRACEABILITY.md ← traceability.render_matrix_md(build_matrix)
+```
+
+- `cdmon wiki` writes all four (idempotent — a second run is a no-op, K7;
+  deterministic content, K10) and echoes each path + whether it changed.
+- `cdmon wiki --check` renders in memory and compares to disk; exits 0 when all
+  fresh, nonzero listing every stale file when not (K8) — the CI freshness gate.
+  No write on `--check`.
+- A shared `WIKI_TARGETS` mapping (path → render thunk) is the single source of the
+  output set so `wiki` and `wiki --check` can never diverge.
+
+The `cdmon trace --fail-on-gap` command (R-03), now that the matrix is complete,
+becomes a CI gate: a new demo/feature without a test (or vice-versa) fails CI. Both
+`cdmon wiki --check` and `cdmon trace --fail-on-gap` are added to `.gitlab-ci.yml`
+(offline, no network — K4). No new dependency (K0). This closes EPIC R: the golden
+reference, its demo/test 1:1 mappings, and the source/test wikis all regenerate
+from one source each and are gated against drift — cdmon's own discipline applied
+to cdmon's own documentation.
+
+## `GET /wiki` + dashboard Wiki page  (EPIC R, R-09 — the wikis in the console)
+
+Surfaces the EPIC-R wikis inside the dashboard. The server gains a GLOBAL, public
+(no-auth, like `/config/templates`) read that serves the committed wikis rendered
+to HTML by the engine's OWN dependency-free renderer (`build.render_markdown`,
+FEAT-LAYOUT-008 — no new dep, K0):
+
+```python
+# server/app.py
+def create_app(store=None, *, static_dir=None, wiki_dir: Path | None = None, clock=...): ...
+#   wiki_dir defaults (None) to _wiki_dir() = <repo root>/feature-doc (mirrors _spa_dir()).
+
+WIKI_SECTIONS = (   # (id, title, repo-relative path under feature-doc/) — deterministic order
+    ("features",     "Feature Reference",   "FEATURES.md"),
+    ("traceability", "Traceability Matrix", "wiki/TRACEABILITY.md"),
+    ("tests",        "Test Wiki",           "wiki/TEST_WIKI.md"),
+    ("source",       "Source Wiki",         "wiki/SOURCE_WIKI.md"),
+)
+
+@app.get("/wiki")
+def wiki() -> dict:
+    """Public: the EPIC-R wikis rendered to HTML. {"sections":[{"id","title","html"}...]}.
+    Missing dir/file → that section omitted (graceful empty for a non-cdmon repo). K10 pure."""
+```
+
+Frontend (`dashboard/`):
+- **Nav (always visible):** AppShell adds a `Wiki` item under the **Reference** group
+  → `<Link to="/wiki">`; `pageLabel("/wiki")` = "Wiki". This is the "show Wiki first".
+- **Lazy switch on click:** `App.tsx` routes `/wiki` to a `React.lazy(() => import("./pages/Wiki"))`
+  page inside `<Suspense>`, so the wiki bundle + its fetch fire ONLY when Wiki is
+  clicked ("only when clicked does it switch to the full wiki frontend").
+- **`pages/Wiki.tsx`** (the full wiki frontend): on mount fetches `api.wiki()`, then
+  renders a docs layout — a left **section rail** (Feature Reference / Traceability /
+  Test Wiki / Source Wiki, the selected one active, with a per-section count badge) +
+  a readable **prose pane** rendering the selected section's HTML. Loading / error /
+  empty states; injectable `api?` prop (no network in tests). `api/client.ts` gains
+  `wiki(): Promise<{sections: {id,title,html}[]}>` (GET /wiki); `types.ts` gains
+  `WikiSection`/`WikiPayload`.
+
+`featurecatalog`: add **FEAT-SERVER-019** "Feature-wiki endpoint" (subsystem server,
+modules [server]) so the golden reference stays correct; tag it on the server test +
+a demo case so `cdmon trace` stays complete. After the endpoint lands, `cdmon wiki`
+is re-run (FEATURES/SOURCE/TEST wikis pick up the new feature) and the server api doc
+is rehealed. No new dependency anywhere (K0); the dashboard adds no npm package.
+
+
+## `frontend/` Astro application  (EPIC ASTRO — one Astro app: native docs/wiki + console as React islands)
+
+Replaces the scattered HTML surfaces (hand-rolled `build.render_markdown` → React
+`dangerouslySetInnerHTML` for the wiki; a separate Vite SPA) with ONE Astro app under
+`frontend/`. Astro is a **frontend-only** toolchain — it never touches the Python
+engine, so K0 (engine core deps) is untouched; the engine never imports it.
+
+**Two surfaces, one app:**
+- **Content (Astro-native, static):** the EPIC-R wikis (`feature-doc/FEATURES.md`,
+  `wiki/{TRACEABILITY,TEST_WIKI,SOURCE_WIKI}.md`) become Astro pages under `/wiki/*`,
+  rendered by Astro's own markdown pipeline at build time — **retiring**
+  `render_markdown`'s frontend role and the `GET /wiki` JSON + the React `Wiki.tsx`
+  island (R-09). Syntax highlighting / TOC / nav come free from Astro.
+- **App (React islands):** the existing tested console — `api/client.ts`, `types.ts`,
+  the 8 pages, `AppShell` — is **ported verbatim** into `frontend/src/` and mounted as
+  a single `client:only="react"` island on the index page, keeping its **HashRouter**
+  (so client routes stay `#/repos` and never shadow API paths). The 15 Vitest suites
+  move with it. No component logic is rewritten — only the build/host changes.
+
+**`astro.config.mjs`:** `integrations: [react(), mdx()]`, `output: 'static'`,
+`build.assets: '_astro'` (Astro's default). `npm run build` = `astro check && astro
+build` → `frontend/dist/` (`index.html`, `wiki/**/index.html`, `_astro/*`).
+
+**Serving (the one real integration point — `server/app.py`):** the per-`/assets`
+mount + `@app.get("/")`→`FileResponse(index.html)` is replaced by a single
+catch-all **mounted LAST**, after every API route, so the API always wins and any
+unclaimed path falls through to the static site (Starlette matches routes in
+declaration order):
+```python
+# after ALL @app.get/@app.post routes:
+if static_dir is not None and (Path(static_dir) / "index.html").is_file():
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="site")
+#   html=True → "/" serves index.html (the console island) and "/wiki/" serves
+#   wiki/index.html (native Astro). "_astro/*" assets served verbatim.
+```
+`_default_static_dir()` → `<repo>/frontend/dist` (a `dashboard/dist` fallback kept
+only through F-03 so the server never breaks mid-migration; dropped in F-04).
+**Collision rule:** native Astro page paths MUST avoid the API's real paths —
+`/health`, `/repos*`, `/config*`, `/sync*`, `/openapi.json`, `/docs` (Swagger). The
+JSON `/wiki` is **retired**, freeing `/wiki/*` for the native pages.
+
+**API base:** prod is single-origin (the server serves both), so the island client's
+base stays `""` (same-origin root) — Astro exposes it as `import.meta.env.PUBLIC_API_BASE`
+(replacing `VITE_API_BASE`); unset → `/api` for the `astro dev` proxy case.
+
+**Dogfood (catalog stays correct):** `GET /wiki` is retired, so **FEAT-SERVER-019**
+is removed/superseded and new **FEAT-FRONTEND-0NN** features (Astro app shell, native
+wiki pages, console islands, single-origin serving) are added to the catalog with
+their demo + test tags; `cdmon wiki` is re-run and `cdmon trace --fail-on-gap` stays
+green. `frontend/` is a frontend artifact (like `dashboard/` was) — outside the Python
+coverage surface; `frontend/{node_modules,dist}` are gitignored.
+
+**Slices:** **ASTRO-01** Astro foundation + the serving rewire (build + served
+in-process, gate green). **ASTRO-02** native Astro docs/wiki under `/wiki/*`, retire
+`GET /wiki` + `render_markdown` frontend use. **ASTRO-03** port the console
+pages/components/client + the 15 Vitest suites as the index island. **ASTRO-04**
+delete `dashboard/`, rewire `.gitlab-ci.yml` (frontend build/test) + packaging,
+dogfood reheal, full gate.
+
+
+## EPIC GIT — server-side git sync & provider credentials  (STEP 0 + PHASE 1 + PHASE 2)
+
+The central server can today only sync a repo that is ALREADY on its disk
+(`configsync.run_sync(local_path, …)`); there is **no clone/fetch anywhere**, and
+the only PR write path is `GitLabTransport`. EPIC GIT closes both gaps so the
+server can sync **and** open docs-PRs against a GitHub/GitLab repo it does NOT
+hold locally, authenticating with a per-repo credential. Three layers, each
+additive (K6) and reusing the prior's seams:
+
+* **STEP 0 — clone-on-demand (`gitfetch.py`).** Materialize a remote repo into a
+  throwaway temp tree, then run the UNCHANGED `run_sync` over it (`mode="local"`,
+  the clone is checked out at the default branch). `configsync.py` is NOT touched
+  (K9). The git side effect is one injected subprocess leaf (K4); teardown +
+  token shred in `finally` (K1).
+* **PHASE 1 — per-repo scoped token.** A provider PAT/project-token, **sealed at
+  rest** (AES-GCM, `secrets.py`) — the conscious fork from the hash-only token
+  model (a git credential must be REPLAYED, so it cannot be hashed). It drives
+  clone + a new `GitHubTransport` + a `POST /repos/{id}/docs-pr` route.
+* **PHASE 2 — GitHub App / GitLab OAuth (`gitauth.py`).** Mint a SHORT-LIVED token
+  from a stored App/OAuth credential; the hot token is never persisted (recovers
+  most of the at-rest invariant Phase 1 weakened). Reuses Phase 1's `RemoteSpec`
+  + clone seam + transports verbatim — only the credential SOURCE changes. GitHub
+  App JWT needs **RS256 (stdlib cannot do it)** → `cryptography` (the one K0
+  asterisk, confined to the `[server]` extra).
+
+### `gitfetch.py`  (STEP 0 — clone-on-demand; stdlib subprocess behind one injected leaf — K0/K1/K4/K8)
+
+```python
+class RemoteSpec(BaseModel):          # frozen, extra=forbid
+    remote_url: str                   # https://github.com/owner/repo(.git) | https://gitlab.com/group/proj(.git)
+    provider: Literal["github", "gitlab"]
+    default_branch: str = "main"
+
+class _Cloner(Protocol):              # the ONE network leaf (K4)
+    # clone spec.remote_url@default_branch into dest, authenticating with `secret`
+    # WITHOUT putting it in argv or the URL (GIT_ASKPASS env + a username-only URL).
+    def clone(self, spec: RemoteSpec, secret: str | None, dest: Path) -> None: ...
+
+class _GitCloner:                     # real leaf; subprocess.run(["git","clone","--depth=1","--branch",b,url,dest], env=…)
+    def clone(self, spec, secret, dest) -> None: ...   # token never in argv; file:// path covered, https+token leaf is the pragma
+
+@contextmanager
+def cloned_repo(spec: RemoteSpec, secret: str | None, *, cloner: _Cloner | None = None) -> Iterator[Path]:
+    # mkdtemp("cdmon-fetch-") → cloner.clone(...) → yield <tmp>/repo → finally rmtree + best-effort secret shred (K1).
+    # A clone failure is a loud SyncError with the secret SCRUBBED from stderr (K8).
+```
+The server route does `with cloned_repo(spec, secret) as tree: run_sync(tree, repo_id, mode="local", default_branch=spec.default_branch, now=now)`. Tests inject a fake `cloner` (copies a fixture tree) for orchestration/teardown/token-not-in-argv, plus a REAL `file://` clone system test that exercises `_GitCloner` with no network (EDR-safe). `_build_clone_argv(spec, dest) -> list[str]` is a pure helper unit-tested to prove the secret is absent from argv.
+
+### `secrets.py`  (PHASE 1 — at-rest secret sealing; `cryptography` in the `[server]` extra ONLY — the one K0 asterisk)
+
+```python
+class SecretError(CodeDocMonitorError): ...   # errors.py — loud on a missing/short KEK or a tampered ciphertext (K8)
+
+class SecretBox:                      # AES-256-GCM (cryptography.hazmat AESGCM)
+    def __init__(self, key: bytes) -> None: ...        # key MUST be 32 bytes (loud SecretError otherwise)
+    def seal(self, plaintext: str) -> bytes: ...       # 12-byte random nonce ‖ ciphertext+tag; returns opaque bytes
+    def open_secret(self, sealed: bytes) -> str: ...   # splits nonce, decrypts; tampered/short → SecretError
+
+def secret_box_from_env(env: str = "CDMON_SECRET_KEY") -> SecretBox:
+    # reads a base64 32-byte KEK from $CDMON_SECRET_KEY; loud SecretError if unset/short/not base64.
+```
+Engine core never imports `secrets.py` (it lives behind the `[server]` extra; only `app.py`/tests import it), so the core dependency surface is unchanged (K0). The KEK is a single env-provided key (no KMS) — sufficient for single-org self-hosting; rotation is a manual re-encrypt (LESSON).
+
+### identity + payload additive fields  (PHASE 1, K6 — appended LAST so field order is untouched)
+
+* `sinks.RepoIdentity` (+2, both default `None`): `provider: Literal["github","gitlab"] | None`, `remote_url: str | None`. (The existing `repo_url` stays the inert *browse* URL — `remote_url` is the *clone/API* URL; the distinction is documented on the field.) These ride INSIDE the `RepoRow.payload` JSON → **no DB migration** (K6 additive round-trip).
+* `registry.RegistrationPayload` (+1, default `None`): `provider_secret: str | None` — a WRITE-ONLY plaintext credential the client mints at register, exactly mirroring `auth_token`. The server SEALS it (never stores plaintext); it is excluded from the stored payload JSON.
+
+### Store provider-secret seam  (PHASE 1 — `server/store.py` Protocol + `InMemoryStore` + `server/db.py` `SqlStore`)
+
+```python
+# store.Store (Protocol) gains — parallel to repo_token_hash:
+def set_provider_secret(self, repo_id: str, sealed: bytes) -> None: ...   # persist OPAQUE sealed bytes
+def repo_provider_secret(self, repo_id: str) -> bytes | None: ...         # the sealed bytes, or None (open/unknown)
+```
+Sealing happens at the ROUTE (`app.py`, the crypto-allowed `[server]` layer); the store persists opaque bytes and **never imports `cryptography`** (keeps `store.py` pure pydantic/stdlib). `db.RepoRow` gains `provider_secret: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)` (BYTEA/​BLOB), and `SqlStore.add_repo` extends the sanitize to `exclude={"auth_token", "provider_secret"}`. **Alembic `0005_repo_provider_secret`** (`down_revision="0004_config_edits"`) adds the one nullable column via `op.add_column` in batch mode (SQLite + Postgres); up/down round-trip gate-tested on temp SQLite.
+
+### `pr.py` GitHubTransport  (PHASE 1 — sibling to GitLabTransport; stdlib urllib behind one injected leaf — K0/K4)
+
+```python
+class _GitHubHttp(Protocol):
+    def request(self, method: str, url: str, *, body: dict | None, token: str) -> dict: ...
+class _UrllibGitHubHttp:              # Authorization: Bearer <token>; Accept: application/vnd.github+json (real urlopen = pragma)
+    ...
+class GitHubTransport:                # submit(plan) does the ATOMIC git-data flow (no local checkout):
+    # 1) GET   /repos/{o}/{r}/git/ref/heads/{target}            → base commit sha
+    # 2) GET   /repos/{o}/{r}/git/commits/{base}                → base tree sha
+    # 3) POST  /repos/{o}/{r}/git/trees {base_tree, tree:[{path,mode:100644,type:blob,content}]}  → new tree sha
+    # 4) POST  /repos/{o}/{r}/git/commits {message, tree, parents:[base]}                          → new commit sha
+    # 5) POST  /repos/{o}/{r}/git/refs {ref:"refs/heads/<source>", sha:new}                        → branch
+    # 6) POST  /repos/{o}/{r}/pulls {title, head:<source>, base:<target>, body}                    → PR  (returns its JSON)
+    def __init__(self, *, owner: str, repo: str, token: str, api_url: str = "https://api.github.com", http: _GitHubHttp | None = None): ...
+    @classmethod
+    def from_env(cls, *, repo_env="GITHUB_REPOSITORY", token_env="CDMON_GITHUB_TOKEN", api_env="GITHUB_API_URL"): ...
+    @classmethod
+    def from_repo(cls, remote_url: str, token: str, *, api_url: str | None = None) -> GitHubTransport: ...  # parse owner/repo from URL
+```
+`GitLabTransport.from_repo(remote_url, token, *, api_url=None)` is the symmetric classmethod (parse the project path → URL-encoded `project_id`). A shared `pr._parse_remote(remote_url) -> (host, owner, repo)` does the parsing (loud `TransportError` on a non-provider URL → SSRF allowlist hook).
+
+### server routes  (PHASE 1 — `server/app.py`, ENV knobs only; no `config/cdmon/server.yaml` edit)
+
+* **`POST /repos/{id}/sync`** — when the stored identity has NO `local_path` but DOES carry `provider` + `remote_url` AND a sealed `provider_secret` exists, the route opens the secret (`secret_box_from_env`), `cloned_repo(RemoteSpec(...), token)`s, and `run_sync`s the clone (`mode="local"`); otherwise the existing local-path path is unchanged. SSRF: `remote_url` host must be on the provider allowlist.
+* **`POST /repos/{id}/docs-pr`** — NEW, token-gated by the existing `_verify_token` (E-06). Clones, `syncpr.sync_pr` heals → `plan_docs_pr`, builds `{GitHub,GitLab}Transport.from_repo(remote_url, token)` by `provider`, `open_docs_pr(...)`; `?dry_run=true` returns the plan without a provider call. Returns the MR/PR response (or `null` when nothing healed). The token is scrubbed from any error surface.
+
+### `gitauth.py`  (PHASE 2 — mint short-lived App/OAuth tokens behind one injected leaf — `cryptography` RS256)
+
+```python
+class _TokenExchangeHttp(Protocol):
+    def request(self, method: str, url: str, *, body: dict | None, headers: dict[str, str]) -> dict: ...
+def github_app_jwt(app_id: str, private_key_pem: str, *, now: int) -> str: ...        # RS256 JWT (cryptography), iat/exp from injected `now` (K10)
+def mint_github_installation_token(app_id, private_key_pem, installation_id, *, now, http=None) -> str: ...
+def mint_gitlab_oauth_token(...) -> str: ...
+# transports gain `from_credential(remote_url, credential, *, now, http=None)` alongside from_repo;
+# routes resolve a MINTED token when the repo carries provider + installation_id (no stored provider_secret needed).
+```
+`RepoIdentity` gains additive `installation_id: str | None = None` (and the App credential — app_id + the PEM — is the SAME sealed-secret column, distinguished by a `provider_kind`). Only the credential SOURCE differs from Phase 1; `RemoteSpec`/`cloned_repo`/`GitHubTransport`/`GitLabTransport`/the routes are reused verbatim. Air-gapped GHE/GitLab falls back to SSH here (only if a concrete adopter needs it).
+
+**Slices:** **GIT-00** clone-on-demand (`gitfetch.py`). **GIT-01** `secrets.py` AES-GCM + `SecretError`. **GIT-02** identity/payload fields + Store provider-secret seam + Alembic 0005. **GIT-03** `GitHubTransport` + `from_repo` on both transports. **GIT-04** remote `/sync` + `POST /docs-pr` route. **GIT-05** `gitauth.py` App/OAuth token exchange + `from_credential`. Each: TDD red-first, green gate (ruff+mypy+pytest ≥90% branch), Store-parity over InMemoryStore AND SqlStore where the store is touched, dogfood reheal, STATUS row + LESSON.

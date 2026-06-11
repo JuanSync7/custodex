@@ -236,6 +236,23 @@ class Store(Protocol):
 
     def repo_token_hash(self, repo_id: str) -> str | None: ...
 
+    def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
+        """Persist the SEALED (opaque) git provider credential for a repo (GIT-02).
+
+        ``sealed`` is the AES-256-GCM output of
+        :meth:`code_doc_monitor.secrets.SecretBox.seal`. The store keeps OPAQUE
+        bytes and NEVER imports ``cryptography`` — sealing/opening happens at the
+        route (the crypto-allowed ``[server]`` layer), so the store seam stays pure
+        pydantic/stdlib. Parallel to ``repo_token_hash`` (a separate write so the
+        reversible provider secret is isolated from the one-way token hash). A
+        re-set rotates it in place; a repo that never sets one reads ``None``.
+        """
+        ...
+
+    def repo_provider_secret(self, repo_id: str) -> bytes | None:
+        """The repo's SEALED git provider credential, or ``None`` if unset/unknown."""
+        ...
+
     # --- Y-01: config documents / code-refs / sync runs ---------------------
 
     def replace_config(
@@ -330,6 +347,10 @@ class InMemoryStore:
         self._resolutions: list[ResolutionRecord] = []
         self._coverage: dict[str, list[dict]] = {}
         self._token_hashes: dict[str, str | None] = {}
+        # GIT-02: per-repo SEALED (opaque bytes) git provider credential. Kept apart
+        # from token_hashes so the reversible secret never mixes with the one-way
+        # token hash; set by the route AFTER sealing (the store stores opaque bytes).
+        self._provider_secrets: dict[str, bytes] = {}
         # Y-01: insertion-ordered lists (K10); filtered in Python on read.
         self._config_documents: list[ConfigDocument] = []
         self._config_code_refs: list[ConfigCodeRef] = []
@@ -398,6 +419,15 @@ class InMemoryStore:
 
     def repo_token_hash(self, repo_id: str) -> str | None:
         return self._token_hashes.get(repo_id)
+
+    def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
+        # Only for a registered repo (parity with SqlStore, which updates an
+        # existing row): a dangling secret for an unknown repo is silently ignored.
+        if repo_id in self._repos:
+            self._provider_secrets[repo_id] = sealed
+
+    def repo_provider_secret(self, repo_id: str) -> bytes | None:
+        return self._provider_secrets.get(repo_id)
 
     # --- Protocol write (F-04) + seed helpers (parity with SqlStore) --------
 

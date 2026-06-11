@@ -1,0 +1,119 @@
+# Feature catalog — `layout` subsystem (Document Layout Standard: structure
+# linting, scaffolding, HTML-twin pairing, and the dependency-free Markdown
+# build). Golden source of truth (EPIC R). Do not duplicate this prose
+# elsewhere; the rendered feature-doc/FEATURES.md and the R-07 source wiki read
+# from here.
+features:
+  - id: FEAT-LAYOUT-001
+    title: Document Layout Standard conformance lint
+    summary: >-
+      lint_doc grades one parsed Doc's SHAPE against the Layout Standard — the
+      managed front-matter schema (cdm.schema_version pinned to LAYOUT_VERSION,
+      audience, fingerprint), the title/purpose anchor order, and the region
+      grammar/declaration consistency — emitting one LayoutIssue (a LayoutCode
+      data value, never an exception) per violation. It is pure: string/Doc in,
+      issues out.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K1, K7, K8, K10]
+
+  - id: FEAT-LAYOUT-002
+    title: Config-wide structural lint driver
+    summary: >-
+      lint_config reads every existing document under config_dir/config.root and
+      runs lint_doc on each, reporting malformed front matter as a
+      MALFORMED_STRUCTURE issue rather than raising; a missing doc file is left
+      to `cdmon check`. It also lints declared HTML twins and runs the
+      index-coverage check, returning the full LayoutIssue list.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K1, K8, K10]
+
+  - id: FEAT-LAYOUT-003
+    title: Conformant document scaffolding
+    summary: >-
+      scaffold_doc renders a fully-conformant, in-sync Markdown document for a
+      DocumentSpec from a DocumentSurface — standard front matter (schema_version,
+      audience, the composite fingerprint plus per-tier digests and symbol-table
+      region anchors) and a body with title, placeholder purpose, and every
+      declared region filled from the surface. The include_body flag must match
+      MonitorConfig.fingerprint_body_tier so the stamp agrees with `cdmon check`.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K2, K7, K10]
+
+  - id: FEAT-LAYOUT-004
+    title: Front-matter auto-fix stamp
+    summary: >-
+      stamp_doc_meta rewrites a Doc's front matter with the standard's static keys
+      (cdm.schema_version and cdm.audience), preserving the existing fingerprint
+      and body — the auto-fix behind `cdmon lint --fix`. It cannot repair
+      structural issues (title/purpose/regions/html), which require authoring.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K1, K7, K10]
+
+  - id: FEAT-LAYOUT-005
+    title: HTML-twin pairing check
+    summary: >-
+      lint_html_twin validates a declared HTML twin against the current Markdown
+      body, flagging HTML_MISSING (no file), HTML_NOT_DERIVED (no embedded source
+      hash), or HTML_STALE (embedded hash != current body hash). md_source_hash
+      gives the deterministic CRLF-normalized sha256[:16] of Markdown (matching
+      helium's algorithm) and embedded_md_hash reads the *-md-sha256 meta tag back
+      out of the HTML; html_twin_path maps an X.md path to its X.html twin.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K1, K10]
+
+  - id: FEAT-LAYOUT-006
+    title: Index landing-page coverage check
+    summary: >-
+      The index-coverage rule (folded into lint_config) is a target-agnostic
+      structural check that every `index: true` document links every other
+      document — by its .md source or its .html twin — so adding a doc to the
+      config without linking it from the landing page raises an INDEX_INCOMPLETE
+      LayoutIssue.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K0, K8]
+
+  - id: FEAT-LAYOUT-007
+    title: Per-region authority state surface
+    summary: >-
+      region_states returns one read-only RegionState per region present in a Doc
+      and declared in spec.region_keys (in region_keys order), reporting each
+      region's RegionMode, whether the engine can render it (has_renderer), whether
+      an llm-seeded region is locked by human edits, and whether it is advisory
+      (heal never authors it). config_region_states is the file-reading driver
+      behind `cdmon lint --modes`; both are pure and never re-validate the modes
+      map.
+    subsystem: layout
+    modules: [layout]
+    constraints: [K1, K10]
+
+  - id: FEAT-LAYOUT-008
+    title: Dependency-free Markdown renderer
+    summary: >-
+      render_markdown turns a managed doc body into an HTML fragment with no
+      third-party dependency, covering the constructs managed docs use (headings
+      with slugged anchor ids, paragraphs, GFM tables, ordered/unordered lists,
+      blockquotes, fenced code, inline code/bold/links, rules); it strips CDM
+      region markers, keeps the generated region tables, and rewrites intra-guide
+      X.md links to their X.html twins. Same Markdown in, same HTML out.
+    subsystem: layout
+    modules: [build]
+    constraints: [K0, K10]
+
+  - id: FEAT-LAYOUT-009
+    title: HTML-twin build orchestration
+    summary: >-
+      build renders every `html: true` document under config_dir/config.root to
+      its .html twin, wrapping render_markdown output in a styled page with a
+      sidebar nav (grouped by nav_section, labelled by nav_label/title) and
+      embedding the body's md_source_hash in a code-doc-md-sha256 meta tag so
+      lint_html_twin recognises the twin as derived and current. Missing source
+      docs are skipped; it returns the written paths.
+    subsystem: layout
+    modules: [build, layout]
+    constraints: [K0, K10]

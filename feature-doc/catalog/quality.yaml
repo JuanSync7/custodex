@@ -1,0 +1,113 @@
+# Feature catalog — `quality` subsystem (doc-style conformance, coverage.rpt,
+# `cdmon doctor` adoption preflight).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-QUALITY-001
+    title: Four-category writing-style map
+    summary: >-
+      load_doc_style parses a `doc-style.yaml` into a DocStyleMap of a `defaults`
+      DocStyleSelection plus per-document DocStyleMapping overrides, where each
+      maps a document to ONE template name per the four STYLE_CATEGORIES
+      (document-type, tone, writing-style, vocabulary). DocStyleMap.style_for
+      resolves a document id to its explicit mapping, else the defaults.
+    subsystem: quality
+    modules: [docstyle]
+    constraints: [K0]
+
+  - id: FEAT-QUALITY-002
+    title: Loud doc-style template validation
+    summary: >-
+      load_doc_style validates the frontmatter (cdmon-config-version + a
+      `doc-style-map` kind) and that EVERY named template — the defaults and every
+      mapping's four names — resolves to an existing
+      templates_root/<category>/<name>.md, raising a single ConfigError listing
+      every offending selection so a typo is caught once with the full picture.
+    subsystem: quality
+    modules: [docstyle]
+    constraints: [K8]
+
+  - id: FEAT-QUALITY-003
+    title: Composed writing guidance for the authoring prompt
+    summary: >-
+      resolve_style_files projects a DocStyleSelection to its
+      `category -> template path` mapping in the fixed STYLE_CATEGORIES order, and
+      read_style_guidance reads those four bodies from disk and concatenates them
+      under `## Writing guidance — <category>` headers, deterministically, to feed
+      the agent's authoring prompt when it writes a no-renderer `llm` region.
+    subsystem: quality
+    modules: [docstyle]
+    constraints: [K10]
+
+  - id: FEAT-QUALITY-004
+    title: Idempotent doc-style.yaml serialization
+    summary: >-
+      dump_doc_style serializes a DocStyleMap back to canonical `---`-fenced
+      frontmatter + body YAML such that load_doc_style of the written text
+      round-trips to an equal model; key order is deterministic and a
+      loaded-then-dumped map is byte-identical, with only the frontmatter
+      `updated:` field refreshed from the injected clock.
+    subsystem: quality
+    modules: [docstyle]
+    constraints: [K7, K10]
+
+  - id: FEAT-QUALITY-005
+    title: coverage.rpt builder over the real coverage engine
+    summary: >-
+      build_coverage_rpt produces a CoverageRpt (RptSummary + per-unit RptUnit
+      slices + an RptUndocumented gap list) by reusing effective_coverage →
+      inventory.discover_files/discover_symbols → coverage.resolve_coverage, so the
+      report counts are the same facts `cdmon coverage` shows, never a parallel
+      computation. Per-unit attribution is deepest-wins and waived files leave both
+      sides of each percentage.
+    subsystem: quality
+    modules: [report]
+    constraints: [K1, K10]
+
+  - id: FEAT-QUALITY-006
+    title: Suggested-unit attribution for coverage gaps
+    summary: >-
+      Each RptUndocumented gap file pairs its `path` with the `suggested_unit` it
+      should be declared in — the deepest unit whose `dir-covered` contains the
+      path and whose `source-files-format` includes its extension — or a None
+      suggestion with a `reason` explaining the format mismatch or that no unit
+      directory contains it.
+    subsystem: quality
+    modules: [report]
+    constraints: [K10]
+
+  - id: FEAT-QUALITY-007
+    title: Byte-stable .rpt render / parse round-trip
+    summary: >-
+      render_rpt emits a CoverageRpt as a `---` frontmatter block (report-version /
+      kind / repo / ref / generated-by, no wall-clock) over a fixed-key-order YAML
+      body with every list sorted and percentages at two decimals (`n/a` when the
+      denominator is 0), and parse_rpt is its loud inverse so
+      parse_rpt(render_rpt(r)) == r; write_rpt writes the text to
+      config_dir/coverage.rpt.
+    subsystem: quality
+    modules: [report]
+    constraints: [K7, K8, K10]
+
+  - id: FEAT-QUALITY-008
+    title: cdmon doctor offline adoption preflight
+    summary: >-
+      run_checks answers "is this repo wired up correctly enough to run cdmon and
+      report centrally?" with a deterministic, ordered list of Check results over
+      config / documents / backend / central (and the agent extra), reading only
+      os.environ / $PATH / installed distributions with no network and no mutation.
+    subsystem: quality
+    modules: [doctor]
+    constraints: [K1, K4, K10]
+
+  - id: FEAT-QUALITY-009
+    title: WARN-vs-FAIL doctor grading philosophy
+    summary: >-
+      Each Check carries a CheckStatus where only FAIL fails the gate: a merely
+      absent prereq (no `claude` CLI, unset $ANTHROPIC_API_KEY, missing langgraph
+      extra, an unset central token, an unresolved code ref) is a WARN because the
+      config is valid, while a structurally broken config (an `http` central sink
+      missing its url or repo_id) is a FAIL.
+    subsystem: quality
+    modules: [doctor]
+    constraints: [K8]

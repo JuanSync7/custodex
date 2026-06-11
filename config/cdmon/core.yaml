@@ -108,6 +108,9 @@ documents:
     code_refs:
       - path: code_doc_monitor/registry.py
       - path: code_doc_monitor/configsync.py
+      - path: code_doc_monitor/gitfetch.py    # EPIC GIT: clone-on-demand (STEP 0)
+      - path: code_doc_monitor/secrets.py     # EPIC GIT: at-rest credential sealing (PHASE 1)
+      - path: code_doc_monitor/gitauth.py     # EPIC GIT: short-lived token minting (PHASE 2)
     # context_refs (EDITOR E-01, additive/K6): generation-context "glance-through"
     # references, NOT documented surface and NOT coverage. configsync reprojects a
     # registered repo into the SQL rows the central server serves, so an author of

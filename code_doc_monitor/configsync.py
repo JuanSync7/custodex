@@ -121,6 +121,13 @@ class SyncResult(BaseModel):
     documents: tuple[ConfigDocument, ...]
     code_refs: tuple[ConfigCodeRef, ...]
     run: SyncRun
+    # The coverage snapshot of the synced tree: the same JSON-safe wire dict
+    # ``coverage.coverage_snapshot`` produces (per-file list + basket counts +
+    # percentages, stamped ``captured_at = now``). The central server persists it
+    # on every sync so the dashboard's Coverage page reflects the JUST-SYNCED tree,
+    # not only the last explicit ``POST /coverage`` ingest (T-02). ``run_sync``
+    # always populates it; the ``None`` default keeps the field additive (K6).
+    coverage: dict | None = None
 
 
 def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> GitInfo:
@@ -157,21 +164,22 @@ def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> 
     )
 
 
-def _coverage_percent(bundle: object, config_dir: Path) -> float:
-    """Compute the file-coverage percent for ``bundle`` (reuses the real engine).
+def _coverage_report(bundle: object, config_dir: Path) -> coverage_mod.CoverageReport:
+    """Compute the full :class:`CoverageReport` for ``bundle`` (reuses the real engine).
 
     Mirrors :func:`code_doc_monitor.report.build_coverage_rpt`'s pipeline —
     :func:`effective_coverage` → :func:`inventory.discover_files` →
-    :func:`inventory.discover_symbols` → :func:`coverage.resolve_coverage` — and
-    returns :attr:`CoverageReport.percent_files`. Pure except for the engine's
-    reads (K1).
+    :func:`inventory.discover_symbols` → :func:`coverage.resolve_coverage`. The
+    caller reads :attr:`CoverageReport.percent_files` for the drift summary and
+    projects the same report into a stored snapshot via
+    :func:`code_doc_monitor.coverage.coverage_snapshot`. Pure except for the
+    engine's reads (K1).
     """
     repo_root = resolve_repo_root(config_dir, bundle.index.root)  # type: ignore[attr-defined]
     cov = effective_coverage(bundle, repo_root)  # type: ignore[arg-type]
     inv = inventory.discover_files(repo_root, include=cov.include, exclude=cov.exclude)
     sym = inventory.discover_symbols(inv, repo_root)
-    report = coverage_mod.resolve_coverage(bundle.config, sym)  # type: ignore[attr-defined]
-    return report.percent_files
+    return coverage_mod.resolve_coverage(bundle.config, sym)  # type: ignore[attr-defined]
 
 
 def _drift_summary(report: DriftReport, coverage_percent: float) -> dict:
@@ -375,11 +383,18 @@ def run_sync(
         git,
     ):
         report = detect(bundle.config, config_dir)  # type: ignore[attr-defined]
-        coverage_percent = _coverage_percent(bundle, config_dir)
+        cov_report = _coverage_report(bundle, config_dir)
         documents, code_refs = _build_rows(
             bundle, repo_id, mode=mode, ref=git.ref, now=now
         )
+    coverage_percent = cov_report.percent_files
     drift = _drift_summary(report, coverage_percent)
+    # Project the SAME report into the stored wire snapshot (T-02 shape) so the
+    # central server can refresh the dashboard's Coverage page from this synced
+    # tree. Pure projection (no disk reads), stamped with the one injected clock
+    # (K10) — there is no second wall-clock read.
+    coverage = coverage_mod.coverage_snapshot(cov_report)
+    coverage["captured_at"] = now
 
     fully_synced = report.ok if mode == "git" else report.ok and git.commits_ahead == 0
 
@@ -398,4 +413,6 @@ def run_sync(
         started_at=now,
         finished_at=now,
     )
-    return SyncResult(documents=documents, code_refs=code_refs, run=run)
+    return SyncResult(
+        documents=documents, code_refs=code_refs, run=run, coverage=coverage
+    )

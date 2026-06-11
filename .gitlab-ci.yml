@@ -91,6 +91,15 @@ docs:gate:
     # Either failing fails the pipeline, so doc drift never lands silently.
     - .venv/bin/cdmon check --config config/cdmon
     - .venv/bin/cdmon lint --config config/cdmon
+    # EPIC-R close-out gates (R-08), both offline (K4). `cdmon wiki --check`
+    # renders the four golden wikis (FEATURES + test/source/traceability) in
+    # memory and exits nonzero if any on-disk artifact is stale — the reference
+    # cannot silently drift from the catalog/tests/source. `cdmon trace
+    # --fail-on-gap` exits nonzero if ANY catalogued feature lacks a demo or a
+    # test (or an unknown ref is tagged) — a new feature without its demo+test
+    # mapping fails the pipeline.
+    - .venv/bin/cdmon wiki --check
+    - .venv/bin/cdmon trace --fail-on-gap
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'

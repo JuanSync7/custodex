@@ -1,0 +1,116 @@
+# Feature catalog — `drift` subsystem (detect-only doc<->code drift grading).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-DRIFT-001
+    title: Detect-only drift grading
+    summary: >-
+      detect(config, config_dir) grades every document in a MonitorConfig against
+      its freshly built code surface and returns a DriftReport — pure and
+      side-effect free (K1): it never writes a file and never calls a backend.
+      The repo root is the one shared resolve_repo_root(config_dir, root) formula.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1, K2]
+
+  - id: FEAT-DRIFT-002
+    title: Drift kind taxonomy
+    summary: >-
+      DriftKind enumerates the four discrepancy classes — MISSING_DOC (the doc
+      file is absent, a stub can be created), HASH (the stored fingerprint differs
+      from the surface hash), REGION (a managed region body is stale), and
+      UNHEALABLE (a managed region with no known renderer the engine cannot
+      regenerate).
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1]
+
+  - id: FEAT-DRIFT-003
+    title: Drift as data, never an exception
+    summary: >-
+      Each finding is a frozen Drift model carrying kind, doc_id, doc_path,
+      detail, optional region_id, a healable flag, the doc's audience and an
+      optional unified diff — drift is reported as data, distinct from the
+      DriftError raised only for operational failures.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1]
+
+  - id: FEAT-DRIFT-004
+    title: Audience-aware drift suppression
+    summary: >-
+      Every Drift carries the document's audience and the audience rule (K3) is
+      honored: a docstring/comment- or private-symbol-only change does not move a
+      user-guide surface hash (the extraction filter already excludes those) so it
+      produces no HASH drift for a user-guide, while it does for an eng-guide.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K3]
+
+  - id: FEAT-DRIFT-005
+    title: Which-tier-moved HASH reporting
+    summary: >-
+      On a HASH drift, when the doc carries stored per-tier digests, detect names
+      which surface tier(s) moved (signature / docstring / body) via
+      SurfaceFingerprint.drifted_against, recorded on Drift.drifted_tiers; an old
+      doc with only a composite fingerprint falls back to a composite-only message
+      with empty drifted_tiers.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K6]
+
+  - id: FEAT-DRIFT-006
+    title: Anchor-identity change classification
+    summary: >-
+      On a HASH drift, detect compares the documented symbol anchor_ids against the
+      stamped region anchor set and records Drift.anchors_added / anchors_removed —
+      both empty means the SAME symbols changed internally (a re-bind/move), while a
+      nonempty delta means a symbol was added, removed or renamed (a structural
+      change). Empty when the doc predates anchor stamping.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K2]
+
+  - id: FEAT-DRIFT-007
+    title: Region ownership and lockability
+    summary: >-
+      detect grades only regions the spec declares: a human (or an llm-seeded
+      region locked once a human edited it, via the shared region_is_locked
+      predicate) region whose code moved is reported for manual review but marked
+      healable=False so the engine never auto-edits it, while a stale rendered
+      region is a healable REGION drift.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1]
+
+  - id: FEAT-DRIFT-008
+    title: Persistent human-review advisory
+    summary: >-
+      A human-owned region carries a stored per-region hash stamped when last
+      reviewed; while the body still matches that stamp the advisory keeps firing
+      across a fingerprint heal until the human acknowledges, and with no stamp yet
+      detect falls back to the code-moved fingerprint signal.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1]
+
+  - id: FEAT-DRIFT-009
+    title: LLM-authored region staleness
+    summary: >-
+      A pure-llm region (no mechanical renderer) is backend-authored prose, not
+      graded against a render: its body stands while the surface is unchanged and is
+      surfaced as a healable REGION drift only when the whole-doc fingerprint
+      diverges, so the backend re-authors it from the current surface.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1, K4]
+
+  - id: FEAT-DRIFT-010
+    title: Report aggregation and human summary
+    summary: >-
+      DriftReport bundles the tuple of drifts with an ok property (true when no
+      drift) and a summary() that renders one human-readable line per drift —
+      doc_id, optional region, kind, an UNHEALABLE marker and detail.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1]

@@ -34,6 +34,12 @@ server = [
     "sqlalchemy>=2.0",
     "alembic",
     "psycopg[binary]",
+    # GIT-01: seal per-repo provider credentials at rest (AES-256-GCM). A git
+    # credential must be REPLAYED (not hashed), so it is encrypted, not one-way —
+    # the conscious fork from the E-06 token-hash model. The engine core NEVER
+    # imports `cryptography` (secrets.py lazy-imports it, and only app.py/tests
+    # import secrets.py), so the core dependency surface is unchanged (K0).
+    "cryptography>=42",
 ]
 dev = [
     "pytest",
@@ -48,6 +54,7 @@ dev = [
     "sqlalchemy>=2.0",
     "alembic",
     "psycopg[binary]",
+    "cryptography>=42",
 ]
 
 [project.scripts]
@@ -120,6 +127,10 @@ markers = [
     "live_llm: spawns a real LLM backend (resolved from the config file); opt-in, excluded by default.",
     "pg: runs the DB store contract against a real Postgres ($CDMON_DATABASE_URL); opt-in, excluded by default (the offline suite uses SQLite).",
     "regression: H-03 curated regression corpus — one durable invariant per learned failure mode (tests/regression/). INCLUDED in the default suite (it lives under tests/) AND selectable alone via `pytest -m regression`.",
+    "unit: pure single-module unit test — one module's logic, no cross-module orchestration/CLI/server (EPIC R taxonomy, tests/unit/). Auto-applied by path.",
+    "integration: module-to-module seam or cross-module config loading, no full CLI (EPIC R taxonomy, tests/integration/). Auto-applied by path.",
+    "system: drives the CLI or server end-to-end on a real fixture/demo/example (EPIC R taxonomy, tests/system/). Auto-applied by path.",
+    "smoke: trivial import/availability/wiring check (EPIC R taxonomy, tests/smoke/). Auto-applied by path.",
 ]
 filterwarnings = [
     # Starlette's TestClient (the [server] extra, E-03) emits a targeted

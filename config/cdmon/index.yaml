@@ -51,6 +51,16 @@ coverage:
       reason: "re-export aggregator; symbols documented in agent-workflow doc"
     - path: "code_doc_monitor/server/__init__.py"
       reason: "re-export aggregator; symbols documented in server doc"
+    - path: "code_doc_monitor/featurecatalog.py"
+      reason: "EPIC R golden catalog; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
+    - path: "code_doc_monitor/traceability.py"
+      reason: "EPIC R traceability; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
+    - path: "code_doc_monitor/testwiki.py"
+      reason: "EPIC R test wiki; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
+    - path: "code_doc_monitor/srcindex.py"
+      reason: "EPIC R source index; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
+    - path: "code_doc_monitor/wiki.py"
+      reason: "EPIC R wiki regeneration; documented in feature-doc/, api doc owned by R-08 cdmon wiki"
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
 # *.yaml unit on disk MUST be listed (run `cdmon index` to regenerate). The three

@@ -27,6 +27,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     Integer,
+    LargeBinary,
     StaticPool,
     String,
     create_engine,
@@ -86,8 +87,12 @@ class RepoRow(Base):
     repo_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     payload: Mapped[dict] = mapped_column(_json_type())
     # E-06: sha256 hash of the per-repo bearer token (never the plaintext). Nullable so
-    # pre-E-06 rows / token-less repos keep writes open. The ONLY non-JSON repo column.
+    # pre-E-06 rows / token-less repos keep writes open.
     token_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    # GIT-02: AES-256-GCM SEALED bytes of the per-repo git provider credential (never
+    # the plaintext; opaque to the store — sealed/opened at the route). Nullable so
+    # pre-GIT-02 rows / local-only repos carry none. Added by Alembic 0005.
+    provider_secret: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
 
 class RecordRow(Base):
@@ -280,8 +285,12 @@ class SqlStore:
         omits it leaves the existing hash untouched (so reads stay simple).
         """
         repo_id = payload.repo.repo_id
-        # Sanitize: the plaintext token never reaches the JSON column.
-        data = payload.model_dump(mode="json", exclude={"auth_token"})
+        # Sanitize: neither the plaintext bearer token (E-06) nor the plaintext git
+        # provider credential (GIT-02) ever reaches the JSON column. The provider
+        # secret is persisted SEPARATELY as sealed bytes via set_provider_secret.
+        data = payload.model_dump(
+            mode="json", exclude={"auth_token", "provider_secret"}
+        )
         token_hash = (
             hash_token(payload.auth_token) if payload.auth_token is not None else None
         )
@@ -391,6 +400,27 @@ class SqlStore:
         with self._session() as session:
             return session.scalars(
                 select(RepoRow.token_hash).where(RepoRow.repo_id == repo_id)
+            ).first()
+
+    def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
+        """Store the SEALED git provider credential bytes on the repo row (GIT-02).
+
+        Updates the existing row in place (the route registers the repo first); a
+        re-set rotates it. Opaque bytes — the store never opens them (K6 isolation
+        of the reversible secret from the one-way token hash).
+        """
+        with self._session() as session, session.begin():
+            row = session.scalars(
+                select(RepoRow).where(RepoRow.repo_id == repo_id)
+            ).first()
+            if row is not None:
+                row.provider_secret = sealed
+
+    def repo_provider_secret(self, repo_id: str) -> bytes | None:
+        """The repo's SEALED provider credential bytes, or ``None`` if unset/unknown."""
+        with self._session() as session:
+            return session.scalars(
+                select(RepoRow.provider_secret).where(RepoRow.repo_id == repo_id)
             ).first()
 
     # --- E-04 extras (endpoints in E-05) ------------------------------------

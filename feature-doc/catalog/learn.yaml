@@ -1,0 +1,72 @@
+# Feature catalog — `learn` subsystem (similarity retrieval + promotion detector).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-LEARN-001
+    title: Deterministic similarity retrieval over resolved drifts
+    summary: >-
+      rank_similar mines the review log joined to the resolutions log and returns
+      the top_n most-similar PAST RESOLVED records to a target ReviewRecord as
+      Exemplars; the population is resolved-only (via resolved_index, last-write-wins)
+      with the target excluded by record_id, and the result is a stable total order
+      over (score, recency, record_id).
+    subsystem: learn
+    modules: [similar]
+    constraints: [K0, K10]
+
+  - id: FEAT-LEARN-002
+    title: Embedding-free weighted feature-match score
+    summary: >-
+      The Exemplar score is a deterministic weighted sum of equal-attribute matches
+      defined by FEATURE_WEIGHTS (surface_hash 5.0, doc_id 3.0, drift_kind 2.0,
+      audience 1.0; max 11.0) — no embeddings and no new dependency, so retrieval is
+      offline and fully reproducible (vector retrieval is a documented future option).
+    subsystem: learn
+    modules: [similar]
+    constraints: [K0, K10]
+
+  - id: FEAT-LEARN-003
+    title: Few-shot exemplar payload for the agent
+    summary: >-
+      The frozen Exemplar model pairs a past resolved ReviewRecord with its
+      ResolutionRecord human outcome and the match score, so the agent backend can
+      feed "here is a drift like this one and how a human resolved it" few-shot
+      examples; it is extra="forbid" so an unexpected key is a loud error.
+    subsystem: learn
+    modules: [similar]
+    constraints: [K8, K10]
+
+  - id: FEAT-LEARN-004
+    title: Promotion detector for recurring resolved drift shapes
+    summary: >-
+      detect_promotions groups resolved records by the generalizable shape
+      (doc_id, drift_kind, audience) — NOT surface_hash — and emits a
+      PromotionCandidate per shape whose resolved records unanimously share one
+      decision >= min_count times; orphan resolutions are ignored and output is
+      deterministically sorted. Pure, no I/O, no wall-clock.
+    subsystem: learn
+    modules: [promotion]
+    constraints: [K0, K10]
+
+  - id: FEAT-LEARN-005
+    title: Decision-only auto-promotion guard
+    summary: >-
+      Only the content-free DECISION resolutions in PROMOTABLE_RESOLUTIONS
+      (invalidated, rejected) auto-promote; overridden (human prose) and accepted
+      (already LLM-free mechanical fix) are deliberately excluded, so an automated
+      rule only ever reproduces a content-free human judgement.
+    subsystem: learn
+    modules: [promotion]
+    constraints: [K10]
+
+  - id: FEAT-LEARN-006
+    title: Deterministic rule synthesis and matching
+    summary: >-
+      rule_from_candidate maps a PromotionCandidate to a frozen PromotionRule (both
+      promotable decisions yield the INVALIDATE verdict), and rule_for returns the
+      first rule whose (doc_id, drift_kind, audience) shape matches a Drift (else
+      None) — enabling opt-in, additive rule application that resolves a matched
+      drift with zero backend calls.
+    subsystem: learn
+    modules: [promotion]
+    constraints: [K4, K10]

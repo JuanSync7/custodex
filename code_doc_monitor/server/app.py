@@ -24,6 +24,7 @@ import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -70,6 +71,57 @@ _IGNORED_FILES_CAP = 200
 
 _LOG = logging.getLogger("code_doc_monitor.server")
 
+# The EPIC-R wikis surfaced by `GET /wiki`, in deterministic display order
+# (features, traceability, tests, source). Each tuple is
+# ``(id, title, <feature-doc/-relative path>)`` — the SINGLE source of the
+# section set + order shared by the route and the dashboard Wiki page (R-09).
+WIKI_SECTIONS = (
+    ("features", "Feature Reference", "FEATURES.md"),
+    ("traceability", "Traceability Matrix", "wiki/TRACEABILITY.md"),
+    ("tests", "Test Wiki", "wiki/TEST_WIKI.md"),
+    ("source", "Source Wiki", "wiki/SOURCE_WIKI.md"),
+)
+
+
+def _wiki_dir() -> Path | None:
+    """The committed EPIC-R wikis dir shipped beside the package, if present.
+
+    Looks for ``feature-doc/`` at the repo root (two levels above this package,
+    beside ``dashboard/dist`` the SPA loader finds) so a single ``cdmon``-server
+    process can serve the rendered wikis on the same port as the API. Returns
+    ``None`` when ``feature-doc/`` is absent (a non-cdmon repo) so ``GET /wiki``
+    degrades to an empty payload rather than crashing (K8). Mirrors
+    :func:`_default_static_dir`.
+    """
+    root = Path(__file__).resolve().parents[2] / "feature-doc"
+    return root if root.is_dir() else None
+
+
+def _load_wiki_sections(wiki_dir: Path | None) -> list[dict[str, str]]:
+    """Render the committed EPIC-R wikis under ``wiki_dir`` to HTML sections (R-09).
+
+    For each ``(id, title, relpath)`` in :data:`WIKI_SECTIONS` (deterministic
+    order), if ``wiki_dir/relpath`` is a file, read it and append
+    ``{"id", "title", "html"}`` with the body rendered by the engine's OWN
+    dependency-free :func:`code_doc_monitor.build.render_markdown` (no new dep,
+    K0). A missing file → that section omitted; ``wiki_dir is None`` → ``[]``.
+    Pure (no clock, K10): the same bytes in, the same sections out. The renderer
+    is imported lazily so ``import app`` (the TestClient path) stays cheap.
+    """
+    if wiki_dir is None:
+        return []
+    from ..build import render_markdown
+
+    sections: list[dict[str, str]] = []
+    for section_id, title, relpath in WIKI_SECTIONS:
+        path = wiki_dir / relpath
+        if path.is_file():
+            text = path.read_text(encoding="utf-8")
+            sections.append(
+                {"id": section_id, "title": title, "html": render_markdown(text)}
+            )
+    return sections
+
 
 class CoverageIngest(BaseModel):
     """The ``POST /repos/{id}/coverage`` body — a permissive coverage snapshot (T-02).
@@ -115,6 +167,20 @@ class SyncRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: str
+
+
+class DocsPrRequest(BaseModel):
+    """The ``POST /repos/{id}/docs-pr`` body — open a docs PR upstream (GIT-04).
+
+    ``dry_run`` heals + plans the PR but does NOT call the provider (returns the
+    would-be plan instead of a real MR/PR). The repo must carry ``provider`` +
+    ``remote_url`` (and, for a private repo, a sealed credential) — the route
+    clones it on demand, so there is no ``mode``/``local_path`` here.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    dry_run: bool = False
 
 
 class DocumentTree(BaseModel):
@@ -610,11 +676,89 @@ def _disk_editable_parts(
     return undocumented, ignored, unit_files, doc_styles
 
 
+def _allowed_git_hosts() -> set[str]:
+    """The clone/PR host allowlist (SSRF guard, GIT-04).
+
+    The two public providers plus any host in ``$CDMON_ALLOWED_GIT_HOSTS``
+    (comma-separated) for self-hosted GitHub Enterprise / GitLab. ENV-only — no
+    config/cdmon knob (that file is a coverage unit).
+    """
+    hosts = {"github.com", "gitlab.com"}
+    extra = os.environ.get("CDMON_ALLOWED_GIT_HOSTS", "")
+    return hosts | {h.strip() for h in extra.split(",") if h.strip()}
+
+
+def _check_remote_allowed(remote_url: str) -> None:
+    """Reject a ``remote_url`` not on the https allowlist (nor a ``file://``) (K8).
+
+    The server clones an ADOPTER-supplied URL, so it must not be coaxed into
+    reaching an arbitrary internal host (SSRF). ``https`` is allowed only to a host
+    on :func:`_allowed_git_hosts`; ``file://`` (a local path/mirror — no network
+    egress) is allowed; any other scheme/host is a loud 400.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(remote_url)
+    if parsed.scheme == "file":
+        return
+    if parsed.scheme != "https":
+        raise HTTPException(
+            status_code=400,
+            detail=f"remote_url must be https:// or file://, got {parsed.scheme or '?'}://",
+        )
+    if parsed.hostname not in _allowed_git_hosts():
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"remote_url host {parsed.hostname!r} is not on the git host "
+                "allowlist (set $CDMON_ALLOWED_GIT_HOSTS for self-hosted providers)"
+            ),
+        )
+
+
+def _iso_to_epoch(iso: str) -> int:
+    """Epoch seconds from the injected ISO clock string (for the PHASE-2 JWT, K10)."""
+    return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp())
+
+
+def _resolve_provider_token(
+    store: Store, repo: RegisteredRepo, *, now: str, token_exchange_http: Any
+) -> str | None:
+    """The EFFECTIVE git token for a repo, or ``None`` for a public clone (GIT-04/05).
+
+    Opens the sealed credential with the KEK (``$CDMON_SECRET_KEY``; a missing/wrong
+    KEK raises :class:`~code_doc_monitor.errors.SecretError` → the route's 500). Then,
+    by ``provider_kind``: ``None``/``"token"`` (PHASE 1) → the opened secret IS the
+    token, replayed as-is; ``"github-app"``/``"gitlab-oauth"`` (PHASE 2) → the opened
+    secret is a JSON credential and a SHORT-LIVED access token is minted from it via
+    :func:`code_doc_monitor.gitauth.mint_provider_token` (the hot token is never
+    stored). A mint failure is a loud :class:`~code_doc_monitor.errors.TransportError`.
+    """
+    sealed = store.repo_provider_secret(repo.repo.repo_id)
+    if sealed is None:
+        return None
+    from ..secrets import secret_box_from_env
+
+    material = secret_box_from_env().open_secret(sealed)
+    kind = repo.repo.provider_kind
+    if kind in ("github-app", "gitlab-oauth"):
+        from ..gitauth import mint_provider_token
+
+        return mint_provider_token(
+            kind, material, now=_iso_to_epoch(now), http=token_exchange_http
+        )
+    return material
+
+
 def create_app(
     store: Store | None = None,
     *,
     static_dir: Path | None = None,
+    wiki_dir: Path | None = None,
     clock: Callable[[], str] = _default_now,
+    cloner: Any = None,
+    pr_transport_factory: Callable[[str, str, str | None], Any] | None = None,
+    token_exchange_http: Any = None,
 ) -> FastAPI:
     """Build the central FastAPI app over ``store`` (DI; defaults to in-memory).
 
@@ -631,8 +775,26 @@ def create_app(
     deploy. The SPA uses a hash router, so its client routes never shadow the
     API's ``/repos/...`` paths. Omitted (the default, and in tests) -> ``/`` is a
     JSON landing payload instead.
+
+    ``wiki_dir`` (optional) is the committed EPIC-R wikis dir (``feature-doc/``)
+    served, rendered to HTML, by the public ``GET /wiki`` (R-09). ``None`` (the
+    default) auto-resolves to :func:`_wiki_dir` (the repo's ``feature-doc/``), so
+    the live ``cdmon serve`` path serves the wikis with no extra wiring; a tmp dir
+    is injected in tests. An absent dir → an empty ``/wiki`` payload (K8).
+
+    ``cloner`` / ``pr_transport_factory`` (optional, GIT-04) are the clone + PR
+    seams behind the remote ``POST /sync`` and ``POST /docs-pr`` routes. Both
+    default to the real implementations (a :class:`~code_doc_monitor.gitfetch`
+    git-clone leaf and ``{GitHub,GitLab}Transport.from_repo``); tests inject a fake
+    cloner (copies a fixture tree) and a fake transport factory so the routes run
+    fully offline (K4). ``pr_transport_factory(provider, remote_url, token)``
+    returns a :class:`~code_doc_monitor.pr.PRTransport`. ``token_exchange_http``
+    (GIT-05, PHASE 2) is the injected leaf the App/OAuth short-lived-token mint uses
+    (:mod:`code_doc_monitor.gitauth`); default real, faked in tests so minting is
+    offline.
     """
     resolved: Store = store if store is not None else InMemoryStore()
+    resolved_wiki_dir: Path | None = wiki_dir if wiki_dir is not None else _wiki_dir()
     app = FastAPI(title="code-doc-monitor central server", version="0.1.0")
 
     spa_index: Path | None = None
@@ -640,12 +802,23 @@ def create_app(
         candidate = Path(static_dir) / "index.html"
         if candidate.is_file():
             spa_index = candidate
-            assets = Path(static_dir) / "assets"
-            if assets.is_dir():
-                app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+            # The built site is mounted as a single catch-all at the END of
+            # create_app (after every API route), so the API always wins and the
+            # whole `dist/` — index.html, native `/wiki/*` pages, `/_astro/*`
+            # assets — is served. See the `app.mount("/", ...)` before `return`.
 
     def get_store() -> Store:
         return resolved
+
+    def _make_transport(provider: str, remote_url: str, token: str | None) -> Any:
+        """Build the provider PR transport (GIT-04) — injectable for tests (K4)."""
+        if pr_transport_factory is not None:
+            return pr_transport_factory(provider, remote_url, token)
+        from ..pr import GitHubTransport, GitLabTransport
+
+        if provider == "github":
+            return GitHubTransport.from_repo(remote_url, token or "")
+        return GitLabTransport.from_repo(remote_url, token or "")
 
     def _require_known_repo(store: Store, repo_id: str) -> None:
         if store.get_repo(repo_id) is None:
@@ -711,6 +884,21 @@ def create_app(
         """
         return dict(V2_TEMPLATES)
 
+    @app.get("/wiki")
+    def wiki() -> dict:
+        """The committed EPIC-R wikis rendered to HTML (R-09, GLOBAL + public).
+
+        Returns ``{"sections": [{"id", "title", "html"}, ...]}`` — the four
+        committed wikis (Feature Reference / Traceability / Test / Source) in the
+        deterministic :data:`WIKI_SECTIONS` order, each body rendered by the
+        engine's OWN dependency-free :func:`code_doc_monitor.build.render_markdown`
+        (no new dep, K0). No auth (a public reference like ``/config/templates``,
+        no ``_verify_token``). A missing section file is OMITTED; an absent
+        ``feature-doc/`` (a non-cdmon repo) → ``{"sections": []}`` — a graceful
+        empty payload, never a 500 (K8). Pure / deterministic (K10).
+        """
+        return {"sections": _load_wiki_sections(resolved_wiki_dir)}
+
     @app.post("/repos", status_code=201)
     def register_repo(
         payload: RegistrationPayload,
@@ -722,6 +910,23 @@ def create_app(
         if store.get_repo(payload.repo.repo_id) is not None:
             _verify_token(store, payload.repo.repo_id, authorization)
         store.add_repo(payload)
+        # GIT-02/04: a write-only git provider credential is SEALED at rest and
+        # stored separately (the store never sees plaintext). A re-register that
+        # omits it leaves the prior sealed secret; one that carries it rotates it.
+        if payload.provider_secret is not None:
+            from ..errors import SecretError
+            from ..secrets import secret_box_from_env
+
+            try:
+                sealed = secret_box_from_env().seal(payload.provider_secret)
+            except SecretError as exc:
+                # The server has no/invalid KEK ($CDMON_SECRET_KEY) — a server
+                # misconfiguration, not a client error (K8).
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"cannot seal the provider secret: {exc}",
+                ) from exc
+            store.set_provider_secret(payload.repo.repo_id, sealed)
         return {"repo_id": payload.repo.repo_id}
 
     @app.post("/ingest", status_code=202)
@@ -855,32 +1060,68 @@ def create_app(
         repo = store.get_repo(repo_id)
         assert repo is not None  # _require_known_repo guarantees it
         local_path = repo.repo.local_path
-        if not local_path:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"repo {repo_id!r} has no local_path on file; re-register it "
-                    "with a local_path to enable sync"
-                ),
-            )
+        remote_url = repo.repo.remote_url
+        provider = repo.repo.provider
         default_branch = repo.default_branch or repo.repo.default_branch or "main"
         # Lazy import: the engine pulls in the config/drift/coverage stack; keeping
         # it out of module load avoids a server↔configsync import cycle (configsync
         # imports the pure store models) and keeps `import app` cheap (K0).
         from ..configsync import run_sync
-        from ..errors import SyncError
+        from ..errors import SecretError, SyncError, TransportError
 
+        now = clock()
         try:
-            result = run_sync(
-                Path(local_path),
-                repo_id,
-                mode=body.mode,
-                default_branch=default_branch,
-                now=clock(),
-            )
-        except SyncError as exc:
-            # A bad mode / missing-tree / git failure is a client-actionable 400
-            # with the loud engine message (K8) — never a 500.
+            if local_path:
+                # A repo on the server's disk: sync its working tree directly (Y-02).
+                result = run_sync(
+                    Path(local_path),
+                    repo_id,
+                    mode=body.mode,
+                    default_branch=default_branch,
+                    now=now,
+                )
+            elif remote_url and provider:
+                # GIT-04 clone-on-demand: the server does NOT hold this repo locally.
+                # Fetch it read-only into a throwaway tree (K1) and sync that. The
+                # token is the opened PAT (PHASE 1) or a freshly minted short-lived
+                # App/OAuth token (PHASE 2) — both resolved the same way.
+                _check_remote_allowed(remote_url)
+                from ..gitfetch import RemoteSpec, cloned_repo
+
+                token = _resolve_provider_token(
+                    store, repo, now=now, token_exchange_http=token_exchange_http
+                )
+                spec = RemoteSpec(
+                    remote_url=remote_url,
+                    provider=provider,
+                    default_branch=default_branch,
+                )
+                with cloned_repo(spec, token, cloner=cloner) as tree:
+                    result = run_sync(
+                        tree,
+                        repo_id,
+                        mode=body.mode,
+                        default_branch=default_branch,
+                        now=now,
+                    )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"repo {repo_id!r} has no local_path and no "
+                        "provider+remote_url on file; re-register it with one to "
+                        "enable sync"
+                    ),
+                )
+        except SecretError as exc:
+            # The server can't open the sealed credential (KEK missing/wrong) — a
+            # server misconfiguration, not a client error (K8).
+            raise HTTPException(
+                status_code=500, detail=f"cannot open the provider secret: {exc}"
+            ) from exc
+        except (SyncError, TransportError) as exc:
+            # A bad mode / missing-tree / git/clone failure OR a failed PHASE-2 token
+            # mint is a client-actionable 400 (token scrubbed by gitfetch) (K8).
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         store.replace_config(
             repo_id,
@@ -889,7 +1130,95 @@ def create_app(
             list(result.code_refs),
         )
         store.add_sync_run(result.run)
+        # Refresh the Coverage page from the just-synced tree: the sync already
+        # walked the real coverage engine, so persist its snapshot here (same
+        # ``captured_at`` clock) instead of waiting for the next POST /coverage
+        # ingest. ``coverage`` is always set by run_sync; the None-guard keeps the
+        # route robust if a future caller opts out (K6/K8).
+        if result.coverage is not None:
+            store.add_coverage_snapshot(repo_id, now, result.coverage)
         return result.run
+
+    @app.post("/repos/{repo_id:path}/docs-pr", status_code=201)
+    def docs_pr(
+        repo_id: str,
+        body: DocsPrRequest,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict:
+        """Clone the repo, heal its docs, and open a docs PR upstream (GIT-04).
+
+        Token-protected like the other writes (404 unknown / 401 missing / 403
+        wrong). Requires the repo to carry ``provider`` + ``remote_url`` (else 400).
+        Clones read-only into a throwaway tree (K1), heals via the SAME monitor
+        pipeline (:func:`syncpr.sync_pr` — region authority honored, offline mock
+        backend), plans the PR from the healed docs, and opens it through the
+        provider transport (:meth:`from_repo`). ``dry_run`` heals + plans but does
+        NOT call the provider. Returns the heal summary, the changed doc paths,
+        whether a PR was opened, and the provider/plan response. A clone/transport
+        failure is a loud 400 (token scrubbed); a missing/wrong KEK is a 500.
+        """
+        _require_known_repo(store, repo_id)
+        _verify_token(store, repo_id, authorization)
+        repo = store.get_repo(repo_id)
+        assert repo is not None
+        provider = repo.repo.provider
+        remote_url = repo.repo.remote_url
+        if not (provider and remote_url):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"repo {repo_id!r} has no provider+remote_url on file; cannot "
+                    "open a docs PR (re-register it with a github/gitlab remote_url)"
+                ),
+            )
+        _check_remote_allowed(remote_url)
+        default_branch = repo.default_branch or repo.repo.default_branch or "main"
+        from ..config import load_bundle
+        from ..errors import SecretError, SyncError, TransportError
+        from ..gitfetch import RemoteSpec, cloned_repo
+        from ..monitor import Monitor
+        from ..pr import open_docs_pr
+        from ..syncpr import sync_pr
+
+        stamp = clock()
+        try:
+            # PHASE 1 PAT or a freshly minted PHASE 2 short-lived token (same resolver).
+            token = _resolve_provider_token(
+                store, repo, now=stamp, token_exchange_http=token_exchange_http
+            )
+        except SecretError as exc:
+            raise HTTPException(
+                status_code=500, detail=f"cannot open the provider secret: {exc}"
+            ) from exc
+        except TransportError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        spec = RemoteSpec(
+            remote_url=remote_url, provider=provider, default_branch=default_branch
+        )
+        try:
+            with cloned_repo(spec, token, cloner=cloner) as tree:
+                bundle = load_bundle(tree.joinpath("config", "cdmon"))
+                monitor = Monitor(
+                    bundle.config, tree / "config" / "cdmon", now=lambda: stamp
+                )
+                sync = sync_pr(monitor, dry_run=False)  # heal the cloned docs
+                transport = _make_transport(provider, remote_url, token)
+                response = open_docs_pr(
+                    sync,
+                    monitor.root,
+                    transport=transport,
+                    target_branch=default_branch,
+                    dry_run=body.dry_run,
+                )
+        except (SyncError, TransportError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "summary": sync.summary,
+            "changed_paths": list(sync.changed_paths),
+            "opened": response is not None,
+            "response": response,
+        }
 
     @app.get("/repos/{repo_id:path}/documents")
     def documents_for(
@@ -1223,17 +1552,31 @@ def create_app(
         _require_known_repo(store, repo_id)
         return store.latest_sync_run(repo_id, sync_kind)
 
+    # Single-origin static site (EPIC ASTRO): serve the built frontend at "/"
+    # AFTER every API route above, so the API always wins and any unclaimed path
+    # — index.html, the native `/wiki/*` pages, `/_astro/*` assets — falls through
+    # to the site. `html=True` serves index.html for "/" and directory paths. The
+    # mount is LAST so it can never shadow a route (K8/K10).
+    if spa_index is not None:
+        app.mount(
+            "/",
+            StaticFiles(directory=str(spa_index.parent), html=True),
+            name="site",
+        )
+
     return app
 
 
-def _default_static_dir() -> Path | None:
-    """The built dashboard SPA shipped beside the package, if present.
+def _default_static_dir(root: Path | None = None) -> Path | None:
+    """The built ``frontend/dist`` Astro app shipped beside the package, if present.
 
-    Looks for ``dashboard/dist`` at the repo root (two levels above this package)
-    so a single ``cdmon``-server process serves both the API and the console on
-    one port. Returns ``None`` when the dashboard has not been built.
+    Returns ``None`` when the frontend has not been built (the server still runs,
+    serving the JSON landing at ``/``). ``root`` defaults to the repo root (two
+    levels above this package); tests pass a tmp root. (EPIC ASTRO replaced the
+    legacy ``dashboard/dist`` SPA with this single Astro build.)
     """
-    dist = Path(__file__).resolve().parents[2] / "dashboard" / "dist"
+    base = root if root is not None else Path(__file__).resolve().parents[2]
+    dist = base / "frontend" / "dist"
     return dist if (dist / "index.html").is_file() else None
 
 

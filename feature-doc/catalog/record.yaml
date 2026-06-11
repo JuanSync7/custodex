@@ -1,0 +1,145 @@
+# Feature catalog — `record` subsystem (the public review/resolution record schema,
+# its append-only JSONL logs, and the central-system sinks).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-RECORD-001
+    title: Public versioned review record
+    summary: >-
+      ReviewRecord is the public, frozen/extra-forbid payload for one handled
+      drift — carrying the original drift, the LLM cause, the Verdict, the
+      ProposedFix, and an audience/config/hash snapshot — versioned by
+      schema_version so the central system has one contract to consume.
+    subsystem: record
+    modules: [schema]
+    constraints: [K5, K6, K10]
+
+  - id: FEAT-RECORD-002
+    title: Additive schema evolution
+    summary: >-
+      ReviewRecord grows only by appending optional fields (source_sha, ticket,
+      drifted_tiers) that default empty, so an old "1.0.0" JSONL line still
+      model_validate_json's; minor schema_version bumps signal the new metadata
+      without breaking pre-existing records.
+    subsystem: record
+    modules: [schema]
+    constraints: [K6]
+
+  - id: FEAT-RECORD-003
+    title: Model-derived JSON schema
+    summary: >-
+      review_record_schema and resolution_record_schema emit the public JSON
+      Schema straight from the pydantic models (model_json_schema), so the model
+      is the single source of truth and the schema is never hand-written.
+    subsystem: record
+    modules: [schema]
+    constraints: [K6]
+
+  - id: FEAT-RECORD-004
+    title: Proposed fix model
+    summary: >-
+      ProposedFix is the backend's remediation for one drift — either a
+      region-shaped fix (region_id + new_region_body) or a whole-doc fix
+      (new_doc_text), always with a rationale — and satisfies the structural
+      heal.ProposedFixLike protocol.
+    subsystem: record
+    modules: [schema]
+    constraints: [K5]
+
+  - id: FEAT-RECORD-005
+    title: Deterministic record id
+    summary: >-
+      new_record_id derives a stable 12-char sha256 prefix from a drift's
+      identity (doc_id, surface_hash, detected_at), so the same drift handled
+      with the same inputs always yields the same id — reproducible and dedupable
+      without a clock or counter.
+    subsystem: record
+    modules: [schema]
+    constraints: [K10]
+
+  - id: FEAT-RECORD-006
+    title: Separate resolution outcome event
+    summary: >-
+      ResolutionRecord captures the human OUTCOME (Resolution: accepted /
+      overridden / rejected / invalidated) as a separate frozen event linked to a
+      ReviewRecord by record_id, so a reviewer's decision is recorded without ever
+      mutating the immutable review record.
+    subsystem: record
+    modules: [schema]
+    constraints: [K5, K6, K10]
+
+  - id: FEAT-RECORD-007
+    title: Append-only review log
+    summary: >-
+      reviewlog.append writes each ReviewRecord as one JSON line in append mode
+      (never rewriting existing lines) and read_all parses every line back; a
+      corrupt non-empty line raises a loud typed SchemaError naming the line
+      number rather than being silently skipped.
+    subsystem: record
+    modules: [reviewlog]
+    constraints: [K5, K8]
+
+  - id: FEAT-RECORD-008
+    title: Deterministic review summaries
+    summary: >-
+      summarize counts records by verdict, audience, and doc id (each map sorted
+      by key) with a total, and select_by_verdict returns the records of one
+      Verdict in append (oldest-first) order — pure, order-stable, and
+      deterministic.
+    subsystem: record
+    modules: [reviewlog]
+    constraints: [K10]
+
+  - id: FEAT-RECORD-009
+    title: Append-only resolutions log with last-write-wins join
+    summary: >-
+      append_resolution and read_resolutions manage a separate resolutions JSONL
+      (DEFAULT_RESOLUTIONS_PATH under .cdmon); resolved_index joins record_id to
+      its ResolutionRecord last-write-wins, and summarize_with_resolutions reports
+      resolved-vs-unresolved counts while ignoring orphan resolutions.
+    subsystem: record
+    modules: [reviewlog]
+    constraints: [K5, K10]
+
+  - id: FEAT-RECORD-010
+    title: Shared ingest wire envelope
+    summary: >-
+      IngestEnvelope is the one versioned client to server wire format, wrapping a
+      ReviewRecord with its RepoIdentity (repo_id, commit, optional local_path /
+      default_branch), so the HttpSink client and the central /ingest server share
+      a single schema with no separate DTOs.
+    subsystem: record
+    modules: [sinks]
+    constraints: [K6]
+
+  - id: FEAT-RECORD-011
+    title: Offline-default sinks
+    summary: >-
+      A sink emits a ReviewRecord to the central system; the Sink protocol's
+      default NullSink emits nowhere and FileSink appends JSONL as an offline
+      stand-in, so reporting runs in CI with zero network.
+    subsystem: record
+    modules: [sinks]
+    constraints: [K0, K4]
+
+  - id: FEAT-RECORD-012
+    title: Resilient HTTP sink with outbox
+    summary: >-
+      HttpSink POSTs an IngestEnvelope with an injected stdlib-only client (no
+      requests), draining a JSONL outbox oldest-first, retrying with a bounded
+      budget, and queuing to the outbox on final failure — emit NEVER raises, so a
+      down central system can't break a heal run.
+    subsystem: record
+    modules: [sinks]
+    constraints: [K0, K4, K6]
+
+  - id: FEAT-RECORD-013
+    title: Config-resolved sink factory
+    summary: >-
+      make_sink resolves a CentralConfig to the right sink (none / file / http),
+      raising a loud SchemaError on a missing required field (file path, http url,
+      or repo_id) and building the RepoIdentity with config-or-CI_COMMIT_SHA
+      commit precedence.
+    subsystem: record
+    modules: [sinks]
+    constraints: [K4, K8]

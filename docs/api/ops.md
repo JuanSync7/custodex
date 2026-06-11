@@ -1,9 +1,73 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 4d857e829aa882b4
+  fingerprint: a0d7689b7781a089
+  fingerprint_tiers:
+    composite: a0d7689b7781a089
+    docstring: bcba1f3c208237dc
+    signature: 087bf65aed24829c
+  region_anchors:
+    symbols:
+    - 051af376199dec21
+    - 09ab528f037a044d
+    - 0a12e5898c92bfc6
+    - 0d4275088d28bef2
+    - 0d6e4079e36703eb
+    - 0dad8198442ebc15
+    - 12a435ec8454c6d1
+    - 1a4e31eebbd1771e
+    - 1bc04b5291c26a46
+    - 1d3c8aff2168435b
+    - 20f65c28671b4093
+    - 24c458cfb46d9a45
+    - 2a07ca57ed083879
+    - 44575cf5b28512d7
+    - 484de142f352dff3
+    - 49e9627e39c92dd0
+    - 4e95b8c32f60f796
+    - 602fda589448378a
+    - 62067d75d7bbed60
+    - 655076b86b1c4c83
+    - 663f896d732e2207
+    - 6eb2db11cfd447e6
+    - 7022c89609e06451
+    - 706a95d834379a05
+    - 72f4be89d6ebab14
+    - 731dc691eb24a65c
+    - 7482f6dd334689ff
+    - 75c75efe327a8ef3
+    - 763cdc62a869262b
+    - 7de97367c9cdc3c6
+    - 845e91831319e89c
+    - 85877352f834ad30
+    - 87780fa5de684e87
+    - 8790ad57e78ac78e
+    - 8dcd689ac1fd0270
+    - 9185806e77b1178b
+    - 9d60841e0a7891df
+    - a03de20603d8e571
+    - a0df5f85a3810828
+    - a172cedcae47474b
+    - a1c1adc663fbd6f0
+    - b0e0fabb95a65a96
+    - b9ac8d502e11101f
+    - bb54068aea85faa7
+    - c3a3091b9d32267d
+    - ca8e9a370614b71a
+    - d3a3ed1c7e737699
+    - d42417752e8efd40
+    - d734efde26c583c9
+    - da966368ea663ea5
+    - df0ad6e43880f09c
+    - e31271f86c854de9
+    - e62f7af7ce023782
+    - eafe895eb8119e6e
+    - edcc4b4214b84e54
+    - f4e94e73272ff576
+    - fdf09cdfc26cccf6
+    - fe494651a43235a5
   region_hashes:
-    symbols: 999097f0426b33ee
+    symbols: c22252aa45391eae
   schema_version: 1.0.0
 ---
 # ops
@@ -35,6 +99,7 @@ cdm:
 | _coverage_payload | function | def _coverage_payload(report: coverage_mod.CoverageReport) -> dict[str, object] |
 | _doc_style_for | function | def _doc_style_for(config_dir: Path) -> DocStyleMap \| None |
 | _issue_transport | function | def _issue_transport(provider: str) -> GitLabIssueTransport \| GitHubIssueTransport |
+| _known_modules | function | def _known_modules() -> set[str] |
 | _load | function | def _load(config: Path) -> tuple[MonitorConfig, Path] |
 | _now | function | def _now() -> str |
 | _parse_resolution | function | def _parse_resolution(value: str) -> Resolution |
@@ -43,6 +108,7 @@ cdm:
 | _resolve_config | function | def _resolve_config(config: Path) -> tuple[MonitorConfig, Path] |
 | _run_uvicorn | function | def _run_uvicorn(app_obj: Any, *, host: str, port: int) -> None |
 | _sync_run_lines | function | def _sync_run_lines(run: dict) -> list[str] |
+| _trace_lines | function | def _trace_lines(matrix: TraceMatrix) -> list[str] |
 | _write_coverage_manifest | function | def _write_coverage_manifest(report: coverage_mod.CoverageReport, config: MonitorConfig, target: Path) -> bool |
 | app | variable | app = ... |
 | build | function | def build(config: Path = _CONFIG_OPTION) -> None |
@@ -69,4 +135,6 @@ cdm:
 | surface_gaps | function | def surface_gaps(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the issue plan WITHOUT opening an issue (never builds a transport, so no provider env is required).'), provider: str = typer.Option('gitlab', '--provider', help='Issue tracker to open the coverage-gap issue on (gitlab \| github).')) -> None |
 | sync | function | def sync(mode: str = typer.Option('local', '--mode', help="Which sync to run: 'local' (the working tree / feature branch) or 'git' (the default branch baseline)."), remote: str \| None = typer.Option(None, '--remote', metavar='URL', help='Central-server URL to POST the sync to. Without it the sync runs locally and prints the summary (no central access required).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Stable repo id. REQUIRED with --remote; for a local sync it defaults to the bundle's index `repo` field (else the directory name)."), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the remote bearer token is read from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), default_branch: str = typer.Option('main', '--default-branch', help='The default branch the local sync compares against (commits_ahead).'), as_json: bool = typer.Option(False, '--json', help='Emit the SyncRun as JSON instead of the human summary.')) -> None |
 | sync_pr_cmd | function | def sync_pr_cmd(config: Path = _CONFIG_OPTION, out: Path \| None = typer.Option(None, '--out', help='Write the unified-diff patch to this file instead of stdout.'), dry_run: bool = typer.Option(False, '--dry-run', help='Compute the patch WITHOUT mutating the working tree (K1).')) -> None |
+| trace | function | def trace(catalog: Path = typer.Option(Path('feature-doc') / 'catalog', '--catalog', help='The feature-doc/catalog directory of golden feature *.yaml files.'), tests_root: Path = typer.Option(Path('tests'), '--tests-root', help='Directory scanned for TEST evidence (inline `Feature:` tags).'), demo_root: Path = typer.Option(Path('demo'), '--demo-root', help='Directory scanned for DEMO evidence (inline `Feature:` tags).'), as_json: bool = typer.Option(False, '--json', help='Emit the traceability matrix as JSON instead of the human summary.'), fail_on_gap: bool = typer.Option(False, '--fail-on-gap', help='Exit nonzero if ANY feature lacks a test or demo, or any unknown ref exists (the CI gate, K8). Without it the command is informational (always exits 0).')) -> None |
+| wiki | function | def wiki(check: bool = typer.Option(False, '--check', help='Verify the wikis are fresh; exit nonzero if any is stale (no write).')) -> None |
 <!-- CDM:END symbols -->

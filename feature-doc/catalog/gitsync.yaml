@@ -1,0 +1,66 @@
+# Feature catalog — `gitsync` subsystem (EPIC GIT: server-side git sync & provider
+# credentials). Golden source of truth (EPIC R discipline). The central server can
+# sync + open docs-PRs against a GitHub/GitLab repo it does NOT hold locally, using a
+# per-repo credential — clone-on-demand (STEP 0), a sealed PAT (PHASE 1), and minted
+# short-lived App/OAuth tokens (PHASE 2). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-GITSYNC-001
+    title: Clone-on-demand for a not-local repo
+    summary: >-
+      gitfetch.cloned_repo(spec, secret) materializes a remote repo into a
+      throwaway temp tree (a shallow single-branch git clone via one injected
+      _Cloner leaf) and yields it for run_sync(mode="local"), then tears the temp
+      tree down on success OR error — so the server syncs a repo it does not hold
+      locally without ever touching configsync. RemoteSpec carries the
+      remote_url/provider/default_branch; the token reaches git only via an
+      ephemeral GIT_ASKPASS env helper, never argv or the URL (_build_clone_argv
+      is asserted secret-free); a clone failure is a loud SyncError with the
+      secret scrubbed.
+    subsystem: gitsync
+    modules: [gitfetch]
+    constraints: [K0, K1, K4, K8]
+
+  - id: FEAT-GITSYNC-002
+    title: At-rest sealing of per-repo provider credentials
+    summary: >-
+      secrets.SecretBox seals a per-repo git provider credential with AES-256-GCM
+      (random-nonce; seal/open_secret round-trip) under a base64 32-byte KEK read
+      from $CDMON_SECRET_KEY (secret_box_from_env). A git credential must be
+      REPLAYED, so — unlike the E-06 bearer token's one-way sha256 — it is
+      encrypted (reversible), the conscious at-rest fork. The store persists OPAQUE
+      sealed bytes (set_provider_secret/repo_provider_secret) and never imports
+      cryptography; sealing/opening happen at the route. A missing/short/non-base64
+      KEK or a tampered ciphertext is a loud SecretError.
+    subsystem: gitsync
+    modules: [secrets]
+    constraints: [K0, K6, K8]
+
+  - id: FEAT-GITSYNC-003
+    title: Short-lived GitHub App / GitLab OAuth token minting
+    summary: >-
+      gitauth mints a SHORT-LIVED provider token from a longer-lived credential so
+      the hot token is never stored: github_app_jwt signs a 9-minute RS256 JWT
+      (cryptography) which mint_github_installation_token exchanges at POST
+      /app/installations/{id}/access_tokens; mint_gitlab_oauth_token exchanges a
+      refresh token at the OAuth token endpoint; mint_provider_token dispatches by
+      provider_kind over the opened credential JSON. The HTTP exchange is one
+      injected leaf (K4); a bad PEM/non-RSA key/failed exchange/unknown kind is a
+      loud TransportError.
+    subsystem: gitsync
+    modules: [gitauth]
+    constraints: [K0, K4, K8, K10]
+
+  - id: FEAT-GITSYNC-004
+    title: GitHub docs-PR transport (atomic git-data flow)
+    summary: >-
+      pr.GitHubTransport is the PRTransport sibling of GitLabTransport: submit
+      opens a docs PR through the canonical ATOMIC GitHub git-data flow with no
+      local checkout — read the target ref + base tree, POST a new tree carrying
+      every healed file inline, POST a commit, create the source branch ref, then
+      open the pull request — each through one injected _GitHubHttp leaf (stdlib
+      urllib, K0/K4). from_repo(remote_url, token) builds either transport from a
+      repo URL (the shared _parse_remote is the SSRF/host chokepoint).
+    subsystem: gitsync
+    modules: [pr]
+    constraints: [K0, K4, K8, K10]

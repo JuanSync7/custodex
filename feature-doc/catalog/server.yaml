@@ -1,0 +1,228 @@
+# Feature catalog — `server` subsystem (the central FastAPI service + client-side
+# repo registration). Golden source of truth (EPIC R). Do not duplicate this prose
+# elsewhere; the rendered feature-doc/FEATURES.md and the R-07 source wiki read
+# from here.
+features:
+  - id: FEAT-SERVER-001
+    title: Optional central FastAPI service
+    summary: >-
+      create_app builds the central FastAPI app over a dependency-injected Store
+      (defaulting to InMemoryStore); importing the server subpackage requires the
+      [server] extra (fastapi), kept lazy so `import code_doc_monitor` core pulls
+      in nothing from here, and main launches it via uvicorn on port 33333.
+    subsystem: server
+    modules: [server]
+    constraints: [K0, K4]
+
+  - id: FEAT-SERVER-002
+    title: Repo registration over the shared schema
+    summary: >-
+      The POST /repos route validates its body directly against the shared,
+      versioned RegistrationPayload and persists it via Store.add_repo — ONE
+      schema shared with the client-side register, no hand-written DTOs.
+    subsystem: server
+    modules: [server]
+    constraints: [K6]
+
+  - id: FEAT-SERVER-003
+    title: Record ingest with explicit-registration policy
+    summary: >-
+      The POST /ingest route consumes the shared IngestEnvelope directly and
+      stores its ReviewRecord through Store.add_record; ingest never
+      auto-registers, so an envelope for an unregistered repo_id is a loud 404,
+      not a silent create.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K8]
+
+  - id: FEAT-SERVER-004
+    title: Per-repo bearer-token auth on writes
+    summary: >-
+      Writes (/ingest, /resolutions, /coverage, /sync, /config/edits,
+      /config/generate, apply-fix) are guarded by a per-repo bearer token whose
+      sha256 (hash_token) is the ONLY thing stored — the plaintext is never kept
+      or returned; a missing header on a protected repo is 401, a wrong token 403,
+      and a token-less repo stays open while reads are always open.
+    subsystem: server
+    modules: [server]
+    constraints: [K8, K10]
+
+  - id: FEAT-SERVER-005
+    title: Store persistence seam with two backends
+    summary: >-
+      The Store Protocol is the one persistence boundary the routes depend on;
+      InMemoryStore (dict-backed) and SqlStore implement the SAME Protocol so
+      create_app swaps them transparently, both storing the shared models
+      (RegistrationPayload / ReviewRecord / ResolutionRecord) and returning
+      deterministic insertion-ordered lists.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K10]
+
+  - id: FEAT-SERVER-006
+    title: Postgres-first SqlStore with SQLite offline twin
+    summary: >-
+      SqlStore is a SQLAlchemy 2.0 store — JSONB on Postgres, JSON on SQLite via
+      _json_type — using an "indexed columns + full JSON" hybrid where the full
+      shared pydantic model is the source of truth on read (so an added field
+      round-trips with no migration) alongside indexed scalar projections for
+      filtered queries; engine_from_url builds the engine and create_all is the
+      dev schema path.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K10]
+
+  - id: FEAT-SERVER-007
+    title: Environment store selection + Alembic migrations
+    summary: >-
+      store_from_env reads $CDMON_DATABASE_URL — when set it runs Alembic `upgrade
+      head` and returns a persistent SqlStore; when unset it returns a transient
+      InMemoryStore and logs a LOUD warning that ingested data is lost on restart;
+      SQLite and Postgres run the same migration scripts so dev/test and prod stay
+      in lock-step.
+    subsystem: server
+    modules: [server]
+    constraints: [K0, K8]
+
+  - id: FEAT-SERVER-008
+    title: Computed status / health / telemetry views
+    summary: >-
+      Read routes expose RepoStatus (verdict counts, escalations, unresolved,
+      coverage_ratio), RepoHealth (escalation rate, overrides, MTTR), and
+      RepoTelemetry (worst-first ShapeStat per drift_kind/audience plus
+      detect_promotions candidates) as deterministic AGGREGATE views over store
+      reads — not parallel copies of the shared schema.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K10]
+
+  - id: FEAT-SERVER-009
+    title: Server-side config sync route
+    summary: >-
+      POST /repos/{id}/sync runs run_sync read-only against the repo's local_path,
+      then REPLACES the (repo_id, mode) config rows and appends a SyncRun via the
+      store; a bad mode or missing tree is a loud 400 (not a 500) and the injected
+      server clock stamps every persisted row.
+    subsystem: server
+    modules: [server]
+    constraints: [K1, K8, K10]
+
+  - id: FEAT-SERVER-010
+    title: Document and editable-config relationship views
+    summary: >-
+      GET /documents returns the DocumentTree (each ConfigDocument with its nested
+      ConfigCodeRef rows); GET /config/editable returns the EditableConfigTree
+      joining stored documents with disk-derived undocumented_files / ignored_files
+      / unit_files / doc_styles, defaulting to the local working-tree view and
+      degrading gracefully for a central-only repo.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K8, K10]
+
+  - id: FEAT-SERVER-011
+    title: Staged config-edit tickets
+    summary: >-
+      POST /config/edits stages one typed ConfigEdit (a discriminated union over
+      create_doc / add_code_ref / remove_code_ref / set_context_refs /
+      set_doc_style) as a pending StoredConfigEdit with a deterministic edit_id;
+      GET /config/edits lists them in insertion order, optionally filtered by
+      status, and an unknown action or stray field is a loud 422.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K8, K10]
+
+  - id: FEAT-SERVER-012
+    title: Generate staged edits to disk
+    summary: >-
+      POST /config/generate makes selected pending edits live — applying them to
+      the on-disk config via apply_edits_to_disk (offline, no-LLM), re-running
+      run_sync to reproject the DB, marking the edits applied, and returning the
+      applied ids, fresh SyncRun and recomputed undocumented_files; a central-only
+      repo with no local_path is a 409 and no pending edits is an idempotent no-op.
+    subsystem: server
+    modules: [server]
+    constraints: [K7, K8, K10]
+
+  - id: FEAT-SERVER-013
+    title: One-click apply of an LLM-proposed fix
+    summary: >-
+      POST /repos/{id}/records/{record_id}/apply-fix applies a FIX-verdict
+      record's proposed fix to its doc on disk via apply_record_fix (offline,
+      scoped), appends an accepted ResolutionRecord, re-syncs to reproject the DB,
+      and returns the ApplyFixResponse (applied / doc_path / diff / sync_run); a
+      non-FIX or fix-less record is a 409 and a central-only repo a 409.
+    subsystem: server
+    modules: [server]
+    constraints: [K7, K8, K10]
+
+  - id: FEAT-SERVER-014
+    title: Standalone per-repo `cdmon serve`
+    summary: >-
+      build_standalone_store / build_standalone_app build an InMemoryStore holding
+      ONLY the current repo, auto-registered OPEN (no token), pre-synced read-only
+      for both local (required) and git (best-effort) modes so the dashboard
+      renders on first load with no central server, registration, token or network;
+      resolve_repo_id picks the id from the bundle index or the directory name.
+    subsystem: server
+    modules: [server]
+    constraints: [K1, K4, K10]
+
+  - id: FEAT-SERVER-015
+    title: Single-origin dashboard SPA + landing payload
+    summary: >-
+      When a built dashboard SPA (dashboard/dist) is located via _default_static_dir
+      and mounted, create_app serves the console at / and its assets at /assets on
+      the same port as the API (single-origin); otherwise GET / returns a friendly
+      JSON landing payload, and /health is an unauthenticated liveness probe.
+    subsystem: server
+    modules: [server]
+    constraints: [K0]
+
+  - id: FEAT-SERVER-016
+    title: Public config-template reference endpoint
+    summary: >-
+      GET /config/templates returns the four canonical config/cdmon v2 template
+      strings (unit, index, ignore, doc_style) as JSON with no auth, deterministic
+      — the same bytes every call — for the dashboard Config page and adopters.
+    subsystem: server
+    modules: [server]
+    constraints: [K10]
+
+  - id: FEAT-SERVER-017
+    title: Client-side `cdmon register`
+    summary: >-
+      register_repo builds a RegistrationPayload (identity from
+      repo_identity_from_config: repo_id/name/url plus commit from config or
+      $CI_COMMIT_SHA) and submits it through an INJECTED RegisterTransport — or a
+      lazily-built stdlib-only HttpRegisterTransport (no requests) — to <url>/repos;
+      dry_run returns the would-send payload with no network, and a missing
+      url/repo_id is a loud typed SchemaError.
+    subsystem: server
+    modules: [registry]
+    constraints: [K0, K4, K6, K8]
+
+  - id: FEAT-SERVER-018
+    title: Client-side remote sync trigger
+    summary: >-
+      sync_repo_remote POSTs {mode} to <url>/repos/{repo_id}/sync through an
+      injected HttpSyncTransport (or a default built from url/auth_env), reusing the
+      exact stdlib HTTP + bearer-from-auth_env seam as register so it is mocked in
+      tests identically, and returns the server's SyncRun JSON verbatim; a missing
+      url is a loud SchemaError.
+    subsystem: server
+    modules: [registry]
+    constraints: [K0, K4, K8]
+
+  - id: FEAT-SERVER-019
+    title: Feature-wiki endpoint
+    summary: >-
+      GET /wiki serves the committed EPIC-R wikis — the Feature Reference,
+      Traceability Matrix, Test Wiki and Source Wiki — rendered to HTML via the
+      engine's OWN dependency-free render_markdown (no new dep), as
+      {"sections":[{"id","title","html"}...]} in the deterministic WIKI_SECTIONS
+      order; it is GLOBAL and public (no auth, like /config/templates), a missing
+      section file is omitted, and an absent feature-doc/ degrades to an empty
+      payload rather than crashing.
+    subsystem: server
+    modules: [server]
+    constraints: [K0, K4, K8, K10]

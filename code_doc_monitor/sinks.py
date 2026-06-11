@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -65,6 +65,23 @@ class RepoIdentity(BaseModel):
     # is untouched.
     local_path: str | None = None
     default_branch: str | None = None
+    # GIT-02 (ADDITIVE, K6): how the central server fetches this repo when it does
+    # NOT hold it locally (EPIC GIT, clone-on-demand). ``provider`` selects the
+    # git host (and its auth/transport conventions); ``remote_url`` is the
+    # CLONE/API url. NOTE: this is distinct from ``repo_url`` above, which is the
+    # inert *browse* URL (a link surfaced in the UI) — ``remote_url`` is the one
+    # :class:`~code_doc_monitor.gitfetch.RemoteSpec`/the PR transports act on.
+    # Both default ``None`` (a local-only repo carries neither) and ride in the
+    # stored payload JSON, so no DB migration is needed. Appended LAST.
+    provider: Literal["github", "gitlab"] | None = None
+    remote_url: str | None = None
+    # GIT-05 (ADDITIVE, K6): HOW the sealed ``provider_secret`` is used (EPIC GIT
+    # PHASE 2). ``None``/``"token"`` (the default) = the opened secret IS the
+    # credential, replayed as-is (PHASE 1). ``"github-app"``/``"gitlab-oauth"`` = the
+    # opened secret is a JSON credential the server mints a SHORT-LIVED access token
+    # from on each op (the hot token is never stored). Default ``None`` keeps every
+    # pre-GIT-05 identity valid. Appended LAST.
+    provider_kind: Literal["token", "github-app", "gitlab-oauth"] | None = None
 
 
 class IngestEnvelope(BaseModel):

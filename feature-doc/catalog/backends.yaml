@@ -1,0 +1,98 @@
+# Feature catalog — `backends` subsystem (pluggable, offline-by-default LLM fixers).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+features:
+  - id: FEAT-BACKENDS-001
+    title: Backend-agnostic verdict contract
+    summary: >-
+      The Backend Protocol (`propose(req: FixRequest) -> BackendResult`) makes
+      every backend return the SAME immutable contract — a FIX/INVALIDATE/ESCALATE
+      Verdict, a cause, and an optional ProposedFix — so the orchestrator is
+      backend-agnostic. FixRequest and BackendResult are frozen, extra-forbid
+      pydantic snapshots.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K4, K6, K8]
+
+  - id: FEAT-BACKENDS-002
+    title: One pluggable backend factory
+    summary: >-
+      make_backend resolves a BackendConfig (and optional AgentConfig) to a
+      Backend through a single factory — mock, claude-code, api, or the
+      LangGraph agent — defaulting unknown kinds to a loud BackendError; the
+      agent kind sits behind a lazy import so the optional langgraph dependency
+      is only required when selected.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K0, K4, K8]
+
+  - id: FEAT-BACKENDS-003
+    title: Deterministic offline MockBackend (the default)
+    summary: >-
+      MockBackend is the deterministic, offline default that never touches the
+      network or an LLM: it FIXes a healable region from the surface, authors
+      idempotent prose for a no-renderer `llm` region, INVALIDATEs a user-guide
+      docstring/comment/private HASH drift, FIXes a surface HASH drift via a
+      whole-doc render_corrected, and ESCALATEs anything else.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K3, K4, K10]
+
+  - id: FEAT-BACKENDS-004
+    title: Headless ClaudeCodeBackend with injected runner
+    summary: >-
+      ClaudeCodeBackend builds the shared prompt, assembles argv (default
+      `claude -p <prompt>` or a configured `{prompt}`-token command template),
+      and runs an INJECTED ProcessRunner so tests never spawn `claude`; when
+      none is given a stdlib subprocess runner is built lazily and any
+      failure/timeout is wrapped in a BackendError.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K0, K4, K8]
+
+  - id: FEAT-BACKENDS-005
+    title: Anthropic ApiBackend with injected client
+    summary: >-
+      ApiBackend calls the Anthropic Messages API through an INJECTED ApiClient
+      so tests never hit the network; when none is given a stdlib urllib client
+      is built lazily (no `anthropic` package), requiring an API key from
+      `api_key_env` or raising a loud BackendError, and any client failure is
+      wrapped in a BackendError.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K0, K4, K8]
+
+  - id: FEAT-BACKENDS-006
+    title: Shared audience-aware prompt builder
+    summary: >-
+      build_prompt is the single prompt builder shared by the LLM backends: it
+      describes the drift, embeds the document text and the code-surface symbol
+      table, states the audience-specific FIX-vs-INVALIDATE rule, selects a
+      region-shaped or whole-doc fix shape, and demands a JSON-only verdict
+      reply.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K3]
+
+  - id: FEAT-BACKENDS-007
+    title: Robust loud reply parsing
+    summary: >-
+      parse_backend_json extracts the first balanced `{...}` object from a
+      possibly prose-wrapped or fenced reply and validates it into a
+      BackendResult/ProposedFix, raising a loud BackendError on no JSON,
+      malformed JSON, an invalid verdict, or a payload that fails the contract.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K8]
+
+  - id: FEAT-BACKENDS-008
+    title: Authoring context refs and writing-style guidance
+    summary: >-
+      A FixRequest carries additive authoring inputs — `context_refs`
+      glance-through sub-documents/source-files (rendered with a deterministic
+      public-symbol glance for `.py` refs), `style_guidance`, `exemplars`, and
+      `region_mode` — that enrich the LLM-authored prose prompt while the mock
+      backend ignores them to stay deterministic.
+    subsystem: backends
+    modules: [backends]
+    constraints: [K3, K6, K10]

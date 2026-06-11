@@ -18,6 +18,8 @@ __all__ = [
     "InventoryError",
     "TransportError",
     "SyncError",
+    "CatalogError",
+    "SecretError",
 ]
 
 
@@ -59,4 +61,22 @@ class SyncError(CodeDocMonitorError):
     Raised for a missing ``local_path``, an unknown sync ``mode``, or a failed
     git subprocess (the working tree could not be materialized / inspected). The
     user's working tree is NEVER mutated on the failure path (K1).
+    """
+
+
+class CatalogError(CodeDocMonitorError):
+    """The golden feature catalog is missing, malformed, or inconsistent (EPIC R, K8).
+
+    Raised for a missing/empty catalog dir, malformed yaml, a bad feature id,
+    a duplicate id across files, or a feature naming a non-existent module.
+    """
+
+
+class SecretError(CodeDocMonitorError):
+    """A provider secret could not be sealed/opened (GIT-01, K8).
+
+    Raised for a missing/empty/non-base64/wrong-length ``$CDMON_SECRET_KEY`` (the
+    KEK that seals per-repo provider credentials at rest) or a sealed value that
+    fails authentication (tampered ciphertext or the wrong key). The plaintext
+    credential is NEVER included in the message.
     """

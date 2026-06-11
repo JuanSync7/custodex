@@ -1,0 +1,242 @@
+# Feature catalog — `cli` subsystem (the `cdmon` Typer command-line surface).
+# Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
+# rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
+# Each feature is one `cdmon` subcommand (or a tight family) defined on the
+# `app` Typer object in code_doc_monitor/cli.py and confirmed via `cdmon --help`.
+features:
+  - id: FEAT-CLI-001
+    title: Config scaffold (cdmon init)
+    summary: >-
+      `cdmon init` writes a documented config template, refusing to clobber
+      unless `--force`. `--central URL` wires the `central:` HTTP-reporting block
+      (`--repo-id`/`--token-env`/`--repo-url`); `--v2` scaffolds the multi-file
+      `config/cdmon/` directory layout (`--config-dir`/`--repo`) instead.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K8]
+
+  - id: FEAT-CLI-002
+    title: Index regeneration (cdmon index)
+    summary: >-
+      `cdmon index` rebuilds `config/cdmon/index.yaml`'s `units:` from the
+      on-disk unit files via `regenerate_index`/`write_index`, preserving every
+      global. `--check` is a read-only CI gate that exits 1 on a real units-list
+      change (ignoring the wall-clock `updated:` stamp via `_blank_updated`, N-06).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K7]
+
+  - id: FEAT-CLI-003
+    title: Dir-layout coverage report (cdmon rpt)
+    summary: >-
+      `cdmon rpt` computes the `config/cdmon/` coverage report via
+      `load_bundle`/`build_coverage_rpt`/`render_rpt` and prints it; `--write`
+      writes a deterministic `config/cdmon/coverage.rpt` (idempotent), `--ref`
+      stamps the report's provenance.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K7]
+
+  - id: FEAT-CLI-004
+    title: Surface dump (cdmon surface)
+    summary: >-
+      `cdmon surface` prints each document's id/audience/symbol-count and
+      surface hash via `build_document_surface` for debugging; `--json` dumps
+      each surface (hash plus every symbol) as a JSON list.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1]
+
+  - id: FEAT-CLI-005
+    title: Drift gate (cdmon check)
+    summary: >-
+      `cdmon check` runs `Monitor.check()`, prints the report summary, and
+      exits 1 when drift is present and 0 when clean — the read-only CI warning
+      signal.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1]
+
+  - id: FEAT-CLI-006
+    title: HTML twin build (cdmon build)
+    summary: >-
+      `cdmon build` renders every `html: true` document to its derived `.html`
+      twin via `build` (build_twins), echoing each written path and the twin
+      count.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K7]
+
+  - id: FEAT-CLI-007
+    title: Remediation run (cdmon monitor)
+    summary: >-
+      `cdmon monitor` runs `Monitor.run` (detect → backend verdict → record →
+      optionally apply → recheck), exiting 1 when drift remains. `--apply/--no-apply`
+      overrides the config default; `--ref`/`--source-sha` (else `$CI_COMMIT_SHA`)
+      stamps each record's `source_sha` provenance (C-05).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K8]
+
+  - id: FEAT-CLI-008
+    title: Docs heal patch (cdmon sync-pr)
+    summary: >-
+      `cdmon sync-pr` heals the docs and emits a unified-diff patch of exactly
+      the changed docs via `sync_pr`, printing it (or writing it to `--out`).
+      `--dry-run` computes the same patch with no working-tree mutation; a clean
+      or second run yields an empty patch (idempotent).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K4, K7, K10]
+
+  - id: FEAT-CLI-009
+    title: Loop-safety guard (cdmon should-sync)
+    summary: >-
+      `cdmon should-sync` is a read-only guard (`should_sync`) that exits 0 to
+      proceed with a heal and 1 to skip — skipping when every changed file is a
+      managed doc path (a bot doc-only commit) or the set is empty. Reads file
+      paths from args or newline-separated stdin (C-04).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1]
+
+  - id: FEAT-CLI-010
+    title: Docs merge request (cdmon open-docs-pr)
+    summary: >-
+      `cdmon open-docs-pr` heals the docs then opens a docs merge request
+      (branch + commit + MR) via the default `GitLabTransport`/`open_docs_pr`
+      (`--target`/`--ref`). A clean repo is a no-op; `--dry-run` prints the MR
+      plan as JSON from a dry sync with no mutation and no transport built.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K4, K8, K10]
+
+  - id: FEAT-CLI-011
+    title: Central registration (cdmon register)
+    summary: >-
+      `cdmon register` announces this repo to the central server by POSTing a
+      `RegistrationPayload` (a `RepoIdentity` from `central.repo_id`) to
+      `<central url>/repos` via `register_repo` (bearer from `central.auth_env`).
+      `--dry-run` prints the payload it would send with no network call (E-02).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K4, K8]
+
+  - id: FEAT-CLI-012
+    title: Config sync (cdmon sync)
+    summary: >-
+      `cdmon sync` runs a `local`/`git` config sync (`--mode`): without `--remote`
+      it runs `configsync.run_sync` read-only against the cwd and prints the
+      summary; with `--remote URL --repo-id ID` it POSTs to `<URL>/repos/{ID}/sync`
+      via `sync_repo_remote`. `--json` emits the SyncRun; the clock is injected (K10).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K8, K10]
+
+  - id: FEAT-CLI-013
+    title: Standalone dashboard (cdmon serve)
+    summary: >-
+      `cdmon serve` launches the FastAPI dashboard for the current repo
+      standalone via `build_standalone_app` — auto-registering and pre-syncing
+      the cwd — on `--host`/`--port`. Loud K8 when the cwd has no
+      `config/cdmon/index.yaml` (L-01).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K8]
+
+  - id: FEAT-CLI-014
+    title: Preflight checks (cdmon doctor)
+    summary: >-
+      `cdmon doctor` is an offline, read-only preflight: it loads the config
+      (malformed → loud K8) then runs `run_checks` (config / documents / backend
+      prereq / central wiring / extras), printing one `STATUS  name — detail`
+      line each and exiting 1 only if any check FAILs (G-02).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K4, K8, K10]
+
+  - id: FEAT-CLI-015
+    title: Review-log report (cdmon report)
+    summary: >-
+      `cdmon report` summarizes the review log via `summarize` plus the
+      `summarize_with_resolutions` resolved/unresolved join; `--verdict V` lists
+      the individual records of that verdict (e.g. the `ESCALATE`s a human must
+      act on) via `select_by_verdict`, with `--json` for machine output.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K5]
+
+  - id: FEAT-CLI-016
+    title: Promotion candidates (cdmon promotions)
+    summary: >-
+      `cdmon promotions` lists read-only promotion CANDIDATES via
+      `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose
+      resolved records (≥ `--min-count`) unanimously share one decision
+      resolution and could become a deterministic rule. `--json` for machine output.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K10]
+
+  - id: FEAT-CLI-017
+    title: Doc coverage (cdmon coverage)
+    summary: >-
+      `cdmon coverage` reports file/public-symbol coverage percentages plus the
+      documented/undocumented/waived baskets via `discover_files`/`discover_symbols`/
+      `resolve_coverage`. `--fail-under N` gates on public-symbol coverage; `--write
+      [PATH]` writes a deterministic manifest (idempotent); `--json` dumps the report.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K7]
+
+  - id: FEAT-CLI-018
+    title: Coverage-gap issue (cdmon surface-gaps)
+    summary: >-
+      `cdmon surface-gaps` turns doc coverage gaps into a tracker issue: it runs
+      discover → `resolve_coverage` → `suggest_owners`, builds an `IssuePlan`
+      via `plan_coverage_issue`, and opens it via the `--provider` (gitlab|github)
+      transport. No gaps is a no-op; `--dry-run` prints the plan as JSON (H-04).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K4, K8, K10]
+
+  - id: FEAT-CLI-019
+    title: Resolution recording (cdmon resolve)
+    summary: >-
+      `cdmon resolve RECORD_ID --resolution {accepted|overridden|rejected|invalidated}`
+      records the human outcome of a handled drift as a separate append-only
+      `ResolutionRecord` via `append_resolution`, validating the id exists (loud
+      K8) and leaving the review log immutable. The timestamp is injected (K10).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K5, K8, K10]
+
+  - id: FEAT-CLI-020
+    title: Layout lint (cdmon lint)
+    summary: >-
+      `cdmon lint` validates doc structure against the Layout Standard via
+      `lint_config`, exiting 1 on issues. `--fix` stamps missing static front
+      matter (`stamp_doc_meta`); `--modes` prints each managed region's authority
+      mode/lock/advisory state (informational, never changing the exit code, B-05).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K1, K8, K10]
+
+  - id: FEAT-CLI-021
+    title: Doc scaffold (cdmon new-doc)
+    summary: >-
+      `cdmon new-doc DOC_ID` scaffolds a conformant, in-sync Markdown document
+      for a configured doc id via `build_document_surface`/`scaffold_doc`,
+      refusing to overwrite an existing file unless `--force`.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K8]
+
+  - id: FEAT-CLI-022
+    title: Schema export (cdmon schema)
+    summary: >-
+      `cdmon schema` emits the public review-record JSON schema
+      (`review_record_schema`) to stdout, or to `--out FILE` — one source of
+      truth for the record contract (K6).
+    subsystem: cli
+    modules: [cli]
+    constraints: [K6]
