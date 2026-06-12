@@ -42,4 +42,4 @@ regenerates its options table and `cdmon build` refreshes `cli.html`.
 drift. The user-guides only track the externally-visible surface, so a comment
 or private-symbol change to their sources is a non-event.
 
-The example is covered by `tests/test_example_multilang.py`.
+The example is covered by `tests/system/test_example_multilang.py`.

@@ -17,7 +17,7 @@ external-repo/
 
 The committed tree is in sync (`cdmon check` exits 0, `cdmon lint` exits 0).
 
-The e2e test `tests/test_example_external.py` copies this tree under `tmp_path`,
+The e2e test `tests/system/test_example_external.py` copies this tree under `tmp_path`,
 adds a public function to `src/widget.py` (so `cdmon check` now reports drift),
 heals it with `cdmon monitor --apply`, then registers the repo and reports the
 healed records to an **in-process central server** (FastAPI `TestClient`) — wiring

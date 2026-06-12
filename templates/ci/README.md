@@ -40,5 +40,6 @@ Both ship the same two jobs:
    review records to the central server.
 
 > The templates reference only real `cdmon` subcommands — a test in this repo
-> (`tests/test_ci_templates.py`) parses every script line and fails if a template
-> ever names a command the CLI does not expose, so they cannot drift out of date.
+> (`tests/system/test_ci_templates.py`) parses every script line and fails if a
+> template ever names a command the CLI does not expose, so they cannot drift out
+> of date.

@@ -80,9 +80,11 @@ cdm:
 ---
 # central-client
 
-> The central-system client side (EPIC E/G): the per-repo registry/identity that
-> stamps which repo a review record came from before it is shipped to the
-> central ingest endpoint.
+> The central-system client side (EPIC E/G/GIT): the per-repo registry/identity
+> that stamps which repo a review record came from before shipping it to the
+> central ingest endpoint, plus the read-only config-sync engine and the
+> server-side git surface — clone-on-demand, AES-GCM credential sealing, and
+> short-lived GitHub App / GitLab OAuth token minting.
 
 <!-- CDM:BEGIN symbols -->
 | symbol | kind | signature |

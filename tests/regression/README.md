@@ -34,6 +34,7 @@ unlisted-engine-module-is-a-gap case).
 | `test_llm_seeded_unlocked_regenerates_on_code_move` | **[B-03]** | an UNLOCKED llm-seeded region still regenerates (the foil to the lock) |
 | `test_both_drift_shapes_close_in_one_apply` | **[CDM-07]** | a realistic HASH+REGION change converges in one `--apply` (fixer ≡ checker) |
 | `test_loop_safety_doc_only_commit_does_not_resync` | **[C-04]** | `should_sync` False for a doc-only commit; separator-normalized truth table (break-it documented) |
+| `test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched` | **[B-06]** | a `mode: llm` no-renderer region is AUTHORED prose end-to-end: a code move surfaces a healable REGION drift, `--apply` re-authors its prose from the current surface, a second `--apply` is a clean no-op, and an adjacent `human` region stays byte-identical (break-it documented) |
 
 ### `test_corpus_contracts.py` — schema / transport / learning contracts
 | Case | Lesson | Invariant |
@@ -74,6 +75,9 @@ documented in each case's docstring:
   `test_pre_field_review_record_still_parses` reds.
 - **[D-06]** zero-backend-calls — moving the rule check after `backend.propose`
   makes `spy.calls == 1` for a matched drift → the spy assertion reds.
+- **[B-06]** pure-`llm` no-renderer authoring — reverting the `drift.py` B-06
+  branch so a no-renderer `llm` region falls back to `UNHEALABLE` reds the
+  re-author step of `test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched`.
 
 ## Notes on stale / superseded lessons
 
