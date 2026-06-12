@@ -460,9 +460,15 @@ def build_seeded_store() -> InMemoryStore:
     # The CONFIG-V2 adopter demo: registered OPEN with its local_path + pre-synced
     # so the dashboard shows its Documents view + a working Sync button (M-02).
     _register_demo_taskflow(store)
-    # The dogfood repo's full 12-document mapping, stored from the SAME sync that
-    # produced its coverage snapshot above (git mode lands it under the "git" view
-    # — the dashboard Documents page's default — so it shows on first load).
+    # The dogfood repo's full document mapping (incl. the monitored README,
+    # FEAT-CONFIGV2-016). It is synced ONCE (git preferred — it reads a clean
+    # worktree, avoiding a working-tree walk of node_modules/.venv), then MIRRORED
+    # under the OTHER Source partition so the README + every doc shows on BOTH
+    # default views with no second sync: the Documents page (defaults to "git")
+    # and the Mapping page (defaults to "local"). The mirror reuses the identical
+    # config projection (documents/code_refs come from config/cdmon, not the
+    # filesystem scan, so they are the same in either mode), re-stamped only with
+    # the partition's sync_kind/ref.
     if dogfood is not None:
         store.replace_config(
             "code-doc-monitor",
@@ -471,6 +477,20 @@ def build_seeded_store() -> InMemoryStore:
             list(dogfood.code_refs),
         )
         store.add_sync_run(dogfood.run)
+        mirror = "local" if dogfood.run.sync_kind != "local" else "git"
+        mirror_ref = "local" if mirror == "local" else dogfood.run.ref
+        store.replace_config(
+            "code-doc-monitor",
+            mirror,
+            [
+                d.model_copy(update={"sync_kind": mirror, "ref": mirror_ref})
+                for d in dogfood.documents
+            ],
+            [c.model_copy(update={"sync_kind": mirror}) for c in dogfood.code_refs],
+        )
+        store.add_sync_run(
+            dogfood.run.model_copy(update={"sync_kind": mirror, "ref": mirror_ref})
+        )
 
     return store
 
