@@ -182,7 +182,7 @@ _CASES = (
         name="demo",
         default_branch="main",
         build=lambda root: _DEMO,  # the live demo tree (copied by repo_from_tree)
-        doc_ids=frozenset({"core-api", "getting-started", "io-api"}),
+        doc_ids=frozenset({"core-api", "getting-started", "readme", "io-api"}),
         covered_new_file="src/taskflow/core/extra.py",
         drift_file="src/taskflow/core/model.py",
     ),
@@ -384,6 +384,7 @@ def test_clone_on_demand_demo_sync_is_store_parity(store: Any, tmp_path: Path) -
     assert {d["document"]["doc_id"] for d in docs} == {
         "core-api",
         "getting-started",
+        "readme",
         "io-api",
     }
     cov = client.get(f"/repos/{repo_id}/coverage").json()[-1]
@@ -474,6 +475,7 @@ def test_demo_as_git_materializes_a_syncable_repo(tmp_path: Path) -> None:
     assert {d["document"]["doc_id"] for d in docs} == {
         "core-api",
         "getting-started",
+        "readme",
         "io-api",
     }
     cov = client.get("/repos/demo-taskflow/coverage").json()[-1]

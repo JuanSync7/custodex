@@ -383,6 +383,20 @@ def _register_demo_taskflow(store: InMemoryStore) -> None:
         _DEMO_REPO_ID, "local", list(local.documents), list(local.code_refs)
     )
     store.add_sync_run(local.run)
+    # Mirror the same config projection under the "git" partition too, so the
+    # demo's documents (incl. the monitored README, FEAT-CONFIGV2-016) show on
+    # BOTH default views: the Documents page (defaults to "git") and the Mapping
+    # page (defaults to "local"). The demo isn't a git repo in the seed, so this
+    # reuses the local projection (identical: documents/code_refs come from
+    # config/cdmon, not the scan) re-stamped — no second sync. The repo's real
+    # Sync button still performs a fresh sync on demand.
+    store.replace_config(
+        _DEMO_REPO_ID,
+        "git",
+        [d.model_copy(update={"sync_kind": "git"}) for d in local.documents],
+        [c.model_copy(update={"sync_kind": "git"}) for c in local.code_refs],
+    )
+    store.add_sync_run(local.run.model_copy(update={"sync_kind": "git"}))
 
     # Make the repo's pages SHOW content on first click: the demo's own heal
     # records (drift timeline + tickets) and its real coverage snapshot (the

@@ -276,7 +276,7 @@ exist, no duplicate doc id, no two units claim the same dir) and the index↔uni
 reverse invariant. The repo root is the one shared resolver.
 **How to observe.** Read `demo/config/cdmon/index.yaml`, `core.yaml`, `io.yaml`,
 `ignore.yaml`; load via `load_bundle(demo/config/cdmon)` — one `MonitorConfig`,
-three documents, two units.
+four documents, two units.
 Features: FEAT-CONFIGV2-001, FEAT-CONFIGV2-002, FEAT-CONFIGV2-003, FEAT-CONFIGV2-004, FEAT-CONFIGV2-008, FEAT-CONFIGV2-010, FEAT-CONFIG-001, FEAT-CONFIG-002
 
 ### DEMO-020 — Nested deepest-wins attribution + ignore translation
@@ -344,7 +344,7 @@ document / code-ref rows and a `SyncRun` summary, mutating nothing; `--json` emi
 the run. (Git mode materialises the default branch in a throwaway worktree torn
 down in a finally — see DEMO-031.)
 **How to observe.** `cdmon sync --mode local --json --config demo/config/cdmon`
-prints the `SyncRun` (3 documents, 6 code refs, fully synced); the working tree is
+prints the `SyncRun` (4 documents, 7 code refs, fully synced); the working tree is
 untouched.
 Features: FEAT-CLI-012, FEAT-CONFIGV2-012, FEAT-SERVER-018
 
@@ -851,23 +851,26 @@ See `tests/system/test_gitrepo_sync_e2e.py` (the parametrized any-repo matrix,
 the git-mode baseline, and `::test_demo_as_git_materializes_a_syncable_repo`).
 Features: FEAT-GITSYNC-005
 
-### DEMO-057 — A README is a monitored narrative document (dogfooded)
+### DEMO-057 — A README is a monitored narrative document
 **What it shows.** A narrative Markdown file — a `README.md` — is a first-class
-monitored document, not just engineering reference pages. cdmon dogfoods this on
-its OWN `README.md`: `config/cdmon/core.yaml` declares a `readme` document
+monitored document, not just engineering reference pages. The demo declares its
+OWN `README.md` as a `readme` document in `demo/config/cdmon/core.yaml`
 (`audience: user-guide`) whose `code_refs` name the source it describes
-(`code_doc_monitor/cli.py`) and which carries NO managed region, so the engine
-tracks it by the whole-doc fingerprint over that CLI surface and never rewrites
-its prose (K2). Because it is a `user-guide`, a docstring/comment/private change
-to `cli.py` is a non-event (K3) — only a real change to the public command
-surface drifts the README, surfacing a `ReviewRecord` for a human to act on (K5);
-`cdmon monitor --apply` then refreshes only its fingerprint. The eng-only
-`api-index` is NOT forced to list this user-guide README because the
+(`src/taskflow/core/model.py`) and which carries NO managed region, so cdmon
+tracks it by the whole-doc fingerprint over that surface and never rewrites its
+prose (K2). Because it is a `user-guide`, a comment/docstring/private change to
+`model.py` is a non-event (K3) — only a real public-surface change drifts the
+README, surfacing a `ReviewRecord` for a human (K5); `cdmon monitor --apply` then
+refreshes only its fingerprint. cdmon dogfoods the very same pattern on its OWN
+`README.md` (tracked against `code_doc_monitor/cli.py`), where an eng-only
+`api-index` is NOT forced to list the user-guide README because the
 `INDEX_INCOMPLETE` lint honors the index region's `kind: eng-guide` audience.
-**How to observe.** Inspect the `readme` document in `config/cdmon/core.yaml` and
-the `cdm:` front matter atop `README.md`, then run
-`cdmon check --config config/cdmon` (the README is reported in sync, and the
-`api-index` is not flagged for omitting it). Test:
-`tests/system/test_dogfood.py::test_dogfood_readme_is_a_monitored_user_guide_doc`
-and `::test_dogfood_readme_drifts_on_public_cli_change_and_reheals`.
+**How to observe.** Inspect the `readme` document in `demo/config/cdmon/core.yaml`
+and the `cdm:` front matter atop `demo/README.md`, then run
+`cdmon check --config demo/config/cdmon` (the README is reported in sync). It also
+shows in the console: open the `demo-taskflow` repo and the **README files**
+section appears under both Documents and Mapping. Tests:
+`tests/system/test_demo_e2e.py` (the demo's 4-document / 7-code-ref mapping incl.
+`readme`) and
+`tests/system/test_dogfood.py::test_dogfood_readme_is_a_monitored_user_guide_doc`.
 Features: FEAT-CONFIGV2-016

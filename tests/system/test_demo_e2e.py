@@ -56,19 +56,21 @@ _NOW = "2026-06-07T00:00:00Z"
 _REPO_ROOT = REPO_ROOT
 _DEMO_DIR = _REPO_ROOT / "demo"
 
-# The six code refs the demo's documents reference, in load order (index units
-# order, then in-file documents order): core.yaml carries core-api then the
+# The seven code refs the demo's documents reference, in load order (index units
+# order, then in-file documents order): core.yaml carries core-api, then the
 # user-guide getting-started (symbol-selective refs over the same two core
-# files), then io.yaml carries io-api.
+# files), then the user-guide README (a narrative tracked against model.py,
+# FEAT-CONFIGV2-016); finally io.yaml carries io-api.
 _DEMO_CODE_REFS = (
     "src/taskflow/core/model.py",
     "src/taskflow/core/engine.py",
     "src/taskflow/core/model.py",
     "src/taskflow/core/engine.py",
+    "src/taskflow/core/model.py",
     "src/taskflow/io/storage.py",
     "src/taskflow/io/report.py",
 )
-_DEMO_DOC_IDS = ("core-api", "getting-started", "io-api")
+_DEMO_DOC_IDS = ("core-api", "getting-started", "readme", "io-api")
 
 
 # Make scripts/seed_demo importable (it lives outside the package, like the
@@ -135,8 +137,8 @@ def test_central_token_less_local_sync_succeeds_with_counts() -> None:
     # whereas "the demo has no drift" is the real invariant under test.)
     assert run["drift"]["ok"] is True
     assert run["drift"]["drift_count"] == 0
-    assert run["document_count"] == 3
-    assert run["code_ref_count"] == 6
+    assert run["document_count"] == 4
+    assert run["code_ref_count"] == 7
 
 
 def test_central_sync_state_returns_the_run() -> None:
@@ -147,7 +149,7 @@ def test_central_sync_state_returns_the_run() -> None:
         ).json()
     assert state is not None
     assert state["sync_kind"] == "local"
-    assert state["document_count"] == 3
+    assert state["document_count"] == 4
 
 
 def test_central_seeded_demo_has_records_and_coverage() -> None:
@@ -268,8 +270,8 @@ def test_git_mode_reads_config_in_subdir(tmp_path: Path) -> None:
     result = run_sync(sub, "demo-taskflow", mode="git", default_branch="main", now=_NOW)
     run = result.run
     assert run.sync_kind == "git"
-    assert run.document_count == 3
-    assert run.code_ref_count == 6
+    assert run.document_count == 4
+    assert run.code_ref_count == 7
     assert run.commits_ahead == 0
     # The committed demo docs are healed in-sync, so main is fully synced.
     assert run.fully_synced is True

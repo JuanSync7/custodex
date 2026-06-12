@@ -52,3 +52,16 @@ documents:
         note: "the full engine reference"
       - path: src/taskflow/core/engine.py
         note: "scheduling semantics referenced in the tour"
+
+  # The adopter README — a USER-GUIDE narrative monitored against the core model
+  # it describes (FEAT-CONFIGV2-016). It declares NO managed region, so cdmon
+  # never authors its prose; it is tracked by the whole-doc fingerprint over
+  # `model.py`'s public surface. As a user-guide, a comment/docstring/private
+  # change is a non-event (K3); only a real public-surface change drifts it,
+  # surfacing a ReviewRecord for a human (K5). `model.py` is already documented
+  # by core-api, so this adds NO new coverage gap.
+  - id: readme
+    path: README.md
+    audience: user-guide
+    code_refs:
+      - path: src/taskflow/core/model.py
