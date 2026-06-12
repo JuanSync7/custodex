@@ -1,8 +1,8 @@
-import { useCallback, type CSSProperties } from "react";
+import { useCallback, useState, type CSSProperties } from "react";
 import { useParams } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { useApi } from "../hooks/useApi";
-import { buildCoverageRows } from "../lib/grouping";
+import { buildCoverageRows, dirPaths, isRowVisible } from "../lib/grouping";
 import type { CoverageFile, CoverageSnapshot } from "../types";
 
 /** Indentation (rem) applied per tree level so the hierarchy reads as a tree. */
@@ -45,6 +45,18 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
   );
   const state = useApi<CoverageSnapshot[]>(loader, [loader]);
 
+  // Collapse/expand the directory hierarchy: a set of COLLAPSED dir paths (empty
+  // ⇒ fully expanded, the default). A row is hidden when an ancestor dir is
+  // collapsed (see isRowVisible). Declared before the early returns (Rules of Hooks).
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleDir = (path: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+
   if (state.phase === "loading") {
     return (
       <section aria-busy="true">
@@ -77,6 +89,9 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
   // The server returns snapshots latest-last; the dashboard shows the latest.
   const latest = state.data[state.data.length - 1];
   const files = latest.files;
+  const rows = files ? buildCoverageRows(files) : [];
+  const visibleRows = rows.filter((row) => isRowVisible(row, collapsed));
+  const allDirs = dirPaths(rows);
 
   return (
     <section>
@@ -108,10 +123,22 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
 
       {files && files.length > 0 ? (
         <div className="coverage-files panel">
-          <p className="coverage-summary">
-            {basket(latest.documented)} documented · {basket(latest.undocumented)}{" "}
-            gaps · {basket(latest.waived)} waived
-          </p>
+          <div className="coverage-files__head">
+            <p className="coverage-summary">
+              {basket(latest.documented)} documented ·{" "}
+              {basket(latest.undocumented)} gaps · {basket(latest.waived)} waived
+            </p>
+            {allDirs.length > 0 ? (
+              <div className="coverage-tree__controls" role="group" aria-label="hierarchy">
+                <button type="button" onClick={() => setCollapsed(new Set())}>
+                  Expand all
+                </button>
+                <button type="button" onClick={() => setCollapsed(new Set(allDirs))}>
+                  Collapse all
+                </button>
+              </div>
+            ) : null}
+          </div>
           <table className="coverage-tree">
             <thead>
               <tr>
@@ -122,24 +149,32 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
               </tr>
             </thead>
             <tbody>
-              {/* Files are shown as a directory HIERARCHY (a tree) rather than a
-                  flat list of repo-relative paths: each directory is a header row
-                  with a status roll-up, its files indented beneath it. */}
-              {buildCoverageRows(files).map((row) =>
+              {/* Files are shown as a COLLAPSIBLE directory hierarchy (a tree)
+                  rather than a flat list of repo-relative paths: each directory is
+                  a clickable header row (toggles its subtree) with a status
+                  roll-up, its files indented beneath it. Only rows whose ancestor
+                  directories are all expanded are rendered (isRowVisible). */}
+              {visibleRows.map((row) =>
                 row.kind === "dir" ? (
                   <tr key={`dir:${row.path}`} className="coverage-dir-row">
                     <th scope="row" colSpan={4}>
-                      <span
+                      <button
+                        type="button"
                         className="coverage-dir"
+                        aria-expanded={!collapsed.has(row.path)}
+                        onClick={() => toggleDir(row.path)}
                         style={{ paddingLeft: `${row.depth * INDENT_REM}rem` }}
                       >
+                        <span className="coverage-dir__chevron" aria-hidden="true">
+                          {collapsed.has(row.path) ? "▸" : "▾"}
+                        </span>
                         <span className="coverage-dir__name">{row.name}/</span>
                         <span className="coverage-dir__counts">
                           {row.counts!.documented} documented ·{" "}
                           {row.counts!.undocumented} gaps · {row.counts!.waived}{" "}
                           waived
                         </span>
-                      </span>
+                      </button>
                     </th>
                   </tr>
                 ) : (

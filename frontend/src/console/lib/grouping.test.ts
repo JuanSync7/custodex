@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
   buildCoverageRows,
+  dirPaths,
   isReadmePath,
+  isRowVisible,
   partitionReadme,
 } from "./grouping";
 import type { CoverageFile } from "../types";
@@ -86,5 +88,47 @@ describe("buildCoverageRows", () => {
 
   it("returns an empty array for no files", () => {
     expect(buildCoverageRows([])).toEqual([]);
+  });
+});
+
+describe("dirPaths + isRowVisible (collapse/expand)", () => {
+  const file = (path: string): CoverageFile => ({
+    path,
+    language: "python",
+    owners: [],
+    status: "undocumented",
+    waived_reason: null,
+  });
+  const rows = buildCoverageRows([
+    file("pkg/server/app.py"),
+    file("pkg/cli.py"),
+    file("setup.py"),
+  ]);
+
+  it("dirPaths lists every directory node's path in tree order", () => {
+    expect(dirPaths(rows)).toEqual(["pkg", "pkg/server"]);
+  });
+
+  it("collapsing a directory hides its whole subtree (but not the dir itself)", () => {
+    const collapsed = new Set(["pkg"]);
+    const visible = rows
+      .filter((r) => isRowVisible(r, collapsed))
+      .map((r) => [r.kind, r.name]);
+    expect(visible).toEqual([
+      ["dir", "pkg"],
+      ["file", "setup.py"],
+    ]);
+  });
+
+  it("collapsing a deeper directory hides only that subtree", () => {
+    const collapsed = new Set(["pkg/server"]);
+    const names = rows
+      .filter((r) => isRowVisible(r, collapsed))
+      .map((r) => r.name);
+    expect(names).toEqual(["pkg", "server", "cli.py", "setup.py"]); // app.py hidden
+  });
+
+  it("an empty collapsed set shows every row (fully expanded default)", () => {
+    expect(rows.every((r) => isRowVisible(r, new Set()))).toBe(true);
   });
 });

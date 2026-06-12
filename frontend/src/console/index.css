@@ -1165,8 +1165,9 @@ tbody th {
 }
 
 /* Coverage HIERARCHY: a file leaf's basename reads as code; a directory node is
-   a faint header row rolling up its descendant-file status counts. Indentation
-   is applied inline (per tree depth) on the leading span. */
+   a CLICKABLE header row (collapse/expand its subtree) rolling up its
+   descendant-file status counts. Indentation is applied inline (per tree depth)
+   on the leading span/button. */
 .file-name {
   display: inline-block;
   font-family: var(--font-mono);
@@ -1177,10 +1178,28 @@ tbody th {
 .coverage-dir-row th {
   font-weight: 600;
 }
+/* The directory row is a button — reset native chrome, keep it inline. */
 .coverage-dir {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.coverage-dir:hover .coverage-dir__name {
+  color: var(--text);
+}
+.coverage-dir__chevron {
+  display: inline-block;
+  width: 0.9em;
+  color: var(--text-faint);
+  font-size: 0.7rem;
 }
 .coverage-dir__name {
   font-family: var(--font-mono);
@@ -1190,6 +1209,35 @@ tbody th {
   font-size: 0.78rem;
   font-weight: 400;
   color: var(--text-faint);
+}
+/* The summary line + the Expand all / Collapse all controls share one header row. */
+.coverage-files__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.coverage-files__head .coverage-summary {
+  border-bottom: none;
+}
+.coverage-tree__controls {
+  display: inline-flex;
+  gap: 0.4rem;
+  padding-right: 1.3rem;
+}
+.coverage-tree__controls button {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--canvas);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.coverage-tree__controls button:hover {
+  color: var(--text);
+  border-color: var(--primary);
 }
 .file-status {
   display: inline-flex;

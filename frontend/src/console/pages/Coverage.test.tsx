@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Coverage, { type CoverageApi } from "./Coverage";
 import type { CoverageSnapshot } from "../types";
@@ -96,6 +96,40 @@ describe("Coverage page", () => {
     expect(
       screen.getByText(/9 documented · 1 gaps · 1 waived/),
     ).toBeInTheDocument();
+  });
+
+  it("collapses and expands a directory subtree", async () => {
+    renderCoverage(fakeApi());
+    await screen.findByText("82%");
+
+    // Fully expanded by default — the files under `src/` are visible.
+    expect(screen.getByRole("row", { name: /install\.py/ })).toBeInTheDocument();
+
+    // Click the `src/` directory toggle → its subtree collapses (files hidden).
+    const dirToggle = screen.getByRole("button", { name: /src\// });
+    expect(dirToggle).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(dirToggle);
+    expect(screen.queryByRole("row", { name: /install\.py/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /legacy\.py/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /src\// })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    // Click again → the subtree expands back.
+    fireEvent.click(screen.getByRole("button", { name: /src\// }));
+    expect(screen.getByRole("row", { name: /install\.py/ })).toBeInTheDocument();
+  });
+
+  it("supports expand-all / collapse-all over the whole hierarchy", async () => {
+    renderCoverage(fakeApi());
+    await screen.findByText("82%");
+
+    fireEvent.click(screen.getByRole("button", { name: /collapse all/i }));
+    expect(screen.queryByRole("row", { name: /install\.py/ })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /expand all/i }));
+    expect(screen.getByRole("row", { name: /install\.py/ })).toBeInTheDocument();
   });
 
   it("falls back to baskets-only when the snapshot has no files", async () => {

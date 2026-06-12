@@ -50,6 +50,30 @@ export interface CoverageCounts {
   waived: number;
 }
 
+/** Every directory node's path, in tree order — the set a "collapse all" toggles. */
+export function dirPaths(rows: readonly CoverageTreeRow[]): string[] {
+  return rows.filter((r) => r.kind === "dir").map((r) => r.path);
+}
+
+/** A row is visible iff NONE of its ancestor directories are collapsed. A row at
+ * ``path`` and ``depth`` has ancestor-dir paths = the first ``depth`` path
+ * segments joined progressively (a file under ``a/b`` has ancestors ``a`` and
+ * ``a/b``); if any is in ``collapsed`` the row is hidden. Empty ``collapsed`` ⇒
+ * everything visible (the default, fully-expanded tree). */
+export function isRowVisible(
+  row: CoverageTreeRow,
+  collapsed: ReadonlySet<string>,
+): boolean {
+  if (collapsed.size === 0) return true;
+  const segments = row.path.split("/");
+  let prefix = "";
+  for (let i = 0; i < row.depth; i += 1) {
+    prefix = prefix ? `${prefix}/${segments[i]}` : segments[i];
+    if (collapsed.has(prefix)) return false;
+  }
+  return true;
+}
+
 interface DirNode {
   dirs: Map<string, DirNode>;
   files: CoverageFile[];
