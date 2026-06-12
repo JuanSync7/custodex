@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Coverage, { type CoverageApi } from "./Coverage";
 import type { CoverageSnapshot } from "../types";
@@ -64,28 +64,35 @@ describe("Coverage page", () => {
     expect(alert).toHaveTextContent(/coverage boom/);
   });
 
-  // ── T-03: the config-driven file list ─────────────────────────────────────
+  // ── T-03 / FEAT-CONFIGV2-016: the config-driven file HIERARCHY ─────────────
 
-  it("renders a file row per file with status, owners and waived reason", async () => {
+  it("renders the files as a directory hierarchy, not flat repo-relative paths", async () => {
     renderCoverage(fakeApi());
 
     await screen.findByText("82%");
 
-    // One row per file in the latest snapshot.
-    const documentedRow = await screen.findByRole("row", {
-      name: /src\/install\.py/,
-    });
+    // A directory node groups its files and rolls up their status counts.
+    const dirRow = screen.getByRole("row", { name: /src\// });
+    expect(dirRow).toHaveTextContent(/1 documented · 1 gaps · 1 waived/);
+
+    // File leaves are addressed by basename (the hierarchy replaces the flat
+    // "src/install.py" path), and still carry status / owners / waived reason.
+    const documentedRow = screen.getByRole("row", { name: /install\.py/ });
     expect(documentedRow).toHaveTextContent(/documented/i);
     expect(documentedRow).toHaveTextContent("guide/install");
+    // The full path is preserved as a hover title, not as the visible label.
+    expect(
+      within(documentedRow).getByText("install.py"),
+    ).toHaveAttribute("title", "src/install.py");
 
-    const gapRow = screen.getByRole("row", { name: /src\/legacy\.py/ });
+    const gapRow = screen.getByRole("row", { name: /legacy\.py/ });
     expect(gapRow).toHaveTextContent(/undocumented/i);
 
-    const waivedRow = screen.getByRole("row", { name: /src\/generated\.py/ });
+    const waivedRow = screen.getByRole("row", { name: /generated\.py/ });
     expect(waivedRow).toHaveTextContent(/waived/i);
     expect(waivedRow).toHaveTextContent(/auto-generated/i);
 
-    // Summary line.
+    // Summary line (above the tree) is unchanged.
     expect(
       screen.getByText(/9 documented · 1 gaps · 1 waived/),
     ).toBeInTheDocument();

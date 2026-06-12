@@ -18,6 +18,7 @@ import { useApi } from "../hooks/useApi";
 import SyncControls, { type SyncControlsApi } from "../components/SyncControls";
 import MappingTicketForm from "../components/MappingTicketForm";
 import Modal from "../components/Modal";
+import { partitionReadme } from "../lib/grouping";
 import type {
   ConfigEdit,
   EditableConfigTree,
@@ -220,6 +221,12 @@ export function Mapping({ api = apiClient, repoId: repoIdProp }: MappingProps) {
 
   const tree = state.data;
 
+  // README / narrative docs get their OWN mapping section (FEAT-CONFIGV2-016).
+  const { main: mainDocs, readme: readmeDocs } = partitionReadme(
+    tree.documents,
+    (entry) => entry.document.path,
+  );
+
   const onStaged = () => {
     setEditsReload((n) => n + 1);
     setForm(null);
@@ -258,11 +265,24 @@ export function Mapping({ api = apiClient, repoId: repoIdProp }: MappingProps) {
       />
 
       <DocumentsSection
-        documents={tree.documents}
+        title="Documents"
+        emptyText="No documents configured for this repo."
+        documents={mainDocs}
         expanded={expanded}
         onToggle={toggleExpanded}
         onEditMapping={(docId) => setForm({ docId })}
       />
+
+      {readmeDocs.length > 0 ? (
+        <DocumentsSection
+          title="README files"
+          emptyText="No README files for this repo."
+          documents={readmeDocs}
+          expanded={expanded}
+          onToggle={toggleExpanded}
+          onEditMapping={(docId) => setForm({ docId })}
+        />
+      ) : null}
 
       <UnlinkedSection
         files={tree.undocumented_files}
@@ -274,13 +294,19 @@ export function Mapping({ api = apiClient, repoId: repoIdProp }: MappingProps) {
   );
 }
 
-/** Section 1: the documents, each a collapsible row revealing code_refs + context_refs. */
+/** Section 1: the documents, each a collapsible row revealing code_refs +
+ * context_refs. Rendered once for the engineering docs and again (with a
+ * different `title`) for the README files section (FEAT-CONFIGV2-016). */
 function DocumentsSection({
+  title,
+  emptyText,
   documents,
   expanded,
   onToggle,
   onEditMapping,
 }: {
+  title: string;
+  emptyText: string;
   documents: EditableDocument[];
   expanded: Set<string>;
   onToggle: (docId: string) => void;
@@ -288,11 +314,9 @@ function DocumentsSection({
 }) {
   return (
     <div className="mapping-documents panel">
-      <h2>Documents</h2>
+      <h2>{title}</h2>
       {documents.length === 0 ? (
-        <p className="mapping-documents__empty">
-          No documents configured for this repo.
-        </p>
+        <p className="mapping-documents__empty">{emptyText}</p>
       ) : (
         <table>
           <thead>

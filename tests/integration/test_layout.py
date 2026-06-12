@@ -284,6 +284,97 @@ def test_index_coverage_accepts_md_or_html_links(tmp_path: Path) -> None:
     assert LayoutCode.INDEX_INCOMPLETE not in codes
 
 
+def test_index_coverage_respects_index_template_audience_kind(tmp_path: Path) -> None:
+    """An index whose index region pins a `kind` audience need only link the
+    documents that index actually renders — a sibling of another audience (e.g. a
+    user-guide README under an eng-guide index) is NOT required (FEAT-CONFIGV2-016).
+
+    This aligns INDEX_INCOMPLETE with what ``render_index`` emits (it filters by
+    ``template.kind``): the eng-only api-index renders only eng-guide docs, so it
+    is not flagged for omitting a user-guide doc the engine never lists there.
+    """
+    from code_doc_monitor.config import Audience as A
+    from code_doc_monitor.config import MonitorConfig, RegionColumn, RegionTemplate
+    from code_doc_monitor.layout import _index_coverage_issues
+
+    idx = DocumentSpec(
+        id="index",
+        path="index.md",
+        audience=A.ENG_GUIDE,
+        index=True,
+        region_keys=("api-index",),
+    )
+    eng = DocumentSpec(id="eng", path="api/eng.md", audience=A.ENG_GUIDE)
+    readme = DocumentSpec(id="readme", path="README.md", audience=A.USER_GUIDE)
+    template = RegionTemplate(
+        source="index",
+        kind="eng-guide",
+        columns=(RegionColumn(header="Document", field="title"),),
+    )
+    cfg = MonitorConfig(
+        root=".",
+        documents=(idx, eng, readme),
+        region_templates={"api-index": template},
+    )
+
+    # The index links only the eng doc (not the user-guide README).
+    _write_index(tmp_path, "- [eng](api/eng.md)")
+    issues = _index_coverage_issues(cfg, tmp_path)
+    assert [i.code for i in issues] == [], (
+        "an eng-guide-scoped index must not be flagged for omitting a user-guide doc"
+    )
+
+    # If the index also forgets a same-audience (eng-guide) sibling, that IS flagged.
+    eng2 = DocumentSpec(id="eng2", path="api/eng2.md", audience=A.ENG_GUIDE)
+    cfg2 = MonitorConfig(
+        root=".",
+        documents=(idx, eng, eng2, readme),
+        region_templates={"api-index": template},
+    )
+    issues2 = _index_coverage_issues(cfg2, tmp_path)
+    assert [i.doc_id for i in issues2] == ["index"]
+    assert "'eng2'" in issues2[0].detail
+
+
+def test_index_coverage_requires_all_when_template_kind_is_none(tmp_path: Path) -> None:
+    """An index whose index region renders ALL audiences (``kind`` is None) keeps
+    the original target-agnostic rule: every other document must be linked,
+    regardless of audience (back-compat with the pre-FEAT-CONFIGV2-016 behavior)."""
+    from code_doc_monitor.config import Audience as A
+    from code_doc_monitor.config import MonitorConfig, RegionColumn, RegionTemplate
+    from code_doc_monitor.layout import LayoutCode as LC
+    from code_doc_monitor.layout import _index_coverage_issues
+
+    idx = DocumentSpec(
+        id="index",
+        path="index.md",
+        audience=A.ENG_GUIDE,
+        index=True,
+        region_keys=("all-index",),
+    )
+    eng = DocumentSpec(id="eng", path="api/eng.md", audience=A.ENG_GUIDE)
+    readme = DocumentSpec(id="readme", path="README.md", audience=A.USER_GUIDE)
+    template = RegionTemplate(
+        source="index",
+        kind=None,  # renders every audience -> index must link every doc
+        columns=(RegionColumn(header="Document", field="title"),),
+    )
+    cfg = MonitorConfig(
+        root=".",
+        documents=(idx, eng, readme),
+        region_templates={"all-index": template},
+    )
+
+    _write_index(tmp_path, "- [eng](api/eng.md)")  # forgets the README
+    issues = [
+        i
+        for i in _index_coverage_issues(cfg, tmp_path)
+        if i.code is LC.INDEX_INCOMPLETE
+    ]
+    assert [i.doc_id for i in issues] == ["index"]
+    assert "'readme'" in issues[0].detail
+
+
 # --- B-05: per-region authority STATE surface (region_states) -----------------
 
 

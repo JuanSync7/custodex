@@ -14,7 +14,7 @@ fixture (``examples/external-repo/cdmon.yaml``) and more broadly by
 ``tests/test_example_external.py`` / ``tests/test_config.py``.
 
 Features: FEAT-CLI-002, FEAT-CONFIG-003, FEAT-CONFIG-008, FEAT-CONFIG-009
-Features: FEAT-CONFIGV2-001, FEAT-CONFIGV2-003, FEAT-CONFIGV2-008
+Features: FEAT-CONFIGV2-001, FEAT-CONFIGV2-003, FEAT-CONFIGV2-008, FEAT-CONFIGV2-016
 Features: FEAT-CONFIGV2-009, FEAT-EXTRACT-001, FEAT-DRIFT-001, FEAT-MONITOR-002
 Features: FEAT-MONITOR-003, FEAT-HEAL-001, FEAT-COVERAGE-007, FEAT-COVERAGE-008
 Features: FEAT-LAYOUT-001, FEAT-LAYOUT-002, FEAT-LAYOUT-006
@@ -59,15 +59,18 @@ def _copy_dogfood_tree(dst: Path) -> Path:
     """Copy the engine + docs + dir-layout config + templates into ``dst``.
 
     Mirrors what the dir layout needs to resolve on a temp copy: the package,
-    the docs it manages, the ``config/cdmon/`` directory, and the
+    the docs it manages, the ``config/cdmon/`` directory, the
     ``templates/writing/`` tree the ``doc-style.yaml`` pointer resolves against
-    (root="../.." ⇒ the copied repo root). Returns the copied ``config/cdmon``.
+    (root="../.." ⇒ the copied repo root), and the repo-root ``README.md`` (a
+    tracked user-guide document, FEAT-CONFIGV2-016). Returns the copied
+    ``config/cdmon``.
     """
     dst.mkdir(exist_ok=True)
     shutil.copytree(_ROOT / "code_doc_monitor", dst / "code_doc_monitor")
     shutil.copytree(_ROOT / "docs", dst / "docs")
     shutil.copytree(_ROOT / "config", dst / "config")
     shutil.copytree(_ROOT / "templates", dst / "templates")
+    shutil.copy2(_ROOT / "README.md", dst / "README.md")
     return dst / "config" / "cdmon"
 
 
@@ -220,6 +223,71 @@ def test_dogfood_docs_conform_to_layout_standard() -> None:
     cfg = load_config_dir(_CONFIG_DIR)
     issues = lint_config(cfg, _ROOT)
     assert issues == [], [f"{i.doc_id}: {i.code.value} — {i.detail}" for i in issues]
+
+
+def test_dogfood_readme_is_a_monitored_user_guide_doc() -> None:
+    """FEAT-CONFIGV2-016: cdmon's own README.md is a monitored narrative document.
+
+    It is declared as a ``user-guide`` document with code_refs to the CLI surface
+    it documents and NO managed region (the engine never authors README prose, K2),
+    so it is tracked by the whole-doc fingerprint over that surface. The eng-only
+    ``api-index`` is NOT flagged for omitting it — its ``kind: eng-guide`` audience
+    scope excludes a user-guide doc (the INDEX_INCOMPLETE refinement)."""
+    from code_doc_monitor.config import Audience
+    from code_doc_monitor.layout import LayoutCode, _index_coverage_issues
+
+    cfg = load_config_dir(_CONFIG_DIR)
+    readme = next(d for d in cfg.documents if d.id == "readme")
+    assert readme.path == "README.md"
+    assert readme.audience is Audience.USER_GUIDE
+    assert readme.region_keys == ()  # no managed region — fingerprint-tracked only
+    assert "code_doc_monitor/cli.py" in {r.path for r in readme.code_refs}
+    # It tracks a real surface (cli.py has public commands to fingerprint).
+    surface = build_document_surface(readme, _ROOT)
+    assert surface.symbols, "readme: no symbols extracted from the CLI surface"
+    # The eng-only api-index is not required to link the user-guide README.
+    bad = [
+        i
+        for i in _index_coverage_issues(cfg, _ROOT)
+        if i.code is LayoutCode.INDEX_INCOMPLETE
+    ]
+    assert bad == [], [i.detail for i in bad]
+
+
+def test_dogfood_readme_drifts_on_public_cli_change_and_reheals(tmp_path: Path) -> None:
+    """FEAT-CONFIGV2-016 (K3/K5): a PUBLIC ``cli.py`` change drifts the user-guide
+    README; ``monitor --apply`` reheals its fingerprint WITHOUT touching the prose
+    (the engine never authors a README, and a ReviewRecord captures the change)."""
+    dst = tmp_path / "proj"
+    config_dir = _copy_dogfood_tree(dst)
+    cfg = load_config_dir(config_dir)
+    assert Monitor(cfg, config_dir).check().ok  # copy starts clean
+
+    readme_path = dst / "README.md"
+    original = readme_path.read_text(encoding="utf-8")
+
+    # Add a PUBLIC command-shaped function to cli.py: the user-guide surface moves.
+    cli = dst / "code_doc_monitor" / "cli.py"
+    cli.write_text(
+        cli.read_text(encoding="utf-8")
+        + "\n\ndef brand_new_public_command(name: str) -> str:\n"
+        '    """A brand new public command."""\n    return name\n',
+        encoding="utf-8",
+    )
+    drifts = Monitor(cfg, config_dir).check().drifts
+    assert any(d.doc_id == "readme" and d.kind.value == "HASH" for d in drifts), (
+        "a public CLI surface change must drift the user-guide README"
+    )
+
+    result = Monitor(cfg, config_dir, now=lambda: "2026-06-01T00:00:00Z").run(
+        apply=True
+    )
+    assert result.records  # a ReviewRecord was written for the human (K5)
+    assert Monitor(cfg, config_dir).check().ok  # fully rehealed
+
+    # Only the front-matter fingerprint moved — the prose body is byte-identical.
+    healed = readme_path.read_text(encoding="utf-8")
+    assert original.split("## Why", 1)[1] == healed.split("## Why", 1)[1]
 
 
 def test_dogfood_api_index_is_a_landing_page_that_links_every_doc() -> None:

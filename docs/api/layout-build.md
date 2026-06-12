@@ -1,9 +1,65 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: b5fd2842f759d26a
+  fingerprint: 1fc33011c2b2e246
+  fingerprint_tiers:
+    composite: 1fc33011c2b2e246
+    docstring: b6d648df49dfaeed
+    signature: 148704f70f48ac5c
+  region_anchors:
+    symbols:
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 0a117288e3ad5fd9
+    - 121fac4abbd395e7
+    - 1aa85dcdb820ad6f
+    - 1c09754ba01a0bd4
+    - 25a91541a80c2db7
+    - 28f3b5bece254269
+    - 32466863d59a837d
+    - 3263bf02338e3642
+    - 32b4643f68a7fb0c
+    - 39f44ada4b1c867f
+    - 428e940464772b56
+    - 44575cf5b28512d7
+    - 455bc0c616969849
+    - 4bd9dfdca395b1c2
+    - 50faa59c28359a81
+    - 57e95573338b8c2c
+    - 595c2ade54f041a6
+    - 7090147ceb0f13e4
+    - 76c672648868806c
+    - 80e1f0d22cb730d7
+    - 813af547c4b32143
+    - 860a6a26aa433f4d
+    - 8ab7c9f466a0a9ad
+    - 900cc34005e4e6c4
+    - 91bc38b860278093
+    - 939970728c990620
+    - 97ecb5831b1569a9
+    - a31e15ecaa50a231
+    - a5f2ce7571108068
+    - a65e8494c7b4ebcb
+    - ac85cf40a716ad95
+    - b2f96f3352bc541f
+    - b7b052ea09395beb
+    - b896315011001453
+    - bd8d37ebab94dcc2
+    - c14470b3f3fd6751
+    - c26192c331298b0c
+    - c898a6e5d78245c2
+    - c9d11b2748b2f916
+    - d3b8fd43b3f1bdf7
+    - d4850c3b92cc3267
+    - d94a531b0edeebe3
+    - e48bb07ca2299726
+    - e8cba50f7965bea9
+    - f13cd8f9638ef83f
+    - fb63866c577db827
+    - fe988deeef5014be
   region_hashes:
-    symbols: d25caa6734bced9b
+    symbols: 7c71fc9ce96c9720
   schema_version: 1.0.0
 ---
 # layout-build
@@ -42,6 +98,7 @@ cdm:
 | _fields | function | def _fields(index_spec: DocumentSpec, target: DocumentSpec, root: Path) -> dict[str, str] |
 | _index_coverage_issues | function | def _index_coverage_issues(config: MonitorConfig, root: Path) -> list[LayoutIssue] |
 | _index_link_targets | function | def _index_link_targets(index_spec: DocumentSpec, target: DocumentSpec) -> set[str] |
+| _indexed_audiences | function | def _indexed_audiences(spec: DocumentSpec, config: MonitorConfig) -> set[str] \| None |
 | _inline | function | def _inline(text: str) -> str |
 | _link | function | def _link(index_spec: DocumentSpec, target: DocumentSpec) -> str |
 | _md_href_to_html | function | def _md_href_to_html(target: str) -> str |

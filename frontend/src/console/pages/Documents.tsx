@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { useApi } from "../hooks/useApi";
 import SyncControls, { type SyncControlsApi } from "../components/SyncControls";
+import { partitionReadme } from "../lib/grouping";
 import type { ConfigDocumentTree } from "../types";
 
 /** The slice of the API this page needs — fakeable in tests (no network). The
@@ -112,78 +113,117 @@ export function Documents({ api = apiClient, repoId: repoIdProp }: DocumentsProp
     );
   }
 
+  // README / narrative docs are surfaced as their OWN section, separate from the
+  // engineering/API documents (FEAT-CONFIGV2-016).
+  const { main, readme } = partitionReadme(state.data, (t) => t.document.path);
+
   return (
     <section>
       {head}
       <div className="documents-table panel">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Document</th>
-              <th scope="col">Audience</th>
-              <th scope="col">Unit</th>
-              <th scope="col">Regions</th>
-              <th scope="col">Code refs</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.data.map((tree) => {
-              const doc = tree.document;
-              const isOpen = expanded.has(doc.doc_id);
-              const refCount = tree.code_refs.length;
-              return (
-                <RowFragment key={doc.doc_id}>
-                  <tr>
-                    <th scope="row">
-                      <span className="doc-id">{doc.doc_id}</span>
-                      <span className="doc-path"> ({doc.path})</span>
-                    </th>
-                    <td>
-                      <span className="badge audience-badge">{doc.audience}</span>
-                    </td>
-                    <td>
-                      <span className="chip unit-chip">{doc.unit}</span>
-                    </td>
-                    <td>
-                      {doc.region_keys.length > 0 ? (
-                        <span className="region-chips">
-                          {doc.region_keys.map((key) => (
-                            <span key={key} className="chip region-chip">
-                              {key}
-                            </span>
-                          ))}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ticket-toggle"
-                        aria-expanded={isOpen}
-                        onClick={() => toggleExpanded(doc.doc_id)}
-                      >
-                        {`${isOpen ? "Hide" : "View"} ${refCount} ref${
-                          refCount === 1 ? "" : "s"
-                        }`}
-                      </button>
-                    </td>
-                  </tr>
-                  {isOpen ? (
-                    <tr className="code-refs-row">
-                      <td colSpan={5}>
-                        <CodeRefs tree={tree} />
-                      </td>
-                    </tr>
-                  ) : null}
-                </RowFragment>
-              );
-            })}
-          </tbody>
-        </table>
+        {main.length > 0 ? (
+          <DocumentsTable
+            trees={main}
+            expanded={expanded}
+            onToggle={toggleExpanded}
+          />
+        ) : (
+          <p>No non-README documents configured for this repo.</p>
+        )}
       </div>
+
+      {readme.length > 0 ? (
+        <div className="documents-readme panel">
+          <h2>README files</h2>
+          <DocumentsTable
+            trees={readme}
+            expanded={expanded}
+            onToggle={toggleExpanded}
+          />
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+/** The documents relationship table — rendered once for the engineering docs and
+ * again for the README files section, so both read identically. */
+function DocumentsTable({
+  trees,
+  expanded,
+  onToggle,
+}: {
+  trees: ConfigDocumentTree[];
+  expanded: Set<string>;
+  onToggle: (docId: string) => void;
+}) {
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Document</th>
+          <th scope="col">Audience</th>
+          <th scope="col">Unit</th>
+          <th scope="col">Regions</th>
+          <th scope="col">Code refs</th>
+        </tr>
+      </thead>
+      <tbody>
+        {trees.map((tree) => {
+          const doc = tree.document;
+          const isOpen = expanded.has(doc.doc_id);
+          const refCount = tree.code_refs.length;
+          return (
+            <RowFragment key={doc.doc_id}>
+              <tr>
+                <th scope="row">
+                  <span className="doc-id">{doc.doc_id}</span>
+                  <span className="doc-path"> ({doc.path})</span>
+                </th>
+                <td>
+                  <span className="badge audience-badge">{doc.audience}</span>
+                </td>
+                <td>
+                  <span className="chip unit-chip">{doc.unit}</span>
+                </td>
+                <td>
+                  {doc.region_keys.length > 0 ? (
+                    <span className="region-chips">
+                      {doc.region_keys.map((key) => (
+                        <span key={key} className="chip region-chip">
+                          {key}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="ticket-toggle"
+                    aria-expanded={isOpen}
+                    onClick={() => onToggle(doc.doc_id)}
+                  >
+                    {`${isOpen ? "Hide" : "View"} ${refCount} ref${
+                      refCount === 1 ? "" : "s"
+                    }`}
+                  </button>
+                </td>
+              </tr>
+              {isOpen ? (
+                <tr className="code-refs-row">
+                  <td colSpan={5}>
+                    <CodeRefs tree={tree} />
+                  </td>
+                </tr>
+              ) : null}
+            </RowFragment>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 

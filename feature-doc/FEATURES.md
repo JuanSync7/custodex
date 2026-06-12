@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**197 features** across 19 subsystems.
+**198 features** across 19 subsystems.
 
 ## agent
 
@@ -293,6 +293,7 @@ errors.py defines a single CodeDocMonitorError base carrying a human message plu
 | `FEAT-CONFIGV2-013` | Generate-to-disk engine | generate | K1, K7, K8, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-014` | Pure unit-file serializers and model editors | config | K7, K8, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-015` | Index-source region rendering | index | K0, K2, K10 | — | — | implemented |
+| `FEAT-CONFIGV2-016` | README / narrative-document monitoring | config, drift, layout | K0, K2, K3, K5, K10 | — | — | implemented |
 
 ### `FEAT-CONFIGV2-001` — Multi-file config/cdmon directory layout
 
@@ -353,6 +354,10 @@ dump_unit_file serializes a UnitFile back to canonical ---fenced YAML that round
 ### `FEAT-CONFIGV2-015` — Index-source region rendering
 
 render_index renders a source='index' managed region as a Markdown table over the config's other documents (excluding the index doc, optionally filtered by audience), one row per doc with synthetic columns (doc_id, title as a link to the HTML twin or .md, summary, link, audience, path) in deterministic config order.
+
+### `FEAT-CONFIGV2-016` — README / narrative-document monitoring
+
+A narrative Markdown document such as README.md is a first-class monitored document: it is declared in a config/cdmon unit with code_refs naming the source files it describes and NO managed region, so the engine tracks it by the whole-doc fingerprint over that code surface and never authors its prose (K2). As a user-guide its drift is audience-gated — a comment/docstring or private change to a referenced source file is a non-event, only a real public-surface change drifts it (K3) — and the drift is recorded as a ReviewRecord for a human, never auto-rewritten (K5); monitor --apply only refreshes its fingerprint. To keep an eng-only api-index from being forced to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index region's audience kind, so an index need only link the documents it renders. cdmon dogfoods this on its own README.md.
 
 ## coverage
 

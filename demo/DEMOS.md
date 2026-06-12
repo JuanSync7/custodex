@@ -10,9 +10,9 @@ recipe).
 
 Each case ends with a `Features: <id>[, <id>...]` tag line. Those lines are the
 single source of truth `cdmon trace` scans (`traceability.scan_refs(demo, DEMO)`)
-to prove **every one of the 186 catalogued features is demonstrated by at least
-one case**. The marker `Features:` is what makes a `FEAT-id` a reference — a bare
-mention elsewhere in prose is ignored.
+to prove **every catalogued feature is demonstrated by at least one case** (the
+exact count is the header of `feature-doc/FEATURES.md`). The marker `Features:` is
+what makes a `FEAT-id` a reference — a bare mention elsewhere in prose is ignored.
 
 **Honesty rule.** A case tags a feature only if the scenario genuinely
 demonstrates or observes it (see `feature-doc/FEATURES.md` for each feature's
@@ -850,3 +850,24 @@ that registers the `file://` origin and `POST`s `/sync`) — no network, no `cur
 See `tests/system/test_gitrepo_sync_e2e.py` (the parametrized any-repo matrix,
 the git-mode baseline, and `::test_demo_as_git_materializes_a_syncable_repo`).
 Features: FEAT-GITSYNC-005
+
+### DEMO-057 — A README is a monitored narrative document (dogfooded)
+**What it shows.** A narrative Markdown file — a `README.md` — is a first-class
+monitored document, not just engineering reference pages. cdmon dogfoods this on
+its OWN `README.md`: `config/cdmon/core.yaml` declares a `readme` document
+(`audience: user-guide`) whose `code_refs` name the source it describes
+(`code_doc_monitor/cli.py`) and which carries NO managed region, so the engine
+tracks it by the whole-doc fingerprint over that CLI surface and never rewrites
+its prose (K2). Because it is a `user-guide`, a docstring/comment/private change
+to `cli.py` is a non-event (K3) — only a real change to the public command
+surface drifts the README, surfacing a `ReviewRecord` for a human to act on (K5);
+`cdmon monitor --apply` then refreshes only its fingerprint. The eng-only
+`api-index` is NOT forced to list this user-guide README because the
+`INDEX_INCOMPLETE` lint honors the index region's `kind: eng-guide` audience.
+**How to observe.** Inspect the `readme` document in `config/cdmon/core.yaml` and
+the `cdm:` front matter atop `README.md`, then run
+`cdmon check --config config/cdmon` (the README is reported in sync, and the
+`api-index` is not flagged for omitting it). Test:
+`tests/system/test_dogfood.py::test_dogfood_readme_is_a_monitored_user_guide_doc`
+and `::test_dogfood_readme_drifts_on_public_cli_change_and_reheals`.
+Features: FEAT-CONFIGV2-016

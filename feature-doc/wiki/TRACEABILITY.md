@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdmon trace` (R-07 `cdmon wiki`) to regenerate.
 
-**197 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**198 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -71,6 +71,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-CONFIGV2-013` | integration/test_apply_fix.py, integration/test_generate.py, system/test_demo_walkthrough.py | DEMOS.md |
 | `FEAT-CONFIGV2-014` | unit/test_unit_serializer.py | DEMOS.md |
 | `FEAT-CONFIGV2-015` | unit/test_index.py | DEMOS.md |
+| `FEAT-CONFIGV2-016` | system/test_dogfood.py | DEMOS.md |
 | `FEAT-COVERAGE-001` | integration/test_config_ignore.py, integration/test_editable_tree.py, integration/test_generate.py, integration/test_report.py, regression/test_corpus_selfcoverage.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-002` | integration/test_config_ignore.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-003` | unit/test_inventory.py | DEMOS.md |

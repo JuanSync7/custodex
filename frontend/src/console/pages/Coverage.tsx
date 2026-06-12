@@ -2,7 +2,11 @@ import { useCallback, type CSSProperties } from "react";
 import { useParams } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { useApi } from "../hooks/useApi";
+import { buildCoverageRows } from "../lib/grouping";
 import type { CoverageFile, CoverageSnapshot } from "../types";
+
+/** Indentation (rem) applied per tree level so the hierarchy reads as a tree. */
+const INDENT_REM = 1.25;
 
 /** The slice of the API this page needs — fakeable in tests (no network). */
 export interface CoverageApi {
@@ -108,7 +112,7 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
             {basket(latest.documented)} documented · {basket(latest.undocumented)}{" "}
             gaps · {basket(latest.waived)} waived
           </p>
-          <table>
+          <table className="coverage-tree">
             <thead>
               <tr>
                 <th scope="col">File</th>
@@ -118,36 +122,69 @@ export function Coverage({ api = apiClient, repoId: repoIdProp }: CoverageProps)
               </tr>
             </thead>
             <tbody>
-              {files.map((file) => (
-                <tr key={file.path}>
-                  <th scope="row">
-                    <span className="file-path">{file.path}</span>
-                  </th>
-                  <td>
-                    <span className={`file-status status-${file.status}`}>
+              {/* Files are shown as a directory HIERARCHY (a tree) rather than a
+                  flat list of repo-relative paths: each directory is a header row
+                  with a status roll-up, its files indented beneath it. */}
+              {buildCoverageRows(files).map((row) =>
+                row.kind === "dir" ? (
+                  <tr key={`dir:${row.path}`} className="coverage-dir-row">
+                    <th scope="row" colSpan={4}>
                       <span
-                        className={`dot ${STATUS_DOT[file.status]}`}
-                        aria-hidden="true"
-                      />
-                      {file.status}
-                    </span>
-                  </td>
-                  <td>
-                    {file.owners.length > 0 ? (
-                      <span className="owner-chips">
-                        {file.owners.map((owner) => (
-                          <span key={owner} className="chip owner-chip">
-                            {owner}
-                          </span>
-                        ))}
+                        className="coverage-dir"
+                        style={{ paddingLeft: `${row.depth * INDENT_REM}rem` }}
+                      >
+                        <span className="coverage-dir__name">{row.name}/</span>
+                        <span className="coverage-dir__counts">
+                          {row.counts!.documented} documented ·{" "}
+                          {row.counts!.undocumented} gaps · {row.counts!.waived}{" "}
+                          waived
+                        </span>
                       </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>{file.status === "waived" ? file.waived_reason ?? "" : ""}</td>
-                </tr>
-              ))}
+                    </th>
+                  </tr>
+                ) : (
+                  <tr key={`file:${row.path}`}>
+                    <th scope="row">
+                      <span
+                        className="file-name"
+                        style={{
+                          paddingLeft: `${row.depth * INDENT_REM}rem`,
+                        }}
+                        title={row.path}
+                      >
+                        {row.name}
+                      </span>
+                    </th>
+                    <td>
+                      <span className={`file-status status-${row.file!.status}`}>
+                        <span
+                          className={`dot ${STATUS_DOT[row.file!.status]}`}
+                          aria-hidden="true"
+                        />
+                        {row.file!.status}
+                      </span>
+                    </td>
+                    <td>
+                      {row.file!.owners.length > 0 ? (
+                        <span className="owner-chips">
+                          {row.file!.owners.map((owner) => (
+                            <span key={owner} className="chip owner-chip">
+                              {owner}
+                            </span>
+                          ))}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      {row.file!.status === "waived"
+                        ? row.file!.waived_reason ?? ""
+                        : ""}
+                    </td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         </div>

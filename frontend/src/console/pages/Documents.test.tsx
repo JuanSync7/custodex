@@ -9,7 +9,7 @@ import {
 import { MemoryRouter } from "react-router-dom";
 import Documents, { type DocumentsApi } from "./Documents";
 import type { ConfigDocumentTree, SyncRun } from "../types";
-import { configDocuments, syncRunGit } from "../test/fixtures";
+import { configDocuments, readmeDocTree, syncRunGit } from "../test/fixtures";
 
 function fakeApi(overrides: Partial<DocumentsApi> = {}): DocumentsApi {
   return {
@@ -130,5 +130,21 @@ describe("Documents page", () => {
     });
 
     await waitFor(() => expect(seen).toContain("local"));
+  });
+
+  it("lists README files in a separate section, apart from the engineering docs", async () => {
+    renderDocuments(
+      fakeApi({ documentsFor: async () => [...configDocuments, readmeDocTree] }),
+    );
+
+    // The engineering documents render in the main table.
+    await screen.findByRole("row", { name: /guide\/install/ });
+
+    // The README appears under its OWN "README files" heading/section.
+    const heading = screen.getByRole("heading", { name: /readme files/i });
+    const section = heading.closest("div")!;
+    const readmeRow = within(section).getByRole("row", { name: /readme/i });
+    expect(readmeRow).toHaveTextContent("README.md");
+    expect(readmeRow).toHaveTextContent("user-guide");
   });
 });
