@@ -19,6 +19,7 @@ import type {
 import {
   editableTree,
   generateResponse,
+  readmeEditableDoc,
   storedConfigEdits,
   syncRunLocal,
 } from "../test/fixtures";
@@ -162,6 +163,23 @@ describe("Mapping page", () => {
     });
 
     await waitFor(() => expect(seen).toContain("git"));
+  });
+
+  it("lists README files in their OWN mapping section", async () => {
+    const tree: EditableConfigTree = {
+      ...editableTree,
+      documents: [...editableTree.documents, readmeEditableDoc],
+    };
+    renderMapping(fakeApi({ configEditable: async () => tree }));
+
+    // The engineering docs stay in the main "Documents" section…
+    await screen.findByRole("row", { name: /guide\/getting-started/ });
+    // …and the README under a separate "README files" section.
+    const heading = await screen.findByRole("heading", { name: /readme files/i });
+    const section = heading.closest("div")!;
+    const readmeRow = within(section).getByRole("row", { name: /readme/i });
+    expect(readmeRow).toHaveTextContent("README.md");
+    expect(readmeRow).toHaveTextContent("user-guide");
   });
 });
 

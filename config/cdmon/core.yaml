@@ -136,3 +136,17 @@ documents:
     code_refs:
       - path: code_doc_monitor/cli.py
       - path: code_doc_monitor/doctor.py
+
+  # The project README — a USER-GUIDE narrative monitored against the CLI surface
+  # it documents (FEAT-CONFIGV2-016). It declares NO managed region, so the engine
+  # never authors its prose; it is tracked by the whole-doc fingerprint over the
+  # `cli.py` public surface. Because the audience is user-guide, a docstring- or
+  # comment-only change to cli.py is a NON-event (K3) — only a real change to the
+  # public command surface drifts the README, which then surfaces a ReviewRecord
+  # for a human to act on (K5). Reheal its fingerprint with `cdmon monitor --apply`
+  # after a CLI surface change, exactly like the other tracked docs.
+  - id: readme
+    path: README.md
+    audience: user-guide
+    code_refs:
+      - path: code_doc_monitor/cli.py

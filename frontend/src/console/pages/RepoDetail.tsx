@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { ApiError, apiClient, type RecordFilters } from "../api/client";
 import { useApi } from "../hooks/useApi";
 import SyncControls, { type SyncControlsApi } from "../components/SyncControls";
+import { partitionReadme } from "../lib/grouping";
 import type {
   ApplyFixResponse,
   Audience,
@@ -214,6 +215,103 @@ export function RepoDetail({ api = apiClient, repoId: repoIdProp }: RepoDetailPr
     [api, repoId, token],
   );
 
+  // record_id → resolution, available regardless of phase (empty until ready) so
+  // the row renderer below can be a plain closure.
+  const resolutions =
+    state.phase === "ready"
+      ? state.data.resolutions
+      : new Map<string, ResolutionRecord>();
+
+  const recordsHead = (
+    <thead>
+      <tr>
+        <th scope="col">Doc</th>
+        <th scope="col">Drift kind</th>
+        <th scope="col">Verdict</th>
+        <th scope="col">Detected</th>
+        <th scope="col">Source</th>
+        <th scope="col">Resolution</th>
+        <th scope="col">Details</th>
+      </tr>
+    </thead>
+  );
+
+  // One <tbody>'s worth of rows for a list of records — rendered once for the main
+  // timeline and again for the README files section (FEAT-CONFIGV2-016).
+  const renderRecordRows = (recs: ReviewRecord[]): ReactNode =>
+    recs.map((rec) => {
+      const resolution =
+        posted.get(rec.record_id) ?? resolutions.get(rec.record_id);
+      const isOpen = expanded.has(rec.record_id);
+      const hasTicket = !!rec.ticket;
+      const verb = isOpen ? "Hide" : "View";
+      const noun = hasTicket ? "ticket" : "details";
+      return (
+        <RowFragment key={rec.record_id}>
+          <tr>
+            <th scope="row">
+              <span className="doc-id">{rec.doc_id}</span>
+              <span className="doc-path"> ({rec.doc_path})</span>
+            </th>
+            <td>{rec.drift_kind}</td>
+            <td>
+              <span className={`verdict verdict-${rec.verdict.toLowerCase()}`}>
+                {rec.verdict}
+              </span>
+            </td>
+            <td>{rec.detected_at}</td>
+            <td>{shortSha(rec.source_sha)}</td>
+            <td>
+              {resolution ? (
+                <span
+                  className={`badge resolution resolution-${resolution.resolution}`}
+                >
+                  {resolution.resolution}
+                </span>
+              ) : (
+                <ResolveControl
+                  onResolve={(res, note) =>
+                    submitResolution(rec.record_id, res, note)
+                  }
+                />
+              )}
+            </td>
+            <td>
+              <button
+                type="button"
+                className="ticket-toggle"
+                aria-expanded={isOpen}
+                onClick={() => toggleExpanded(rec.record_id)}
+              >
+                {`${verb} ${noun}`}
+              </button>
+            </td>
+          </tr>
+          {isOpen ? (
+            <tr className="ticket-detail-row">
+              <td colSpan={7}>
+                {rec.ticket ? (
+                  <TicketCard
+                    ticket={rec.ticket}
+                    statusLabel={ticketStatusLabel(resolution)}
+                  />
+                ) : (
+                  <LegacyDetail record={rec} />
+                )}
+                {rec.verdict === "FIX" && rec.fix ? (
+                  <ApplyFixControl
+                    applying={applyingFix.has(rec.record_id)}
+                    result={fixResults.get(rec.record_id)}
+                    onApply={() => applyFix(rec.record_id)}
+                  />
+                ) : null}
+              </td>
+            </tr>
+          ) : null}
+        </RowFragment>
+      );
+    });
+
   return (
     <section>
       <h1>
@@ -311,94 +409,33 @@ export function RepoDetail({ api = apiClient, repoId: repoIdProp }: RepoDetailPr
       ) : state.data.records.length === 0 ? (
         <p>No records match these filters.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Doc</th>
-              <th scope="col">Drift kind</th>
-              <th scope="col">Verdict</th>
-              <th scope="col">Detected</th>
-              <th scope="col">Source</th>
-              <th scope="col">Resolution</th>
-              <th scope="col">Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {state.data.records.map((rec) => {
-              const resolution =
-                posted.get(rec.record_id) ??
-                state.data.resolutions.get(rec.record_id);
-              const isOpen = expanded.has(rec.record_id);
-              const hasTicket = !!rec.ticket;
-              const verb = isOpen ? "Hide" : "View";
-              const noun = hasTicket ? "ticket" : "details";
-              return (
-                <RowFragment key={rec.record_id}>
-                  <tr>
-                    <th scope="row">
-                      <span className="doc-id">{rec.doc_id}</span>
-                      <span className="doc-path"> ({rec.doc_path})</span>
-                    </th>
-                    <td>{rec.drift_kind}</td>
-                    <td>
-                      <span className={`verdict verdict-${rec.verdict.toLowerCase()}`}>
-                        {rec.verdict}
-                      </span>
-                    </td>
-                    <td>{rec.detected_at}</td>
-                    <td>{shortSha(rec.source_sha)}</td>
-                    <td>
-                      {resolution ? (
-                        <span
-                          className={`badge resolution resolution-${resolution.resolution}`}
-                        >
-                          {resolution.resolution}
-                        </span>
-                      ) : (
-                        <ResolveControl
-                          onResolve={(res, note) =>
-                            submitResolution(rec.record_id, res, note)
-                          }
-                        />
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ticket-toggle"
-                        aria-expanded={isOpen}
-                        onClick={() => toggleExpanded(rec.record_id)}
-                      >
-                        {`${verb} ${noun}`}
-                      </button>
-                    </td>
-                  </tr>
-                  {isOpen ? (
-                    <tr className="ticket-detail-row">
-                      <td colSpan={7}>
-                        {rec.ticket ? (
-                          <TicketCard
-                            ticket={rec.ticket}
-                            statusLabel={ticketStatusLabel(resolution)}
-                          />
-                        ) : (
-                          <LegacyDetail record={rec} />
-                        )}
-                        {rec.verdict === "FIX" && rec.fix ? (
-                          <ApplyFixControl
-                            applying={applyingFix.has(rec.record_id)}
-                            result={fixResults.get(rec.record_id)}
-                            onApply={() => applyFix(rec.record_id)}
-                          />
-                        ) : null}
-                      </td>
-                    </tr>
-                  ) : null}
-                </RowFragment>
-              );
-            })}
-          </tbody>
-        </table>
+        (() => {
+          // README / narrative-doc drift is shown in its OWN section, separate
+          // from the engineering timeline (FEAT-CONFIGV2-016).
+          const { main, readme } = partitionReadme(
+            state.data.records,
+            (r) => r.doc_path,
+          );
+          return (
+            <>
+              {main.length > 0 ? (
+                <table>
+                  {recordsHead}
+                  <tbody>{renderRecordRows(main)}</tbody>
+                </table>
+              ) : null}
+              {readme.length > 0 ? (
+                <div className="drift-readme panel">
+                  <h2>README files</h2>
+                  <table>
+                    {recordsHead}
+                    <tbody>{renderRecordRows(readme)}</tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          );
+        })()
       )}
     </section>
   );

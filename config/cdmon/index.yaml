@@ -31,9 +31,14 @@ central:
 
 # A `source: index` region lists OTHER documents (a collection/landing page).
 # Columns map per-doc synthetic fields: title (linked), summary, audience, ...
+# `kind: eng-guide` SCOPES this index to the engineering docs: render_index only
+# lists eng-guide docs here, and the INDEX_INCOMPLETE lint only requires those to
+# be linked — so the user-guide README (FEAT-CONFIGV2-016) is monitored without
+# being dragged onto this engineering landing page.
 region_templates:
   api-index:
     source: index
+    kind: eng-guide
     columns:
       - {header: "Document", field: "title"}
       - {header: "What it covers", field: "summary"}

@@ -5,6 +5,7 @@ import type {
   ConfigDocumentTree,
   CoverageSnapshot,
   EditableConfigTree,
+  EditableDocument,
   GenerateResponse,
   RegisteredRepo,
   RepoHealth,
@@ -265,6 +266,81 @@ export const configDocuments: ConfigDocumentTree[] = [
     ],
   },
 ];
+
+// ── FEAT-CONFIGV2-016 fixtures: a monitored README (narrative) document ─────
+
+/** A README document tree — a user-guide narrative with no managed region,
+ * tracked against the CLI surface it documents. Surfaced in its OWN section. */
+export const readmeDocTree: ConfigDocumentTree = {
+  document: {
+    repo_id: "acme/widget",
+    doc_id: "readme",
+    path: "README.md",
+    audience: "user-guide",
+    unit: "core",
+    region_keys: [],
+    context_refs: [],
+    sync_kind: "git",
+    ref: "main",
+    synced_at: "2026-06-04T09:00:00Z",
+  },
+  code_refs: [
+    {
+      repo_id: "acme/widget",
+      doc_id: "readme",
+      path: "src/cli.py",
+      symbols: [],
+      unit: "core",
+      sync_kind: "git",
+    },
+  ],
+};
+
+/** A drift record against the README (its public CLI surface moved). */
+export const readmeRecord: ReviewRecord = {
+  schema_version: "1.0.0",
+  record_id: "rec-readme-1",
+  doc_id: "readme",
+  doc_path: "README.md",
+  audience: "user-guide",
+  drift_kind: "signature_changed",
+  drift_detail: "the CLI gained a `cdmon trace` command",
+  cause: "the README's command list is stale",
+  verdict: "FIX",
+  fix: { rationale: "regenerate the command list", new_doc_text: "…" },
+  surface_hash: "cccc3333",
+  backend_kind: "mock",
+  detected_at: "2026-06-04T12:30:00Z",
+  resolved_at: "2026-06-04T12:30:00Z",
+  config_snapshot: {},
+  source_sha: "sha-ccc",
+};
+
+/** A README entry for the editable (Mapping) tree. */
+export const readmeEditableDoc: EditableDocument = {
+  document: {
+    repo_id: "acme/widget",
+    doc_id: "readme",
+    path: "README.md",
+    audience: "user-guide",
+    unit: "core",
+    region_keys: [],
+    context_refs: [],
+    sync_kind: "local",
+    ref: "local",
+    synced_at: "2026-06-06T09:00:00Z",
+  },
+  code_refs: [
+    {
+      repo_id: "acme/widget",
+      doc_id: "readme",
+      path: "src/taskflow/cli.py",
+      symbols: [],
+      unit: "core",
+      sync_kind: "local",
+    },
+  ],
+};
 
 // ── W-03 fixtures (the Y-02 SyncRun summary) ────────────────────────────────
 

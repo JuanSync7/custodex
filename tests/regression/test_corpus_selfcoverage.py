@@ -38,7 +38,8 @@ def _copy_dogfood_tree(dst: Path) -> Path:
 
     The dir layout resolves the repo root via ``config/cdmon`` root="../.." and a
     ``doc-style.yaml`` pointer under ``templates/writing/``, so the copy must carry
-    all four trees. Returns the copied ``config/cdmon`` directory.
+    all four trees — plus the repo-root ``README.md``, a tracked user-guide
+    document (FEAT-CONFIGV2-016). Returns the copied ``config/cdmon`` directory.
     """
     import shutil
 
@@ -47,6 +48,7 @@ def _copy_dogfood_tree(dst: Path) -> Path:
     shutil.copytree(_ROOT / "docs", dst / "docs")
     shutil.copytree(_ROOT / "config", dst / "config")
     shutil.copytree(_ROOT / "templates", dst / "templates")
+    shutil.copy2(_ROOT / "README.md", dst / "README.md")
     return dst / "config" / "cdmon"
 
 

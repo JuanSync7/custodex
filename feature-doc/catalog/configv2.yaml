@@ -184,3 +184,22 @@ features:
     subsystem: configv2
     modules: [index]
     constraints: [K0, K2, K10]
+
+  - id: FEAT-CONFIGV2-016
+    title: README / narrative-document monitoring
+    summary: >-
+      A narrative Markdown document such as README.md is a first-class monitored
+      document: it is declared in a config/cdmon unit with code_refs naming the
+      source files it describes and NO managed region, so the engine tracks it by
+      the whole-doc fingerprint over that code surface and never authors its prose
+      (K2). As a user-guide its drift is audience-gated — a comment/docstring or
+      private change to a referenced source file is a non-event, only a real
+      public-surface change drifts it (K3) — and the drift is recorded as a
+      ReviewRecord for a human, never auto-rewritten (K5); monitor --apply only
+      refreshes its fingerprint. To keep an eng-only api-index from being forced
+      to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index
+      region's audience kind, so an index need only link the documents it renders.
+      cdmon dogfoods this on its own README.md.
+    subsystem: configv2
+    modules: [config, drift, layout]
+    constraints: [K0, K2, K3, K5, K10]

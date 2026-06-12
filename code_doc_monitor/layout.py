@@ -282,13 +282,44 @@ def _index_link_targets(index_spec: DocumentSpec, target: DocumentSpec) -> set[s
     return wanted
 
 
-def _index_coverage_issues(config: MonitorConfig, root: Path) -> list[LayoutIssue]:
-    """Check that every ``index: true`` doc links every other document (K0).
+def _indexed_audiences(spec: DocumentSpec, config: MonitorConfig) -> set[str] | None:
+    """The audience scope an ``index: true`` doc covers, or ``None`` for "all".
 
-    A purely structural, target-agnostic rule: a landing page declared as an
-    index must reference each sibling doc (by its ``.md`` or ``.html`` link), so
-    adding a doc to the config without linking it from the index is caught. A
-    missing or malformed index doc is left to the other lint/check passes.
+    Derived from the doc's ``source='index'`` region templates so the
+    completeness rule matches what :func:`~code_doc_monitor.index.render_index`
+    actually lists: every such template that pins a ``kind`` narrows the index to
+    that audience. When every index region pins a kind, the index need only link
+    documents of those audiences; when ANY index region renders all audiences
+    (``kind`` is ``None``) — or the doc declares no index template at all — the
+    original target-agnostic rule stands and ``None`` is returned (link every
+    document). Additive: a kind-less api-index keeps today's behavior.
+    """
+    index_templates = [
+        config.region_templates[rid]
+        for rid in spec.region_keys
+        if rid in config.region_templates
+        and config.region_templates[rid].source == "index"
+    ]
+    if not index_templates:
+        return None
+    kinds: set[str] = set()
+    for template in index_templates:
+        if template.kind is None:
+            return None  # an all-audiences index region => require every doc
+        kinds.add(template.kind)
+    return kinds
+
+
+def _index_coverage_issues(config: MonitorConfig, root: Path) -> list[LayoutIssue]:
+    """Check that every ``index: true`` doc links every document it indexes (K0).
+
+    A purely structural rule: a landing page declared as an index must reference
+    each sibling doc it lists (by its ``.md`` or ``.html`` link), so adding a doc
+    to the config without linking it from the index is caught. The set of docs an
+    index "lists" honors its index template's audience ``kind`` filter
+    (:func:`_indexed_audiences`) — an eng-only api-index is not flagged for
+    omitting a user-guide doc it never renders. A missing or malformed index doc
+    is left to the other lint/check passes.
     """
     issues: list[LayoutIssue] = []
     for spec in config.documents:
@@ -301,9 +332,12 @@ def _index_coverage_issues(config: MonitorConfig, root: Path) -> list[LayoutIssu
             body = parse_doc(doc_path).body
         except DriftError:
             continue  # malformed structure is reported by lint_doc
+        scope = _indexed_audiences(spec, config)
         for target in config.documents:
             if target.id == spec.id:
                 continue
+            if scope is not None and target.audience.value not in scope:
+                continue  # outside this index's audience scope (not rendered there)
             wanted = _index_link_targets(spec, target)
             if not any(link in body for link in wanted):
                 issues.append(

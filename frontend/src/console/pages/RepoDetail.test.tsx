@@ -9,7 +9,13 @@ import type {
   ReviewRecord,
   SyncRun,
 } from "../types";
-import { applyFixResponse, records, resolutions, syncRunGit } from "../test/fixtures";
+import {
+  applyFixResponse,
+  readmeRecord,
+  records,
+  resolutions,
+  syncRunGit,
+} from "../test/fixtures";
 
 interface RecordCall {
   repoId: string;
@@ -443,5 +449,21 @@ describe("RepoDetail page", () => {
     expect(screen.getByText(/update the import path/i)).toBeInTheDocument();
     // No ticket title is rendered.
     expect(screen.queryByText(/HIGH\] signature_changed/)).not.toBeInTheDocument();
+  });
+
+  it("lists README drift in a separate 'README files' section", async () => {
+    const { api } = fakeApi({
+      recordsFor: async () => [...records, readmeRecord],
+    });
+    renderDetail(api);
+
+    // Engineering records render in the main timeline…
+    await screen.findByRole("row", { name: /guide\/install/ });
+    // …and the README record under its OWN "README files" section.
+    const heading = screen.getByRole("heading", { name: /readme files/i });
+    const section = heading.closest("div")!;
+    const readmeRow = within(section).getByRole("row", { name: /readme/i });
+    expect(readmeRow).toHaveTextContent("README.md");
+    expect(readmeRow).toHaveTextContent("signature_changed");
   });
 });

@@ -1163,6 +1163,34 @@ tbody th {
   color: var(--text);
   word-break: break-all;
 }
+
+/* Coverage HIERARCHY: a file leaf's basename reads as code; a directory node is
+   a faint header row rolling up its descendant-file status counts. Indentation
+   is applied inline (per tree depth) on the leading span. */
+.file-name {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--text);
+  word-break: break-all;
+}
+.coverage-dir-row th {
+  font-weight: 600;
+}
+.coverage-dir {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+.coverage-dir__name {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+}
+.coverage-dir__counts {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-faint);
+}
 .file-status {
   display: inline-flex;
   align-items: center;

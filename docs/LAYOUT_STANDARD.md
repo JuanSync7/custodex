@@ -58,7 +58,10 @@ The front matter MUST carry a `cdm:` mapping with three managed keys:
 
 `schema_version` and `audience` are **static** — authored once and preserved
 across heals (heal only ever rewrites `fingerprint`). Any other front-matter
-keys a project wants to add are allowed and left untouched.
+keys a project wants to add are allowed and left untouched. (The engine also
+stamps additional *managed* `cdm.*` keys — `cdm.region_hashes` (§7) plus the
+fingerprint-tier and region-anchor keys — which are engine-written, not
+project-authored.)
 
 ## 3. Marker grammar
 
@@ -127,6 +130,7 @@ would see does. Audience split is preserved: humans read `*.html` /
 | `HTML_MISSING` | declared HTML twin file is absent |
 | `HTML_NOT_DERIVED` | HTML twin lacks the embedded source hash |
 | `HTML_STALE` | embedded hash ≠ current Markdown body hash |
+| `INDEX_INCOMPLETE` | an `index: true` document does not link every document it indexes — honoring the index region's audience `kind` (§8) |
 
 ## 6. Workflow
 
@@ -135,6 +139,7 @@ cdmon new-doc <doc-id>     # scaffold a conformant .md from the config + code
 cdmon lint                 # validate every doc against this standard (exit 1 on issues)
 cdmon lint --fix           # stamp missing static front matter (schema_version/audience)
 cdmon check                # content drift (orthogonal to lint — run both in CI)
+cdmon build                # (re)render html:true docs to their .html twins (keeps the §4 pairing fresh)
 ```
 
 `lint` (structure) and `check` (content) are orthogonal gates; CI should run
@@ -247,11 +252,23 @@ config (the index document excludes itself), kept in sync like any code-backed
 region (re-purpose, rename, add, or remove a sibling and the index drifts until
 rebuilt). Set `kind: <audience>` to list only `user-guide` or `eng-guide` docs.
 
+Separately, set `index: true` on the document spec to enable the structural
+**completeness** lint: `cdmon lint` then emits `INDEX_INCOMPLETE` (§5) if the
+landing page fails to link a document it indexes. The two flags are orthogonal —
+`source: index` drives the *generated table*, `index: true` drives the
+*link-completeness lint* — and a landing page typically sets both.
+
+The completeness lint honors the index region's audience **`kind`**, so it stays
+aligned with the table the index actually renders: an `eng-guide`-scoped index is
+*not* flagged for omitting a `user-guide` document (e.g. a monitored `README.md`),
+because that document is never listed there. With no `kind` (an all-audiences
+index), every other document must be linked.
+
 ```yaml
 region_templates:
   api-index:
     source: index
-    # kind: eng-guide          # optional: restrict to one audience
+    kind: eng-guide            # restrict to one audience (and scope the lint to it)
     columns:
       - {header: "Document",       field: "title"}    # linked to the doc
       - {header: "What it covers", field: "summary"}
@@ -260,6 +277,7 @@ documents:
   - id: api-index
     path: docs/api/index.md
     audience: eng-guide
+    index: true                 # landing page: INDEX_INCOMPLETE requires it to link every eng-guide sibling
     region_keys: [api-index]    # an index doc needs no code_refs
 ```
 
@@ -300,6 +318,7 @@ documents:
 
 `context_refs` are surfaced to the authoring prompt as reference material but are
 **never counted in coverage, the `.rpt`, or drift** — they are not part of the
-documented surface (that is `code_refs`). They can be added from the dashboard's
-interactive Mapping page (see the project README). Paths are not resolved for
-existence at load, so a `context_refs` entry may point at a not-yet-created doc.
+documented surface (that is `code_refs`). They can be added from the console's
+interactive Mapping view (the single Astro frontend served at `/`; see the
+project README). Paths are not resolved for existence at load, so a
+`context_refs` entry may point at a not-yet-created doc.
