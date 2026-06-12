@@ -47,7 +47,8 @@ def _git(repo: Path, *args: str) -> None:
 
 
 def _demo_origin(tmp_path: Path) -> Path:
-    """A real git origin holding a COPY of the committed ``demo/`` tree (on ``main``)."""
+    """A real git origin holding a COPY of the committed ``demo/`` tree
+    (on ``main``)."""
     origin = tmp_path / "demo-origin"
     shutil.copytree(_DEMO, origin)
     _git(origin, "init", "-q")

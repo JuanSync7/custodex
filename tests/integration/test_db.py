@@ -355,7 +355,8 @@ def test_sql_reregister_can_rotate_token(store: SqlStore) -> None:
 
 
 def test_sql_provider_secret_plaintext_never_in_stored_payload(store: SqlStore) -> None:
-    """The WRITE-ONLY plaintext provider_secret must never reach the JSON column (GIT-02)."""
+    """The WRITE-ONLY plaintext provider_secret must never reach the JSON
+    column (GIT-02)."""
     from sqlalchemy import select
 
     from code_doc_monitor.server.db import RepoRow
