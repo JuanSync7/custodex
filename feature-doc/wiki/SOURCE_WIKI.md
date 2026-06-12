@@ -50,7 +50,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `configsync.py`
 - Public symbols: `GitInfo`, `SyncResult`, `__all__`, `read_config_at`, `run_sync`
-- Implemented by: `FEAT-CONFIGV2-012`
+- Implemented by: `FEAT-CONFIGV2-012`, `FEAT-GITSYNC-005`
 
 ## `coverage`
 
@@ -110,7 +110,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `gitfetch.py`
 - Public symbols: `RemoteSpec`, `__all__`, `cloned_repo`
-- Implemented by: `FEAT-GITSYNC-001`
+- Implemented by: `FEAT-GITSYNC-001`, `FEAT-GITSYNC-005`
 
 ## `heal`
 

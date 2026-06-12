@@ -213,3 +213,27 @@ cdmon's server reads a repo two ways:
   repo's default branch**. Until then git-mode sync raises a loud, actionable
   error (and the standalone/seed launchers treat git as best-effort and skip it),
   while local-mode sync keeps working against the working tree.
+
+## Put the demo in git — `scripts/demo_as_git.py`
+
+Want a *real, standalone* git repo to point the **central server** at — the
+clone-on-demand path the server uses for a repo it does **not** hold on disk?
+The demo can't host its own `.git` (it is a subdir of the outer repo), so a small
+launcher exports it to one:
+
+```bash
+python scripts/demo_as_git.py /tmp/demo-as-git   # from the repo root
+```
+
+This materializes the demo into a genuine git repository with an **authentic,
+multi-commit history** (one commit per stage of the project's evolution, mirroring
+`CHANGELOG.md`) plus a **bare `file://` origin** — all offline and reproducibly
+(pinned git identity + a fixed commit date). It then prints a network-free recipe
+(an in-process `TestClient`, no `curl`) that registers the `file://` origin with
+the server and runs a clone-on-demand `POST /sync` over it. The server clones the
+origin, surfaces the demo's three documents, and reports the same **80%** coverage
+(the lone `scheduler.py` gap) it does for the local tree.
+
+The same flow is proven for *any* git repo — not just the demo — in
+`tests/system/test_gitrepo_sync_e2e.py` (a one-unit repo, a two-unit repo on a
+`trunk` default branch, and the demo, each over a real `file://` origin).

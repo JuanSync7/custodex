@@ -832,3 +832,21 @@ plans without calling the provider.
 `test_pr.py` (the GitHub atomic flow) and
 `test_demo_gitsync_e2e.py::test_demo_docs_pr_after_upstream_drift_opens_pr`.
 Features: FEAT-GITSYNC-004
+
+### DEMO-056 — Put the demo in git: clone-on-demand works for any real repo
+**What it shows.** The clone-on-demand flow is repo-agnostic — it works against
+ANY real git repository, with an authentic multi-commit history, not just a
+single-commit fixture. `scripts/demo_as_git.py` materializes the committed
+`demo/` tree into a genuine standalone git repo (one commit per stage of the
+project's evolution, mirroring `CHANGELOG.md`) plus a bare `file://` origin,
+fully offline and reproducibly (pinned git identity + a fixed commit date). The
+server then clones that origin on demand and surfaces the demo's documents +
+its pinned 80% coverage off the real default-branch tip — and the same holds
+for synthetic one-/two-unit repos and a repo whose default branch is `trunk`,
+not `main`.
+**How to observe.** Run `python scripts/demo_as_git.py /tmp/demo-as-git` to build
+the repo, then run the offline sync recipe it prints (an in-process `TestClient`
+that registers the `file://` origin and `POST`s `/sync`) — no network, no `curl`.
+See `tests/system/test_gitrepo_sync_e2e.py` (the parametrized any-repo matrix,
+the git-mode baseline, and `::test_demo_as_git_materializes_a_syncable_repo`).
+Features: FEAT-GITSYNC-005

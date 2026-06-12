@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdmon trace` (R-07 `cdmon wiki`) to regenerate.
 
-**196 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**197 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -67,7 +67,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-CONFIGV2-009` | integration/test_config_index.py, system/test_dogfood.py | DEMOS.md |
 | `FEAT-CONFIGV2-010` | integration/test_config_v2.py | DEMOS.md |
 | `FEAT-CONFIGV2-011` | integration/test_templates_v2.py | DEMOS.md |
-| `FEAT-CONFIGV2-012` | integration/test_apply_fix.py, integration/test_configsync.py, integration/test_gitfetch.py, integration/test_server_gitsync.py, integration/test_server_sync.py, system/test_cli_sync.py, system/test_demo_e2e.py, system/test_demo_gitsync_e2e.py, system/test_standalone.py, unit/test_gitfetch.py | DEMOS.md |
+| `FEAT-CONFIGV2-012` | integration/test_apply_fix.py, integration/test_configsync.py, integration/test_gitfetch.py, integration/test_server_gitsync.py, integration/test_server_sync.py, system/test_cli_sync.py, system/test_demo_e2e.py, system/test_demo_gitsync_e2e.py, system/test_gitrepo_sync_e2e.py, system/test_standalone.py, unit/test_gitfetch.py | DEMOS.md |
 | `FEAT-CONFIGV2-013` | integration/test_apply_fix.py, integration/test_generate.py, system/test_demo_walkthrough.py | DEMOS.md |
 | `FEAT-CONFIGV2-014` | unit/test_unit_serializer.py | DEMOS.md |
 | `FEAT-CONFIGV2-015` | unit/test_index.py | DEMOS.md |
@@ -97,10 +97,11 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-EXTRACT-004` | regression/test_corpus_pipeline.py, system/test_system.py, unit/test_extract.py | DEMOS.md |
 | `FEAT-EXTRACT-005` | system/test_system.py, unit/test_extract.py | DEMOS.md |
 | `FEAT-EXTRACT-006` | system/test_example_multilang.py, system/test_system.py, unit/test_extract.py | DEMOS.md |
-| `FEAT-GITSYNC-001` | unit/test_gitfetch.py | DEMOS.md |
+| `FEAT-GITSYNC-001` | system/test_gitrepo_sync_e2e.py, unit/test_gitfetch.py | DEMOS.md |
 | `FEAT-GITSYNC-002` | unit/test_secrets.py | DEMOS.md |
 | `FEAT-GITSYNC-003` | unit/test_gitauth.py | DEMOS.md |
 | `FEAT-GITSYNC-004` | unit/test_pr.py | DEMOS.md |
+| `FEAT-GITSYNC-005` | system/test_gitrepo_sync_e2e.py | DEMOS.md |
 | `FEAT-HEAL-001` | integration/test_heal.py, regression/test_corpus_pipeline.py, regression/test_corpus_selfcoverage.py, system/test_demo_walkthrough.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, system/test_example_external.py, system/test_system.py | DEMOS.md |
 | `FEAT-HEAL-002` | integration/test_heal.py, system/test_system.py | DEMOS.md |
 | `FEAT-HEAL-003` | unit/test_templates.py | DEMOS.md |
@@ -147,7 +148,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-PR-002` | integration/test_syncpr.py, system/test_cli.py | DEMOS.md |
 | `FEAT-PR-003` | integration/test_syncpr.py, regression/test_corpus_pipeline.py, system/test_cli.py | DEMOS.md |
 | `FEAT-PR-004` | system/test_cli.py, unit/test_pr.py | DEMOS.md |
-| `FEAT-PR-005` | unit/test_pr.py | DEMOS.md |
+| `FEAT-PR-005` | system/test_gitrepo_sync_e2e.py, unit/test_pr.py | DEMOS.md |
 | `FEAT-PR-006` | system/test_cli.py, unit/test_pr.py | DEMOS.md |
 | `FEAT-PR-007` | system/test_cli.py, unit/test_issues.py | DEMOS.md |
 | `FEAT-PR-008` | system/test_cli.py, unit/test_issues.py | DEMOS.md |
@@ -188,7 +189,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-SERVER-003` | integration/test_provider_secret.py, integration/test_server.py, integration/test_server_gitsync.py, integration/test_server_store_parity.py, system/test_demo_gitsync_e2e.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_server_launch.py | DEMOS.md |
 | `FEAT-SERVER-004` | integration/test_apply_fix.py, integration/test_config_edits_routes.py, integration/test_db.py, integration/test_generate.py, integration/test_server.py, integration/test_server_store_parity.py, integration/test_server_sync.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_standalone.py | DEMOS.md |
 | `FEAT-SERVER-005` | integration/test_apply_fix.py, integration/test_config_edits_routes.py, integration/test_db.py, integration/test_server.py, integration/test_server_store_parity.py, integration/test_server_sync.py, integration/test_store_config.py, system/test_e2e_ticket_coverage.py, system/test_server_launch.py | DEMOS.md |
-| `FEAT-SERVER-006` | integration/test_db.py, integration/test_provider_secret.py, integration/test_server_gitsync.py, integration/test_server_store_parity.py, integration/test_server_sync.py, integration/test_store_config.py, system/test_server_launch.py, unit/test_gitauth.py, unit/test_secrets.py | DEMOS.md |
+| `FEAT-SERVER-006` | integration/test_db.py, integration/test_provider_secret.py, integration/test_server_gitsync.py, integration/test_server_store_parity.py, integration/test_server_sync.py, integration/test_store_config.py, system/test_gitrepo_sync_e2e.py, system/test_server_launch.py, unit/test_gitauth.py, unit/test_secrets.py | DEMOS.md |
 | `FEAT-SERVER-007` | integration/test_db.py, system/test_server_launch.py | DEMOS.md |
 | `FEAT-SERVER-008` | integration/test_server.py, integration/test_server_store_parity.py, system/test_demo_e2e.py, system/test_e2e_ticket_coverage.py, system/test_server_launch.py | DEMOS.md |
 | `FEAT-SERVER-009` | integration/test_server_sync.py, integration/test_store_config.py, system/test_demo_e2e.py, system/test_standalone.py | DEMOS.md |

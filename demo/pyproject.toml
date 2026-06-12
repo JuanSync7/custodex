@@ -1,0 +1,50 @@
+# Packaging + tooling for `taskflow`, the demo adopter app.
+#
+# This is the *adopter's* pyproject — it is intentionally separate from the
+# outer code-doc-monitor project so the demo reads like a real standalone repo
+# (its own package metadata, test config, and lint rules). cdmon never reads
+# this file; the cdmon config lives under `config/cdmon/`.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "taskflow"
+version = "0.3.0"
+description = "A tiny, dependency-ordered task engine."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "demo-team", email = "demo-team@example.com" }]
+keywords = ["tasks", "dag", "scheduling", "dependencies"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+[project.urls]
+Homepage = "https://example.com/demo-team/taskflow"
+Source = "https://example.com/demo-team/taskflow"
+Changelog = "https://example.com/demo-team/taskflow/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/taskflow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

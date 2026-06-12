@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**196 features** across 19 subsystems.
+**197 features** across 19 subsystems.
 
 ## agent
 
@@ -507,6 +507,7 @@ ShellExtractor statically parses sh/bash function definitions (`name() {…}` an
 | `FEAT-GITSYNC-002` | At-rest sealing of per-repo provider credentials | secrets | K0, K6, K8 | — | — | implemented |
 | `FEAT-GITSYNC-003` | Short-lived GitHub App / GitLab OAuth token minting | gitauth | K0, K4, K8, K10 | — | — | implemented |
 | `FEAT-GITSYNC-004` | GitHub docs-PR transport (atomic git-data flow) | pr | K0, K4, K8, K10 | — | — | implemented |
+| `FEAT-GITSYNC-005` | Repo-agnostic clone-on-demand sync over a real git origin | gitfetch, configsync | K0, K1, K4, K10 | — | — | implemented |
 
 ### `FEAT-GITSYNC-001` — Clone-on-demand for a not-local repo
 
@@ -523,6 +524,10 @@ gitauth mints a SHORT-LIVED provider token from a longer-lived credential so the
 ### `FEAT-GITSYNC-004` — GitHub docs-PR transport (atomic git-data flow)
 
 pr.GitHubTransport is the PRTransport sibling of GitLabTransport: submit opens a docs PR through the canonical ATOMIC GitHub git-data flow with no local checkout — read the target ref + base tree, POST a new tree carrying every healed file inline, POST a commit, create the source branch ref, then open the pull request — each through one injected _GitHubHttp leaf (stdlib urllib, K0/K4). from_repo(remote_url, token) builds either transport from a repo URL (the shared _parse_remote is the SSRF/host chokepoint).
+
+### `FEAT-GITSYNC-005` — Repo-agnostic clone-on-demand sync over a real git origin
+
+The clone-on-demand sync + docs-PR flow is repo-agnostic — it works against ANY real git repository, not just one fixture. The committed demo tree (and synthetic one- and two-unit repos, including one whose default branch is trunk, not main) are materialized into genuine MULTI-COMMIT git repos served as file:// origins — via the reproducible scripts/demo_as_git.py launcher (pinned git identity + a fixed commit date, K10) and the shared tests _gitrepo builder — and the server clones each on demand (gitfetch), surfaces its documents + a coverage snapshot off the REAL default-branch tip (configsync.run_sync), sees a newly committed undocumented file on re-sync, and opens a healed docs-PR. All over stdlib git on the local filesystem with NO network (K4); git-mode sync reads the default-branch baseline even when HEAD is on a feature branch ahead of it.
 
 ## heal
 
