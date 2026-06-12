@@ -1,6 +1,27 @@
 # Demo adopter repo ignores. `config/cdmon/ignore.yaml` has `gitignore: true`,
 # so these patterns merge into cdmon's coverage-exclude set too.
+
+# Python
 __pycache__/
+*.py[cod]
 *.log
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environments
+.venv/
+venv/
+
 # cdmon's local review log (written by `monitor`/`monitor --apply`).
 .cdmon/

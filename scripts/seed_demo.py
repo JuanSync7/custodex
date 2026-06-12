@@ -37,7 +37,7 @@ from code_doc_monitor.config import (
     load_config_dir,
     resolve_repo_root,
 )
-from code_doc_monitor.configsync import run_sync
+from code_doc_monitor.configsync import SyncResult, run_sync
 from code_doc_monitor.coverage import coverage_snapshot, resolve_coverage
 from code_doc_monitor.drift import Drift, DriftKind
 from code_doc_monitor.errors import CodeDocMonitorError
@@ -239,29 +239,36 @@ def _fixture_snapshot(root: Path) -> dict:
     return snap
 
 
-def _dogfood_snapshot() -> dict | None:
-    """A REAL coverage snapshot from THIS repo's own ``config/cdmon/`` (dogfood).
+def _dogfood_sync() -> SyncResult | None:
+    """ONE sync of THIS repo (dogfood), reused for BOTH its coverage snapshot AND
+    its 12-document mapping — so the (filesystem-bound) work happens a SINGLE time
+    at startup, not twice.
 
-    Z-02: cdmon's canonical self-config is the CONFIG-V2 dir layout (the redundant
-    single-file ``cdmon.yaml`` was removed). Returns ``None`` if the config or scan
-    is unavailable (import-safe: seeding must never raise just because the working
-    tree is unusual).
+    Prefers **git** mode: it reads a CLEAN ``git worktree`` of tracked files, so it
+    never walks the heavyweight UNTRACKED trees in the live checkout
+    (``frontend/node_modules`` ~330MB, ``.venv/``) that a working-tree scan would
+    traverse. Falls back to **local** mode when git is unavailable (e.g. a CI
+    detached-HEAD checkout with no local ``main`` ref; there those untracked trees
+    are typically absent, so the walk stays cheap). Returns the full
+    :class:`~code_doc_monitor.configsync.SyncResult` (its ``coverage`` wire
+    snapshot is already stamped ``captured_at = _NOW``), or ``None`` if the config
+    is absent / both modes fail. Best-effort: never raises (seeding must not break
+    the launch, K8/K10).
     """
-    config_dir = _REPO_ROOT / "config" / "cdmon"
-    if not (config_dir / "index.yaml").is_file():
+    if not (_REPO_ROOT / "config" / "cdmon" / "index.yaml").is_file():
         return None
-    try:
-        cfg = load_config_dir(config_dir)
-        root = config_dir / cfg.root
-        inv = discover_files(
-            root, include=cfg.coverage.include, exclude=cfg.coverage.exclude
-        )
-        sym = discover_symbols(inv, root)
-        snap = coverage_snapshot(resolve_coverage(cfg, sym))
-    except Exception:  # noqa: BLE001 — seeding is best-effort; never break the launch
-        return None
-    snap["captured_at"] = _NOW
-    return snap
+    for mode in ("git", "local"):
+        try:
+            return run_sync(
+                _REPO_ROOT,
+                "code-doc-monitor",
+                mode=mode,
+                default_branch="main",
+                now=_NOW,
+            )
+        except CodeDocMonitorError:
+            continue  # git unavailable (e.g. CI detached HEAD) → try local
+    return None
 
 
 # A drift induced on a THROWAWAY copy of the demo so the seeded board shows the
@@ -387,34 +394,6 @@ def _register_demo_taskflow(store: InMemoryStore) -> None:
         store.add_coverage_snapshot(_DEMO_REPO_ID, _NOW, snapshot)
 
 
-def _register_dogfood_documents(store: InMemoryStore) -> None:
-    """Config-sync THIS repo's own ``config/cdmon`` into the store so the dogfood
-    ``code-doc-monitor`` repo SHOWS its full 12-document mapping (Documents +
-    Mapping pages), not just records/coverage.
-
-    Read-only on purpose: the repo is registered (in the :data:`_DEMO_REPOS` loop)
-    WITHOUT a ``local_path``, so the editor's write actions (Sync / Generate /
-    apply-fix) stay disabled (409) against the live development tree — the rows are
-    a synced SNAPSHOT for viewing. Best-effort: never breaks the launch (K8/K10).
-    """
-    if not (_REPO_ROOT / "config" / "cdmon" / "index.yaml").is_file():
-        return
-    try:
-        res = run_sync(
-            _REPO_ROOT,
-            "code-doc-monitor",
-            mode="local",
-            default_branch="main",
-            now=_NOW,
-        )
-    except CodeDocMonitorError:
-        return
-    store.replace_config(
-        "code-doc-monitor", "local", list(res.documents), list(res.code_refs)
-    )
-    store.add_sync_run(res.run)
-
-
 def build_seeded_store() -> InMemoryStore:
     """Build an :class:`InMemoryStore` populated with the demo data (import-safe).
 
@@ -445,15 +424,31 @@ def build_seeded_store() -> InMemoryStore:
         )
         records = records + _varied_records(build_document_surface(eng, tmp_root))
 
-    dogfood_snapshot = _dogfood_snapshot()
+    # ONE dogfood sync, reused below for BOTH the coverage snapshot (in the loop)
+    # and the document mapping — computed a single time, not twice (the sync is
+    # filesystem-bound on a large repo, so doing it once matters at startup).
+    dogfood = _dogfood_sync()
+    dogfood_snapshot = dogfood.coverage if dogfood is not None else None
 
     for repo_id, repo_name, description in _DEMO_REPOS:
-        identity = RepoIdentity(repo_id=repo_id, repo_name=repo_name)
+        # The dogfood repo IS this checkout: give it a local_path + default branch
+        # so its dashboard Sync button actually works. Prefer "Sync (main)" (git
+        # mode) — it reads a CLEAN `git worktree` of tracked files in ~1s; "Sync
+        # (local)" walks the whole working tree (incl. .venv/, node_modules, caches)
+        # and is far slower, so the browser fetch can time out on a big repo.
+        local_path = str(_REPO_ROOT) if repo_id == "code-doc-monitor" else None
+        identity = RepoIdentity(
+            repo_id=repo_id,
+            repo_name=repo_name,
+            local_path=local_path,
+            default_branch="main",
+        )
         store.add_repo(
             RegistrationPayload(
                 repo=identity,
                 description=description,
                 auth_token=_DEMO_TOKEN,
+                default_branch="main",
             )
         )
         for rec in records:
@@ -465,8 +460,17 @@ def build_seeded_store() -> InMemoryStore:
     # The CONFIG-V2 adopter demo: registered OPEN with its local_path + pre-synced
     # so the dashboard shows its Documents view + a working Sync button (M-02).
     _register_demo_taskflow(store)
-    # The dogfood repo shows its full 12-document mapping (read-only snapshot).
-    _register_dogfood_documents(store)
+    # The dogfood repo's full 12-document mapping, stored from the SAME sync that
+    # produced its coverage snapshot above (git mode lands it under the "git" view
+    # — the dashboard Documents page's default — so it shows on first load).
+    if dogfood is not None:
+        store.replace_config(
+            "code-doc-monitor",
+            dogfood.run.sync_kind,
+            list(dogfood.documents),
+            list(dogfood.code_refs),
+        )
+        store.add_sync_run(dogfood.run)
 
     return store
 

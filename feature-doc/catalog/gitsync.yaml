@@ -64,3 +64,22 @@ features:
     subsystem: gitsync
     modules: [pr]
     constraints: [K0, K4, K8, K10]
+
+  - id: FEAT-GITSYNC-005
+    title: Repo-agnostic clone-on-demand sync over a real git origin
+    summary: >-
+      The clone-on-demand sync + docs-PR flow is repo-agnostic — it works against
+      ANY real git repository, not just one fixture. The committed demo tree (and
+      synthetic one- and two-unit repos, including one whose default branch is
+      trunk, not main) are materialized into genuine MULTI-COMMIT git repos served
+      as file:// origins — via the reproducible scripts/demo_as_git.py launcher
+      (pinned git identity + a fixed commit date, K10) and the shared tests
+      _gitrepo builder — and the server clones each on demand (gitfetch), surfaces
+      its documents + a coverage snapshot off the REAL default-branch tip
+      (configsync.run_sync), sees a newly committed undocumented file on re-sync,
+      and opens a healed docs-PR. All over stdlib git on the local filesystem with
+      NO network (K4); git-mode sync reads the default-branch baseline even when
+      HEAD is on a feature branch ahead of it.
+    subsystem: gitsync
+    modules: [gitfetch, configsync]
+    constraints: [K0, K1, K4, K10]
