@@ -2560,3 +2560,44 @@ def mint_gitlab_oauth_token(...) -> str: ...
 `RepoIdentity` gains additive `installation_id: str | None = None` (and the App credential — app_id + the PEM — is the SAME sealed-secret column, distinguished by a `provider_kind`). Only the credential SOURCE differs from Phase 1; `RemoteSpec`/`cloned_repo`/`GitHubTransport`/`GitLabTransport`/the routes are reused verbatim. Air-gapped GHE/GitLab falls back to SSH here (only if a concrete adopter needs it).
 
 **Slices:** **GIT-00** clone-on-demand (`gitfetch.py`). **GIT-01** `secrets.py` AES-GCM + `SecretError`. **GIT-02** identity/payload fields + Store provider-secret seam + Alembic 0005. **GIT-03** `GitHubTransport` + `from_repo` on both transports. **GIT-04** remote `/sync` + `POST /docs-pr` route. **GIT-05** `gitauth.py` App/OAuth token exchange + `from_credential`. Each: TDD red-first, green gate (ruff+mypy+pytest ≥90% branch), Store-parity over InMemoryStore AND SqlStore where the store is touched, dogfood reheal, STATUS row + LESSON.
+
+## EPIC TDOC — test→test-doc mirror  (FEAT-CONFIGV2-017; a CONFIG CONVENTION, no engine code)
+
+The mirror that syncs **tests → test-docs** the way source syncs to docs. The
+governing finding: the engine is already **generic over any `.py` file** — a test
+file is just a `.py` file, so `extract.build_document_surface`, `drift.detect`,
+`heal.regenerate_regions`, and `coverage.resolve_coverage` work on test files with
+**zero new code (K0)**. The mirror is therefore a *config convention* + a frontend
+partition, NOT a new module or signature.
+
+**The convention.** A `tests.yaml` unit (peer of `core.yaml`/`server.yaml`) whose
+`dir-covered` names a test directory and whose `DocumentSpec`s point `code_refs` at
+test files, with the documents living under a top-level **`test-docs/`** directory
+and carrying a managed `symbols` region. The region then lists the test file's
+`test_*` functions; editing a test drifts the test-doc; `cdmon monitor --apply`
+heals it (K7). The test file is the source of truth, the test-doc is graded against
+it (K2). 1:1: one test-doc per test file. Scoped to keep coverage bounded — the
+dogfood covers only `tests/smoke`; the demo covers all of `demo/tests/`.
+
+**`api-index` interaction.** Test-docs are `eng-guide`, so the eng-only `api-index`
+lists them — consistent with its rule (it lists every `eng-guide` doc; the README
+is excluded only because it is `user-guide`, FEAT-CONFIGV2-016). The user-facing
+*separation* is the frontend section, not the index.
+
+**Frontend (`frontend/src/console/lib/grouping.ts`).** Two additive pure helpers,
+parallel to `isReadmePath`/`partitionReadme`:
+```ts
+export function isTestDocPath(path: string): boolean;  // first segment === "test-docs"
+export function partitionDocs<T>(items, pathOf): { main: T[]; readme: T[]; tests: T[] };
+```
+The Documents / RepoDetail(Drift) / Mapping pages call `partitionDocs` and render a
+third **"Test docs"** section (after the README section) using the same row
+renderers. No new API/route/store/schema surface — test-docs flow through the
+existing document endpoints, distinguished purely by path.
+
+**Slices:** **TDOC-01** convention + dogfood (`tests/smoke`) + the engine-contract
+test (`test_testdoc_mirror.py`). **TDOC-02** demo 1:1 (`demo/tests` → 4 test-docs)
++ the count-pin ripple. **TDOC-03** `FEAT-CONFIGV2-017` + DEMO-058 + trace 199/199
++ wikis. **TDOC-04** the frontend Test docs section. Each: TDD red-first, full gate
+green (ruff+mypy+pytest ≥90% branch + dogfood/demo `cdmon` gates + `astro check`),
+STATUS row + LESSON.

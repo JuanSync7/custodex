@@ -44,7 +44,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `config.py`
 - Public symbols: `AgentConfig`, `Audience`, `BackendConfig`, `CONFIG_TEMPLATE`, `CentralConfig`, `CodeRef`, `ConfigBundle`, `ContextRef`, `CoverageConfig`, `DEFAULT_CENTRAL_TOKEN_ENV`, `DocumentSpec`, `IgnoreFile`, `IgnoreFrontmatter`, `IndexFile`, `IndexFrontmatter`, `IndexUnitRef`, `MonitorConfig`, `RESERVED_UNIT_STEMS`, `RegionColumn`, `RegionMode`, `RegionTemplate`, `UnitFile`, `UnitFrontmatter`, `WaiverEntry`, `__all__`, `add_code_ref`, `central_config_template`, `dump_unit_file`, `effective_coverage`, `gitignore_to_globs`, `load_bundle`, `load_config`, `load_config_dir`, `load_ignore_file`, `load_index_file`, `load_unit_file`, `regenerate_index`, `remove_code_ref`, `resolve_repo_root`, `set_context_refs`, `unit_for_path`, `upsert_document`, `write_index`, `write_template`
-- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`
+- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`, `FEAT-CONFIGV2-017`
 
 ## `configsync`
 
@@ -86,7 +86,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `extract.py`
 - Public symbols: `DocumentSurface`, `Extractor`, `PythonAstExtractor`, `Record`, `ShellExtractor`, `SurfaceFingerprint`, `Symbol`, `SymbolKind`, `__all__`, `anchor_id`, `build_document_surface`, `extract_argparse_records`, `extract_file`, `extract_json_records`, `extract_switches`, `get_extractor`, `register_extractor`
-- Implemented by: `FEAT-EXTRACT-001`, `FEAT-EXTRACT-002`, `FEAT-EXTRACT-003`, `FEAT-EXTRACT-004`, `FEAT-EXTRACT-005`, `FEAT-EXTRACT-006`, `FEAT-MANIFEST-005`
+- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-EXTRACT-001`, `FEAT-EXTRACT-002`, `FEAT-EXTRACT-003`, `FEAT-EXTRACT-004`, `FEAT-EXTRACT-005`, `FEAT-EXTRACT-006`, `FEAT-MANIFEST-005`
 
 ## `featurecatalog`
 
@@ -116,7 +116,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `heal.py`
 - Public symbols: `ProposedFixLike`, `__all__`, `apply_fix`, `locked_region_ids`, `regenerate_regions`, `render_corrected`
-- Implemented by: `FEAT-HEAL-001`, `FEAT-HEAL-004`, `FEAT-HEAL-005`, `FEAT-HEAL-006`, `FEAT-HEAL-007`, `FEAT-HEAL-008`, `FEAT-HEAL-009`
+- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-HEAL-001`, `FEAT-HEAL-004`, `FEAT-HEAL-005`, `FEAT-HEAL-006`, `FEAT-HEAL-007`, `FEAT-HEAL-008`, `FEAT-HEAL-009`
 
 ## `index`
 

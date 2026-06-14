@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**198 features** across 19 subsystems.
+**199 features** across 19 subsystems.
 
 ## agent
 
@@ -294,6 +294,7 @@ errors.py defines a single CodeDocMonitorError base carrying a human message plu
 | `FEAT-CONFIGV2-014` | Pure unit-file serializers and model editors | config | K7, K8, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-015` | Index-source region rendering | index | K0, K2, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-016` | README / narrative-document monitoring | config, drift, layout | K0, K2, K3, K5, K10 | — | — | implemented |
+| `FEAT-CONFIGV2-017` | Test → test-doc mirror | config, extract, heal | K0, K2, K5, K7, K10 | — | — | implemented |
 
 ### `FEAT-CONFIGV2-001` — Multi-file config/cdmon directory layout
 
@@ -358,6 +359,10 @@ render_index renders a source='index' managed region as a Markdown table over th
 ### `FEAT-CONFIGV2-016` — README / narrative-document monitoring
 
 A narrative Markdown document such as README.md is a first-class monitored document: it is declared in a config/cdmon unit with code_refs naming the source files it describes and NO managed region, so the engine tracks it by the whole-doc fingerprint over that code surface and never authors its prose (K2). As a user-guide its drift is audience-gated — a comment/docstring or private change to a referenced source file is a non-event, only a real public-surface change drifts it (K3) — and the drift is recorded as a ReviewRecord for a human, never auto-rewritten (K5); monitor --apply only refreshes its fingerprint. To keep an eng-only api-index from being forced to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index region's audience kind, so an index need only link the documents it renders. cdmon dogfoods this on its own README.md.
+
+### `FEAT-CONFIGV2-017` — Test → test-doc mirror
+
+Test files are monitored exactly like source files: a config/cdmon unit whose code_refs point at tests/** and whose documents live under a top-level test-docs/ directory maps each test file 1:1 to a test-doc carrying a managed symbols region that lists the file's test_* functions. It is the SAME engine as source -> docs with no new code — a test file is just a .py file (K0), so the extractor, drift detector, healer, and coverage resolver all work unchanged. The test file is the source of truth and the test-doc is graded against it, never the reverse (K2); editing or renaming a test drifts its test-doc and records a ReviewRecord for a human (K5), and monitor --apply heals it idempotently (K7). The demo maps all four of its test files to test-docs 1:1, and cdmon dogfoods the pattern on its own tests/smoke boundary; the console surfaces test-docs in a dedicated Test docs section on the Documents, Drift, and Mapping pages.
 
 ## coverage
 

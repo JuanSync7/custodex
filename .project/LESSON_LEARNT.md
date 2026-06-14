@@ -2042,3 +2042,27 @@ own implementing modules are inside the thing being gated.
   K0 boundary with its own subprocess test (`import …configsync…; assert 'gitauth' /
   'cryptography' not in sys.modules`). The lazy import lives INSIDE the function that
   signs/seals, never at module top, so importing the module is free.
+- [TDOC-01] **The engine was already generic — "monitor tests" needed no engine
+  code.** `extract`/`drift`/`heal`/`coverage` operate on any `.py` file with no
+  source-vs-test branching, and `UnitFile`/`DocumentSpec`/`CodeRef` are
+  audience-agnostic. So the test→test-doc mirror is a *config convention* (a
+  `tests.yaml` unit + docs under `test-docs/`) + a frontend partition, not a new
+  module. The TDD red proved it: the two engine-level tests passed BEFORE any
+  config existed — only the dogfood-wiring test was red. → Before designing a
+  "new" capability, check whether the existing engine already does it generically
+  and the feature is really just configuration + presentation.
+- [TDOC-02] **Adding a coverage-bearing unit ripples to EVERY count pin AND the
+  fixtures that COPY the tree.** A `tests` unit made the demo 4→8 docs / 7→11
+  code_refs / 80%→88.9%, which touched `_DEMO_DOC_IDS`/`_DEMO_CODE_REFS`/
+  `document_count`/`code_ref_count`, two `== {…}` doc-id sets, `percent_files`
+  (`pytest.approx(88.888…)`) and the rounded `.rpt` `summary.percent` (88.89), and
+  `test_editable_tree`'s unit list. Both `_copy_dogfood_tree` helpers had to copy
+  the new `test-docs/`+`tests/smoke/` trees (else surfaces don't resolve on the
+  copy), and `demo_as_git.py`'s `DEMO_HISTORY` had to fold `test-docs` into the
+  adopt-cdmon commit (else a stray 9th catch-all commit). → After adding a unit,
+  get ground-truth counts from a real config load, grep EVERY pin (don't trust one
+  test file), and check the tree-copying fixtures + the authentic-history builder.
+- [TDOC-03] **Renaming a test re-stales `TEST_WIKI.md`.** The wiki indexes test
+  nodeids (`path::func`), so even a pure rename (`…_two_units` → `…_three_units`)
+  drifts it and the `wikis fresh` gate fails. → Run `cdmon wiki` as the LAST step
+  after any test add/remove/RENAME, not just after catalog edits.

@@ -203,3 +203,23 @@ features:
     subsystem: configv2
     modules: [config, drift, layout]
     constraints: [K0, K2, K3, K5, K10]
+
+  - id: FEAT-CONFIGV2-017
+    title: Test → test-doc mirror
+    summary: >-
+      Test files are monitored exactly like source files: a config/cdmon unit
+      whose code_refs point at tests/** and whose documents live under a top-level
+      test-docs/ directory maps each test file 1:1 to a test-doc carrying a managed
+      symbols region that lists the file's test_* functions. It is the SAME engine
+      as source -> docs with no new code — a test file is just a .py file (K0), so
+      the extractor, drift detector, healer, and coverage resolver all work
+      unchanged. The test file is the source of truth and the test-doc is graded
+      against it, never the reverse (K2); editing or renaming a test drifts its
+      test-doc and records a ReviewRecord for a human (K5), and monitor --apply
+      heals it idempotently (K7). The demo maps all four of its test files to
+      test-docs 1:1, and cdmon dogfoods the pattern on its own tests/smoke
+      boundary; the console surfaces test-docs in a dedicated Test docs section on
+      the Documents, Drift, and Mapping pages.
+    subsystem: configv2
+    modules: [config, extract, heal]
+    constraints: [K0, K2, K5, K7, K10]
