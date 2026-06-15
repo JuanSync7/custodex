@@ -394,6 +394,7 @@ thead th,
   min-width: 0;
   width: 100%;
   max-width: var(--content-max);
+  margin-inline: auto; /* center the capped content within the wide grid track */
   padding: 2.4rem 2.4rem 5rem;
 }
 
