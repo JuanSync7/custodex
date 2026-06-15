@@ -30,7 +30,7 @@
   /* — ink / text (cool light on dark) — */
   --text: #edeef2; /* body / headings — AA+ on every surface */
   --text-dim: #9ea0ab; /* secondary content — passes AA (~7:1) */
-  --text-faint: #6c6e7a; /* decorative mono micro-labels (~4.3:1) */
+  --text-faint: #7e808c; /* secondary / decorative mono micro-labels — clears AA (~5:1) */
 
   /* — primary: indigo→violet (the one BRAND accent · interactive) — */
   --primary: #5b5bd6;
@@ -100,7 +100,7 @@ body,
 body {
   margin: 0;
   padding: 0;
-  /* Warm paper field — flat and calm; colour is reserved for signal. */
+  /* Deep near-black field — flat and calm; colour is reserved for signal. */
   background-color: var(--canvas);
   color: var(--text);
 }
@@ -266,7 +266,7 @@ thead th,
   background: var(--surface-2);
   color: var(--text);
 }
-/* Active rail item: a tinted well with an engraved evergreen tick on the edge. */
+/* Active rail item: a tinted well with a brand-violet tick on the edge. */
 .nav__item--active {
   background: var(--primary-tint);
   color: var(--primary-strong);
@@ -345,7 +345,7 @@ thead th,
   color: var(--text-faint);
 }
 
-/* — signal dot: an instrument readout LED (inset face + soft halo) — */
+/* — signal dot: a status readout LED (soft signal-tinted glow halo) — */
 .dot {
   position: relative;
   flex: none;
@@ -812,7 +812,7 @@ tbody th {
 }
 
 /* ── Button language ────────────────────────────────────────────────────── */
-/* Secondary (default) keys: warm-white face, hairline border, dark label. */
+/* Secondary (default) keys: dark surface face, hairline border, light label. */
 .ticket-toggle,
 .sync-btn,
 .edit-mapping-btn,
@@ -862,7 +862,7 @@ tbody th {
   cursor: not-allowed;
 }
 
-/* Primary (commit) keys: filled evergreen. */
+/* Primary (commit) keys: filled indigo→violet (the brand accent). */
 .generate-btn,
 .ticket-submit-btn {
   font-family: var(--font-sans);

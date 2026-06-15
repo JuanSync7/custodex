@@ -36,5 +36,7 @@ frontend/.astro/
 .claude/
 .playwright-mcp/
 
-# One-off screenshots / scratch captures (not tracked source assets)
-/cdmon-fleet.png
+# One-off screenshots / scratch captures at repo root (verification artifacts,
+# never tracked source assets). Root-anchored so it can't shadow images that
+# legitimately live in subdirs (docs/, feature-doc/, …).
+/*.png
