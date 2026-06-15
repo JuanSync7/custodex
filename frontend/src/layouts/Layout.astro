@@ -1,8 +1,8 @@
 ---
 // The document shell for the whole frontend (EPIC ASTRO). Shares the console's
-// "Signal (dark)" design language (Linear/Vercel-style: near-black canvas,
-// indigo→violet brand accent, Geist type) so the native wiki pages look
-// identical to the main console — one dark, minimal surface.
+// "Atlas (light)" design language (Vercel/Linear-style: cool-white canvas,
+// cobalt-blue accent, Manrope + JetBrains Mono type) so the native wiki pages
+// look identical to the main console — one clean, minimal light surface.
 interface Props {
   title?: string;
   description?: string;
@@ -25,37 +25,37 @@ const {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
     />
   </head>
   <body>
     <slot />
     <style is:global>
       :root {
-        --font-display: "Geist", system-ui, -apple-system, sans-serif;
-        --font-sans: "Geist", system-ui, -apple-system, sans-serif;
-        --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+        --font-display: "Manrope", system-ui, -apple-system, sans-serif;
+        --font-sans: "Manrope", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-        /* "Signal (dark)" surfaces — match the console's index.css. */
-        --bg: #08090a;
-        --surface: #0e0f12;
-        --surface-2: #16181d;
-        --surface-3: #20232a;
-        --border: rgba(255, 255, 255, 0.08);
-        --border-soft: rgba(255, 255, 255, 0.05);
-        --text: #edeef2;
-        --text-dim: #9ea0ab;
-        --text-faint: #7e808c; /* kept in sync with console index.css */
+        /* "Atlas (light)" surfaces — match the console's index.css. */
+        --bg: #fbfbfd;
+        --surface: #ffffff;
+        --surface-2: #f4f5f8;
+        --surface-3: #eaecf1;
+        --border: #e7e9ee;
+        --border-soft: #eef0f4;
+        --text: #14151a;
+        --text-dim: #585e6d;
+        --text-faint: #6b7180; /* kept in sync with console index.css */
 
-        --accent: #8b8bf5;
-        --accent-strong: #a5a5fb;
-        --accent-tint: rgba(99, 99, 222, 0.16);
+        --accent: #0b62f4;
+        --accent-strong: #0a4fc4;
+        --accent-tint: #e8f0ff;
 
         --radius: 12px;
         --radius-sm: 8px;
-        --shadow: 0 2px 6px rgba(0, 0, 0, 0.45), 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+        --shadow: 0 1px 2px rgba(20, 21, 26, 0.06), 0 16px 48px -12px rgba(20, 21, 26, 0.20);
 
-        color-scheme: dark;
+        color-scheme: light;
       }
 
       * {
@@ -114,14 +114,14 @@ const {
         color: var(--text-faint);
       }
 
-      /* Readable column for the native-Astro wiki/doc pages — dark, like the
-         console: light ink on near-black, hairline borders, soft code blocks. */
+      /* Readable column for the native-Astro wiki/doc pages — light, like the
+         console: dark ink on white, hairline borders, soft code blocks. */
       .prose {
         max-width: 78ch;
         color: var(--text);
       }
       .prose :where(p, li) {
-        color: #c7c9d1;
+        color: #2c313c;
       }
       .prose :where(h1, h2, h3) {
         scroll-margin-top: 5rem;

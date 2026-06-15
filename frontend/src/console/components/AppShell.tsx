@@ -1,6 +1,7 @@
-// The application base: a fixed instrument rail + sticky topbar wrapping the
-// routed views. It is the single frame that holds the live API connection and
-// the navigation between every API-driven view. Pages render INTO `children`.
+// The application base: a single horizontal COMMAND BAR across the top wrapping
+// the routed views (the "Atlas" shell — no left rail). It is the one frame that
+// holds the live API connection and the navigation between every API-driven
+// view. Pages render INTO `children`.
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ConnectionStatus from "./ConnectionStatus";
@@ -13,7 +14,7 @@ function apiBase(): string {
   return typeof fromEnv === "string" && fromEnv.length > 0 ? fromEnv : "";
 }
 
-/** Derive the topbar page label from the current route. */
+/** Derive the current page label from the route (names the main landmark). */
 function pageLabel(pathname: string): string {
   if (pathname === "/" || pathname === "") return "Fleet Overview";
   if (pathname.endsWith("/coverage")) return "Coverage Basket";
@@ -38,93 +39,59 @@ export function AppShell({ children }: AppShellProps) {
   const openApiHref = `${root}/openapi.json`;
 
   return (
-    <div className="shell">
-      <aside className="rail">
-        <div className="brand">
-          <BrandMark className="brand__mark" aria-hidden />
-          <span className="brand__text">
-            <span className="brand__title">drift console</span>
-            <span className="brand__sub">code · doc · monitor</span>
+    <div className="app">
+      <header className="topnav" role="banner">
+        <Link to="/" className="topnav__brand" aria-label="code-doc-monitor console">
+          <BrandMark className="topnav__brandmark" aria-hidden />
+          <span className="topnav__word">
+            <span className="topnav__title">drift console</span>
+            <span className="topnav__sub">code · doc · monitor</span>
           </span>
-        </div>
+        </Link>
 
-        <div className="rail__label">Console</div>
-        <nav className="nav" aria-label="primary">
+        <nav className="topnav__nav" aria-label="primary">
           <Link
             to="/"
-            className={`nav__item${onFleet ? " nav__item--active" : ""}`}
+            className={`topnav__link${onFleet ? " topnav__link--active" : ""}`}
             aria-current={onFleet ? "page" : undefined}
           >
             <FleetIcon className="nav__icon" aria-hidden />
             Fleet
           </Link>
-        </nav>
-
-        <div className="rail__label">Reference</div>
-        <nav className="nav" aria-label="reference">
           <Link
             to="/config"
-            className={`nav__item${onConfig ? " nav__item--active" : ""}`}
+            className={`topnav__link${onConfig ? " topnav__link--active" : ""}`}
             aria-current={onConfig ? "page" : undefined}
           >
             <DocIcon className="nav__icon" aria-hidden />
             Format
           </Link>
-          <a className="nav__item" href="/wiki/features">
+          <a className="topnav__link" href="/wiki/features">
             <DocIcon className="nav__icon" aria-hidden />
             Wiki
           </a>
-          <a className="nav__item" href={docsHref} target="_blank" rel="noreferrer">
-            <DocIcon className="nav__icon" aria-hidden />
+        </nav>
+
+        <div className="topnav__spacer" />
+
+        <nav className="topnav__nav topnav__nav--ref" aria-label="reference">
+          <a className="topnav__link" href={docsHref} target="_blank" rel="noreferrer">
             API Docs
-            <ExternalIcon
-              className="nav__icon"
-              style={{ marginLeft: "auto", width: 13, height: 13 }}
-              aria-hidden
-            />
+            <ExternalIcon className="nav__icon" aria-hidden />
           </a>
-          <a className="nav__item" href={openApiHref} target="_blank" rel="noreferrer">
+          <a className="topnav__link" href={openApiHref} target="_blank" rel="noreferrer">
             <PulseIcon className="nav__icon" aria-hidden />
             OpenAPI
-            <ExternalIcon
-              className="nav__icon"
-              style={{ marginLeft: "auto", width: 13, height: 13 }}
-              aria-hidden
-            />
           </a>
         </nav>
 
-        <div className="rail__spacer" />
-
-        <div className="rail__label">Central server</div>
+        <span className="topnav__div" aria-hidden />
         <ConnectionStatus />
+      </header>
 
-        <div className="rail__foot">
-          <span>v0.1.0</span>
-          <span>FastAPI · E-06</span>
-        </div>
-      </aside>
-
-      <div className="main">
-        <header className="topbar">
-          <div className="crumb">
-            <span className="crumb__root">code-doc-monitor</span>
-            <span className="crumb__sep">/</span>
-            <span className="crumb__here">{pageLabel(pathname)}</span>
-          </div>
-          <a
-            className="chip"
-            href={docsHref}
-            target="_blank"
-            rel="noreferrer"
-            style={{ marginLeft: "auto" }}
-          >
-            View API
-            <ExternalIcon style={{ width: 12, height: 12 }} aria-hidden />
-          </a>
-        </header>
-        <main className="canvas">{children}</main>
-      </div>
+      <main className="canvas" aria-label={pageLabel(pathname)}>
+        {children}
+      </main>
     </div>
   );
 }
