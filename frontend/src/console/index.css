@@ -29,14 +29,16 @@
   --line-strong: #d8d0bf;
 
   /* — ink / text (warm charcoal) — */
-  --text: #232019;
-  --text-dim: #6a6155;
-  --text-faint: #9b9082;
+  --text: #232019; /* body / headings — AA+ on canvas & surface */
+  --text-dim: #6a6155; /* secondary content — passes AA (~5.4:1 on canvas) */
+  --text-faint: #8a8072; /* decorative mono micro-labels — large-text AA (~3.4:1) */
 
   /* — primary: evergreen (the one accent · fresh / in-sync / interactive) — */
   --primary: #1a7d5e;
   --primary-strong: #115d45;
   --primary-tint: #e6f0ea;
+  --primary-wash: #d6ebdf; /* hover wash — one shade past --primary-tint */
+  --on-primary: #fff; /* label on a filled --primary key (AA: 5.07:1 on evergreen) */
   --primary-ring: rgba(26, 125, 94, 0.18);
 
   /* — signal palette (the instrument's readout lights) — */
@@ -584,7 +586,7 @@ thead th,
 }
 .metric__foot {
   font-size: 0.78rem;
-  color: var(--text-faint);
+  color: var(--text-dim);
 }
 
 /* — panel: the core card — */
@@ -697,7 +699,7 @@ tbody th {
 .repo-name {
   font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--text-faint);
+  color: var(--text-dim);
 }
 .repo-links {
   display: inline-flex;
@@ -708,7 +710,7 @@ tbody th {
   font-family: var(--font-sans);
   font-size: 0.74rem;
   font-weight: 500;
-  color: var(--text-faint);
+  color: var(--text-dim);
 }
 .repo-links a:hover {
   color: var(--primary);
@@ -864,7 +866,7 @@ tbody th {
   font-family: var(--font-sans);
   font-size: 0.84rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-primary);
   background: var(--primary);
   border: 1px solid var(--primary-strong);
   border-radius: var(--radius);
@@ -909,7 +911,7 @@ tbody th {
   box-shadow: none;
 }
 .sync-btn--local:hover:not(:disabled) {
-  background: #d6ebdf;
+  background: var(--primary-wash);
   border-color: var(--primary);
 }
 
@@ -1597,7 +1599,7 @@ form[aria-label="auth"] input:focus {
   font-family: var(--font-sans);
   font-size: 0.78rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-primary);
   background: var(--primary);
   border: 1px solid var(--primary);
   border-radius: var(--radius);
