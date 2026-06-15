@@ -1,83 +1,85 @@
 /* ============================================================================
-   DRIFT CONSOLE — "Instrument (light)".
+   DRIFT CONSOLE — "Signal (dark)".
    ----------------------------------------------------------------------------
-   A precision measurement console for code↔doc freshness. The product MEASURES
-   documentation drift, so the interface is built like an instrument: a calm,
-   warm-paper field, charcoal ink, hairline rules and generous negative space —
-   and colour appears ONLY as signal (the sync / review / drift readout lights),
-   never as decoration. A single confident evergreen is the one accent, and it
-   doubles as the "in-sync / fresh" signal so the palette stays honest.
+   A modern, minimal control surface for code↔doc freshness, in the language of
+   contemporary developer tools (Linear / Vercel): a deep near-black field,
+   layered surfaces lifted by translucent hairline edges, cool light ink, and a
+   single indigo→violet BRAND accent for everything interactive. Colour is
+   otherwise reserved for SIGNAL — green (in-sync), amber (review), red (drift)
+   — so status reads at a glance and nothing competes with it.
 
-   Craft signatures: engraved micro-labels set in MONO (the etched panel-text
-   voice), a hairline "gauge rule" beneath every page title, LED-style status
-   dots, and tabular mono for every id / path / count so columns line up to the
-   pixel.
+   Craft signatures: engraved micro-labels set in MONO (Geist Mono), a hairline
+   "datum rule" beneath every page title, soft-glow status LEDs, and tabular
+   mono for every id / path / count so columns line up to the pixel.
 
-   Type: Schibsted Grotesk (display) · Hanken Grotesk (UI/body) · JetBrains
-   Mono (engraved labels, code, ids, paths, readouts).
+   Type: Geist (display + UI/body) · Geist Mono (engraved labels, code, ids,
+   paths, readouts).
    ============================================================================ */
 
 :root {
-  /* — warm-paper surfaces (a calibrated neutral ramp) — */
-  --canvas: #f4f1ea;    /* the paper field */
-  --surface: #fdfcf8;   /* raised card / instrument face */
-  --surface-2: #efebe1; /* recessed: table heads, code, tints */
-  --surface-3: #e5e0d3; /* deepest: tracks & wells */
+  /* — near-black layered surfaces (a calibrated depth ramp) — */
+  --canvas: #08090a;    /* the deep field */
+  --surface: #0e0f12;   /* raised card / panel face */
+  --surface-2: #16181d; /* recessed: table heads, code, wells */
+  --surface-3: #20232a; /* deepest: tracks & inset fills */
 
-  /* — hairlines & borders — */
-  --line: #e6e1d3;
-  --line-strong: #d8d0bf;
+  /* — hairlines & borders (translucent white — Linear-style edges) — */
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.15);
 
-  /* — ink / text (warm charcoal) — */
-  --text: #232019; /* body / headings — AA+ on canvas & surface */
-  --text-dim: #6a6155; /* secondary content — passes AA (~5.4:1 on canvas) */
-  --text-faint: #8a8072; /* decorative mono micro-labels — large-text AA (~3.4:1) */
+  /* — ink / text (cool light on dark) — */
+  --text: #edeef2; /* body / headings — AA+ on every surface */
+  --text-dim: #9ea0ab; /* secondary content — passes AA (~7:1) */
+  --text-faint: #7e808c; /* secondary / decorative mono micro-labels — clears AA (~5:1) */
 
-  /* — primary: evergreen (the one accent · fresh / in-sync / interactive) — */
-  --primary: #1a7d5e;
-  --primary-strong: #115d45;
-  --primary-tint: #e6f0ea;
-  --primary-wash: #d6ebdf; /* hover wash — one shade past --primary-tint */
-  --on-primary: #fff; /* label on a filled --primary key (AA: 5.07:1 on evergreen) */
-  --primary-ring: rgba(26, 125, 94, 0.18);
+  /* — primary: indigo→violet (the one BRAND accent · interactive) — */
+  --primary: #5b5bd6;
+  --primary-strong: #8b8bf5; /* brighter — interactive text / emphasis on dark */
+  --primary-tint: rgba(99, 99, 222, 0.16); /* active wells, fix verdicts */
+  --primary-wash: rgba(99, 99, 222, 0.26); /* hover wash — one step past tint */
+  --on-primary: #ffffff; /* label on a filled --primary key (white, AA on indigo) */
+  --primary-ring: rgba(124, 124, 245, 0.38); /* focus / glow halo */
 
-  /* — signal palette (the instrument's readout lights) — */
-  --sync: #1a7d5e; /* in-sync / ok / healthy (== primary) */
-  --sync-tint: #e6f0ea;
+  /* — signal palette (semantic status readouts) — */
+  --sync: #3fb950; /* in-sync / ok / healthy — green */
+  --sync-tint: rgba(63, 185, 80, 0.16);
+  --sync-ink: #56d364; /* readable green text on a tint */
   /* alias kept for the BrandMark SVG (icons.tsx references var(--accent)). */
-  --accent: #1a7d5e;
-  --review: #b07814; /* review / warn — warm amber */
-  --review-tint: #f4ead2;
-  --review-ink: #855810; /* readable amber text on a tint */
-  --drift: #c0463e; /* escalate / drift / offline — warm clay red */
-  --drift-tint: #f6e2dd;
-  --drift-ink: #9c342d; /* readable red text on a tint */
-  --link: #1a7d5e;
+  --accent: #7d7cf5;
+  --review: #d29922; /* review / warn — amber */
+  --review-tint: rgba(210, 153, 34, 0.16);
+  --review-ink: #e3b341; /* readable amber text on a tint */
+  --drift: #f85149; /* escalate / drift / offline — red */
+  --drift-tint: rgba(248, 81, 73, 0.16);
+  --drift-ink: #ff7b72; /* readable red text on a tint */
+  --link: #8b8bf5;
 
-  /* — elevation (warm, soft, low) — */
-  --shadow-xs: 0 1px 2px rgba(45, 38, 24, 0.05);
+  /* — elevation (dark: depth from a faint top-light + a deep cast) — */
+  --shadow-xs:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm:
-    0 1px 2px rgba(45, 38, 24, 0.06),
-    0 1px 3px rgba(45, 38, 24, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 2px 6px rgba(0, 0, 0, 0.45);
   --shadow-md:
-    0 2px 4px rgba(45, 38, 24, 0.05),
-    0 10px 24px -8px rgba(45, 38, 24, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 24px -6px rgba(0, 0, 0, 0.6);
   --shadow-lg:
-    0 1px 3px rgba(45, 38, 24, 0.08),
-    0 28px 56px -16px rgba(45, 38, 24, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 24px 56px -16px rgba(0, 0, 0, 0.7);
 
   /* — type — */
-  --font-display: "Schibsted Grotesk", "Hanken Grotesk", system-ui, sans-serif;
-  --font-sans: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "Geist", system-ui, -apple-system, sans-serif;
+  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* — geometry — */
   --rail-w: 256px;
   --radius: 8px;
-  --radius-lg: 13px;
+  --radius-lg: 12px;
   --radius-pill: 999px;
 
-  color-scheme: light;
+  color-scheme: dark;
   font-family: var(--font-sans);
   color: var(--text);
   line-height: 1.55;
@@ -98,7 +100,7 @@ body,
 body {
   margin: 0;
   padding: 0;
-  /* Warm paper field — flat and calm; colour is reserved for signal. */
+  /* Deep near-black field — flat and calm; colour is reserved for signal. */
   background-color: var(--canvas);
   color: var(--text);
 }
@@ -130,8 +132,8 @@ pre {
 }
 
 ::selection {
-  background: var(--primary-ring);
-  color: var(--primary-strong);
+  background: var(--primary-tint);
+  color: var(--text);
 }
 
 :focus-visible {
@@ -264,7 +266,7 @@ thead th,
   background: var(--surface-2);
   color: var(--text);
 }
-/* Active rail item: a tinted well with an engraved evergreen tick on the edge. */
+/* Active rail item: a tinted well with a brand-violet tick on the edge. */
 .nav__item--active {
   background: var(--primary-tint);
   color: var(--primary-strong);
@@ -343,7 +345,7 @@ thead th,
   color: var(--text-faint);
 }
 
-/* — signal dot: an instrument readout LED (inset face + soft halo) — */
+/* — signal dot: a status readout LED (soft signal-tinted glow halo) — */
 .dot {
   position: relative;
   flex: none;
@@ -351,25 +353,25 @@ thead th,
   height: 9px;
   border-radius: 50%;
   background: var(--text-faint);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
 }
 .dot--sync {
   background: var(--sync);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 0 0 3px var(--sync-tint);
+    0 0 0 3px var(--sync-tint),
+    0 0 10px 1px var(--sync-tint);
 }
 .dot--review {
   background: var(--review);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 0 0 3px var(--review-tint);
+    0 0 0 3px var(--review-tint),
+    0 0 10px 1px var(--review-tint);
 }
 .dot--drift {
   background: var(--drift);
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
-    0 0 0 3px var(--drift-tint);
+    0 0 0 3px var(--drift-tint),
+    0 0 10px 1px var(--drift-tint);
 }
 .dot--live::after {
   content: "";
@@ -406,8 +408,8 @@ thead th,
   align-items: center;
   gap: 1.5rem;
   padding: 1rem 2.4rem;
-  background: rgba(253, 252, 248, 0.8);
-  backdrop-filter: blur(12px) saturate(150%);
+  background: rgba(12, 13, 16, 0.72);
+  backdrop-filter: blur(12px) saturate(140%);
   border-bottom: 1px solid var(--line);
 }
 .crumb {
@@ -794,7 +796,7 @@ tbody th {
   color: var(--text-dim);
 }
 .chip--sync {
-  color: var(--primary-strong);
+  color: var(--sync-ink);
   border-color: transparent;
   background: var(--sync-tint);
 }
@@ -810,7 +812,7 @@ tbody th {
 }
 
 /* ── Button language ────────────────────────────────────────────────────── */
-/* Secondary (default) keys: warm-white face, hairline border, dark label. */
+/* Secondary (default) keys: dark surface face, hairline border, light label. */
 .ticket-toggle,
 .sync-btn,
 .edit-mapping-btn,
@@ -860,7 +862,7 @@ tbody th {
   cursor: not-allowed;
 }
 
-/* Primary (commit) keys: filled evergreen. */
+/* Primary (commit) keys: filled indigo→violet (the brand accent). */
 .generate-btn,
 .ticket-submit-btn {
   font-family: var(--font-sans);
@@ -881,10 +883,9 @@ tbody th {
 }
 .generate-btn:hover:not(:disabled),
 .ticket-submit-btn:hover:not(:disabled) {
-  background: var(--primary-strong);
   box-shadow:
-    0 1px 2px rgba(45, 38, 24, 0.08),
-    0 0 0 4px var(--primary-ring);
+    0 0 0 4px var(--primary-ring),
+    0 6px 18px -4px rgba(91, 91, 214, 0.5);
 }
 .generate-btn:active:not(:disabled),
 .ticket-submit-btn:active:not(:disabled) {
@@ -1138,7 +1139,7 @@ tbody th {
   line-height: 1;
   letter-spacing: -0.045em;
   font-variant-numeric: tabular-nums;
-  color: var(--primary-strong);
+  color: var(--sync);
   text-transform: none;
 }
 /* A soft fill track pinned to the card's bottom edge, width = ratio. */
@@ -1158,7 +1159,7 @@ tbody th {
   bottom: 0;
   height: 4px;
   width: calc(var(--ratio, 0) * 100%);
-  background: linear-gradient(90deg, var(--primary), var(--primary-strong));
+  background: linear-gradient(90deg, var(--sync), var(--sync-ink));
   border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
 }
 
@@ -1612,8 +1613,7 @@ form[aria-label="auth"] input:focus {
     transform 0.06s ease;
 }
 .resolve-control button[type="submit"]:hover {
-  background: var(--primary-strong);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 0 0 4px var(--primary-ring);
 }
 .resolve-control button[type="submit"]:active {
   transform: translateY(1px);
@@ -1810,7 +1810,7 @@ form[aria-label="auth"] input:focus {
   background: var(--review-tint);
 }
 .chip.edit-status--applied {
-  color: var(--primary-strong);
+  color: var(--sync-ink);
   border-color: transparent;
   background: var(--sync-tint);
 }
@@ -2477,7 +2477,7 @@ details.mapping-ignored[open] > summary::before {
   justify-content: center;
   padding: 4.5rem 1rem 2rem;
   overflow-y: auto;
-  background: rgba(35, 32, 25, 0.34);
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(3px);
   animation: fade 0.16s both;
 }
