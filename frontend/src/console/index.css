@@ -30,7 +30,7 @@
   /* — ink / text (near-black cool) — */
   --text: #14151a;     /* body / headings — AA+ everywhere */
   --text-dim: #585e6d; /* secondary content — AA (~7:1) */
-  --text-faint: #6b7180; /* mono micro-labels — AA (~4.6:1 on white) */
+  --text-faint: #656b7a; /* mono micro-labels — clears AA on white & surface-2 (~4.9:1) */
 
   /* — primary action: near-black fill (the Vercel key voice) — */
   --primary: #14151a;
