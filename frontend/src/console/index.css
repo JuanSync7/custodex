@@ -75,8 +75,8 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* — geometry — */
-  --bar-h: 56px;
-  --content-max: 1180px;
+  --rail-w: 248px;
+  --content-max: 1320px;
   --radius: 8px;
   --radius-lg: 12px;
   --radius-sm: 6px;
@@ -166,7 +166,6 @@ td,
 /* Engraved micro-labels — small, tracked, uppercase MONO (the editorial legend
    voice). This base set is the single source of truth for that voice. */
 .brand__sub,
-.topnav__sub,
 .conn__state,
 .tstat__k,
 .metric__k,
@@ -181,145 +180,141 @@ thead th,
   text-transform: uppercase;
 }
 
-/* ── App frame: top command bar + content ──────────────────────────────── */
+/* ── App frame: left side nav + content ────────────────────────────────── */
 .app,
 .shell {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr;
   min-height: 100vh;
 }
 
-/* The top command bar (replaces the old left rail). */
-.topnav {
+/* The left side nav bar. */
+.rail {
   position: sticky;
   top: 0;
-  z-index: 20;
+  align-self: start;
+  height: 100vh;
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  height: var(--bar-h);
-  padding: 0 1.3rem;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(12px) saturate(160%);
-  border-bottom: 1px solid var(--line);
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 1.1rem 0.85rem 1rem;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
 }
 
-.topnav__brand,
 .brand {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.2rem 0.55rem 0.2rem 0.2rem;
-  margin-right: 0.35rem;
-  border-radius: var(--radius);
+  padding: 0.3rem 0.5rem 1.2rem;
   text-decoration: none;
 }
-.topnav__brandmark,
 .brand__mark {
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
-.topnav__word,
 .brand__text {
   display: flex;
   flex-direction: column;
   line-height: 1;
 }
-.topnav__title,
 .brand__title {
   font-family: var(--font-display);
-  font-size: 0.96rem;
+  font-size: 1.04rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text);
 }
-.topnav__sub,
 .brand__sub {
   font-size: 0.5rem;
   font-weight: 600;
   letter-spacing: 0.18em;
   color: var(--text-faint);
-  margin-top: 0.28rem;
+  margin-top: 0.34rem;
 }
 
-/* primary + reference nav clusters live inline in the bar */
-.topnav__nav,
-.nav {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1rem;
+.rail__label {
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 1rem 0.65rem 0.35rem;
 }
-.topnav__link,
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
 .nav__item {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.42rem 0.7rem;
+  gap: 0.6rem;
+  padding: 0.48rem 0.65rem;
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   font-family: var(--font-sans);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
   font-weight: 600;
-  white-space: nowrap;
   transition:
     background 0.14s ease,
     color 0.14s ease;
 }
-.topnav__link:hover,
 .nav__item:hover {
   background: var(--surface-2);
   color: var(--text);
 }
-.topnav__link--active,
 .nav__item--active {
   color: var(--accent);
   background: var(--accent-tint);
 }
-.topnav__link .nav__icon,
-.nav__item .nav__icon {
-  width: 15px;
-  height: 15px;
-  color: currentColor;
-  opacity: 0.85;
+.nav__item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.5px;
+  height: 1.05rem;
+  border-radius: 2px;
+  background: var(--accent);
 }
 .nav__icon {
   flex: none;
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
+  color: var(--text-faint);
+}
+.nav__item:hover .nav__icon {
+  color: var(--text-dim);
+}
+.nav__item--active .nav__icon {
+  color: var(--accent);
 }
 
-.topnav__spacer,
 .rail__spacer {
   flex: 1;
 }
-.topnav__div {
-  width: 1px;
-  height: 22px;
-  background: var(--line);
-  margin: 0 0.35rem;
-}
 
-/* the rail section labels are unused in the bar layout */
-.rail__label {
-  display: none;
-}
-
-/* — connection status: a compact inline pill in the bar — */
+/* — connection status: a card pinned near the foot of the rail — */
 .conn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.32rem 0.6rem;
+  margin-top: 0.4rem;
+  padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 .conn__row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
 }
 .conn__state {
   font-size: 0.58rem;
@@ -327,16 +322,27 @@ thead th,
   letter-spacing: 0.1em;
 }
 .conn__url {
-  display: none; /* kept in DOM (test reads its text) but hidden in the bar */
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-faint);
+  word-break: break-all;
 }
 .conn__meta {
   font-family: var(--font-mono);
   font-size: 0.64rem;
   color: var(--text-faint);
+  margin-left: auto;
 }
 
 .rail__foot {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 0.65rem 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
 }
 
 /* — signal dot: a small status LED with a soft tint halo — */
@@ -385,11 +391,11 @@ thead th,
   display: contents;
 }
 .canvas {
-  flex: 1;
+  min-width: 0;
   width: 100%;
   max-width: var(--content-max);
-  margin: 0 auto;
-  padding: 2.4rem 1.8rem 5rem;
+  margin-inline: auto; /* center the capped content within the wide grid track */
+  padding: 2.4rem 2.4rem 5rem;
 }
 
 /* ── Page primitives — the "eyeline" header ────────────────────────────── */
@@ -2106,17 +2112,36 @@ details.mapping-ignored[open] > summary::before {
 
 /* ── Responsive ────────────────────────────────────────────────────────── */
 @media (max-width: 900px) {
-  .topnav {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 0.5rem 0.9rem;
-    gap: 0.3rem;
+  .app,
+  .shell {
+    grid-template-columns: 1fr;
   }
-  .topnav__nav {
+  .rail {
+    position: static;
+    height: auto;
+    flex-direction: row;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .rail__label,
+  .rail__spacer,
+  .rail__foot {
+    display: none;
+  }
+  .nav {
+    flex-direction: row;
+  }
+  .nav__item--active::before {
+    display: none;
+  }
+  .conn {
+    margin-top: 0;
   }
   .canvas {
-    padding: 1.5rem 1.05rem 3rem;
+    padding: 1.5rem 1.1rem 3rem;
   }
 }
 
