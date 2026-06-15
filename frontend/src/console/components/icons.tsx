@@ -4,16 +4,19 @@ import type { SVGProps } from "react";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
+// Static SVG attributes hoisted to module scope (rendering-hoist-jsx): the
+// shared stroke/viewBox defaults are allocated once, not rebuilt per render.
+const ICON_BASE = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.6,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+} as const;
+
 function base(props: IconProps) {
-  return {
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 1.6,
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    ...props,
-  };
+  return { ...ICON_BASE, ...props };
 }
 
 /** Stacked layers — the fleet / repos overview. */

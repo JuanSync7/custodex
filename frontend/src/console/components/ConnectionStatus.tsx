@@ -20,13 +20,14 @@ export interface ConnectionStatusProps {
   intervalMs?: number;
 }
 
-function displayBase(): string {
+/** The env-configured base, if any — SSR-safe (never reads `window`). When unset
+ *  ("" or "/" = same-origin), the live host is resolved AFTER mount (see below). */
+function envBase(): string | null {
   const fromEnv = import.meta.env?.PUBLIC_API_BASE;
   if (typeof fromEnv === "string" && fromEnv !== "" && fromEnv !== "/") {
     return fromEnv;
   }
-  // unset, "" or "/" = same-origin root (single-port deploy): show the live origin.
-  return typeof window !== "undefined" ? window.location.host : "same-origin";
+  return null;
 }
 
 const PHASE_COPY: Record<Phase, string> = {
@@ -47,7 +48,15 @@ export function ConnectionStatus({
 }: ConnectionStatusProps) {
   const [phase, setPhase] = useState<Phase>("connecting");
   const [latency, setLatency] = useState<number | null>(null);
-  const url = baseUrl ?? displayBase();
+  // The same-origin host is window-derived, so reading it during render would
+  // make the server-rendered HTML (where window is absent) disagree with the
+  // first client render — a hydration mismatch (React #418) on the `client:load`
+  // chrome. Resolve it AFTER mount so both first renders agree, then settle.
+  const [host, setHost] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined") setHost(window.location.host);
+  }, []);
+  const url = baseUrl ?? envBase() ?? host ?? "same-origin";
   // A monotonic-ish clock that still works under fake timers / jsdom.
   const now = () =>
     typeof performance !== "undefined" ? performance.now() : 0;
