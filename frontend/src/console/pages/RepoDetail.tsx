@@ -561,8 +561,8 @@ function TicketCard({ ticket, statusLabel }: TicketCardProps) {
       <section className="acceptance" aria-label="Acceptance checklist">
         <h3 className="acceptance__title">Acceptance checklist</h3>
         <ul className="acceptance__list">
-          {ticket.acceptance_criteria.map((check, i) => (
-            <li key={i} className="acceptance__item">
+          {ticket.acceptance_criteria.map((check) => (
+            <li key={check.text} className="acceptance__item">
               <span
                 className={`dot ${check.auto_satisfied ? "dot--sync" : "dot--review"}`}
                 aria-hidden="true"
