@@ -8,6 +8,7 @@ import type {
   EditableConfigTree,
   GenerateRequest,
   GenerateResponse,
+  OwnershipData,
   RegisteredRepo,
   RepoHealth,
   RepoStatus,
@@ -171,6 +172,13 @@ export class ApiClient {
   coverageFor(repoId: string): Promise<CoverageSnapshot[]> {
     return this.getJson<CoverageSnapshot[]>(
       `/repos/${encodeRepoId(repoId)}/coverage`,
+    );
+  }
+
+  /** GET {base}/repos/{repoId}/ownership → OwnershipData (EPIC OWN). */
+  ownershipFor(repoId: string): Promise<OwnershipData> {
+    return this.getJson<OwnershipData>(
+      `/repos/${encodeRepoId(repoId)}/ownership`,
     );
   }
 

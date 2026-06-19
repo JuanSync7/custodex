@@ -10,6 +10,7 @@ import {
   linkToDocuments,
   linkToHealth,
   linkToMapping,
+  linkToOwnership,
   linkToRepo,
 } from "../routing";
 
@@ -19,12 +20,19 @@ export interface RepoNavProps {
 
 /** Which view a per-repo pathname resolves to — mirrors RepoRoute's suffix
  * dispatch (and AppShell's `pageLabel`). The base path with no suffix is Drift. */
-type View = "drift" | "mapping" | "documents" | "coverage" | "health";
+type View =
+  | "drift"
+  | "mapping"
+  | "documents"
+  | "ownership"
+  | "coverage"
+  | "health";
 
 function activeView(pathname: string): View {
   if (pathname.endsWith("/coverage")) return "coverage";
   if (pathname.endsWith("/health")) return "health";
   if (pathname.endsWith("/documents")) return "documents";
+  if (pathname.endsWith("/ownership")) return "ownership";
   if (pathname.endsWith("/mapping")) return "mapping";
   return "drift";
 }
@@ -39,6 +47,7 @@ export function RepoNav({ repoId }: RepoNavProps) {
     { view: "drift", label: "Drift", to: linkToRepo(repoId) },
     { view: "mapping", label: "Mapping", to: linkToMapping(repoId) },
     { view: "documents", label: "Documents", to: linkToDocuments(repoId) },
+    { view: "ownership", label: "Ownership", to: linkToOwnership(repoId) },
     { view: "coverage", label: "Coverage", to: linkToCoverage(repoId) },
     { view: "health", label: "Health", to: linkToHealth(repoId) },
   ];

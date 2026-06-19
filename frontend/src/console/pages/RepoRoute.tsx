@@ -9,6 +9,7 @@ import Coverage from "./Coverage";
 import Documents from "./Documents";
 import Health from "./Health";
 import Mapping from "./Mapping";
+import Ownership from "./Ownership";
 import RepoDetail from "./RepoDetail";
 
 function decodePath(tail: string): string {
@@ -32,6 +33,10 @@ function dispatch(tail: string): { repoId: string; page: ReactNode } {
   if (tail.endsWith("/documents")) {
     const repoId = decodePath(tail.slice(0, -"/documents".length));
     return { repoId, page: <Documents repoId={repoId} /> };
+  }
+  if (tail.endsWith("/ownership")) {
+    const repoId = decodePath(tail.slice(0, -"/ownership".length));
+    return { repoId, page: <Ownership repoId={repoId} /> };
   }
   if (tail.endsWith("/mapping")) {
     const repoId = decodePath(tail.slice(0, -"/mapping".length));
