@@ -988,3 +988,19 @@ reassign a DRI), not a hard loss.
 `core-api` is `orphan_dri_vacant`, orphan_count 1. Pinned by
 `tests/integration/test_ownership_server.py::test_ownership_view_and_departure_cascade`.
 Features: FEAT-OWNERSHIP-007
+
+### DEMO-066 — Reassign a document's owner (the orphan fix, config = truth)
+**What it shows.** When an orphan surfaces (a departed DRI), the fix is a
+reassignment — and config is the single source of truth, so it is written to disk.
+A `reassign_owner` edit (`ReassignOwnerEdit`) carries the new owner/team/dri; the
+pure `config.set_document_owner` editor applies it (a provided value sets that
+field, `None` leaves it — so reassigning just the DRI keeps the team), and
+`apply_edits_to_disk` rewrites `config/cdmon/<unit>.yaml` (byte-stable, idempotent
+K7) before re-mirroring. Reassigning a departed DRI to an active person clears the
+orphan on the next `GET /ownership`.
+**How to observe.** On a copy of the demo, `apply_edits_to_disk(repo,
+[ReassignOwnerEdit(unit="core", doc_id="core-api", dri="erin")], now=...)` rewrites
+`core.yaml` so `core-api`'s dri is `erin` (owner/team unchanged); a second identical
+apply is byte-identical. Pinned by `tests/integration/test_generate.py` and
+`tests/unit/test_unit_serializer.py`.
+Features: FEAT-OWNERSHIP-008

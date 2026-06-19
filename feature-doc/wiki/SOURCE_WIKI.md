@@ -43,8 +43,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `config`
 
 - Path: `config.py`
-- Public symbols: `AgentConfig`, `Audience`, `BackendConfig`, `CONFIG_TEMPLATE`, `CentralConfig`, `CodeRef`, `ConfigBundle`, `ContextRef`, `CoverageConfig`, `DEFAULT_CENTRAL_TOKEN_ENV`, `DocumentSpec`, `IgnoreFile`, `IgnoreFrontmatter`, `IndexFile`, `IndexFrontmatter`, `IndexUnitRef`, `MonitorConfig`, `RESERVED_UNIT_STEMS`, `RegionColumn`, `RegionMode`, `RegionTemplate`, `UnitFile`, `UnitFrontmatter`, `WaiverEntry`, `__all__`, `add_code_ref`, `central_config_template`, `dump_unit_file`, `effective_coverage`, `gitignore_to_globs`, `load_bundle`, `load_config`, `load_config_dir`, `load_ignore_file`, `load_index_file`, `load_unit_file`, `regenerate_index`, `remove_code_ref`, `resolve_repo_root`, `set_context_refs`, `unit_for_path`, `upsert_document`, `write_index`, `write_template`
-- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`, `FEAT-CONFIGV2-017`, `FEAT-OWNERSHIP-001`
+- Public symbols: `AgentConfig`, `Audience`, `BackendConfig`, `CONFIG_TEMPLATE`, `CentralConfig`, `CodeRef`, `ConfigBundle`, `ContextRef`, `CoverageConfig`, `DEFAULT_CENTRAL_TOKEN_ENV`, `DocumentSpec`, `IgnoreFile`, `IgnoreFrontmatter`, `IndexFile`, `IndexFrontmatter`, `IndexUnitRef`, `MonitorConfig`, `RESERVED_UNIT_STEMS`, `RegionColumn`, `RegionMode`, `RegionTemplate`, `UnitFile`, `UnitFrontmatter`, `WaiverEntry`, `__all__`, `add_code_ref`, `central_config_template`, `dump_unit_file`, `effective_coverage`, `gitignore_to_globs`, `load_bundle`, `load_config`, `load_config_dir`, `load_ignore_file`, `load_index_file`, `load_unit_file`, `regenerate_index`, `remove_code_ref`, `resolve_repo_root`, `set_context_refs`, `set_document_owner`, `unit_for_path`, `upsert_document`, `write_index`, `write_template`
+- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`, `FEAT-CONFIGV2-017`, `FEAT-OWNERSHIP-001`, `FEAT-OWNERSHIP-008`
 
 ## `configsync`
 
@@ -98,7 +98,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `generate.py`
 - Public symbols: `ApplyFixResult`, `GenerateResult`, `__all__`, `apply_edits_to_disk`, `apply_record_fix`
-- Implemented by: `FEAT-CONFIGV2-013`
+- Implemented by: `FEAT-CONFIGV2-013`, `FEAT-OWNERSHIP-008`
 
 ## `gitauth`
 
@@ -205,8 +205,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `server`
 
 - Path: `server/__init__.py`
-- Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
-- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`
+- Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `ReassignOwnerEdit`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
+- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`
 
 ## `similar`
 

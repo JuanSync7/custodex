@@ -120,12 +120,21 @@ _SET_DOC_STYLE = {
     "doc_id": "getting-started",
     "doc_style": {"writing_style": "concise", "vocabulary": "technical"},
 }
+_REASSIGN_OWNER = {  # EPIC OWN (FEAT-OWNERSHIP-008): the orphan fix, config = truth
+    "action": "reassign_owner",
+    "unit": "core",
+    "doc_id": "getting-started",
+    "owner": "platform-team",
+    "team": "platform-team",
+    "dri": "alice",
+}
 _ALL_ACTIONS = [
     _CREATE_DOC,
     _ADD_CODE_REF,
     _REMOVE_CODE_REF,
     _SET_CONTEXT_REFS,
     _SET_DOC_STYLE,
+    _REASSIGN_OWNER,
 ]
 
 

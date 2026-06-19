@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**206 features** across 20 subsystems.
+**207 features** across 20 subsystems.
 
 ## agent
 
@@ -785,6 +785,7 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 | `FEAT-OWNERSHIP-005` | Central roster mirror (persisted, both stores) | server, ownership | K0, K4, K6, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-006` | Admin-token roster routes (global, not per-repo) | server | K0, K8 | — | — | implemented |
 | `FEAT-OWNERSHIP-007` | Per-repo /ownership view + cross-repo departure cascade | server, ownership | K0, K5, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-008` | Reassign-owner edit (the orphan fix, config = truth) | config, generate, server | K5, K6, K7, K8 | — | — | implemented |
 
 ### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
 
@@ -813,6 +814,10 @@ POST /admin/roster (upsert) and POST /admin/roster/{name}/departed gate cross-re
 ### `FEAT-OWNERSHIP-007` — Per-repo /ownership view + cross-repo departure cascade
 
 GET /repos/{id}/ownership reads the synced config documents (which carry the resolved accountable/durable owner) and crosses them against the LIVE roster through ownership.detect_orphans, returning {owners, findings, orphan_count}. Because the orphan check runs on READ, marking one identity departed cascades — every document that identity is accountable for, across EVERY repo, flips to an orphan on the next read with no re-sync. Open read; deterministic (K5/K10).
+
+### `FEAT-OWNERSHIP-008` — Reassign-owner edit (the orphan fix, config = truth)
+
+ReassignOwnerEdit (a new ConfigEdit discriminated-union action) + the pure config.set_document_owner editor reassign a document's owner/team/dri through the EDITOR generate-to-disk flow: a provided value sets that field, None leaves it (a partial reassignment keeps the rest). apply_edits_to_disk rewrites config/cdmon/<unit>.yaml (byte-stable, idempotent K7) and the re-sync re-mirrors — the human fix that clears an orphan, with config as the single source of truth.
 
 ## pr
 

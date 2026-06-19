@@ -76,6 +76,7 @@ __all__ = [
     "add_code_ref",
     "remove_code_ref",
     "set_context_refs",
+    "set_document_owner",
     # CONFIG-V2 (N-02): index↔disk reverse validation + regeneration.
     "RESERVED_UNIT_STEMS",
     "regenerate_index",
@@ -1645,6 +1646,36 @@ def remove_code_ref(unit: UnitFile, doc_id: str, path: str) -> UnitFile:
             f"document {doc_id!r}: no code_ref with path {path!r} to remove"
         )
     new_doc = doc.model_copy(update={"code_refs": kept})
+    docs = list(unit.documents)
+    docs[i] = new_doc
+    return _replace_documents(unit, tuple(docs))
+
+
+def set_document_owner(
+    unit: UnitFile,
+    doc_id: str,
+    *,
+    owner: str | None = None,
+    team: str | None = None,
+    dri: str | None = None,
+) -> UnitFile:
+    """Reassign a document's owner/team/dri, returning a NEW frozen unit (EPIC OWN).
+
+    The human fix for an orphan (config = truth). A provided value SETS that field;
+    ``None`` LEAVES the existing value (so a partial reassignment — e.g. just a new
+    ``dri`` when the team stays — keeps owner/team). Loud :class:`ConfigError` if
+    ``doc_id`` is unknown (K8). Pure (B-02 immutability): the model is copied, never
+    mutated, so the dump round-trips and a re-apply is idempotent (K7).
+    """
+    i = _find_doc_index(unit, doc_id)
+    updates: dict[str, str] = {}
+    if owner is not None:
+        updates["owner"] = owner
+    if team is not None:
+        updates["team"] = team
+    if dri is not None:
+        updates["dri"] = dri
+    new_doc = unit.documents[i].model_copy(update=updates)
     docs = list(unit.documents)
     docs[i] = new_doc
     return _replace_documents(unit, tuple(docs))

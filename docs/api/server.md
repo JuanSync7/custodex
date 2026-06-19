@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: ca9a1057992e5b67
+  fingerprint: d7760b7ff77bc65c
   fingerprint_tiers:
-    composite: ca9a1057992e5b67
-    docstring: 30dec7a64af3128c
-    signature: 1cf3903664f9b735
+    composite: d7760b7ff77bc65c
+    docstring: a1d3d84f35b25b71
+    signature: dead65ed2de28222
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -132,6 +132,7 @@ cdm:
     - b3248dc191833eee
     - b70299153e99744b
     - b994b678f77964b4
+    - ba3dc6df6c7f6300
     - bb863595c216b603
     - c00b14bad6d13e8b
     - c130cb9540867907
@@ -169,7 +170,7 @@ cdm:
     - f95e33eaf5a43c96
     - fa2f6597462ddabd
   region_hashes:
-    symbols: 9c78109170319ddd
+    symbols: 065827139c5fbc7e
   schema_version: 1.0.0
 ---
 # server
@@ -230,6 +231,7 @@ cdm:
 | InMemoryStore.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
 | InMemoryStore.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
 | InMemoryStore.upsert_identity | method | def upsert_identity(self, identity: Identity) -> None |
+| ReassignOwnerEdit | class | class ReassignOwnerEdit(BaseModel) |
 | RecordRow | class | class RecordRow(Base) |
 | RegisteredRepo | class | class RegisteredRepo(BaseModel) |
 | RemoveCodeRefEdit | class | class RemoveCodeRefEdit(BaseModel) |

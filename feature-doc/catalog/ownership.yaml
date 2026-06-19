@@ -99,3 +99,16 @@ features:
     subsystem: ownership
     modules: [server, ownership]
     constraints: [K0, K5, K10]
+
+  - id: FEAT-OWNERSHIP-008
+    title: Reassign-owner edit (the orphan fix, config = truth)
+    summary: >-
+      ReassignOwnerEdit (a new ConfigEdit discriminated-union action) + the pure
+      config.set_document_owner editor reassign a document's owner/team/dri through
+      the EDITOR generate-to-disk flow: a provided value sets that field, None leaves
+      it (a partial reassignment keeps the rest). apply_edits_to_disk rewrites
+      config/cdmon/<unit>.yaml (byte-stable, idempotent K7) and the re-sync re-mirrors
+      — the human fix that clears an orphan, with config as the single source of truth.
+    subsystem: ownership
+    modules: [config, generate, server]
+    constraints: [K5, K6, K7, K8]

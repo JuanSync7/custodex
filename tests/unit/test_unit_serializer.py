@@ -28,6 +28,7 @@ from code_doc_monitor.config import (
     load_unit_file,
     remove_code_ref,
     set_context_refs,
+    set_document_owner,
     upsert_document,
 )
 from code_doc_monitor.errors import ConfigError
@@ -178,3 +179,29 @@ def test_set_context_refs_rejects_duplicate_path() -> None:
     dup = (ContextRef(path="docs/a.md"), ContextRef(path="docs/a.md"))
     with pytest.raises(ConfigError):
         set_context_refs(unit, "foundation", dup)
+
+
+def test_set_document_owner_sets_partial_and_round_trips(tmp_path: Path) -> None:
+    """set_document_owner reassigns owner/team/dri; None leaves a field; round-trips.
+
+    Features: FEAT-OWNERSHIP-008
+    """
+    unit = _unit()  # the foundation doc starts unowned
+    out = set_document_owner(unit, "foundation", owner="team-a", dri="alice")
+    assert out is not unit  # NEW frozen model (no mutation, B-02)
+    doc = out.documents[0]
+    assert (doc.owner, doc.dri, doc.team) == ("team-a", "alice", None)
+    # partial: setting only the dri keeps owner/team
+    out2 = set_document_owner(out, "foundation", dri="bob")
+    assert (out2.documents[0].owner, out2.documents[0].dri) == ("team-a", "bob")
+    # the reassignment survives a dump→load round-trip (K7)
+    assert _roundtrip(out2, tmp_path) == out2
+
+
+def test_set_document_owner_loud_on_unknown_doc() -> None:
+    """An unknown doc id is a loud ConfigError (K8).
+
+    Features: FEAT-OWNERSHIP-008
+    """
+    with pytest.raises(ConfigError):
+        set_document_owner(_unit(), "nope", owner="x")
