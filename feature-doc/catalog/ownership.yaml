@@ -60,3 +60,42 @@ features:
     subsystem: ownership
     modules: [cli, ownership]
     constraints: [K1, K4, K8, K10]
+
+  - id: FEAT-OWNERSHIP-005
+    title: Central roster mirror (persisted, both stores)
+    summary: >-
+      The central server persists a roster of identities (people/teams) as the
+      accountability MIRROR — upsert_identity / list_roster / mark_identity_departed
+      on the Store Protocol, implemented identically over InMemoryStore AND SqlStore
+      (Postgres-first; SQLite offline twin + pg) and created by Alembic migration
+      0006. The per-document owner/team/dri + resolved accountable/durable ride in
+      the existing config_documents JSON column (additive, K6 — NO column
+      migration). Insertion-ordered, injected timestamps (K10).
+    subsystem: ownership
+    modules: [server, ownership]
+    constraints: [K0, K4, K6, K10]
+
+  - id: FEAT-OWNERSHIP-006
+    title: Admin-token roster routes (global, not per-repo)
+    summary: >-
+      POST /admin/roster (upsert) and POST /admin/roster/{name}/departed gate
+      cross-repo roster mutations behind a SEPARATE global admin token
+      ($CDMON_ADMIN_TOKEN), never a per-repo token — a leaked repo token must not
+      grant roster access (401 missing / 403 wrong; open when unset, for dev). GET
+      /roster is an open read. A departed mark on an unknown name is a loud 404 (K8).
+    subsystem: ownership
+    modules: [server]
+    constraints: [K0, K8]
+
+  - id: FEAT-OWNERSHIP-007
+    title: Per-repo /ownership view + cross-repo departure cascade
+    summary: >-
+      GET /repos/{id}/ownership reads the synced config documents (which carry the
+      resolved accountable/durable owner) and crosses them against the LIVE roster
+      through ownership.detect_orphans, returning {owners, findings, orphan_count}.
+      Because the orphan check runs on READ, marking one identity departed cascades —
+      every document that identity is accountable for, across EVERY repo, flips to an
+      orphan on the next read with no re-sync. Open read; deterministic (K5/K10).
+    subsystem: ownership
+    modules: [server, ownership]
+    constraints: [K0, K5, K10]

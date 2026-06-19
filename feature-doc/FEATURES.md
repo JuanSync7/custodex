@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**203 features** across 20 subsystems.
+**206 features** across 20 subsystems.
 
 ## agent
 
@@ -782,6 +782,9 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 | `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-003` | Orphan & DRI-vacant detection (pure) | ownership | K1, K5, K8, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-004` | cdmon ownership CLI (read-only accountability gate) | cli, ownership | K1, K4, K8, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-005` | Central roster mirror (persisted, both stores) | server, ownership | K0, K4, K6, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-006` | Admin-token roster routes (global, not per-repo) | server | K0, K8 | — | — | implemented |
+| `FEAT-OWNERSHIP-007` | Per-repo /ownership view + cross-repo departure cascade | server, ownership | K0, K5, K10 | — | — | implemented |
 
 ### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
 
@@ -798,6 +801,18 @@ ownership.detect_orphans classifies each resolved document against the injected 
 ### `FEAT-OWNERSHIP-004` — cdmon ownership CLI (read-only accountability gate)
 
 cdmon ownership lists every document's accountable/durable owner from config and, given an offline --roster YAML, cross-checks it to flag orphaned (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage gap, not a departure) does not trip it. load_roster is loud on a malformed roster (K8).
+
+### `FEAT-OWNERSHIP-005` — Central roster mirror (persisted, both stores)
+
+The central server persists a roster of identities (people/teams) as the accountability MIRROR — upsert_identity / list_roster / mark_identity_departed on the Store Protocol, implemented identically over InMemoryStore AND SqlStore (Postgres-first; SQLite offline twin + pg) and created by Alembic migration 0006. The per-document owner/team/dri + resolved accountable/durable ride in the existing config_documents JSON column (additive, K6 — NO column migration). Insertion-ordered, injected timestamps (K10).
+
+### `FEAT-OWNERSHIP-006` — Admin-token roster routes (global, not per-repo)
+
+POST /admin/roster (upsert) and POST /admin/roster/{name}/departed gate cross-repo roster mutations behind a SEPARATE global admin token ($CDMON_ADMIN_TOKEN), never a per-repo token — a leaked repo token must not grant roster access (401 missing / 403 wrong; open when unset, for dev). GET /roster is an open read. A departed mark on an unknown name is a loud 404 (K8).
+
+### `FEAT-OWNERSHIP-007` — Per-repo /ownership view + cross-repo departure cascade
+
+GET /repos/{id}/ownership reads the synced config documents (which carry the resolved accountable/durable owner) and crosses them against the LIVE roster through ownership.detect_orphans, returning {owners, findings, orphan_count}. Because the orphan check runs on READ, marking one identity departed cascades — every document that identity is accountable for, across EVERY repo, flips to an orphan on the next read with no re-sync. Open read; deterministic (K5/K10).
 
 ## pr
 

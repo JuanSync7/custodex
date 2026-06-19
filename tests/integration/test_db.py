@@ -618,3 +618,32 @@ def test_sql_store_contract_on_postgres() -> None:
     assert [r.repo.repo_id for r in pg.list_repos()] == ["pg/repo"]
     (back,) = pg.records_for("pg/repo")
     assert back == _record("pg/repo")
+
+
+def test_alembic_migration_0006_roster_up_then_down(tmp_path: Path) -> None:
+    """0006 (OWN-04) creates the roster table; down drops it (the rest remain).
+
+    Features: FEAT-OWNERSHIP-005
+    """
+    from alembic import command
+
+    db = tmp_path / "migrate_0006.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0005 -> the roster table does NOT exist yet (additive 0006 adds it).
+    command.upgrade(cfg, "0005_provider_secret")
+    assert "roster" not in set(inspect(engine).get_table_names())
+
+    # upgrade head (through 0006) -> the roster table exists with its key columns.
+    command.upgrade(cfg, "head")
+    assert "roster" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("roster")}
+    assert {"id", "name", "kind", "active", "identity"} <= cols
+
+    # downgrade to 0005 -> the roster table is dropped; the rest remain.
+    command.downgrade(cfg, "0005_provider_secret")
+    after = set(inspect(engine).get_table_names())
+    assert "roster" not in after
+    assert {"repos", "config_documents"} <= after

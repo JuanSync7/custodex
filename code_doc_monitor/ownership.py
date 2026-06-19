@@ -28,6 +28,7 @@ __all__ = [
     "OwnershipStatus",
     "OwnershipFinding",
     "resolve_ownership",
+    "resolve_accountable_durable",
     "detect_orphans",
     "load_roster",
     "render_ownership_text",
@@ -97,6 +98,24 @@ class EffectiveOwner(BaseModel):
     durable: str | None = None  # team → owner → inherited unit owner
 
 
+def resolve_accountable_durable(
+    owner: str | None,
+    team: str | None,
+    dri: str | None,
+    inherited: str | None = None,
+) -> tuple[str | None, str | None]:
+    """The (accountable, durable) precedence — the ONE formula (K10).
+
+    ``accountable = dri → owner → team → inherited`` (the current point of contact);
+    ``durable = team → owner → inherited`` (the part that survives a person leaving).
+    Shared by :func:`resolve_ownership` (engine/CLI) and the server's sync mirror
+    (``configsync``) so the two never diverge.
+    """
+    accountable = dri or owner or team or inherited
+    durable = team or owner or inherited
+    return accountable, durable
+
+
 def resolve_ownership(
     config: MonitorConfig, *, unit_owner: Mapping[str, str] | None = None
 ) -> tuple[EffectiveOwner, ...]:
@@ -111,9 +130,9 @@ def resolve_ownership(
     fallback = unit_owner or {}
     out: list[EffectiveOwner] = []
     for doc in config.documents:
-        inherited = fallback.get(doc.id)
-        accountable = doc.dri or doc.owner or doc.team or inherited
-        durable = doc.team or doc.owner or inherited
+        accountable, durable = resolve_accountable_durable(
+            doc.owner, doc.team, doc.dri, fallback.get(doc.id)
+        )
         out.append(
             EffectiveOwner(
                 doc_id=doc.id,

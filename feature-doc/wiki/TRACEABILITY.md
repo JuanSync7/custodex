@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdmon trace` (R-07 `cdmon wiki`) to regenerate.
 
-**203 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**206 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -150,6 +150,9 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-OWNERSHIP-002` | unit/test_ownership.py | DEMOS.md |
 | `FEAT-OWNERSHIP-003` | unit/test_ownership.py | DEMOS.md |
 | `FEAT-OWNERSHIP-004` | system/test_ownership_cli.py, unit/test_ownership.py | DEMOS.md |
+| `FEAT-OWNERSHIP-005` | integration/test_db.py, integration/test_ownership_server.py | DEMOS.md |
+| `FEAT-OWNERSHIP-006` | integration/test_ownership_server.py | DEMOS.md |
+| `FEAT-OWNERSHIP-007` | integration/test_ownership_server.py | DEMOS.md |
 | `FEAT-PR-001` | integration/test_syncpr.py, system/test_cli.py | DEMOS.md |
 | `FEAT-PR-002` | integration/test_syncpr.py, system/test_cli.py | DEMOS.md |
 | `FEAT-PR-003` | integration/test_syncpr.py, regression/test_corpus_pipeline.py, system/test_cli.py | DEMOS.md |
