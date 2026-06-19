@@ -1,0 +1,34 @@
+# Feature catalog — `ownership` subsystem (EPIC OWN: peg a human/team to every
+# monitored document so a code→doc drift always has an accountable owner, and a
+# person leaving can never silently leave a document ownerless).
+# Golden source of truth (EPIC R discipline). Two tiers: ownership-of-record lives
+# per-repo in config (the SOURCE OF TRUTH, K0 / the K2 scope note); the central
+# server roster is a MIRROR that flags departed owners. Reassignment (config =
+# truth) is the human fix for an orphan.
+features:
+  - id: FEAT-OWNERSHIP-001
+    title: Per-document ownership-of-record
+    summary: >-
+      DocumentSpec carries optional owner/team/dri keys (additive, K6) so a document
+      declares its accountable identity in config — the single source of truth for
+      ownership (K0, never inferred from code). Own by team with a person as the
+      current DRI, so a departure demotes to "DRI vacant" rather than orphaning the
+      doc; the keys round-trip byte-identically through dump_unit_file (K7) and a
+      doc that declares none inherits its unit's frontmatter owner.
+    subsystem: ownership
+    modules: [config]
+    constraints: [K0, K2, K6, K7]
+
+  - id: FEAT-OWNERSHIP-002
+    title: Pure ownership resolver + roster snapshot
+    summary: >-
+      ownership.resolve_ownership projects a loaded config into one EffectiveOwner
+      per document — accountable = dri→owner→team→inherited unit owner, durable =
+      team→owner→inherited — sorted and clock-free (K1/K10). The Identity /
+      RosterSnapshot models are the offline, injected central mirror an
+      unknown-or-departed name reads as inactive against (is_active(None) and an
+      unknown name are both False — an owner the roster cannot vouch for is not an
+      active accountable party).
+    subsystem: ownership
+    modules: [ownership]
+    constraints: [K0, K1, K10]

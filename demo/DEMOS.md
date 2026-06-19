@@ -896,3 +896,30 @@ the **Test docs** section appears under Documents, Drift, and Mapping. Tests:
 `tests/system/test_demo_e2e.py` (the four `test-*` docs in the 8-document mapping)
 and `tests/system/test_testdoc_mirror.py` (the mirror's engine-level contract).
 Features: FEAT-CONFIGV2-017
+
+### DEMO-059 — Per-document ownership-of-record (config = truth)
+**What it shows.** A monitored document declares WHO is accountable for it, in
+config — the single source of truth for ownership (K0). `demo/config/cdmon/core.yaml`
+gives the `core-api` doc `owner: demo-team`, `team: demo-team`, `dri: dana`: the
+team owns it durably, with Dana as the current Directly-Responsible-Individual. The
+keys are optional and additive (K6) — `getting-started` declares none and inherits
+the unit's frontmatter owner — and they round-trip byte-identically through
+`dump_unit_file`/`load_unit_file` (K7), so reassigning an owner is a clean,
+idempotent config rewrite.
+**How to observe.** Inspect `demo/config/cdmon/core.yaml` (the `core-api`
+`owner`/`team`/`dri` block); `load_unit_file` then `dump_unit_file` of that unit is
+byte-identical (the round-trip pinned by `tests/unit/test_ownership.py`).
+Features: FEAT-OWNERSHIP-001
+
+### DEMO-060 — Resolve accountable + durable owner (pure, clock-free)
+**What it shows.** `ownership.resolve_ownership` turns the demo config into one
+`EffectiveOwner` per document: for `core-api` it computes `accountable = dana` (the
+current DRI) and `durable = demo-team` (the part that survives a person leaving);
+for the unowned `getting-started` it inherits the unit owner. The roster
+(`Identity`/`RosterSnapshot`) is the injected mirror — `is_active` reads an
+unknown-or-departed name as inactive, the basis for orphan detection (OWN-02). All
+pure, sorted, no clock (K1/K10).
+**How to observe.** `resolve_ownership(load_bundle('demo/config/cdmon').config)`
+yields `accountable=dana`/`durable=demo-team` for `core-api`; precedence + the
+roster's inactive-on-unknown rule are pinned by `tests/unit/test_ownership.py`.
+Features: FEAT-OWNERSHIP-002

@@ -330,6 +330,11 @@ class DocumentSpec(BaseModel):
     index: bool = False  # landing page that must link every other document
     nav_section: str | None = None  # group heading in the html-twin sidebar
     nav_label: str | None = None  # short sidebar label (falls back to the title)
+    # EPIC OWN — ownership-of-record (config = truth; K0, the K2 scope note). All
+    # optional + additive (K6); a doc with none inherits its unit's frontmatter owner.
+    owner: str | None = None  # accountable identity (a person OR a team handle)
+    team: str | None = None  # durable group accountability (survives a person leaving)
+    dri: str | None = None  # current Directly-Responsible-Individual (vacatable)
 
     @model_validator(mode="after")
     def _region_modes_reference_declared_regions(self) -> DocumentSpec:
@@ -1515,6 +1520,12 @@ def _document_to_yaml(doc: DocumentSpec) -> dict:
         out["nav_section"] = doc.nav_section
     if doc.nav_label is not None:
         out["nav_label"] = doc.nav_label
+    if doc.owner is not None:
+        out["owner"] = doc.owner
+    if doc.team is not None:
+        out["team"] = doc.team
+    if doc.dri is not None:
+        out["dri"] = doc.dri
     if doc.region_keys:
         out["region_keys"] = list(doc.region_keys)
     if doc.region_modes:

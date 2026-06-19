@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**199 features** across 19 subsystems.
+**201 features** across 20 subsystems.
 
 ## agent
 
@@ -773,6 +773,21 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 ### `FEAT-MONITOR-009` — Region-authority-aware fix request
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
+
+## ownership
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-OWNERSHIP-001` | Per-document ownership-of-record | config | K0, K2, K6, K7 | — | — | implemented |
+| `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
+
+### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
+
+DocumentSpec carries optional owner/team/dri keys (additive, K6) so a document declares its accountable identity in config — the single source of truth for ownership (K0, never inferred from code). Own by team with a person as the current DRI, so a departure demotes to "DRI vacant" rather than orphaning the doc; the keys round-trip byte-identically through dump_unit_file (K7) and a doc that declares none inherits its unit's frontmatter owner.
+
+### `FEAT-OWNERSHIP-002` — Pure ownership resolver + roster snapshot
+
+ownership.resolve_ownership projects a loaded config into one EffectiveOwner per document — accountable = dri→owner→team→inherited unit owner, durable = team→owner→inherited — sorted and clock-free (K1/K10). The Identity / RosterSnapshot models are the offline, injected central mirror an unknown-or-departed name reads as inactive against (is_active(None) and an unknown name are both False — an owner the roster cannot vouch for is not an active accountable party).
 
 ## pr
 
