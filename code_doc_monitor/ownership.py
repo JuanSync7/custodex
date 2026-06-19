@@ -12,11 +12,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from enum import Enum
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+import yaml
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .config import Audience, MonitorConfig
+from .errors import ConfigError
 
 __all__ = [
     "Identity",
@@ -26,6 +29,8 @@ __all__ = [
     "OwnershipFinding",
     "resolve_ownership",
     "detect_orphans",
+    "load_roster",
+    "render_ownership_text",
 ]
 
 # Frozen + extra="forbid": ownership records are immutable snapshots; an unknown
@@ -212,3 +217,52 @@ def _classify(
         f"accountable owner {owner.accountable!r} is departed/unknown and no "
         f"active fallback — reassign this document",
     )
+
+
+def load_roster(path: Path) -> RosterSnapshot:
+    """Load an offline roster YAML (``identities: [...]``) → :class:`RosterSnapshot`.
+
+    The roster is the OFFLINE, injected mirror the ``cdmon ownership`` CLI
+    cross-checks against (K4): a mapping with an ``identities`` list of Identity
+    dicts. Loud (``ConfigError``) on a missing/unreadable file, a non-mapping
+    document, or a malformed identity (K8) — never a silent empty roster.
+    """
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise ConfigError(f"could not read roster {str(path)!r}: {exc}") from exc
+    if not isinstance(raw, dict) or not isinstance(raw.get("identities"), list):
+        raise ConfigError(
+            f"roster {str(path)!r} must be a mapping with an 'identities' list"
+        )
+    try:
+        return RosterSnapshot(
+            identities=tuple(Identity(**item) for item in raw["identities"])
+        )
+    except (TypeError, ValidationError) as exc:
+        raise ConfigError(f"malformed roster {str(path)!r}: {exc}") from exc
+
+
+def render_ownership_text(
+    owners: Sequence[EffectiveOwner], findings: Sequence[OwnershipFinding]
+) -> str:
+    """A deterministic plain-text ownership report (K10) — the CLI's human view."""
+    lines = [f"# Ownership — {len(owners)} document(s)", ""]
+    for owner in owners:
+        meta = (
+            f"owner={owner.owner or '—'} "
+            f"team={owner.team or '—'} "
+            f"dri={owner.dri or '—'}"
+        )
+        lines.append(
+            f"  {owner.doc_id}  [{owner.audience.value}]  "
+            f"accountable={owner.accountable or '—'}  ({meta})"
+        )
+    if findings:
+        lines.append("")
+        lines.append(f"# Findings — {len(findings)} document(s) need a human")
+        for finding in findings:
+            lines.append(
+                f"  [{finding.status.value}] {finding.doc_id}: {finding.detail}"
+            )
+    return "\n".join(lines)

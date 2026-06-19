@@ -61,6 +61,13 @@ from .layout import (
 )
 from .manifest import parse_doc
 from .monitor import DEFAULT_LOG_PATH, Monitor
+from .ownership import (
+    OwnershipStatus,
+    detect_orphans,
+    load_roster,
+    render_ownership_text,
+    resolve_ownership,
+)
 from .pr import GitLabTransport, open_docs_pr
 from .promotion import detect_promotions
 from .registry import register_repo, repo_identity_from_config, sync_repo_remote
@@ -163,6 +170,23 @@ def _doc_style_for(config_dir: Path) -> DocStyleMap | None:
     if not (config_dir / "index.yaml").is_file():
         return None
     return load_bundle(config_dir).doc_style
+
+
+def _unit_owner_map(config_dir: Path) -> dict[str, str]:
+    """``doc_id`` → its unit-frontmatter owner for a dir-layout config (EPIC OWN).
+
+    The per-document ownership fallback: a doc that declares no owner of its own
+    inherits its unit's frontmatter owner. A single-file config has no units, so
+    this is empty there (no fallback).
+    """
+    if not (config_dir / "index.yaml").is_file():
+        return {}
+    bundle = load_bundle(config_dir)
+    return {
+        doc.id: unit.frontmatter.owner
+        for unit in bundle.units
+        for doc in unit.documents
+    }
 
 
 @app.callback()
@@ -1649,6 +1673,59 @@ def schema(
         typer.echo(f"Wrote review-record schema to {out}")
         return
     typer.echo(text)
+
+
+@app.command()
+def ownership(
+    config: Path = _CONFIG_OPTION,
+    roster: Path | None = typer.Option(
+        None,
+        "--roster",
+        help="An offline roster YAML (identities: [...]) to cross-check owners "
+        "against; without it the command just lists assignments.",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit {owners, findings} as round-trippable JSON."
+    ),
+    fail_on_orphan: bool = typer.Option(
+        False,
+        "--fail-on-orphan",
+        help="Exit 1 if any document is an orphan (its accountable owner has "
+        "departed). Requires --roster; UNOWNED docs do NOT trip it (that is a "
+        "coverage gap, not a departure).",
+    ),
+) -> None:
+    """List per-document ownership and flag orphaned (departed-owner) docs (K1/K4).
+
+    Pure + offline: resolves each document's accountable/durable owner from config
+    (the source of truth for ownership), optionally cross-checks against an offline
+    ``--roster`` to classify orphans, and prints a table (or ``--json``).
+    ``--fail-on-orphan`` turns a departed-owner orphan into a nonzero exit — an
+    accountability gate. No backend, no network.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        unit_owner = _unit_owner_map(config_dir)
+        owners = resolve_ownership(cfg, unit_owner=unit_owner)
+        snapshot = load_roster(roster) if roster is not None else None
+    except CodeDocMonitorError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    findings = detect_orphans(owners, snapshot) if snapshot is not None else ()
+    if as_json:
+        payload = {
+            "owners": [o.model_dump(mode="json") for o in owners],
+            "findings": [f.model_dump(mode="json") for f in findings],
+        }
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        typer.echo(render_ownership_text(owners, findings))
+    if fail_on_orphan and any(
+        f.status
+        in (OwnershipStatus.ORPHAN_OWNER_DEPARTED, OwnershipStatus.ORPHAN_DRI_VACANT)
+        for f in findings
+    ):
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

@@ -8,12 +8,14 @@ inherited) identity, sorted, clock-free (K1/K10). The roster models (``Identity`
 ``RosterSnapshot``) are the offline, injected mirror an unknown/departed name reads
 as inactive against.
 
-Features: FEAT-OWNERSHIP-001, FEAT-OWNERSHIP-002, FEAT-OWNERSHIP-003
+Features: FEAT-OWNERSHIP-001, FEAT-OWNERSHIP-002, FEAT-OWNERSHIP-003, FEAT-OWNERSHIP-004
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 
 from code_doc_monitor.config import (
     Audience,
@@ -24,6 +26,7 @@ from code_doc_monitor.config import (
     dump_unit_file,
     load_unit_file,
 )
+from code_doc_monitor.errors import ConfigError
 from code_doc_monitor.ownership import (
     EffectiveOwner,
     Identity,
@@ -31,6 +34,8 @@ from code_doc_monitor.ownership import (
     OwnershipStatus,
     RosterSnapshot,
     detect_orphans,
+    load_roster,
+    render_ownership_text,
     resolve_ownership,
 )
 
@@ -310,3 +315,69 @@ def _named_eo(doc_id: str, **owner_kw: str) -> EffectiveOwner:
         )
     )
     return resolve_ownership(cfg)[0]
+
+
+# ── load_roster + render_ownership_text (OWN-03) ─────────────────────────────
+
+
+def test_load_roster_happy(tmp_path: Path) -> None:
+    p = tmp_path / "roster.yaml"
+    p.write_text(
+        "identities:\n"
+        "  - name: alice\n"
+        "    kind: person\n"
+        "    active: true\n"
+        "  - name: platform-team\n"
+        "    kind: team\n"
+        "  - name: carol\n"
+        "    active: false\n"
+        "    departed_at: '2026-01-01T00:00:00Z'\n",
+        encoding="utf-8",
+    )
+    roster = load_roster(p)
+    assert roster.is_active("alice") is True
+    assert roster.is_active("carol") is False
+    assert roster.get("platform-team").kind == "team"
+
+
+def test_load_roster_loud_on_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError):
+        load_roster(tmp_path / "nope.yaml")
+
+
+def test_load_roster_loud_on_not_a_mapping(tmp_path: Path) -> None:
+    p = tmp_path / "roster.yaml"
+    p.write_text("- just\n- a\n- list\n", encoding="utf-8")
+    with pytest.raises(ConfigError):
+        load_roster(p)
+
+
+def test_load_roster_loud_on_bad_identity(tmp_path: Path) -> None:
+    p = tmp_path / "roster.yaml"
+    p.write_text("identities:\n  - kind: person\n", encoding="utf-8")  # missing name
+    with pytest.raises(ConfigError):
+        load_roster(p)
+
+
+def test_render_ownership_text_is_stable() -> None:
+    owners = resolve_ownership(
+        MonitorConfig(
+            documents=(
+                DocumentSpec(
+                    id="d1",
+                    path="d1.md",
+                    audience=Audience.ENG_GUIDE,
+                    team="t",
+                    dri="alice",
+                ),
+                DocumentSpec(id="d2", path="d2.md", audience=Audience.USER_GUIDE),
+            )
+        )
+    )
+    roster = RosterSnapshot(identities=(Identity(name="alice", active=False),))
+    findings = detect_orphans(owners, roster)
+    text = render_ownership_text(owners, findings)
+    assert "d1" in text and "d2" in text
+    assert "alice" in text
+    # deterministic
+    assert render_ownership_text(owners, findings) == text

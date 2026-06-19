@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**202 features** across 20 subsystems.
+**203 features** across 20 subsystems.
 
 ## agent
 
@@ -781,6 +781,7 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 | `FEAT-OWNERSHIP-001` | Per-document ownership-of-record | config | K0, K2, K6, K7 | — | — | implemented |
 | `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-003` | Orphan & DRI-vacant detection (pure) | ownership | K1, K5, K8, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-004` | cdmon ownership CLI (read-only accountability gate) | cli, ownership | K1, K4, K8, K10 | — | — | implemented |
 
 ### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
 
@@ -793,6 +794,10 @@ ownership.resolve_ownership projects a loaded config into one EffectiveOwner per
 ### `FEAT-OWNERSHIP-003` — Orphan & DRI-vacant detection (pure)
 
 ownership.detect_orphans classifies each resolved document against the injected roster snapshot — UNOWNED (no identity named), ORPHAN_OWNER_DEPARTED (the accountable owner is departed/unknown with no active fallback), or ORPHAN_DRI_VACANT (the DRI left but the durable team still owns it — a soft orphan resolved by assigning a new DRI). An orphan is never healable (no code change fixes it); OK docs are omitted by default so the result is exactly what needs a human (K5). Pure, sorted, clock-free (K1/K10).
+
+### `FEAT-OWNERSHIP-004` — cdmon ownership CLI (read-only accountability gate)
+
+cdmon ownership lists every document's accountable/durable owner from config and, given an offline --roster YAML, cross-checks it to flag orphaned (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage gap, not a departure) does not trip it. load_roster is loud on a malformed roster (K8).
 
 ## pr
 

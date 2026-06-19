@@ -37,8 +37,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `doctor`, `index`, `init`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `should_sync_cmd`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`
+- Public symbols: `app`, `build`, `check`, `coverage`, `doctor`, `index`, `init`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `should_sync_cmd`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-OWNERSHIP-004`
 
 ## `config`
 
@@ -157,8 +157,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `ownership`
 
 - Path: `ownership.py`
-- Public symbols: `EffectiveOwner`, `Identity`, `OwnershipFinding`, `OwnershipStatus`, `RosterSnapshot`, `__all__`, `detect_orphans`, `resolve_ownership`
-- Implemented by: `FEAT-OWNERSHIP-002`, `FEAT-OWNERSHIP-003`
+- Public symbols: `EffectiveOwner`, `Identity`, `OwnershipFinding`, `OwnershipStatus`, `RosterSnapshot`, `__all__`, `detect_orphans`, `load_roster`, `render_ownership_text`, `resolve_ownership`
+- Implemented by: `FEAT-OWNERSHIP-002`, `FEAT-OWNERSHIP-003`, `FEAT-OWNERSHIP-004`
 
 ## `pr`
 

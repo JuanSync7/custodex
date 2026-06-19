@@ -935,3 +935,15 @@ needs assigning. Mark `demo-team` inactive too and it escalates to
 (only what needs a human is returned, K5). All pure + offline (K1/K10) — no server.
 **How to observe.** `detect_orphans(resolve_ownership(load_bundle('demo/config/cdmon').config), RosterSnapshot(identities=(Identity(name='dana', active=False), Identity(name='demo-team', active=True))))` flags `core-api` as `ORPHAN_DRI_VACANT`; the branch table is pinned by `tests/unit/test_ownership.py`.
 Features: FEAT-OWNERSHIP-003
+
+### DEMO-062 — `cdmon ownership` lists owners + flags departed-owner orphans
+**What it shows.** `cdmon ownership --config demo/config/cdmon` prints all 8 demo
+documents with their accountable owner — `core-api` is accountable=dana (its DRI),
+while the docs that declare no owner of their own inherit the unit owner
+`demo-team` (the per-doc fallback). Pass an offline roster that marks `dana`
+departed and `cdmon ownership --roster roster.yaml --fail-on-orphan` flags
+`core-api` as `orphan_dri_vacant` and exits nonzero — an accountability gate you
+can wire into CI. Read-only, offline (K1/K4), no backend.
+**How to observe.** From the repo root: `cdmon ownership --config demo/config/cdmon`
+prints the per-document table; with a roster YAML `{identities: [{name: dana, active: false}, {name: demo-team, active: true}]}`, `cdmon ownership --config demo/config/cdmon --roster roster.yaml --fail-on-orphan` exits 1 and names `core-api`. Pinned by `tests/system/test_ownership_cli.py`.
+Features: FEAT-OWNERSHIP-004

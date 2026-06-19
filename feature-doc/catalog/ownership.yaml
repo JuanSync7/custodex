@@ -46,3 +46,17 @@ features:
     subsystem: ownership
     modules: [ownership]
     constraints: [K1, K5, K8, K10]
+
+  - id: FEAT-OWNERSHIP-004
+    title: cdmon ownership CLI (read-only accountability gate)
+    summary: >-
+      cdmon ownership lists every document's accountable/durable owner from config
+      and, given an offline --roster YAML, cross-checks it to flag orphaned
+      (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits
+      {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a
+      nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage
+      gap, not a departure) does not trip it. load_roster is loud on a malformed
+      roster (K8).
+    subsystem: ownership
+    modules: [cli, ownership]
+    constraints: [K1, K4, K8, K10]
