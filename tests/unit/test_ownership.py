@@ -8,7 +8,7 @@ inherited) identity, sorted, clock-free (K1/K10). The roster models (``Identity`
 ``RosterSnapshot``) are the offline, injected mirror an unknown/departed name reads
 as inactive against.
 
-Features: FEAT-OWNERSHIP-001, FEAT-OWNERSHIP-002
+Features: FEAT-OWNERSHIP-001, FEAT-OWNERSHIP-002, FEAT-OWNERSHIP-003
 """
 
 from __future__ import annotations
@@ -27,7 +27,10 @@ from code_doc_monitor.config import (
 from code_doc_monitor.ownership import (
     EffectiveOwner,
     Identity,
+    OwnershipFinding,
+    OwnershipStatus,
     RosterSnapshot,
+    detect_orphans,
     resolve_ownership,
 )
 
@@ -200,3 +203,110 @@ def test_effective_owner_carries_raw_fields() -> None:
     assert isinstance(o, EffectiveOwner)
     assert (o.owner, o.team, o.dri) == ("o", "t", "d")
     assert o.doc_path == "x.md" and o.audience == Audience.ENG_GUIDE
+
+
+# ── detect_orphans (OWN-02) ──────────────────────────────────────────────────
+
+
+def _eo(**owner_kw: str) -> EffectiveOwner:
+    """One resolved EffectiveOwner via the real resolver (accountable/durable)."""
+    cfg = MonitorConfig(
+        documents=(
+            DocumentSpec(id="d", path="d.md", audience=Audience.ENG_GUIDE, **owner_kw),
+        )
+    )
+    return resolve_ownership(cfg)[0]
+
+
+def _roster(*pairs: tuple[str, bool]) -> RosterSnapshot:
+    return RosterSnapshot(
+        identities=tuple(Identity(name=n, active=a) for n, a in pairs)
+    )
+
+
+def test_unowned_when_no_identity_named() -> None:
+    findings = detect_orphans((_eo(),), _roster())
+    assert len(findings) == 1
+    assert findings[0].status is OwnershipStatus.UNOWNED
+
+
+def test_ok_active_dri_is_omitted_by_default() -> None:
+    findings = detect_orphans(
+        (_eo(owner="o", team="t", dri="alice"),), _roster(("alice", True))
+    )
+    assert findings == ()  # OK findings omitted unless include_ok
+
+
+def test_ok_active_dri_included_when_asked() -> None:
+    findings = detect_orphans(
+        (_eo(owner="o", team="t", dri="alice"),),
+        _roster(("alice", True)),
+        include_ok=True,
+    )
+    assert [f.status for f in findings] == [OwnershipStatus.OK]
+
+
+def test_dri_vacant_when_dri_departed_but_team_active() -> None:
+    # accountable=alice (departed), durable=platform (active) → soft orphan
+    finding = detect_orphans(
+        (_eo(team="platform", dri="alice"),),
+        _roster(("alice", False), ("platform", True)),
+    )[0]
+    assert finding.status is OwnershipStatus.ORPHAN_DRI_VACANT
+    assert finding.accountable == "alice" and "platform" in finding.detail
+
+
+def test_owner_departed_when_dri_and_team_both_gone() -> None:
+    finding = detect_orphans(
+        (_eo(team="platform", dri="alice"),),
+        _roster(("alice", False), ("platform", False)),
+    )[0]
+    assert finding.status is OwnershipStatus.ORPHAN_OWNER_DEPARTED
+
+
+def test_lone_owner_departed() -> None:
+    finding = detect_orphans((_eo(owner="bob"),), _roster(("bob", False)))[0]
+    assert finding.status is OwnershipStatus.ORPHAN_OWNER_DEPARTED
+
+
+def test_lone_team_disbanded() -> None:
+    # only a team, the team itself is inactive → owner-departed (no DRI to vacate)
+    finding = detect_orphans((_eo(team="ghosts"),), _roster(("ghosts", False)))[0]
+    assert finding.status is OwnershipStatus.ORPHAN_OWNER_DEPARTED
+
+
+def test_unknown_name_reads_as_departed() -> None:
+    # an accountable name no roster knows is not a silently-OK owner (K8)
+    finding = detect_orphans((_eo(owner="nobody"),), _roster())[0]
+    assert finding.status is OwnershipStatus.ORPHAN_OWNER_DEPARTED
+
+
+def test_findings_sorted_and_each_doc_classified_with_include_ok() -> None:
+    owners = (
+        _named_eo("z", owner="bob"),
+        _named_eo("a", dri="alice", team="t"),
+        _named_eo("m"),
+    )
+    roster = _roster(("alice", True), ("bob", False))
+    findings = detect_orphans(owners, roster, include_ok=True)
+    assert [f.doc_id for f in findings] == ["a", "m", "z"]  # sorted, one per doc
+    assert all(isinstance(f, OwnershipFinding) for f in findings)
+    by_id = {f.doc_id: f.status for f in findings}
+    assert by_id["a"] is OwnershipStatus.OK
+    assert by_id["m"] is OwnershipStatus.UNOWNED
+    assert by_id["z"] is OwnershipStatus.ORPHAN_OWNER_DEPARTED
+
+
+def test_detect_empty() -> None:
+    assert detect_orphans((), _roster()) == ()
+
+
+def _named_eo(doc_id: str, **owner_kw: str) -> EffectiveOwner:
+    cfg = MonitorConfig(
+        documents=(
+            DocumentSpec(
+                id=doc_id, path=f"{doc_id}.md", audience=Audience.ENG_GUIDE, **owner_kw
+            ),
+        )
+    )
+    return resolve_ownership(cfg)[0]

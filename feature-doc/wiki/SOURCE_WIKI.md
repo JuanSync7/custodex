@@ -157,8 +157,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `ownership`
 
 - Path: `ownership.py`
-- Public symbols: `EffectiveOwner`, `Identity`, `RosterSnapshot`, `__all__`, `resolve_ownership`
-- Implemented by: `FEAT-OWNERSHIP-002`
+- Public symbols: `EffectiveOwner`, `Identity`, `OwnershipFinding`, `OwnershipStatus`, `RosterSnapshot`, `__all__`, `detect_orphans`, `resolve_ownership`
+- Implemented by: `FEAT-OWNERSHIP-002`, `FEAT-OWNERSHIP-003`
 
 ## `pr`
 

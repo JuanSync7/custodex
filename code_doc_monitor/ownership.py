@@ -10,7 +10,8 @@ drive this same pure core.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -21,7 +22,10 @@ __all__ = [
     "Identity",
     "RosterSnapshot",
     "EffectiveOwner",
+    "OwnershipStatus",
+    "OwnershipFinding",
     "resolve_ownership",
+    "detect_orphans",
 ]
 
 # Frozen + extra="forbid": ownership records are immutable snapshots; an unknown
@@ -118,3 +122,93 @@ def resolve_ownership(
             )
         )
     return tuple(sorted(out, key=lambda owner: owner.doc_id))
+
+
+class OwnershipStatus(str, Enum):
+    """How a document's accountability stands against the roster."""
+
+    OK = "ok"  # the accountable identity is known + active
+    UNOWNED = "unowned"  # no owner/team/dri declared anywhere
+    ORPHAN_OWNER_DEPARTED = (
+        "orphan_owner_departed"  # accountable gone, no active fallback
+    )
+    ORPHAN_DRI_VACANT = (
+        "orphan_dri_vacant"  # DRI gone but durable owner still active (soft)
+    )
+
+
+class OwnershipFinding(BaseModel):
+    """One document's accountability verdict — the orphan signal (K5)."""
+
+    model_config = _MODEL_CONFIG
+
+    doc_id: str
+    doc_path: str
+    audience: Audience
+    status: OwnershipStatus
+    detail: str
+    accountable: str | None = None
+    owner: str | None = None
+    team: str | None = None
+    dri: str | None = None
+
+
+def detect_orphans(
+    owners: Sequence[EffectiveOwner],
+    roster: RosterSnapshot,
+    *,
+    include_ok: bool = False,
+) -> tuple[OwnershipFinding, ...]:
+    """Classify each document against the roster, sorted by id (pure, no clock).
+
+    An orphan is never *healable* (no code change fixes it) — it is resolved by
+    reassignment (OWN-05). ``OK`` findings are omitted unless ``include_ok`` so the
+    default result is exactly the docs that need a human (K5). The roster is the
+    injected mirror; an unknown-or-departed accountable name is treated inactive.
+    """
+    findings: list[OwnershipFinding] = []
+    for owner in owners:
+        status, detail = _classify(owner, roster)
+        if status is OwnershipStatus.OK and not include_ok:
+            continue
+        findings.append(
+            OwnershipFinding(
+                doc_id=owner.doc_id,
+                doc_path=owner.doc_path,
+                audience=owner.audience,
+                status=status,
+                detail=detail,
+                accountable=owner.accountable,
+                owner=owner.owner,
+                team=owner.team,
+                dri=owner.dri,
+            )
+        )
+    return tuple(sorted(findings, key=lambda finding: finding.doc_id))
+
+
+def _classify(
+    owner: EffectiveOwner, roster: RosterSnapshot
+) -> tuple[OwnershipStatus, str]:
+    """The pure per-document verdict (accountable vs durable vs roster)."""
+    if owner.accountable is None:
+        return OwnershipStatus.UNOWNED, "no owner/team/dri declared"
+    if roster.is_active(owner.accountable):
+        return OwnershipStatus.OK, f"accountable owner {owner.accountable!r} is active"
+    # The accountable identity is departed/unknown. A distinct, still-active durable
+    # owner (the team) makes this a SOFT orphan — assign a new DRI, no panic.
+    if (
+        owner.durable is not None
+        and owner.durable != owner.accountable
+        and roster.is_active(owner.durable)
+    ):
+        return (
+            OwnershipStatus.ORPHAN_DRI_VACANT,
+            f"DRI {owner.accountable!r} departed; durable owner "
+            f"{owner.durable!r} still active — assign a new DRI",
+        )
+    return (
+        OwnershipStatus.ORPHAN_OWNER_DEPARTED,
+        f"accountable owner {owner.accountable!r} is departed/unknown and no "
+        f"active fallback — reassign this document",
+    )

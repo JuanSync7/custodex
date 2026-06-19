@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**201 features** across 20 subsystems.
+**202 features** across 20 subsystems.
 
 ## agent
 
@@ -780,6 +780,7 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 |----|---------|---------|-------------|-------|-------|--------|
 | `FEAT-OWNERSHIP-001` | Per-document ownership-of-record | config | K0, K2, K6, K7 | — | — | implemented |
 | `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-003` | Orphan & DRI-vacant detection (pure) | ownership | K1, K5, K8, K10 | — | — | implemented |
 
 ### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
 
@@ -788,6 +789,10 @@ DocumentSpec carries optional owner/team/dri keys (additive, K6) so a document d
 ### `FEAT-OWNERSHIP-002` — Pure ownership resolver + roster snapshot
 
 ownership.resolve_ownership projects a loaded config into one EffectiveOwner per document — accountable = dri→owner→team→inherited unit owner, durable = team→owner→inherited — sorted and clock-free (K1/K10). The Identity / RosterSnapshot models are the offline, injected central mirror an unknown-or-departed name reads as inactive against (is_active(None) and an unknown name are both False — an owner the roster cannot vouch for is not an active accountable party).
+
+### `FEAT-OWNERSHIP-003` — Orphan & DRI-vacant detection (pure)
+
+ownership.detect_orphans classifies each resolved document against the injected roster snapshot — UNOWNED (no identity named), ORPHAN_OWNER_DEPARTED (the accountable owner is departed/unknown with no active fallback), or ORPHAN_DRI_VACANT (the DRI left but the durable team still owns it — a soft orphan resolved by assigning a new DRI). An orphan is never healable (no code change fixes it); OK docs are omitted by default so the result is exactly what needs a human (K5). Pure, sorted, clock-free (K1/K10).
 
 ## pr
 

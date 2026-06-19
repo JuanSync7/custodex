@@ -923,3 +923,15 @@ pure, sorted, no clock (K1/K10).
 yields `accountable=dana`/`durable=demo-team` for `core-api`; precedence + the
 roster's inactive-on-unknown rule are pinned by `tests/unit/test_ownership.py`.
 Features: FEAT-OWNERSHIP-002
+
+### DEMO-061 — Departure → orphan detection (pure, offline)
+**What it shows.** When a person leaves, the documents they were the DRI for must
+not go silently ownerless. `ownership.detect_orphans` crosses the resolved
+ownership of the demo config against a roster snapshot: with `dana` marked departed
+but `demo-team` still active, the `core-api` doc (dri: dana, team: demo-team) is
+flagged `ORPHAN_DRI_VACANT` — a SOFT orphan: the team still owns it, a new DRI just
+needs assigning. Mark `demo-team` inactive too and it escalates to
+`ORPHAN_OWNER_DEPARTED`. An unowned doc is `UNOWNED`; an active owner is omitted
+(only what needs a human is returned, K5). All pure + offline (K1/K10) — no server.
+**How to observe.** `detect_orphans(resolve_ownership(load_bundle('demo/config/cdmon').config), RosterSnapshot(identities=(Identity(name='dana', active=False), Identity(name='demo-team', active=True))))` flags `core-api` as `ORPHAN_DRI_VACANT`; the branch table is pinned by `tests/unit/test_ownership.py`.
+Features: FEAT-OWNERSHIP-003

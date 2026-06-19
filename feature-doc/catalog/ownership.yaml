@@ -32,3 +32,17 @@ features:
     subsystem: ownership
     modules: [ownership]
     constraints: [K0, K1, K10]
+
+  - id: FEAT-OWNERSHIP-003
+    title: Orphan & DRI-vacant detection (pure)
+    summary: >-
+      ownership.detect_orphans classifies each resolved document against the
+      injected roster snapshot — UNOWNED (no identity named), ORPHAN_OWNER_DEPARTED
+      (the accountable owner is departed/unknown with no active fallback), or
+      ORPHAN_DRI_VACANT (the DRI left but the durable team still owns it — a soft
+      orphan resolved by assigning a new DRI). An orphan is never healable (no code
+      change fixes it); OK docs are omitted by default so the result is exactly what
+      needs a human (K5). Pure, sorted, clock-free (K1/K10).
+    subsystem: ownership
+    modules: [ownership]
+    constraints: [K1, K5, K8, K10]
