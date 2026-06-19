@@ -81,7 +81,10 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
       {orphan_count > 0 ? (
         <p role="status" className="error">
           {orphan_count} document{orphan_count === 1 ? "" : "s"} need a new owner —
-          an accountable owner has departed. Reassign on the Mapping page.
+          an accountable owner has departed. Reassign by updating the document's{" "}
+          <code>owner</code>/<code>team</code>/<code>dri</code> in{" "}
+          <code>config/cdmon</code> (the <code>reassign_owner</code> config edit
+          writes it to disk).
         </p>
       ) : (
         <p className="coverage-summary">
@@ -89,7 +92,7 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
         </p>
       )}
 
-      <table className="coverage-tree">
+      <table className="coverage-tree ownership-table">
         <thead>
           <tr>
             <th scope="col">Document</th>
@@ -103,6 +106,7 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
           {owners.map((o) => {
             const finding = findingByDoc.get(o.doc_id);
             const status = finding ? finding.status : "ok";
+            const departed = status.startsWith("orphan_");
             return (
               <tr key={o.doc_id}>
                 <th scope="row">
@@ -110,7 +114,16 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
                     {o.doc_id}
                   </span>
                 </th>
-                <td>{o.accountable ?? "—"}</td>
+                <td>
+                  {departed ? (
+                    <span className="owner-departed">
+                      <s>{o.accountable ?? "—"}</s>
+                      <span className="badge departed">departed</span>
+                    </span>
+                  ) : (
+                    (o.accountable ?? "—")
+                  )}
+                </td>
                 <td>{o.team ?? "—"}</td>
                 <td>{o.dri ?? "—"}</td>
                 <td>
@@ -124,6 +137,9 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
                     />
                     {statusLabel(status)}
                   </span>
+                  {finding?.detail ? (
+                    <span className="sr-only">{finding.detail}</span>
+                  ) : null}
                 </td>
               </tr>
             );

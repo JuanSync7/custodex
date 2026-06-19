@@ -1703,6 +1703,16 @@ def ownership(
     ``--fail-on-orphan`` turns a departed-owner orphan into a nonzero exit — an
     accountability gate. No backend, no network.
     """
+    if fail_on_orphan and roster is None:
+        # Loud, not a vacuous pass (K8): without a roster there is no departure
+        # data, so the gate could never fire — a forgotten --roster in CI would
+        # silently report "clean". Refuse the misuse instead.
+        typer.echo(
+            "error: --fail-on-orphan requires --roster (no roster = no departure "
+            "data, so the gate would pass vacuously).",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     try:
         cfg, config_dir = _load(config)
         unit_owner = _unit_owner_map(config_dir)

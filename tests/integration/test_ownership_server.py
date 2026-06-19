@@ -131,8 +131,9 @@ def test_mark_departed_route_and_404(kind: str) -> None:
 # ── admin-token auth (a GLOBAL token, NOT per-repo) ──────────────────────────
 
 
-def test_admin_routes_require_admin_token() -> None:
-    client = TestClient(create_app(InMemoryStore(), admin_token="s3cret-admin"))
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_admin_routes_require_admin_token(kind: str) -> None:
+    client = TestClient(create_app(_make_store(kind), admin_token="s3cret-admin"))
     assert client.post("/admin/roster", json={"name": "x"}).status_code == 401
     bad = {"Authorization": "Bearer nope"}
     assert (
@@ -145,9 +146,32 @@ def test_admin_routes_require_admin_token() -> None:
     assert client.get("/roster").status_code == 200  # reads stay open
 
 
-def test_admin_routes_open_when_no_token_configured() -> None:
-    client = TestClient(create_app(InMemoryStore()))  # no admin token
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_admin_routes_open_when_no_token_configured(kind: str) -> None:
+    client = TestClient(create_app(_make_store(kind)))  # no admin token
     assert client.post("/admin/roster", json={"name": "x"}).status_code == 201
+
+
+def test_unset_admin_token_warns_only_for_persistent_store(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Open-when-unset is loud on an insecure PROD default (K8 spirit): warn for a
+    persistent DB-backed store (the GLOBAL routes are unprotected), but stay quiet
+    for the ephemeral offline InMemoryStore so the dev/test path is not spammed.
+    """
+    import logging
+
+    _MSG = "CDMON_ADMIN_TOKEN is not set"
+    sql = _make_store("sql")
+    with caplog.at_level(logging.WARNING, logger="code_doc_monitor.server"):
+        create_app(sql)  # persistent store + no admin token → LOUD
+    assert any(_MSG in r.message for r in caplog.records)
+
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="code_doc_monitor.server"):
+        create_app(InMemoryStore())  # ephemeral store → quiet
+        create_app(sql, admin_token="set")  # token configured → quiet
+    assert not any(_MSG in r.message for r in caplog.records)
 
 
 # ── the per-repo /ownership view + the cross-repo cascade ────────────────────
@@ -189,6 +213,54 @@ def test_ownership_view_and_departure_cascade(kind: str) -> None:
     assert body2["orphan_count"] == 1
     assert body2["findings"][0]["doc_id"] == "core-api"
     assert body2["findings"][0]["status"] == "orphan_dri_vacant"
+
+
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_ownership_hard_orphan_status_over_the_wire(kind: str) -> None:
+    """The HARD orphan (orphan_owner_departed = no active fallback, escalate) is the
+    highest-consequence status; pin it END-TO-END over GET /ownership, alongside a
+    SOFT (dri_vacant) doc, so the route's serialization of that enum AND the
+    orphan_count bucket (which folds BOTH statuses) are both guarded — a regression
+    dropping the hard status from the count would fail this test, not slip through.
+    """
+    store = _make_store(kind)
+    _register(store)
+    store.replace_config(
+        _REPO,
+        "git",
+        [
+            # solo: accountable AND durable both resolve to bob; bob departs → HARD
+            _doc(
+                "solo",
+                owner="bob",
+                team="bob",
+                dri="bob",
+                accountable="bob",
+                durable="bob",
+            ),
+            # core-api: dri dana departs but durable team platform stays → SOFT
+            _doc(
+                "core-api",
+                owner="platform",
+                team="platform",
+                dri="dana",
+                accountable="dana",
+                durable="platform",
+            ),
+        ],
+        [],
+    )
+    store.upsert_identity(Identity(name="bob", active=True))
+    store.upsert_identity(Identity(name="dana", active=True))
+    store.upsert_identity(Identity(name="platform", kind="team", active=True))
+    store.mark_identity_departed("bob", at=_NOW)
+    store.mark_identity_departed("dana", at=_NOW)
+
+    body = TestClient(create_app(store)).get(f"/repos/{_REPO}/ownership").json()
+    statuses = {f["doc_id"]: f["status"] for f in body["findings"]}
+    assert statuses["solo"] == "orphan_owner_departed"  # hard: escalate
+    assert statuses["core-api"] == "orphan_dri_vacant"  # soft: durable still active
+    assert body["orphan_count"] == 2  # BOTH buckets counted
 
 
 @pytest.mark.parametrize("kind", ["memory", "sql"])

@@ -40,6 +40,48 @@ def _cfg(tmp_path: Path) -> Path:
     return p
 
 
+def _dir_cfg(tmp_path: Path) -> Path:
+    """A minimal config/cdmon DIR layout: a unit whose frontmatter declares an
+    owner, plus a document that declares NO owner of its own — so its accountable
+    must INHERIT the unit owner. Exercises the dir-layout branch of _unit_owner_map.
+    """
+    d = tmp_path / "cdmon"
+    d.mkdir()
+    (d / "index.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "repo: probe\n"
+        "generated-by: cdmon\n"
+        'updated: "2026-06-07"\n'
+        "---\n"
+        'root: "."\n'
+        'version: "2.0.0"\n'
+        "units:\n"
+        "  - file: core.yaml\n",
+        encoding="utf-8",
+    )
+    (d / "core.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "unit: core\n"
+        'title: "Core unit"\n'
+        "owner: team-x\n"
+        'created: "2026-06-07"\n'
+        'updated: "2026-06-07"\n'
+        "---\n"
+        "dir-covered:\n"
+        "  - src\n"
+        "source-files-format:\n"
+        '  - ".py"\n'
+        "documents:\n"
+        "  - id: d-inherit\n"
+        "    path: docs/d-inherit.md\n"
+        "    audience: eng-guide\n",  # no owner/team/dri → inherits the unit owner
+        encoding="utf-8",
+    )
+    return d
+
+
 def _roster(tmp_path: Path, *, alice_active: bool) -> Path:
     p = tmp_path / "roster.yaml"
     p.write_text(
@@ -119,3 +161,29 @@ def test_ownership_loud_on_bad_config(tmp_path: Path) -> None:
     bad.write_text("documents: [{id: x}]\n", encoding="utf-8")  # missing path/audience
     res = runner.invoke(app, ["ownership", "--config", str(bad)])
     assert res.exit_code != 0
+
+
+def test_ownership_dir_layout_inherits_unit_owner(tmp_path: Path) -> None:
+    """A dir-layout doc with no owner of its own inherits its unit's frontmatter
+    owner — drives _unit_owner_map's index.yaml/load_bundle branch through the CLI.
+    """
+    res = runner.invoke(
+        app, ["ownership", "--config", str(_dir_cfg(tmp_path)), "--json"]
+    )
+    assert res.exit_code == 0, res.output
+    owners = {o["doc_id"]: o for o in json.loads(res.output)["owners"]}
+    # The doc declares no owner, so accountable + durable inherit the unit owner.
+    assert owners["d-inherit"]["accountable"] == "team-x"
+    assert owners["d-inherit"]["durable"] == "team-x"
+    assert owners["d-inherit"]["owner"] is None  # nothing declared on the doc itself
+
+
+def test_fail_on_orphan_without_roster_is_loud(tmp_path: Path) -> None:
+    """--fail-on-orphan without --roster has no departure data, so the gate could
+    only pass vacuously — it is refused with a nonzero exit, not silently green (K8).
+    """
+    res = runner.invoke(
+        app, ["ownership", "--config", str(_cfg(tmp_path)), "--fail-on-orphan"]
+    )
+    assert res.exit_code == 2, res.output
+    assert "--roster" in res.output

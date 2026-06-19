@@ -2649,9 +2649,11 @@ class RosterSnapshot(BaseModel):      # immutable view of the central roster
 
 class EffectiveOwner(BaseModel):      # resolved ownership for one document
     doc_id: str; doc_path: str; audience: Audience
-    owner: str | None; team: str | None; dri: str | None; unit: str | None
-    accountable: str | None           # dri or owner or team (or unit owner)
-    durable: str | None               # team or owner
+    owner: str | None; team: str | None; dri: str | None
+    accountable: str | None           # dri → owner → team → inherited unit owner
+    durable: str | None               # team → owner → inherited
+    # the inherited unit-owner fallback enters via resolve_ownership's `unit_owner`
+    # Mapping param — it is NOT a field on this model
 
 class OwnershipStatus(str, Enum):
     OK = "ok"
@@ -2701,31 +2703,38 @@ flow rewrites `config/cdmon/*.yaml` then re-mirrors (no route change).
 
 **Server — the central roster MIRROR (`[server]` extra; offline SQLite twin + `pg`).**
 Marking a person departed once cascades orphan detection across every repo.
-- migration `0006_roster_and_ownership.py`: `roster` (identity blob + indexed
-  `name`/`kind`/`active`) and `ownership_mirror` (`repo_id`,`doc_id`,`sync_kind`,
-  `owner`,`team`,`dri`,`accountable`,`synced_at` + blob).
-- `db.py`: `RosterRow`, `OwnershipMirrorRow`.
-- `store.py`: `ConfigDocument` gains additive `owner`/`team`/`dri`; new Store
-  Protocol methods (implemented in BOTH `InMemoryStore` and `SqlStore`, parity):
-  `upsert_identity(identity)`, `list_roster() -> list[Identity]`,
-  `mark_identity_departed(name, *, at)`, `replace_ownership_mirror(repo_id,
-  sync_kind, entries)`, `ownership_mirror_for(repo_id, sync_kind=None)`,
-  `set_admin_token_hash(hash)`, `admin_token_hash()`.
-- `configsync._build_rows`: projects each doc's owner/team/dri into
-  `ConfigDocument`; the `/sync` route upserts the ownership mirror after a sync.
+- migration `0006_roster_and_ownership.py`: creates ONLY the `roster` table
+  (identity blob + indexed `name`/`kind`/`active`). DESIGN REFINEMENT vs the OWN-04
+  pin: there is NO separate `ownership_mirror` table — the resolved owner/team/dri +
+  accountable/durable ride in the EXISTING `config_documents` JSON column (additive,
+  K6; no column migration).
+- `db.py`: `RosterRow`.
+- `store.py`: `ConfigDocument` gains additive `owner`/`team`/`dri` +
+  `accountable`/`durable`; new Store Protocol methods (implemented in BOTH
+  `InMemoryStore` and `SqlStore`, parity): `upsert_identity(identity)`,
+  `list_roster() -> list[Identity]`, `mark_identity_departed(name, *, at)`.
+- `configsync._build_rows`: resolves accountable/durable via the shared
+  `resolve_accountable_durable` and projects owner/team/dri/accountable/durable into
+  `ConfigDocument`'s existing JSON (no new table, no extra route).
 - `app.py` routes: `POST /admin/roster` (admin token, upsert identity);
   `POST /admin/roster/{name}/departed` (admin token, mark departed = active=False,
   departed_at=now); `GET /roster` (open, list); `GET /repos/{repo_id}/ownership`
-  (open, computed view = docs grouped by accountable owner +
-  `detect_orphans(mirror, roster)` findings). Admin auth is a SEPARATE global token
-  (`$CDMON_ADMIN_TOKEN` → `hash_token` → `store.admin_token_hash`), NOT the per-repo
-  token — a leaked repo token must not grant cross-repo roster mutation;
-  `_verify_admin_token` mirrors `_verify_token`.
+  (open, computed view = the synced docs' resolved owners +
+  `detect_orphans(owners, roster)` against the LIVE roster at READ time — so a
+  departure re-flags every repo with no re-sync). Admin auth is a SEPARATE global
+  token (the `admin_token` param / `$CDMON_ADMIN_TOKEN`), hashed ONCE with
+  `hash_token` into a `create_app` closure (`admin_hash`; None ⇒ routes open) and
+  checked by `_verify_admin` (constant-time `hmac.compare_digest`) — NOT a per-repo
+  token, and never persisted on the Store. With no admin token AND a persistent
+  (DB-backed) store, `create_app` logs a loud warning that the GLOBAL routes are
+  unprotected.
 
 **Frontend — Ownership page.** `GET /repos/:repoId/ownership` → a new
 `pages/Ownership.tsx` (sibling to Documents/Coverage), a `RepoNav` entry, and
-`OwnershipData`/`RosterPerson` types; docs grouped by accountable owner with
-active/departed/orphan chips. `astro check` + `astro build` gate.
+`OwnershipData`/`OwnershipOwner`/`OwnershipFinding` types; a per-doc table
+(Document/Accountable/Team/DRI/Status) with status dots, an orphan banner, and a
+struck-through "departed" badge on an orphaned accountable owner. `astro check` +
+`astro build` gate.
 
 **Demo (shows it working).** `demo/config/cdmon/*` docs carry real owners; a
 `seed_demo.py` roster seeds a team + people with ONE marked departed, so the live

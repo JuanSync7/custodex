@@ -73,6 +73,16 @@ describe("Ownership page", () => {
     expect(screen.getByText(/orphan dri vacant/i)).toBeInTheDocument();
   });
 
+  it("marks the departed accountable owner and surfaces the reason to AT", async () => {
+    renderOwnership(fakeApi());
+    // The orphan row's accountable (the departed DRI) gets a visible "departed"
+    // badge instead of reading as a normal active owner...
+    expect(await screen.findByText("departed")).toBeInTheDocument();
+    // ...and the human-readable reason is in the DOM (sr-only) for screen readers,
+    // not trapped solely in a non-interactive title tooltip.
+    expect(screen.getByText(/DRI 'dana' departed/)).toBeInTheDocument();
+  });
+
   it("shows a clean banner when there are no orphans", async () => {
     renderOwnership(
       fakeApi({

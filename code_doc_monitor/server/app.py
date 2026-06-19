@@ -19,6 +19,7 @@ unregistered ``repo_id`` is a loud 404, not a silent create (K8).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
 from collections.abc import Callable
@@ -810,6 +811,23 @@ def create_app(
         admin_token if admin_token is not None else os.environ.get("CDMON_ADMIN_TOKEN")
     )
     admin_hash: str | None = hash_token(effective_admin) if effective_admin else None
+    if admin_hash is None:
+        # Loud on an insecure prod default (K8 spirit, mirrors store_from_env's
+        # missing-DATABASE_URL warning): a roster mutation is GLOBAL — it re-flags
+        # orphans in EVERY repo — so an unset admin token leaves cross-repo
+        # ownership writable by anyone. Stay quiet for the offline/dev InMemoryStore
+        # (the warning would spam the test suite); warn only for a PERSISTENT,
+        # real-deployment store.
+        from .db import SqlStore
+
+        if isinstance(resolved, SqlStore):
+            _LOG.warning(
+                "CDMON_ADMIN_TOKEN is not set — the GLOBAL admin roster routes "
+                "(POST /admin/roster, POST /admin/roster/{name}/departed) are "
+                "UNPROTECTED. A roster mutation cascades to flag orphans in EVERY "
+                "repo, so an unauthenticated caller can poison ownership "
+                "server-wide. Set CDMON_ADMIN_TOKEN in any shared/prod deployment."
+            )
     app = FastAPI(title="code-doc-monitor central server", version="0.1.0")
 
     spa_index: Path | None = None
@@ -861,7 +879,10 @@ def create_app(
                 detail="missing bearer token for a token-protected repo",
             )
         presented = authorization.removeprefix("Bearer ").strip()
-        if hash_token(presented) != token_hash:
+        # Constant-time compare (defense-in-depth): the operands are sha256 hex
+        # digests, not the raw secret, so no token can be forged, but a uniform
+        # compare avoids leaking even a digest-match timing signal.
+        if not hmac.compare_digest(hash_token(presented), token_hash):
             raise HTTPException(status_code=403, detail="invalid bearer token")
 
     def _verify_admin(authorization: str | None) -> None:
@@ -877,7 +898,8 @@ def create_app(
             return
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="missing admin bearer token")
-        if hash_token(authorization.removeprefix("Bearer ").strip()) != admin_hash:
+        presented = authorization.removeprefix("Bearer ").strip()
+        if not hmac.compare_digest(hash_token(presented), admin_hash):
             raise HTTPException(status_code=403, detail="invalid admin token")
 
     @app.get("/")
