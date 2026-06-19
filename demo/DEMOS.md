@@ -1004,3 +1004,17 @@ orphan on the next `GET /ownership`.
 apply is byte-identical. Pinned by `tests/integration/test_generate.py` and
 `tests/unit/test_unit_serializer.py`.
 Features: FEAT-OWNERSHIP-008
+
+### DEMO-067 — Live demo shows a real departed-DRI orphan (out of the box)
+**What it shows.** Launching the demo (`scripts/seed_demo.py`, :33333) seeds the
+central roster: the teams that own the demo + dogfood configs are active, and `dana`
+— the DRI of the demo's `core-api` doc — is DEPARTED. So opening `demo-taskflow` and
+`GET /repos/demo-taskflow/ownership` shows a REAL soft orphan (`core-api`
+`orphan_dri_vacant`: the `demo-team` still owns it, a new DRI just needs assigning),
+while the dogfood repo (owned by the active `cdmon-team`) is clean — visible and
+clickable on first load, not an empty state.
+**How to observe.** With the seeded app, `GET /roster` shows `dana` inactive;
+`GET /repos/demo-taskflow/ownership` returns `orphan_count: 1` with `core-api` →
+`orphan_dri_vacant`; `GET /repos/code-doc-monitor/ownership` returns `orphan_count: 0`.
+Pinned by `tests/system/test_demo_e2e.py::test_central_ownership_view_shows_departed_dri_orphan`.
+Features: FEAT-OWNERSHIP-009

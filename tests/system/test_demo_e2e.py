@@ -473,3 +473,26 @@ def _seeded_app() -> object:
     from code_doc_monitor.server import create_app
 
     return create_app(build_seeded_store())
+
+
+def test_central_ownership_view_shows_departed_dri_orphan() -> None:
+    """OWN-06: the seeded Ownership view flags core-api as a DRI-vacant orphan.
+
+    The seed marks `dana` (core-api's DRI) departed while `demo-team` (the durable
+    owner) stays active, so GET /ownership reports a SOFT orphan that a reassignment
+    clears. The dogfood repo's docs (owned by the active `cdmon-team`) are clean.
+
+    Features: FEAT-OWNERSHIP-009
+    """
+    app = _seeded_app()
+    with TestClient(app) as client:
+        roster = {i["name"]: i["active"] for i in client.get("/roster").json()}
+        body = client.get("/repos/demo-taskflow/ownership").json()
+        dogfood = client.get("/repos/code-doc-monitor/ownership").json()
+    assert roster["dana"] is False and roster["demo-team"] is True
+    owners = {o["doc_id"]: o["accountable"] for o in body["owners"]}
+    assert owners["core-api"] == "dana"  # core-api's DRI
+    assert body["orphan_count"] == 1
+    statuses = {f["doc_id"]: f["status"] for f in body["findings"]}
+    assert statuses["core-api"] == "orphan_dri_vacant"
+    assert dogfood["orphan_count"] == 0  # cdmon-team is active

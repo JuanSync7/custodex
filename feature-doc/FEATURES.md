@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**207 features** across 20 subsystems.
+**208 features** across 20 subsystems.
 
 ## agent
 
@@ -786,6 +786,7 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 | `FEAT-OWNERSHIP-006` | Admin-token roster routes (global, not per-repo) | server | K0, K8 | — | — | implemented |
 | `FEAT-OWNERSHIP-007` | Per-repo /ownership view + cross-repo departure cascade | server, ownership | K0, K5, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-008` | Reassign-owner edit (the orphan fix, config = truth) | config, generate, server | K5, K6, K7, K8 | — | — | implemented |
+| `FEAT-OWNERSHIP-009` | Live demo ownership (seeded departure → visible orphan) | server, ownership | K4, K5, K10 | — | — | implemented |
 
 ### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
 
@@ -818,6 +819,10 @@ GET /repos/{id}/ownership reads the synced config documents (which carry the res
 ### `FEAT-OWNERSHIP-008` — Reassign-owner edit (the orphan fix, config = truth)
 
 ReassignOwnerEdit (a new ConfigEdit discriminated-union action) + the pure config.set_document_owner editor reassign a document's owner/team/dri through the EDITOR generate-to-disk flow: a provided value sets that field, None leaves it (a partial reassignment keeps the rest). apply_edits_to_disk rewrites config/cdmon/<unit>.yaml (byte-stable, idempotent K7) and the re-sync re-mirrors — the human fix that clears an orphan, with config as the single source of truth.
+
+### `FEAT-OWNERSHIP-009` — Live demo ownership (seeded departure → visible orphan)
+
+The live demo (scripts/seed_demo.py → :33333) seeds the central roster with the teams that own the demo + dogfood configs (active) and ONE departed person (dana, the DRI of the demo's core-api doc), so GET /repos/demo-taskflow/ownership shows a real soft orphan (core-api orphan_dri_vacant) out of the box while the dogfood repo (cdmon-team active) stays clean — the accountability feature is visible and clickable, not an empty state.
 
 ## pr
 

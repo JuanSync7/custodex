@@ -210,3 +210,22 @@ def test_config_document_round_trips_ownership(kind: str) -> None:
 def test_ownership_unknown_repo_is_404() -> None:
     client = TestClient(create_app(InMemoryStore()))
     assert client.get("/repos/nope/ownership").status_code == 404
+
+
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_ownership_dedups_doc_across_sync_kinds(kind: str) -> None:
+    """A doc mirrored under git AND local appears ONCE (ownership is one config)."""
+    store = _make_store(kind)
+    _register(store)
+    store.replace_config(
+        _REPO, "git", [_doc("d", owner="o", accountable="o", durable="o")], []
+    )
+    store.replace_config(
+        _REPO,
+        "local",
+        [_doc("d", owner="o", accountable="o", durable="o", sync_kind="local")],
+        [],
+    )
+    client = TestClient(create_app(store))
+    body = client.get(f"/repos/{_REPO}/ownership").json()
+    assert [o["doc_id"] for o in body["owners"]] == ["d"]  # deduped

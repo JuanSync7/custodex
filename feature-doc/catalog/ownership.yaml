@@ -112,3 +112,17 @@ features:
     subsystem: ownership
     modules: [config, generate, server]
     constraints: [K5, K6, K7, K8]
+
+  - id: FEAT-OWNERSHIP-009
+    title: Live demo ownership (seeded departure → visible orphan)
+    summary: >-
+      The live demo (scripts/seed_demo.py → :33333) seeds the central roster with the
+      teams that own the demo + dogfood configs (active) and ONE departed person
+      (dana, the DRI of the demo's core-api doc), so GET
+      /repos/demo-taskflow/ownership shows a real soft orphan (core-api
+      orphan_dri_vacant) out of the box while the dogfood repo (cdmon-team active)
+      stays clean — the accountability feature is visible and clickable, not an empty
+      state.
+    subsystem: ownership
+    modules: [server, ownership]
+    constraints: [K4, K5, K10]

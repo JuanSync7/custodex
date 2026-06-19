@@ -1054,19 +1054,27 @@ def create_app(
         from ..config import Audience
 
         _require_known_repo(store, repo_id)
-        owners = [
-            EffectiveOwner(
-                doc_id=d.doc_id,
-                doc_path=d.path,
-                audience=Audience(d.audience),
-                owner=d.owner,
-                team=d.team,
-                dri=d.dri,
-                accountable=d.accountable,
-                durable=d.durable,
+        # Ownership is a property of the CONFIG (identical across sync_kinds), so a
+        # doc mirrored under both "git" and "local" must appear ONCE — dedup by
+        # doc_id (first wins) when no sync_kind narrows it.
+        owners: list[EffectiveOwner] = []
+        seen: set[str] = set()
+        for d in store.config_documents_for(repo_id, sync_kind):
+            if d.doc_id in seen:
+                continue
+            seen.add(d.doc_id)
+            owners.append(
+                EffectiveOwner(
+                    doc_id=d.doc_id,
+                    doc_path=d.path,
+                    audience=Audience(d.audience),
+                    owner=d.owner,
+                    team=d.team,
+                    dri=d.dri,
+                    accountable=d.accountable,
+                    durable=d.durable,
+                )
             )
-            for d in store.config_documents_for(repo_id, sync_kind)
-        ]
         roster = RosterSnapshot(identities=tuple(store.list_roster()))
         findings = detect_orphans(owners, roster)
         orphan_count = sum(

@@ -158,7 +158,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `ownership.py`
 - Public symbols: `EffectiveOwner`, `Identity`, `OwnershipFinding`, `OwnershipStatus`, `RosterSnapshot`, `__all__`, `detect_orphans`, `load_roster`, `render_ownership_text`, `resolve_accountable_durable`, `resolve_ownership`
-- Implemented by: `FEAT-OWNERSHIP-002`, `FEAT-OWNERSHIP-003`, `FEAT-OWNERSHIP-004`, `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-007`
+- Implemented by: `FEAT-OWNERSHIP-002`, `FEAT-OWNERSHIP-003`, `FEAT-OWNERSHIP-004`, `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-009`
 
 ## `pr`
 
@@ -206,7 +206,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `server/__init__.py`
 - Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `ReassignOwnerEdit`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
-- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`
+- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-OWNERSHIP-009`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`
 
 ## `similar`
 
