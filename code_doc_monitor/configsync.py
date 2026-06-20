@@ -45,6 +45,7 @@ from . import inventory
 from .config import effective_coverage, load_bundle, resolve_repo_root
 from .drift import DriftReport, detect
 from .errors import SyncError
+from .ownership import resolve_accountable_durable
 from .server.store import (
     ConfigCodeRef,
     ConfigContextRef,
@@ -320,6 +321,13 @@ def _build_rows(
     for spec in bundle.config.documents:  # type: ignore[attr-defined]
         unit = bundle.unit_for_document(spec.id)  # type: ignore[attr-defined]
         unit_name = unit.frontmatter.unit if unit is not None else None
+        # EPIC OWN: resolve the accountable/durable owner at sync (where the unit's
+        # frontmatter owner is available as the per-doc fallback), using the ONE
+        # shared precedence so the server mirror never diverges from the engine.
+        unit_owner = unit.frontmatter.owner if unit is not None else None
+        accountable, durable = resolve_accountable_durable(
+            spec.owner, spec.team, spec.dri, unit_owner
+        )
         documents.append(
             ConfigDocument(
                 repo_id=repo_id,
@@ -327,6 +335,11 @@ def _build_rows(
                 path=spec.path,
                 audience=spec.audience.value,
                 unit=unit_name,
+                owner=spec.owner,
+                team=spec.team,
+                dri=spec.dri,
+                accountable=accountable,
+                durable=durable,
                 region_keys=tuple(spec.region_keys),
                 context_refs=tuple(
                     ConfigContextRef(path=cr.path, note=cr.note)

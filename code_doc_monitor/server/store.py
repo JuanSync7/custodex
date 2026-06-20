@@ -18,6 +18,7 @@ from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
+from ..ownership import Identity
 from ..registry import RegistrationPayload
 from ..schema import ResolutionRecord, ReviewRecord
 from ..sinks import RepoIdentity
@@ -119,6 +120,16 @@ class ConfigDocument(BaseModel):
     path: str
     audience: str
     unit: str | None = None
+    # EPIC OWN — ownership-of-record + the resolved accountable/durable (additive,
+    # K6: rides in the JSON blob, NO migration; pre-OWN rows parse with None).
+    # Populated by configsync._build_rows at sync; the GET /ownership route reads
+    # these + the LIVE roster through ownership.detect_orphans, so a departure
+    # cascades at read time across every repo (no re-sync needed).
+    owner: str | None = None
+    team: str | None = None
+    dri: str | None = None
+    accountable: str | None = None
+    durable: str | None = None
     region_keys: tuple[str, ...] = ()
     context_refs: tuple[ConfigContextRef, ...] = ()
     sync_kind: str
@@ -332,6 +343,25 @@ class Store(Protocol):
         """
         ...
 
+    # --- EPIC OWN: the central roster (the accountability MIRROR) ------------
+
+    def upsert_identity(self, identity: Identity) -> None:
+        """Add or UPDATE a roster identity by ``name`` (insertion order, K10)."""
+        ...
+
+    def list_roster(self) -> list[Identity]:
+        """Every roster identity in insertion order (K10)."""
+        ...
+
+    def mark_identity_departed(self, name: str, *, at: str) -> None:
+        """Mark ``name`` departed (active=False, departed_at=at); no-op if unknown.
+
+        The cross-repo cascade: every repo's ``GET /ownership`` recomputes orphans
+        against the LIVE roster on READ, so one departure flips every document this
+        identity is accountable for. ``at`` is the injected ISO timestamp (K10).
+        """
+        ...
+
 
 class InMemoryStore:
     """A dict-backed :class:`Store` — deterministic, no DB (E-03; E-04 adds the DB).
@@ -357,6 +387,8 @@ class InMemoryStore:
         self._sync_runs: list[SyncRun] = []
         # EDITOR E-03: per-repo insertion-ordered pending edits (K10).
         self._config_edits: dict[str, list[StoredConfigEdit]] = {}
+        # EPIC OWN: the central roster, keyed by identity name (insertion order, K10).
+        self._roster: dict[str, Identity] = {}
 
     def add_repo(self, payload: RegistrationPayload) -> None:
         repo_id = payload.repo.repo_id
@@ -536,3 +568,18 @@ class InMemoryStore:
         for i, row in enumerate(rows):
             if row.edit_id in targets:
                 rows[i] = row.model_copy(update={"status": status, "applied_at": at})
+
+    # --- EPIC OWN: the central roster ---------------------------------------
+
+    def upsert_identity(self, identity: Identity) -> None:
+        self._roster[identity.name] = identity
+
+    def list_roster(self) -> list[Identity]:
+        return list(self._roster.values())
+
+    def mark_identity_departed(self, name: str, *, at: str) -> None:
+        existing = self._roster.get(name)
+        if existing is not None:
+            self._roster[name] = existing.model_copy(
+                update={"active": False, "departed_at": at}
+            )

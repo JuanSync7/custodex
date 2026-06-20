@@ -896,3 +896,125 @@ the **Test docs** section appears under Documents, Drift, and Mapping. Tests:
 `tests/system/test_demo_e2e.py` (the four `test-*` docs in the 8-document mapping)
 and `tests/system/test_testdoc_mirror.py` (the mirror's engine-level contract).
 Features: FEAT-CONFIGV2-017
+
+### DEMO-059 — Per-document ownership-of-record (config = truth)
+**What it shows.** A monitored document declares WHO is accountable for it, in
+config — the single source of truth for ownership (K0). `demo/config/cdmon/core.yaml`
+gives the `core-api` doc `owner: demo-team`, `team: demo-team`, `dri: dana`: the
+team owns it durably, with Dana as the current Directly-Responsible-Individual. The
+keys are optional and additive (K6) — `getting-started` declares none and inherits
+the unit's frontmatter owner — and they round-trip byte-identically through
+`dump_unit_file`/`load_unit_file` (K7), so reassigning an owner is a clean,
+idempotent config rewrite.
+**How to observe.** Inspect `demo/config/cdmon/core.yaml` (the `core-api`
+`owner`/`team`/`dri` block); `load_unit_file` then `dump_unit_file` of that unit is
+byte-identical (the round-trip pinned by `tests/unit/test_ownership.py`).
+Features: FEAT-OWNERSHIP-001
+
+### DEMO-060 — Resolve accountable + durable owner (pure, clock-free)
+**What it shows.** `ownership.resolve_ownership` turns the demo config into one
+`EffectiveOwner` per document: for `core-api` it computes `accountable = dana` (the
+current DRI) and `durable = demo-team` (the part that survives a person leaving);
+for the unowned `getting-started` it inherits the unit owner. The roster
+(`Identity`/`RosterSnapshot`) is the injected mirror — `is_active` reads an
+unknown-or-departed name as inactive, the basis for orphan detection (OWN-02). All
+pure, sorted, no clock (K1/K10).
+**How to observe.** `resolve_ownership(load_bundle('demo/config/cdmon').config)`
+yields `accountable=dana`/`durable=demo-team` for `core-api`; precedence + the
+roster's inactive-on-unknown rule are pinned by `tests/unit/test_ownership.py`.
+Features: FEAT-OWNERSHIP-002
+
+### DEMO-061 — Departure → orphan detection (pure, offline)
+**What it shows.** When a person leaves, the documents they were the DRI for must
+not go silently ownerless. `ownership.detect_orphans` crosses the resolved
+ownership of the demo config against a roster snapshot: with `dana` marked departed
+but `demo-team` still active, the `core-api` doc (dri: dana, team: demo-team) is
+flagged `ORPHAN_DRI_VACANT` — a SOFT orphan: the team still owns it, a new DRI just
+needs assigning. Mark `demo-team` inactive too and it escalates to
+`ORPHAN_OWNER_DEPARTED`. An unowned doc is `UNOWNED`; an active owner is omitted
+(only what needs a human is returned, K5). All pure + offline (K1/K10) — no server.
+**How to observe.** `detect_orphans(resolve_ownership(load_bundle('demo/config/cdmon').config), RosterSnapshot(identities=(Identity(name='dana', active=False), Identity(name='demo-team', active=True))))` flags `core-api` as `ORPHAN_DRI_VACANT`; the branch table is pinned by `tests/unit/test_ownership.py`.
+Features: FEAT-OWNERSHIP-003
+
+### DEMO-062 — `cdmon ownership` lists owners + flags departed-owner orphans
+**What it shows.** `cdmon ownership --config demo/config/cdmon` prints all 8 demo
+documents with their accountable owner — `core-api` is accountable=dana (its DRI),
+while the docs that declare no owner of their own inherit the unit owner
+`demo-team` (the per-doc fallback). Pass an offline roster that marks `dana`
+departed and `cdmon ownership --roster roster.yaml --fail-on-orphan` flags
+`core-api` as `orphan_dri_vacant` and exits nonzero — an accountability gate you
+can wire into CI. Read-only, offline (K1/K4), no backend.
+**How to observe.** From the repo root: `cdmon ownership --config demo/config/cdmon`
+prints the per-document table; with a roster YAML `{identities: [{name: dana, active: false}, {name: demo-team, active: true}]}`, `cdmon ownership --config demo/config/cdmon --roster roster.yaml --fail-on-orphan` exits 1 and names `core-api`. Pinned by `tests/system/test_ownership_cli.py`.
+Features: FEAT-OWNERSHIP-004
+
+### DEMO-063 — Central roster mirror persists over both stores (+ migration 0006)
+**What it shows.** The central server keeps a roster of identities (people/teams) as
+the accountability MIRROR, persisted identically over the in-memory store AND the
+SqlStore (Postgres-first; SQLite is the offline twin). Alembic migration 0006
+creates the `roster` table; the per-document `owner`/`team`/`dri` + resolved
+`accountable`/`durable` ride in the existing `config_documents` JSON column
+(additive, K6 — no column migration). `upsert_identity`/`list_roster`/
+`mark_identity_departed` round-trip through both backends (insertion-ordered, K10).
+**How to observe.** `alembic upgrade head` over a SQLite/Postgres URL creates the
+`roster` table; `store.upsert_identity(Identity(name="dana"))` then `store.list_roster()`
+returns it on both `InMemoryStore` and `SqlStore`. Pinned by
+`tests/integration/test_ownership_server.py` (parametrized over both stores) and
+`tests/integration/test_db.py::test_alembic_migration_0006_roster_up_then_down`.
+Features: FEAT-OWNERSHIP-005
+
+### DEMO-064 — Admin-token roster routes (a global token, not a per-repo token)
+**What it shows.** Mutating the roster is a GLOBAL action (it re-flags orphans in
+every repo), so `POST /admin/roster` and `POST /admin/roster/{name}/departed` are
+gated by a SEPARATE admin token (`$CDMON_ADMIN_TOKEN`), never a per-repo token — a
+leaked repo token must not grant roster access. Missing → 401, wrong → 403, right →
+201; `GET /roster` is an open read; marking an unknown name departed is a loud 404.
+**How to observe.** With `create_app(store, admin_token="s3cret")`,
+`POST /admin/roster` with no `Authorization` returns 401, a wrong bearer 403, and the
+right bearer 201; `GET /roster` needs no token. Pinned by
+`tests/integration/test_ownership_server.py`.
+Features: FEAT-OWNERSHIP-006
+
+### DEMO-065 — One departure cascades to every repo's /ownership (read-time)
+**What it shows.** `GET /repos/{id}/ownership` crosses each repo's synced document
+ownership against the LIVE roster through `detect_orphans`, returning
+`{owners, findings, orphan_count}`. Because the orphan check runs on READ, a single
+`POST /admin/roster/dana/departed` flips every document Dana is accountable for — in
+this repo and every other — to an orphan on the next read, with no re-sync. While
+the `demo-team` stays active her `core-api` shows `orphan_dri_vacant` (a soft orphan:
+reassign a DRI), not a hard loss.
+**How to observe.** Register a repo, sync config with owners, `GET /ownership`
+(orphan_count 0); `POST /admin/roster/dana/departed`; `GET /ownership` again →
+`core-api` is `orphan_dri_vacant`, orphan_count 1. Pinned by
+`tests/integration/test_ownership_server.py::test_ownership_view_and_departure_cascade`.
+Features: FEAT-OWNERSHIP-007
+
+### DEMO-066 — Reassign a document's owner (the orphan fix, config = truth)
+**What it shows.** When an orphan surfaces (a departed DRI), the fix is a
+reassignment — and config is the single source of truth, so it is written to disk.
+A `reassign_owner` edit (`ReassignOwnerEdit`) carries the new owner/team/dri; the
+pure `config.set_document_owner` editor applies it (a provided value sets that
+field, `None` leaves it — so reassigning just the DRI keeps the team), and
+`apply_edits_to_disk` rewrites `config/cdmon/<unit>.yaml` (byte-stable, idempotent
+K7) before re-mirroring. Reassigning a departed DRI to an active person clears the
+orphan on the next `GET /ownership`.
+**How to observe.** On a copy of the demo, `apply_edits_to_disk(repo,
+[ReassignOwnerEdit(unit="core", doc_id="core-api", dri="erin")], now=...)` rewrites
+`core.yaml` so `core-api`'s dri is `erin` (owner/team unchanged); a second identical
+apply is byte-identical. Pinned by `tests/integration/test_generate.py` and
+`tests/unit/test_unit_serializer.py`.
+Features: FEAT-OWNERSHIP-008
+
+### DEMO-067 — Live demo shows a real departed-DRI orphan (out of the box)
+**What it shows.** Launching the demo (`scripts/seed_demo.py`, :33333) seeds the
+central roster: the teams that own the demo + dogfood configs are active, and `dana`
+— the DRI of the demo's `core-api` doc — is DEPARTED. So opening `demo-taskflow` and
+`GET /repos/demo-taskflow/ownership` shows a REAL soft orphan (`core-api`
+`orphan_dri_vacant`: the `demo-team` still owns it, a new DRI just needs assigning),
+while the dogfood repo (owned by the active `cdmon-team`) is clean — visible and
+clickable on first load, not an empty state.
+**How to observe.** With the seeded app, `GET /roster` shows `dana` inactive;
+`GET /repos/demo-taskflow/ownership` returns `orphan_count: 1` with `core-api` →
+`orphan_dri_vacant`; `GET /repos/code-doc-monitor/ownership` returns `orphan_count: 0`.
+Pinned by `tests/system/test_demo_e2e.py::test_central_ownership_view_shows_departed_dri_orphan`.
+Features: FEAT-OWNERSHIP-009

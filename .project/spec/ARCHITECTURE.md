@@ -2601,3 +2601,153 @@ test (`test_testdoc_mirror.py`). **TDOC-02** demo 1:1 (`demo/tests` → 4 test-d
 + wikis. **TDOC-04** the frontend Test docs section. Each: TDD red-first, full gate
 green (ruff+mypy+pytest ≥90% branch + dogfood/demo `cdmon` gates + `astro check`),
 STATUS row + LESSON.
+
+## EPIC OWN — ownership & accountability (`ownership.py` + roster mirror + reassignment — K0/K1/K2/K4/K5/K6/K10)
+
+Pegs a *human (or team)* to every monitored document, so a code→doc drift always
+has an accountable owner — and so a person leaving can never silently leave a
+document ownerless. Two tiers, mirroring the existing `disk = truth, SQL = mirror`
+split (the EDITOR contract): ownership-of-record lives **per-repo in config**; the
+central server roster is a **mirror** that flags departed owners.
+
+**Tier 1 — ownership-of-record (per-repo config, the SOURCE OF TRUTH).** Ownership
+is config, never inferred from code — this is the K0 "knowledge enters through
+config" door, NOT a K2 inversion (see CONSTRAINTS K2). `DocumentSpec` gains three
+optional, additive fields (K6); a whole-unit default owner already exists at the
+unit level (`UnitFrontmatter.owner`):
+```python
+class DocumentSpec(BaseModel):
+    ...
+    owner: str | None = None   # canonical owner identity (a person OR a team handle)
+    team: str | None = None    # durable group accountability (survives a person leaving)
+    dri: str | None = None     # current Directly-Responsible-Individual (vacatable)
+```
+Resolution (pure): a document's *accountable* identity = `dri or owner or team`;
+its *durable* owner = `team or owner`; doc-level falls back to the unit `owner`
+when all three are unset. Serialized by `_document_to_yaml` after `nav_label`,
+before `region_keys` (defaults dropped — idempotent round-trip, K7). Code-ref-level
+ownership is intentionally deferred: a code_ref's accountable human is its
+document's owner (cdmon already maps code → doc, so code → doc → human is closed
+without new per-ref fields).
+
+**`ownership.py` (NEW core module — pure, stdlib + pydantic only, K0/K1/K10).** No
+new dependency; no network; no clock in the pure core.
+```python
+class Identity(BaseModel):            # one roster entry (person or team)
+    name: str
+    display_name: str | None = None
+    kind: Literal["person", "team"] = "person"
+    email: str | None = None
+    active: bool = True
+    departed_at: str | None = None    # injected ISO ts (K10), set when marked departed
+    teams: tuple[str, ...] = ()        # teams a person belongs to
+
+class RosterSnapshot(BaseModel):      # immutable view of the central roster
+    identities: tuple[Identity, ...] = ()
+    def get(self, name: str) -> Identity | None: ...
+    def is_active(self, name: str | None) -> bool: ...   # None / unknown => False
+
+class EffectiveOwner(BaseModel):      # resolved ownership for one document
+    doc_id: str; doc_path: str; audience: Audience
+    owner: str | None; team: str | None; dri: str | None
+    accountable: str | None           # dri → owner → team → inherited unit owner
+    durable: str | None               # team → owner → inherited
+    # the inherited unit-owner fallback enters via resolve_ownership's `unit_owner`
+    # Mapping param — it is NOT a field on this model
+
+class OwnershipStatus(str, Enum):
+    OK = "ok"
+    UNOWNED = "unowned"                               # no owner/team/dri anywhere
+    ORPHAN_OWNER_DEPARTED = "orphan_owner_departed"   # accountable inactive, no active fallback
+    ORPHAN_DRI_VACANT = "orphan_dri_vacant"           # dri inactive but durable owner active (soft)
+
+class OwnershipFinding(BaseModel):
+    doc_id: str; doc_path: str; audience: Audience
+    status: OwnershipStatus; detail: str
+    accountable: str | None; owner: str | None; team: str | None; dri: str | None
+
+def resolve_ownership(config: MonitorConfig, *, unit_owner: Mapping[str, str] | None = None) -> tuple[EffectiveOwner, ...]:
+    ...  # pure; unit_owner maps doc_id -> unit frontmatter owner (the fallback); sorted by doc_id (K10)
+
+def detect_orphans(owners: Sequence[EffectiveOwner], roster: RosterSnapshot) -> tuple[OwnershipFinding, ...]:
+    ...  # pure, deterministic, NO clock. unowned => UNOWNED; accountable inactive with no active
+         # durable fallback => ORPHAN_OWNER_DEPARTED; dri inactive but durable active => ORPHAN_DRI_VACANT.
+```
+Staleness/SLA (a doc not re-reviewed within N days) shares this module's seam but
+is DEFERRED — it needs a per-doc `last_reviewed` the schema does not yet carry;
+`detect_orphans` is the clock-free half, a future `detect_stale(owners,
+last_reviewed, *, now, sla_days)` is the injected-clock half.
+
+**CLI — `cdmon ownership` (read-only, K1).**
+```
+cdmon ownership [--config DIR] [--roster roster.yaml] [--json] [--fail-on-orphan]
+```
+Loads the config bundle, optionally an OFFLINE roster YAML (`identities: [...]`),
+resolves ownership, runs `detect_orphans`, prints a per-doc owner table + findings;
+`--fail-on-orphan` exits 1 on any orphan (a CI/accountability gate); with no roster
+it just lists assignments. Pure + offline (K4); no backend, no network.
+
+**EDITOR — reassignment (`ReassignOwnerEdit`, config = truth).** A new discriminated
+`ConfigEdit` variant drives the disk rewrite that reassigns a departed person's
+documents:
+```python
+class ReassignOwnerEdit(BaseModel):
+    action: Literal["reassign_owner"]
+    unit: str; doc_id: str
+    owner: str | None = None; team: str | None = None; dri: str | None = None
+```
+applied by a pure editor `config.set_document_owner(unit, doc_id, *, owner, team,
+dri) -> UnitFile` (returns a NEW frozen `UnitFile`, B-02 immutability), dispatched
+in `generate._apply_unit_edit`; the existing `apply_edits_to_disk` → `run_sync`
+flow rewrites `config/cdmon/*.yaml` then re-mirrors (no route change).
+
+**Server — the central roster MIRROR (`[server]` extra; offline SQLite twin + `pg`).**
+Marking a person departed once cascades orphan detection across every repo.
+- migration `0006_roster_and_ownership.py`: creates ONLY the `roster` table
+  (identity blob + indexed `name`/`kind`/`active`). DESIGN REFINEMENT vs the OWN-04
+  pin: there is NO separate `ownership_mirror` table — the resolved owner/team/dri +
+  accountable/durable ride in the EXISTING `config_documents` JSON column (additive,
+  K6; no column migration).
+- `db.py`: `RosterRow`.
+- `store.py`: `ConfigDocument` gains additive `owner`/`team`/`dri` +
+  `accountable`/`durable`; new Store Protocol methods (implemented in BOTH
+  `InMemoryStore` and `SqlStore`, parity): `upsert_identity(identity)`,
+  `list_roster() -> list[Identity]`, `mark_identity_departed(name, *, at)`.
+- `configsync._build_rows`: resolves accountable/durable via the shared
+  `resolve_accountable_durable` and projects owner/team/dri/accountable/durable into
+  `ConfigDocument`'s existing JSON (no new table, no extra route).
+- `app.py` routes: `POST /admin/roster` (admin token, upsert identity);
+  `POST /admin/roster/{name}/departed` (admin token, mark departed = active=False,
+  departed_at=now); `GET /roster` (open, list); `GET /repos/{repo_id}/ownership`
+  (open, computed view = the synced docs' resolved owners +
+  `detect_orphans(owners, roster)` against the LIVE roster at READ time — so a
+  departure re-flags every repo with no re-sync). Admin auth is a SEPARATE global
+  token (the `admin_token` param / `$CDMON_ADMIN_TOKEN`), hashed ONCE with
+  `hash_token` into a `create_app` closure (`admin_hash`; None ⇒ routes open) and
+  checked by `_verify_admin` (constant-time `hmac.compare_digest`) — NOT a per-repo
+  token, and never persisted on the Store. With no admin token AND a persistent
+  (DB-backed) store, `create_app` logs a loud warning that the GLOBAL routes are
+  unprotected.
+
+**Frontend — Ownership page.** `GET /repos/:repoId/ownership` → a new
+`pages/Ownership.tsx` (sibling to Documents/Coverage), a `RepoNav` entry, and
+`OwnershipData`/`OwnershipOwner`/`OwnershipFinding` types; a per-doc table
+(Document/Accountable/Team/DRI/Status) with status dots, an orphan banner, and a
+struck-through "departed" badge on an orphaned accountable owner. `astro check` +
+`astro build` gate.
+
+**Demo (shows it working).** `demo/config/cdmon/*` docs carry real owners; a
+`seed_demo.py` roster seeds a team + people with ONE marked departed, so the live
+:33333 Ownership page shows a real orphan; `demo_as_git` carries the owners in the
+committed config; e2e asserts ownership renders and a departure produces an orphan.
+
+**Feature catalog — new `ownership` subsystem.** `feature-doc/catalog/ownership.yaml`
+(20th subsystem), FEAT-OWNERSHIP-001…, each traced 1:1 to a `demo/DEMOS.md` case
+and a tagged test (`cdmon trace --fail-on-gap` / `cdmon wiki --check` stay green).
+
+**Slices:** **OWN-00** pin + plan (this) · **OWN-01** config fields + `resolve_ownership`
+· **OWN-02** `detect_orphans` · **OWN-03** `cdmon ownership` CLI · **OWN-04** server
+roster + mirror + migration 0006 + admin token + routes (store parity, `pg` twin) ·
+**OWN-05** `ReassignOwnerEdit` reassignment · **OWN-06** demo seeding + Ownership page
++ e2e. Each: TDD red-first, full gate green (ruff+mypy+pytest ≥90% branch + dogfood
+reheal + `cdmon trace`/`wiki --check` + `astro check`), STATUS row + LESSON.

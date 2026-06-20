@@ -1,13 +1,14 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: a0d7689b7781a089
+  fingerprint: e24c45c87f20fff1
   fingerprint_tiers:
-    composite: a0d7689b7781a089
-    docstring: bcba1f3c208237dc
-    signature: 087bf65aed24829c
+    composite: e24c45c87f20fff1
+    docstring: 2bd6ddf66ee3d95e
+    signature: 07715e3688207ca5
   region_anchors:
     symbols:
+    - 01b8016fdce455c4
     - 051af376199dec21
     - 09ab528f037a044d
     - 0a12e5898c92bfc6
@@ -50,6 +51,7 @@ cdm:
     - a172cedcae47474b
     - a1c1adc663fbd6f0
     - b0e0fabb95a65a96
+    - b6611f50a091a760
     - b9ac8d502e11101f
     - bb54068aea85faa7
     - c3a3091b9d32267d
@@ -67,7 +69,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: c22252aa45391eae
+    symbols: b8e102cf88369662
   schema_version: 1.0.0
 ---
 # ops
@@ -109,6 +111,7 @@ cdm:
 | _run_uvicorn | function | def _run_uvicorn(app_obj: Any, *, host: str, port: int) -> None |
 | _sync_run_lines | function | def _sync_run_lines(run: dict) -> list[str] |
 | _trace_lines | function | def _trace_lines(matrix: TraceMatrix) -> list[str] |
+| _unit_owner_map | function | def _unit_owner_map(config_dir: Path) -> dict[str, str] |
 | _write_coverage_manifest | function | def _write_coverage_manifest(report: coverage_mod.CoverageReport, config: MonitorConfig, target: Path) -> bool |
 | app | variable | app = ... |
 | build | function | def build(config: Path = _CONFIG_OPTION) -> None |
@@ -122,6 +125,7 @@ cdm:
 | monitor | function | def monitor(config: Path = _CONFIG_OPTION, apply: bool \| None = typer.Option(None, '--apply/--no-apply', help="Auto-apply FIX verdicts (defaults to the config's apply_default)."), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Source code ref/commit to stamp on every review record (provenance, C-05). Precedence: this flag, else $CI_COMMIT_SHA, else none. The same ref can flow to `open-docs-pr --ref` (one source of truth).')) -> None |
 | new_doc | function | def new_doc(doc_id: str = typer.Argument(..., help='The document id from the config.'), config: Path = _CONFIG_OPTION, force: bool = typer.Option(False, '--force', help='Overwrite an existing doc file.')) -> None |
 | open_docs_pr_cmd | function | def open_docs_pr_cmd(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the MR plan WITHOUT mutating the tree or opening an MR (uses a dry sync, so NOTHING is written, and never builds a transport).'), target: str = typer.Option('main', '--target', help="The MR target branch (default 'main')."), ref: str \| None = typer.Option(None, '--ref', help='Source ref to record in the MR title/description (provenance).')) -> None |
+| ownership | function | def ownership(config: Path = _CONFIG_OPTION, roster: Path \| None = typer.Option(None, '--roster', help='An offline roster YAML (identities: [...]) to cross-check owners against; without it the command just lists assignments.'), as_json: bool = typer.Option(False, '--json', help='Emit {owners, findings} as round-trippable JSON.'), fail_on_orphan: bool = typer.Option(False, '--fail-on-orphan', help='Exit 1 if any document is an orphan (its accountable owner has departed). Requires --roster; UNOWNED docs do NOT trip it (that is a coverage gap, not a departure).')) -> None |
 | promotions | function | def promotions(config: Path = _CONFIG_OPTION, min_count: int = typer.Option(3, '--min-count', help='How many resolved records of one shape must unanimously share a decision before it is a promotion candidate.'), as_json: bool = typer.Option(False, '--json', help='Emit the candidates as machine-readable JSON.')) -> None |
 | register | function | def register(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Print the registration payload as JSON WITHOUT calling the server (no url/token required).')) -> None |
 | report | function | def report(config: Path = _CONFIG_OPTION, verdict: str \| None = typer.Option(None, '--verdict', help='List the individual records with this verdict (e.g. ESCALATE) instead of the aggregate summary.'), as_json: bool = typer.Option(False, '--json', help='Emit machine-readable JSON (records when --verdict is set).')) -> None |

@@ -30,6 +30,7 @@ __all__ = [
     "RemoveCodeRefEdit",
     "SetContextRefsEdit",
     "SetDocStyleEdit",
+    "ReassignOwnerEdit",
     "ConfigEdit",
     "StoredConfigEdit",
 ]
@@ -156,6 +157,24 @@ class SetDocStyleEdit(BaseModel):
     doc_style: EditDocStyle
 
 
+class ReassignOwnerEdit(BaseModel):
+    """Reassign a document's owner/team/dri (``action='reassign_owner'``, EPIC OWN).
+
+    The human fix for an orphan (config = truth): a provided value SETS that field,
+    while ``None`` (the default / omitted) LEAVES the existing value — so a partial
+    reassignment (e.g. just a new ``dri`` when the team stays) keeps owner/team.
+    """
+
+    model_config = _EDIT_CONFIG
+
+    action: Literal["reassign_owner"] = "reassign_owner"
+    unit: str
+    doc_id: str
+    owner: str | None = None
+    team: str | None = None
+    dri: str | None = None
+
+
 # The tagged union the store persists + the routes accept. ``action`` is the
 # discriminator: validation routes to the matching payload model and a missing/
 # unknown ``action`` (or a payload field that does not belong) is a loud K8 error.
@@ -164,7 +183,8 @@ ConfigEdit = Annotated[
     | AddCodeRefEdit
     | RemoveCodeRefEdit
     | SetContextRefsEdit
-    | SetDocStyleEdit,
+    | SetDocStyleEdit
+    | ReassignOwnerEdit,
     Field(discriminator="action"),
 ]
 

@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**199 features** across 19 subsystems.
+**208 features** across 20 subsystems.
 
 ## agent
 
@@ -773,6 +773,56 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 ### `FEAT-MONITOR-009` — Region-authority-aware fix request
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
+
+## ownership
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-OWNERSHIP-001` | Per-document ownership-of-record | config | K0, K2, K6, K7 | — | — | implemented |
+| `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-003` | Orphan & DRI-vacant detection (pure) | ownership | K1, K5, K8, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-004` | cdmon ownership CLI (read-only accountability gate) | cli, ownership | K1, K4, K8, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-005` | Central roster mirror (persisted, both stores) | server, ownership | K0, K4, K6, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-006` | Admin-token roster routes (global, not per-repo) | server | K0, K8 | — | — | implemented |
+| `FEAT-OWNERSHIP-007` | Per-repo /ownership view + cross-repo departure cascade | server, ownership | K0, K5, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-008` | Reassign-owner edit (the orphan fix, config = truth) | config, generate, server | K5, K6, K7, K8 | — | — | implemented |
+| `FEAT-OWNERSHIP-009` | Live demo ownership (seeded departure → visible orphan) | server, ownership | K4, K5, K10 | — | — | implemented |
+
+### `FEAT-OWNERSHIP-001` — Per-document ownership-of-record
+
+DocumentSpec carries optional owner/team/dri keys (additive, K6) so a document declares its accountable identity in config — the single source of truth for ownership (K0, never inferred from code). Own by team with a person as the current DRI, so a departure demotes to "DRI vacant" rather than orphaning the doc; the keys round-trip byte-identically through dump_unit_file (K7) and a doc that declares none inherits its unit's frontmatter owner.
+
+### `FEAT-OWNERSHIP-002` — Pure ownership resolver + roster snapshot
+
+ownership.resolve_ownership projects a loaded config into one EffectiveOwner per document — accountable = dri→owner→team→inherited unit owner, durable = team→owner→inherited — sorted and clock-free (K1/K10). The Identity / RosterSnapshot models are the offline, injected central mirror an unknown-or-departed name reads as inactive against (is_active(None) and an unknown name are both False — an owner the roster cannot vouch for is not an active accountable party).
+
+### `FEAT-OWNERSHIP-003` — Orphan & DRI-vacant detection (pure)
+
+ownership.detect_orphans classifies each resolved document against the injected roster snapshot — UNOWNED (no identity named), ORPHAN_OWNER_DEPARTED (the accountable owner is departed/unknown with no active fallback), or ORPHAN_DRI_VACANT (the DRI left but the durable team still owns it — a soft orphan resolved by assigning a new DRI). An orphan is never healable (no code change fixes it); OK docs are omitted by default so the result is exactly what needs a human (K5). Pure, sorted, clock-free (K1/K10).
+
+### `FEAT-OWNERSHIP-004` — cdmon ownership CLI (read-only accountability gate)
+
+cdmon ownership lists every document's accountable/durable owner from config and, given an offline --roster YAML, cross-checks it to flag orphaned (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage gap, not a departure) does not trip it. load_roster is loud on a malformed roster (K8).
+
+### `FEAT-OWNERSHIP-005` — Central roster mirror (persisted, both stores)
+
+The central server persists a roster of identities (people/teams) as the accountability MIRROR — upsert_identity / list_roster / mark_identity_departed on the Store Protocol, implemented identically over InMemoryStore AND SqlStore (Postgres-first; SQLite offline twin + pg) and created by Alembic migration 0006. The per-document owner/team/dri + resolved accountable/durable ride in the existing config_documents JSON column (additive, K6 — NO column migration). Insertion-ordered, injected timestamps (K10).
+
+### `FEAT-OWNERSHIP-006` — Admin-token roster routes (global, not per-repo)
+
+POST /admin/roster (upsert) and POST /admin/roster/{name}/departed gate cross-repo roster mutations behind a SEPARATE global admin token ($CDMON_ADMIN_TOKEN), never a per-repo token — a leaked repo token must not grant roster access (401 missing / 403 wrong; open when unset, for dev). GET /roster is an open read. A departed mark on an unknown name is a loud 404 (K8).
+
+### `FEAT-OWNERSHIP-007` — Per-repo /ownership view + cross-repo departure cascade
+
+GET /repos/{id}/ownership reads the synced config documents (which carry the resolved accountable/durable owner) and crosses them against the LIVE roster through ownership.detect_orphans, returning {owners, findings, orphan_count}. Because the orphan check runs on READ, marking one identity departed cascades — every document that identity is accountable for, across EVERY repo, flips to an orphan on the next read with no re-sync. Open read; deterministic (K5/K10).
+
+### `FEAT-OWNERSHIP-008` — Reassign-owner edit (the orphan fix, config = truth)
+
+ReassignOwnerEdit (a new ConfigEdit discriminated-union action) + the pure config.set_document_owner editor reassign a document's owner/team/dri through the EDITOR generate-to-disk flow: a provided value sets that field, None leaves it (a partial reassignment keeps the rest). apply_edits_to_disk rewrites config/cdmon/<unit>.yaml (byte-stable, idempotent K7) and the re-sync re-mirrors — the human fix that clears an orphan, with config as the single source of truth.
+
+### `FEAT-OWNERSHIP-009` — Live demo ownership (seeded departure → visible orphan)
+
+The live demo (scripts/seed_demo.py → :33333) seeds the central roster with the teams that own the demo + dogfood configs (active) and ONE departed person (dana, the DRI of the demo's core-api doc), so GET /repos/demo-taskflow/ownership shows a real soft orphan (core-api orphan_dri_vacant) out of the box while the dogfood repo (cdmon-team active) stays clean — the accountability feature is visible and clickable, not an empty state.
 
 ## pr
 

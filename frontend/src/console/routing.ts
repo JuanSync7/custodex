@@ -40,3 +40,8 @@ function encodePath(repoId: string): string {
     .map((seg) => encodeURIComponent(seg))
     .join("/");
 }
+
+/** Build the ownership href for a repo id (EPIC OWN — accountability view). */
+export function linkToOwnership(repoId: string): string {
+  return `/repos/${encodePath(repoId)}/ownership`;
+}

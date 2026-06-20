@@ -37,6 +37,7 @@ from code_doc_monitor.server.edits import (
     EditCodeRef,
     EditContextRef,
     EditDocStyle,
+    ReassignOwnerEdit,
     SetContextRefsEdit,
     SetDocStyleEdit,
 )
@@ -395,3 +396,24 @@ def test_generate_only_selected_edit_ids(client: TestClient, tmp_path: Path) -> 
         f"/repos/{_REPO}/config/edits", params={"status": "pending"}
     ).json()
     assert [e["edit_id"] for e in pending] == [other]
+
+
+def test_reassign_owner_lands_on_disk(tmp_path: Path) -> None:
+    """A reassign_owner edit rewrites the unit yaml owner; partial + idempotent (K7).
+
+    Features: FEAT-OWNERSHIP-008
+    """
+    repo = _copy_demo(tmp_path)
+    core_yaml = repo / "config" / "cdmon" / "core.yaml"
+    # demo core-api is owned by demo-team with dana as DRI; reassign just the DRI.
+    edit = ReassignOwnerEdit(unit="core", doc_id="core-api", dri="erin")
+    apply_edits_to_disk(repo, [edit], now=_NOW)
+    unit = load_unit_file(core_yaml)
+    doc = next(d for d in unit.documents if d.id == "core-api")
+    assert doc.dri == "erin"  # reassigned
+    assert doc.owner == "demo-team"  # partial reassignment keeps owner/team
+    assert doc.team == "demo-team"
+    # idempotent: a second identical apply is byte-identical (same now).
+    before = core_yaml.read_text(encoding="utf-8")
+    apply_edits_to_disk(repo, [edit], now=_NOW)
+    assert core_yaml.read_text(encoding="utf-8") == before

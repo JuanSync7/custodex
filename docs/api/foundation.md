@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 85fb2f4ab3048aa9
+  fingerprint: 1e6db667ba3ec216
   fingerprint_tiers:
-    composite: 85fb2f4ab3048aa9
-    docstring: 1588ec1c15b1e7b4
-    signature: 2181990b0f92e89a
+    composite: 1e6db667ba3ec216
+    docstring: 3a558162fc754b83
+    signature: 2edcf879620eecc6
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -54,6 +54,7 @@ cdm:
     - 582b027d421386db
     - 5c4c5ccabaf45fe2
     - 5f31511731a8d710
+    - 5f3888a5d6d1f3a2
     - 6509a508c42b1144
     - 67280832bd5a56c8
     - 67768f80fff0ce41
@@ -127,7 +128,7 @@ cdm:
     - fd87e7b303770609
     - ff51b2032355ac8b
   region_hashes:
-    symbols: 6944484155f08334
+    symbols: 0c3f9724c5a3e600
   schema_version: 1.0.0
 ---
 # code-doc-monitor — foundation (engineering reference)
@@ -252,6 +253,7 @@ cdm:
 | resolve_style_files | function | def resolve_style_files(selection: DocStyleSelection, templates_root: Path) -> dict[str, Path] |
 | scaffold_config_dir | function | def scaffold_config_dir(config_dir: Path, *, repo: str, now: str) -> None |
 | set_context_refs | function | def set_context_refs(unit: UnitFile, doc_id: str, refs: tuple[ContextRef, ...]) -> UnitFile |
+| set_document_owner | function | def set_document_owner(unit: UnitFile, doc_id: str, *, owner: str \| None = None, team: str \| None = None, dri: str \| None = None) -> UnitFile |
 | unit_for_path | function | def unit_for_path(bundle: ConfigBundle, repo_relative_path: str) -> UnitFile \| None |
 | upsert_document | function | def upsert_document(unit: UnitFile, doc: DocumentSpec) -> UnitFile |
 | write_index | function | def write_index(config_dir: Path, text: str) -> None |

@@ -1134,6 +1134,24 @@ tbody th {
 .coverage-tree th[scope="col"]:nth-child(4) {
   width: 20%;
 }
+/* The Ownership view reuses the coverage table's look but has FIVE columns
+   (Document, Accountable, Team, DRI, Status) — restate the widths so they sum to
+   100% under table-layout:fixed and the Status signal column does not collapse. */
+.ownership-table th[scope="col"]:nth-child(1) {
+  width: 34%;
+}
+.ownership-table th[scope="col"]:nth-child(2) {
+  width: 18%;
+}
+.ownership-table th[scope="col"]:nth-child(3) {
+  width: 16%;
+}
+.ownership-table th[scope="col"]:nth-child(4) {
+  width: 14%;
+}
+.ownership-table th[scope="col"]:nth-child(5) {
+  width: 18%;
+}
 .coverage-dir {
   display: inline-flex;
   align-items: baseline;
@@ -1215,6 +1233,43 @@ tbody th {
 }
 .file-status.status-waived {
   color: var(--review);
+}
+/* Ownership statuses (Ownership.tsx renders status-<ownership-status>). */
+.file-status.status-ok {
+  color: var(--sync);
+}
+.file-status.status-unowned,
+.file-status.status-orphan_dri_vacant {
+  color: var(--review);
+}
+.file-status.status-orphan_owner_departed {
+  color: var(--drift);
+}
+/* A departed accountable owner, struck through with a small badge. */
+.owner-departed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.owner-departed s {
+  color: var(--text-faint);
+}
+.badge.departed {
+  background: var(--drift-bg, transparent);
+  border: 1px solid var(--drift);
+  color: var(--drift);
+}
+/* Visually hidden, still read by assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ── States ────────────────────────────────────────────────────────────── */

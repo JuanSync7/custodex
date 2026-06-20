@@ -45,6 +45,7 @@ from code_doc_monitor.extract import DocumentSurface, build_document_surface
 from code_doc_monitor.heal import regenerate_regions
 from code_doc_monitor.inventory import discover_files, discover_symbols
 from code_doc_monitor.monitor import Monitor
+from code_doc_monitor.ownership import Identity
 from code_doc_monitor.registry import RegistrationPayload
 from code_doc_monitor.schema import ProposedFix, ReviewRecord, Verdict, new_record_id
 from code_doc_monitor.server import InMemoryStore
@@ -408,6 +409,22 @@ def _register_demo_taskflow(store: InMemoryStore) -> None:
         store.add_coverage_snapshot(_DEMO_REPO_ID, _NOW, snapshot)
 
 
+def _seed_roster(store: InMemoryStore) -> None:
+    """Seed the central roster so the Ownership view shows a REAL orphan (OWN-06).
+
+    The teams that own the demo + dogfood configs are active (so their docs read
+    OK); ``dana`` — the DRI of the demo's ``core-api`` doc — is DEPARTED, so
+    ``GET /repos/demo-taskflow/ownership`` flags ``core-api`` as a soft
+    ``orphan_dri_vacant``: the team still owns it, a new DRI (``erin``, active) just
+    needs assigning. Deterministic (``_NOW``).
+    """
+    store.upsert_identity(Identity(name="cdmon-team", kind="team"))
+    store.upsert_identity(Identity(name="demo-team", kind="team"))
+    store.upsert_identity(Identity(name="erin", display_name="Erin"))
+    store.upsert_identity(Identity(name="dana", display_name="Dana"))
+    store.mark_identity_departed("dana", at=_NOW)
+
+
 def build_seeded_store() -> InMemoryStore:
     """Build an :class:`InMemoryStore` populated with the demo data (import-safe).
 
@@ -471,6 +488,8 @@ def build_seeded_store() -> InMemoryStore:
         snapshot = dogfood_snapshot if is_dogfood else fixture_snapshot
         store.add_coverage_snapshot(repo_id, _NOW, snapshot)
 
+    # EPIC OWN: seed the central roster so the Ownership view shows a REAL orphan.
+    _seed_roster(store)
     # The CONFIG-V2 adopter demo: registered OPEN with its local_path + pre-synced
     # so the dashboard shows its Documents view + a working Sync button (M-02).
     _register_demo_taskflow(store)

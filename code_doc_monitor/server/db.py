@@ -45,6 +45,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.types import TypeEngine
 
+from ..ownership import Identity
 from ..registry import RegistrationPayload
 from ..schema import ResolutionRecord, ReviewRecord
 from .edits import ConfigEdit, StoredConfigEdit
@@ -222,6 +223,24 @@ class ConfigEditRow(Base):
     created_at: Mapped[str] = mapped_column(String)
     applied_at: Mapped[str | None] = mapped_column(String, nullable=True)
     edit: Mapped[dict] = mapped_column(_json_type())
+
+
+class RosterRow(Base):
+    """One central roster identity — FULL :class:`Identity` JSON + indexed cols.
+
+    The accountability MIRROR (OWN-04; it never owns a document — config does):
+    ``identity`` is the source of truth (re-validated on read, K6), ``name`` is the
+    unique business key, and ``active`` is the indexed flag the orphan cascade reads.
+    Added by Alembic 0006. ``id`` is the surrogate insertion-order PK (K10).
+    """
+
+    __tablename__ = "roster"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True)
+    kind: Mapped[str] = mapped_column(String, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, index=True)
+    identity: Mapped[dict] = mapped_column(_json_type())
 
 
 # The discriminated-union validator reused on every config-edit READ (K6 — the JSON
@@ -646,6 +665,47 @@ class SqlStore:
             for row in rows:
                 row.status = status
                 row.applied_at = at
+
+    # --- EPIC OWN: the central roster ---------------------------------------
+
+    def upsert_identity(self, identity: Identity) -> None:
+        """UPSERT a roster identity on ``name`` (a repeat UPDATES in place, K10)."""
+        data = identity.model_dump(mode="json")
+        with self._session() as session, session.begin():
+            row = session.scalars(
+                select(RosterRow).where(RosterRow.name == identity.name)
+            ).first()
+            if row is None:
+                session.add(
+                    RosterRow(
+                        name=identity.name,
+                        kind=identity.kind,
+                        active=identity.active,
+                        identity=data,
+                    )
+                )
+            else:
+                row.kind = identity.kind
+                row.active = identity.active
+                row.identity = data
+
+    def list_roster(self) -> list[Identity]:
+        with self._session() as session:
+            rows = session.scalars(select(RosterRow).order_by(RosterRow.id)).all()
+            return [Identity.model_validate(r.identity) for r in rows]
+
+    def mark_identity_departed(self, name: str, *, at: str) -> None:
+        with self._session() as session, session.begin():
+            row = session.scalars(
+                select(RosterRow).where(RosterRow.name == name)
+            ).first()
+            if row is None:
+                return  # unknown name -> no-op (the route 404s before calling)
+            updated = Identity.model_validate(row.identity).model_copy(
+                update={"active": False, "departed_at": at}
+            )
+            row.active = False
+            row.identity = updated.model_dump(mode="json")
 
 
 def _registered_repo(row: RepoRow) -> RegisteredRepo:

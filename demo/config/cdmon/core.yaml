@@ -24,6 +24,13 @@ documents:
   - id: core-api
     path: docs/api/core-api.md
     audience: eng-guide
+    # EPIC OWN — ownership-of-record (config = truth). The core API doc is owned by
+    # the demo team, with Dana as the current DRI (a person can leave; the team
+    # stays accountable). `cdmon ownership` lists this; resolve_ownership computes
+    # accountable=dana, durable=demo-team.
+    owner: demo-team
+    team: demo-team
+    dri: dana
     region_keys: ["symbols"]
     code_refs:
       - path: src/taskflow/core/model.py

@@ -48,6 +48,7 @@ from .config import (
     remove_code_ref,
     resolve_repo_root,
     set_context_refs,
+    set_document_owner,
     upsert_document,
     write_index,
 )
@@ -70,6 +71,7 @@ from .server.edits import (
     EditCodeRef,
     EditContextRef,
     EditDocStyle,
+    ReassignOwnerEdit,
     RemoveCodeRefEdit,
     SetContextRefsEdit,
     SetDocStyleEdit,
@@ -508,6 +510,10 @@ def _apply_unit_edit(unit: UnitFile, edit: ConfigEdit) -> UnitFile:
     if isinstance(edit, SetContextRefsEdit):
         return set_context_refs(
             unit, edit.doc_id, _context_refs_from_edit(edit.context_refs)
+        )
+    if isinstance(edit, ReassignOwnerEdit):
+        return set_document_owner(
+            unit, edit.doc_id, owner=edit.owner, team=edit.team, dri=edit.dri
         )
     raise CodeDocMonitorError(
         f"unexpected unit edit action {getattr(edit, 'action', '?')!r}"

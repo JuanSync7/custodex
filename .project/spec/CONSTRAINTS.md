@@ -17,6 +17,12 @@ tickets, commits, and the STATUS log.
 - **K2 — Single source of truth = the code.** A document's machine-managed
   regions and fingerprint are derived from the extracted surface, never the
   other way round. The doc is graded against the code, not vice-versa.
+  *Scope note (EPIC OWN):* K2 governs documentation **content** only. A document's
+  **ownership metadata** — who is accountable (`owner`/`team`/`dri`) — is the one
+  thing K2 does NOT govern: it is config-as-truth per K0 (it enters through
+  `config/cdmon/*.yaml`, never inferred from code annotations), and the central
+  server roster only MIRRORS it to flag departed owners. Grading doc *content*
+  against code (K2) and pinning a *human* to a doc (config/K0) are orthogonal axes.
 - **K3 — Audience changes the verdict.** The same raw code change can be drift
   for an `eng-guide` and a non-event for a `user-guide`. This rule lives in the
   surface filter (what is extracted) AND is passed to the backend (so it can

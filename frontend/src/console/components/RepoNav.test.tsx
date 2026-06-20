@@ -7,6 +7,7 @@ import {
   linkToDocuments,
   linkToHealth,
   linkToMapping,
+  linkToOwnership,
   linkToRepo,
 } from "../routing";
 
@@ -37,6 +38,10 @@ describe("RepoNav", () => {
       "href",
       linkToDocuments(repoId),
     );
+    expect(screen.getByRole("link", { name: "Ownership" })).toHaveAttribute(
+      "href",
+      linkToOwnership(repoId),
+    );
     expect(screen.getByRole("link", { name: "Coverage" })).toHaveAttribute(
       "href",
       linkToCoverage(repoId),
@@ -56,6 +61,7 @@ describe("RepoNav", () => {
       "Drift",
       "Mapping",
       "Documents",
+      "Ownership",
       "Coverage",
       "Health",
     ]);

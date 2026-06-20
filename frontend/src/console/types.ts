@@ -488,3 +488,39 @@ export interface ApplyFixResponse {
 // NB: the feature wikis are NOW native Astro pages at `/wiki/*` (EPIC ASTRO) —
 // rendered from `feature-doc/*.md` at build time, not fetched as JSON. The old
 // `WikiSection`/`WikiPayload` types + the `GET /wiki` JSON read were retired.
+
+/**
+ * EPIC OWN — the GET /repos/{id}/ownership view: each monitored document's
+ * resolved owner (accountable = current point of contact, durable = survives a
+ * departure) plus the orphan findings (a document whose accountable owner has
+ * departed) and a count. Mirrors the python ownership.EffectiveOwner /
+ * OwnershipFinding shapes.
+ */
+export interface OwnershipOwner {
+  doc_id: string;
+  doc_path: string;
+  audience: string;
+  owner: string | null;
+  team: string | null;
+  dri: string | null;
+  accountable: string | null;
+  durable: string | null;
+}
+
+export interface OwnershipFinding {
+  doc_id: string;
+  doc_path: string;
+  audience: string;
+  status: string;
+  detail: string;
+  accountable: string | null;
+  owner: string | null;
+  team: string | null;
+  dri: string | null;
+}
+
+export interface OwnershipData {
+  owners: OwnershipOwner[];
+  findings: OwnershipFinding[];
+  orphan_count: number;
+}

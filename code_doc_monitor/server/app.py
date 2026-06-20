@@ -19,6 +19,7 @@ unregistered ``repo_id`` is a loud 404, not a silent create (K8).
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
 from collections.abc import Callable
@@ -31,6 +32,13 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
+from ..ownership import (
+    EffectiveOwner,
+    Identity,
+    OwnershipStatus,
+    RosterSnapshot,
+    detect_orphans,
+)
 from ..promotion import PromotionCandidate, detect_promotions
 from ..registry import RegistrationPayload
 from ..schema import Resolution, ResolutionRecord, ReviewRecord, Verdict
@@ -759,6 +767,7 @@ def create_app(
     cloner: Any = None,
     pr_transport_factory: Callable[[str, str, str | None], Any] | None = None,
     token_exchange_http: Any = None,
+    admin_token: str | None = None,
 ) -> FastAPI:
     """Build the central FastAPI app over ``store`` (DI; defaults to in-memory).
 
@@ -795,6 +804,30 @@ def create_app(
     """
     resolved: Store = store if store is not None else InMemoryStore()
     resolved_wiki_dir: Path | None = wiki_dir if wiki_dir is not None else _wiki_dir()
+    # EPIC OWN: the GLOBAL admin token gating cross-repo roster mutations. From the
+    # param or $CDMON_ADMIN_TOKEN; held only as a sha256 hash (never plaintext). None
+    # ⇒ the roster routes stay open (offline/dev), exactly like a token-less repo.
+    effective_admin = (
+        admin_token if admin_token is not None else os.environ.get("CDMON_ADMIN_TOKEN")
+    )
+    admin_hash: str | None = hash_token(effective_admin) if effective_admin else None
+    if admin_hash is None:
+        # Loud on an insecure prod default (K8 spirit, mirrors store_from_env's
+        # missing-DATABASE_URL warning): a roster mutation is GLOBAL — it re-flags
+        # orphans in EVERY repo — so an unset admin token leaves cross-repo
+        # ownership writable by anyone. Stay quiet for the offline/dev InMemoryStore
+        # (the warning would spam the test suite); warn only for a PERSISTENT,
+        # real-deployment store.
+        from .db import SqlStore
+
+        if isinstance(resolved, SqlStore):
+            _LOG.warning(
+                "CDMON_ADMIN_TOKEN is not set — the GLOBAL admin roster routes "
+                "(POST /admin/roster, POST /admin/roster/{name}/departed) are "
+                "UNPROTECTED. A roster mutation cascades to flag orphans in EVERY "
+                "repo, so an unauthenticated caller can poison ownership "
+                "server-wide. Set CDMON_ADMIN_TOKEN in any shared/prod deployment."
+            )
     app = FastAPI(title="code-doc-monitor central server", version="0.1.0")
 
     spa_index: Path | None = None
@@ -846,8 +879,28 @@ def create_app(
                 detail="missing bearer token for a token-protected repo",
             )
         presented = authorization.removeprefix("Bearer ").strip()
-        if hash_token(presented) != token_hash:
+        # Constant-time compare (defense-in-depth): the operands are sha256 hex
+        # digests, not the raw secret, so no token can be forged, but a uniform
+        # compare avoids leaking even a digest-match timing signal.
+        if not hmac.compare_digest(hash_token(presented), token_hash):
             raise HTTPException(status_code=403, detail="invalid bearer token")
+
+    def _verify_admin(authorization: str | None) -> None:
+        """Admin-token auth for cross-repo roster mutations (OWN-04).
+
+        A roster change is GLOBAL (it re-flags orphans in EVERY repo), so it is gated
+        by a SEPARATE admin token ($CDMON_ADMIN_TOKEN / the ``admin_token`` param),
+        never a per-repo token — a leaked repo token must not grant roster access.
+        With no admin token configured the routes stay open (offline/dev, like a
+        token-less repo). 401 missing / 403 wrong.
+        """
+        if admin_hash is None:
+            return
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="missing admin bearer token")
+        presented = authorization.removeprefix("Bearer ").strip()
+        if not hmac.compare_digest(hash_token(presented), admin_hash):
+            raise HTTPException(status_code=403, detail="invalid admin token")
 
     @app.get("/")
     def root() -> object:
@@ -967,6 +1020,99 @@ def create_app(
     @app.get("/repos")
     def list_repos(store: Store = Depends(get_store)) -> list[RegisteredRepo]:
         return store.list_repos()
+
+    # --- EPIC OWN: the central roster + per-repo ownership view --------------
+
+    @app.post("/admin/roster", status_code=201)
+    def upsert_identity(
+        identity: Identity,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        """Add or update a central roster identity (admin-token write, OWN-04)."""
+        _verify_admin(authorization)
+        store.upsert_identity(identity)
+        return {"name": identity.name}
+
+    @app.post("/admin/roster/{name:path}/departed", status_code=200)
+    def mark_departed(
+        name: str,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        """Mark a roster identity departed (admin-token write, OWN-04).
+
+        Cascades: every repo's ``GET /ownership`` recomputes orphans against the
+        live roster on READ, so this one write flips every document the identity is
+        accountable for, across every repo. 404 if the name is unknown (K8).
+        """
+        _verify_admin(authorization)
+        if not any(i.name == name for i in store.list_roster()):
+            raise HTTPException(
+                status_code=404, detail=f"unknown roster identity {name!r}"
+            )
+        store.mark_identity_departed(name, at=clock())
+        return {"name": name, "departed": True}
+
+    @app.get("/roster")
+    def list_roster(store: Store = Depends(get_store)) -> list[Identity]:
+        # READS ARE OPEN (E-06): the dashboard shows the roster freely.
+        return store.list_roster()
+
+    @app.get("/repos/{repo_id:path}/ownership")
+    def ownership_for(
+        repo_id: str,
+        store: Store = Depends(get_store),
+        sync_kind: str | None = None,
+    ) -> dict[str, object]:
+        """Per-document ownership + orphan findings vs the LIVE roster (OWN-04).
+
+        Reads the synced config documents (which carry the resolved accountable/
+        durable owner) and crosses them against the live roster through
+        :func:`code_doc_monitor.ownership.detect_orphans` — so marking someone
+        departed flips every document they own across every repo on the NEXT read
+        (the cross-repo cascade). Open read.
+        """
+        from ..config import Audience
+
+        _require_known_repo(store, repo_id)
+        # Ownership is a property of the CONFIG (identical across sync_kinds), so a
+        # doc mirrored under both "git" and "local" must appear ONCE — dedup by
+        # doc_id (first wins) when no sync_kind narrows it.
+        owners: list[EffectiveOwner] = []
+        seen: set[str] = set()
+        for d in store.config_documents_for(repo_id, sync_kind):
+            if d.doc_id in seen:
+                continue
+            seen.add(d.doc_id)
+            owners.append(
+                EffectiveOwner(
+                    doc_id=d.doc_id,
+                    doc_path=d.path,
+                    audience=Audience(d.audience),
+                    owner=d.owner,
+                    team=d.team,
+                    dri=d.dri,
+                    accountable=d.accountable,
+                    durable=d.durable,
+                )
+            )
+        roster = RosterSnapshot(identities=tuple(store.list_roster()))
+        findings = detect_orphans(owners, roster)
+        orphan_count = sum(
+            1
+            for f in findings
+            if f.status
+            in (
+                OwnershipStatus.ORPHAN_OWNER_DEPARTED,
+                OwnershipStatus.ORPHAN_DRI_VACANT,
+            )
+        )
+        return {
+            "owners": [o.model_dump(mode="json") for o in owners],
+            "findings": [f.model_dump(mode="json") for f in findings],
+            "orphan_count": orphan_count,
+        }
 
     # `{repo_id:path}` so a repo_id containing slashes (e.g. "acme/widget", the
     # org/name form) is captured whole rather than splitting path segments.

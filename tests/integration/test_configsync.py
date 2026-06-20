@@ -23,7 +23,8 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.configsync import read_config_at, run_sync
+from code_doc_monitor.config import load_bundle
+from code_doc_monitor.configsync import _build_rows, read_config_at, run_sync
 from code_doc_monitor.errors import SyncError
 
 _NOW = "2026-06-07T00:00:00Z"
@@ -382,3 +383,61 @@ def test_git_mode_subdir_missing_config_on_branch_is_loud(tmp_path: Path) -> Non
     with pytest.raises(SyncError, match="config/cdmon"):
         run_sync(sub, "gitrepo", mode="git", default_branch="main", now=_NOW)
     _no_worktrees(top)
+
+
+def test_build_rows_derives_accountable_durable(tmp_path: Path) -> None:
+    """EPIC OWN: the server mirror DERIVES accountable/durable from owner/team/dri
+    via the shared precedence — it does not copy pre-resolved values. Pins both the
+    dri→owner→team order AND the inherited unit-owner fallback for a bare doc, so a
+    precedence regression fails here (not just transitively in the demo e2e).
+    """
+    d = tmp_path / "cdmon"
+    d.mkdir()
+    (d / "index.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "repo: probe\n"
+        "generated-by: cdmon\n"
+        'updated: "2026-06-07"\n'
+        "---\n"
+        'root: "."\n'
+        'version: "2.0.0"\n'
+        "units:\n"
+        "  - file: core.yaml\n",
+        encoding="utf-8",
+    )
+    (d / "core.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "unit: core\n"
+        'title: "Core unit"\n'
+        "owner: team-x\n"
+        'created: "2026-06-07"\n'
+        'updated: "2026-06-07"\n'
+        "---\n"
+        "dir-covered:\n"
+        "  - src\n"
+        "source-files-format:\n"
+        '  - ".py"\n'
+        "documents:\n"
+        "  - id: d-explicit\n"
+        "    path: docs/d-explicit.md\n"
+        "    audience: eng-guide\n"
+        "    owner: o\n"
+        "    team: t\n"
+        "    dri: p\n"
+        "  - id: d-inherit\n"
+        "    path: docs/d-inherit.md\n"
+        "    audience: eng-guide\n",  # no owner → inherits the unit owner
+        encoding="utf-8",
+    )
+    docs, _refs = _build_rows(load_bundle(d), "r", mode="git", ref=None, now=_NOW)
+    by_id = {x.doc_id: x for x in docs}
+    # explicit doc: dri wins for accountable, team for durable
+    assert (by_id["d-explicit"].accountable, by_id["d-explicit"].durable) == ("p", "t")
+    # bare doc: BOTH inherit the unit's frontmatter owner (the server-side fallback
+    # that is otherwise only covered transitively by the demo e2e)
+    assert (by_id["d-inherit"].accountable, by_id["d-inherit"].durable) == (
+        "team-x",
+        "team-x",
+    )
