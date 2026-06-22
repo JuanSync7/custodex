@@ -10,6 +10,7 @@ import {
   records,
   repos,
   resolutions,
+  serverSettings,
   statuses,
 } from "./test/fixtures";
 
@@ -32,6 +33,7 @@ function stubFetch() {
     else if (url.includes("/documents")) body = configDocuments;
     else if (url.includes("/health")) body = health;
     else if (url.includes("/config/templates")) body = configTemplates;
+    else if (url.includes("/settings")) body = serverSettings;
     return { ok: true, status: 200, json: async () => body } as Response;
   });
 }
@@ -139,6 +141,28 @@ describe("App routing", () => {
       expect(
         screen.getByText("index.yaml", { selector: "figcaption" }),
       ).toBeInTheDocument(),
+    );
+  });
+
+  it("navigates to the global server settings page via the Settings nav link", async () => {
+    vi.stubGlobal("fetch", stubFetch());
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <App />
+      </MemoryRouter>,
+    );
+
+    const settingsLink = await screen.findByRole("link", { name: /settings/i });
+    expect(settingsLink).toHaveAttribute("href", "/settings");
+
+    fireEvent.click(settingsLink);
+
+    expect(
+      await screen.findByRole("heading", { name: /^settings$/i }),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText("server.host")).toBeInTheDocument(),
     );
   });
 

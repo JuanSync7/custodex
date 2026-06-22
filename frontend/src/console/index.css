@@ -1152,6 +1152,22 @@ tbody th {
 .ownership-table th[scope="col"]:nth-child(5) {
   width: 18%;
 }
+/* The Settings page reuses the coverage table look but has TWO columns
+   (Setting, Value) — restate the widths so they sum to 100% under fixed layout. */
+.settings-table th[scope="col"]:nth-child(1) {
+  width: 42%;
+}
+.settings-table th[scope="col"]:nth-child(2) {
+  width: 58%;
+}
+.settings-secrets {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
 .coverage-dir {
   display: inline-flex;
   align-items: baseline;

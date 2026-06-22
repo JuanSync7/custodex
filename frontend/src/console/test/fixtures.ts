@@ -12,6 +12,7 @@ import type {
   RepoStatus,
   ResolutionRecord,
   ReviewRecord,
+  SettingsData,
   StoredConfigEdit,
   SyncRun,
 } from "../types";
@@ -202,6 +203,38 @@ export const configTemplates: {
   index: "# config/cdmon/index.yaml\nrepo: acme/widget\ndocuments:\n  - doc_id: guide/install\n    path: ../../docs/install.md\n",
   ignore: "# config/cdmon/ignore.yaml\nignore:\n  - ../../**/generated/**\n",
   doc_style: "# config/cdmon/doc-style.yaml\nstyles:\n  user-guide: ../../templates/writing/user-guide.md\n",
+};
+
+// ── EPIC SVR fixture (the resolved server settings + secret presence) ────────
+
+export const serverSettings: SettingsData = {
+  settings: {
+    version: "1.0.0",
+    server: {
+      host: "0.0.0.0",
+      port: 33333,
+      log_level: "info",
+      trusted_hosts: ["*"],
+      cors: {
+        allow_origins: [],
+        allow_credentials: false,
+        allow_methods: ["*"],
+        allow_headers: ["*"],
+      },
+      rate_limit: { requests_per_minute: null },
+      git: {
+        allowed_hosts: ["github.com", "gitlab.com"],
+        extra_allowed_hosts: [],
+        allow_file_scheme: true,
+        clone_timeout_seconds: null,
+      },
+    },
+  },
+  secrets: {
+    admin_token_configured: false,
+    database_url_set: false,
+    secret_key_set: false,
+  },
 };
 
 // ── W-01 fixture (config documents + their code_refs; the relationship view) ─

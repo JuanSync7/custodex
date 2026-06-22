@@ -1,0 +1,20 @@
+# Keep the build context small + reproducible (EPIC SVR).
+.git
+.gitignore
+.venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+htmlcov
+.coverage
+*.egg-info
+# the console is rebuilt in the frontend stage; node_modules/dist never enter the context
+frontend/node_modules
+frontend/dist
+# planning substrate + local dev artifacts are not needed at runtime
+.project
+tests
+**/.cdmon
+*.rpt

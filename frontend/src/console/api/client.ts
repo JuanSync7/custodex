@@ -14,6 +14,7 @@ import type {
   RepoStatus,
   ResolutionRecord,
   ReviewRecord,
+  SettingsData,
   StoredConfigEdit,
   SyncMode,
   SyncRun,
@@ -221,6 +222,14 @@ export class ApiClient {
       ignore: string;
       doc_style: string;
     }>("/config/templates");
+  }
+
+  /**
+   * GET {base}/settings → SettingsData (EPIC SVR, GLOBAL + open read). The effective
+   * non-secret runtime settings + secret PRESENCE booleans (never the values).
+   */
+  serverSettings(): Promise<SettingsData> {
+    return this.getJson<SettingsData>("/settings");
   }
 
   /**
