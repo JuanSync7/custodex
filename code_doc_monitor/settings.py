@@ -132,7 +132,7 @@ def load_settings(path: Path) -> Settings:
         )
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         raise ConfigError(f"Cannot read settings file {path}: {exc}") from exc
     try:
         data = yaml.safe_load(text)
@@ -151,9 +151,17 @@ def load_settings(path: Path) -> Settings:
         raise ConfigError(f"Invalid settings in {path}:\n{exc}") from exc
 
 
-def _csv(value: str) -> list[str]:
-    """Parse a comma-separated env value into a stripped, non-empty list."""
-    return [part.strip() for part in value.split(",") if part.strip()]
+def _csv(value: str, name: str) -> list[str]:
+    """Parse a comma-separated env value into a stripped, non-empty list.
+
+    A non-empty env value that parses to NO items (e.g. ``","`` or ``" "``) is operator
+    error — silently yielding ``[]`` could brick the server (an empty ``trusted_hosts``
+    rejects every Host), so it is a loud :class:`ConfigError` (K8).
+    """
+    parts = [part.strip() for part in value.split(",") if part.strip()]
+    if not parts:
+        raise ConfigError(f"{name} has no values after splitting on ',': {value!r}")
+    return parts
 
 
 def _int(value: str, name: str) -> int:
@@ -184,13 +192,13 @@ def settings_from_env(base: Settings, env: Mapping[str, str] | None = None) -> S
     if value := source.get("CDMON_SERVER_LOG_LEVEL"):
         srv["log_level"] = value
     if value := source.get("CDMON_TRUSTED_HOSTS"):
-        srv["trusted_hosts"] = _csv(value)
+        srv["trusted_hosts"] = _csv(value, "CDMON_TRUSTED_HOSTS")
     if value := source.get("CDMON_CORS_ORIGINS"):
-        srv["cors"]["allow_origins"] = _csv(value)
+        srv["cors"]["allow_origins"] = _csv(value, "CDMON_CORS_ORIGINS")
     if value := source.get("CDMON_RATE_LIMIT_RPM"):
         srv["rate_limit"]["requests_per_minute"] = _int(value, "CDMON_RATE_LIMIT_RPM")
     if value := source.get("CDMON_ALLOWED_GIT_HOSTS"):
-        srv["git"]["extra_allowed_hosts"] = _csv(value)
+        srv["git"]["extra_allowed_hosts"] = _csv(value, "CDMON_ALLOWED_GIT_HOSTS")
     if value := source.get("CDMON_GIT_CLONE_TIMEOUT"):
         srv["git"]["clone_timeout_seconds"] = _int(value, "CDMON_GIT_CLONE_TIMEOUT")
 

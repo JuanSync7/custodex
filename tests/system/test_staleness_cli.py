@@ -121,3 +121,10 @@ def test_staleness_loud_on_bad_config(tmp_path: Path) -> None:
     bad.write_text("documents: [{id: x}]\n", encoding="utf-8")  # missing path/audience
     res = runner.invoke(app, ["staleness", "--config", str(bad)])
     assert res.exit_code != 0
+
+
+def test_staleness_loud_on_bad_staleness_block(tmp_path: Path) -> None:
+    # a non-positive SLA is malformed config → a loud nonzero exit (K8).
+    cfg = _cfg(tmp_path, _DOCS, staleness={"default_days": 0})
+    res = runner.invoke(app, ["staleness", "--config", str(cfg), "--now", _NOW])
+    assert res.exit_code != 0

@@ -149,3 +149,16 @@ def test_staleness_config_rejects_non_positive_days() -> None:
         StalenessConfig(default_days=0)
     with pytest.raises(ValidationError):
         StalenessConfig(audience_days={Audience.ENG_GUIDE: -1})
+
+
+def test_sla_boundary_is_strict_greater_than() -> None:
+    # reviewed EXACTLY sla_days ago is still FRESH (age == sla, not > sla); one more
+    # day is STALE — pins both sides of the staleness.py boundary against _NOW.
+    docs = [
+        _doc("edge", reviewed="2026-03-24"),  # exactly 90 days before _NOW
+        _doc("over", reviewed="2026-03-23"),  # 91 days
+    ]
+    findings = detect_stale(docs, now=_NOW, default_days=90, include_fresh=True)
+    by_id = {f.doc_id: (f.status, f.age_days) for f in findings}
+    assert by_id["edge"] == (StalenessStatus.FRESH, 90)
+    assert by_id["over"] == (StalenessStatus.STALE, 91)

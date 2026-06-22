@@ -123,12 +123,12 @@ describe("Ownership page", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the Review SLA section flagging documents past their SLA", async () => {
+  it("shows the Review SLA section flagging documents needing review", async () => {
     renderOwnership(fakeApi());
     expect(
       await screen.findByRole("heading", { name: /review sla/i }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/past the review SLA/i)).toBeInTheDocument();
+    expect(screen.getByText(/need a review/i)).toBeInTheDocument();
     // the stale doc's reason is surfaced to assistive tech (sr-only)
     expect(screen.getByText(/reviewed 172 days ago/i)).toBeInTheDocument();
   });
@@ -142,5 +142,26 @@ describe("Ownership page", () => {
     expect(
       await screen.findByText(/within its review SLA/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows the SLA loading sub-state before staleness resolves", async () => {
+    const never = new Promise<StalenessData>(() => {});
+    renderOwnership(fakeApi({ stalenessFor: () => never }));
+    // ownership resolves and renders, but the SLA section is still loading
+    expect(
+      await screen.findByText(/loading review status/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the SLA error sub-state when staleness fails", async () => {
+    renderOwnership(
+      fakeApi({
+        stalenessFor: async () => {
+          throw new Error("sla boom");
+        },
+      }),
+    );
+    const alert = await screen.findByText(/failed to load review status/i);
+    expect(alert).toHaveTextContent(/sla boom/);
   });
 });

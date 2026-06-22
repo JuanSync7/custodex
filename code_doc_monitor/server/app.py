@@ -110,18 +110,21 @@ class _RateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._limit = limit
         self._now = now_epoch
-        self._hits: dict[str, tuple[int, int]] = {}  # client -> (window_start, count)
+        self._window = -1  # the current fixed window; counters reset when it advances
+        self._hits: dict[str, int] = {}  # client -> count IN the current window
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Any]
     ) -> Response:
         client = request.client.host if request.client else "?"
         window = self._now() // 60
-        start, count = self._hits.get(client, (window, 0))
-        if start != window:
-            start, count = window, 0
-        count += 1
-        self._hits[client] = (start, count)
+        if window != self._window:
+            # New window: drop ALL prior counters so the map never grows unbounded
+            # over a long-running server (one entry per client only WITHIN a window).
+            self._window = window
+            self._hits = {}
+        count = self._hits.get(client, 0) + 1
+        self._hits[client] = count
         if count > self._limit:
             return JSONResponse({"detail": "rate limit exceeded"}, status_code=429)
         return await call_next(request)
@@ -1234,17 +1237,20 @@ def create_app(
         Open read; deduped by ``doc_id`` (one config across sync_kinds); the table omits
         FRESH docs unless ``include_fresh``.
         """
-        from ..config import Audience
+        from ..config import Audience, StalenessConfig
 
         _require_known_repo(store, repo_id)
         now = clock()
+        # A pre-SLA mirror row carries no sla_days — fall back to the canonical default
+        # (so it grades exactly like a default-config CLI run; one source of truth).
+        default_sla = StalenessConfig().default_days
         findings: list[StalenessFinding] = []
         seen: set[str] = set()
         for d in store.config_documents_for(repo_id, sync_kind):
             if d.doc_id in seen:
                 continue
             seen.add(d.doc_id)
-            sla = d.sla_days if d.sla_days is not None else 90
+            sla = d.sla_days if d.sla_days is not None else default_sla
             status, age, detail = grade_doc(d.reviewed, now, sla)
             if status is StalenessStatus.FRESH and not include_fresh:
                 continue

@@ -43,6 +43,18 @@ services:
       - "33333:33333"
     volumes:
       - ./config/settings.yaml:/app/config/settings.yaml:ro
+    healthcheck:
+      # In-process urllib (the image is python:3.11-slim and has no curl/wget) hitting
+      # the unauthenticated GET /health liveness probe.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:33333/health').status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   cdmon-db:

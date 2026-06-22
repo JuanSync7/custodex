@@ -2797,8 +2797,9 @@ server resolves them directly; only presence is reported (K8 no-leak).
 if `rate_limit.requests_per_minute`; clock-injected, K10; per-worker caveat documented). `git.*`
 feeds `_check_remote_allowed`; `clone_timeout_seconds` threads to `gitfetch` `subprocess.run(timeout=)`.
 New OPEN read `GET /settings` → `{settings: <Settings dump>, secrets: <presence>}` (defined BEFORE
-the SPA catch-all mount). `main()` + `cdmon serve` read host/port/log_level from settings (CLI
-`--host/--port` still win). App version de-duped via `importlib.metadata`.
+the SPA catch-all mount). The CENTRAL server `main()` reads host/port/log_level from settings;
+`cdmon serve` keeps its own localhost dev defaults (127.0.0.1:0, `--host/--port` override). App
+version de-duped via `importlib.metadata`.
 
 **CLI — `cdmon settings [--settings PATH] [--json]`** (read-only, K1/K4): prints the effective
 resolved settings + secret presence; loud ConfigError → exit 1. Mirrors `schema`/`ownership`.

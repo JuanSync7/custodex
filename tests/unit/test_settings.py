@@ -206,3 +206,19 @@ def test_secret_presence_reports_only_booleans() -> None:
     }
     # the actual secret values never appear in the presence report
     assert "s3cret" not in str(present)
+
+
+def test_non_utf8_file_is_loud(tmp_path: Path) -> None:
+    # a mis-encoded settings file is "unreadable" → a typed ConfigError, not a raw
+    # UnicodeDecodeError escaping the loader (K8).
+    p = tmp_path / "settings.yaml"
+    p.write_bytes(b"\xff\xfe\x00not utf-8")
+    with pytest.raises(ConfigError, match="Cannot read settings file"):
+        load_settings(p)
+
+
+def test_env_degenerate_csv_is_loud() -> None:
+    # a non-empty env value that parses to NO items is operator error, not a silent
+    # empty list (an empty trusted_hosts would reject every Host) (K8).
+    with pytest.raises(ConfigError, match="CDMON_TRUSTED_HOSTS has no values"):
+        settings_from_env(Settings(), {"CDMON_TRUSTED_HOSTS": " , , "})

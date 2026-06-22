@@ -14,7 +14,7 @@ Pure + offline: no I/O, no backend, no clock read. :func:`detect_stale` is the e
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
@@ -90,14 +90,23 @@ def _parse_iso(value: str, *, field: str) -> datetime:
         raise ConfigError(f"{field} is not an ISO date: {value!r}") from exc
 
 
+def _to_naive_utc(value: datetime) -> datetime:
+    """Normalize to naive UTC: an aware datetime is CONVERTED to UTC (not just
+    stripped) so two instants compare by true time, not wall-clock; a naive one is
+    taken as-is. SLA granularity is days, so this is exact enough."""
+    if value.tzinfo is not None:
+        value = value.astimezone(timezone.utc)
+    return value.replace(tzinfo=None)
+
+
 def _age_days(reviewed: str, now: str) -> int:
     """Whole days between ``reviewed`` and ``now`` (negative clamped to 0).
 
-    Both are normalized to naive (the tz is dropped) so a bare ``reviewed`` date and a
-    tz-aware ``now`` compare cleanly — SLA granularity is days, not seconds.
+    Both are normalized to naive UTC so a bare ``reviewed`` date and a tz-aware ``now``
+    compare cleanly by instant.
     """
-    n = _parse_iso(now, field="now").replace(tzinfo=None)
-    r = _parse_iso(reviewed, field="reviewed").replace(tzinfo=None)
+    n = _to_naive_utc(_parse_iso(now, field="now"))
+    r = _to_naive_utc(_parse_iso(reviewed, field="reviewed"))
     return max((n - r).days, 0)
 
 

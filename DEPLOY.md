@@ -23,7 +23,9 @@ store (everything is lost on restart) — fine for a demo, never for production.
 
 Non-secret runtime tunables live in `config/settings.yaml` (mounted read-only in the
 compose file). Every value defaults to the historical behavior, so the file is
-optional. Precedence is **CLI flag > environment variable > file > built-in default**.
+optional. Precedence is **environment variable > file > built-in default** (the central server
+reads no CLI flags; `cdmon serve`'s own `--host`/`--port` only affect the standalone
+dashboard, which keeps its localhost defaults).
 
 | Setting (`config/settings.yaml`)         | Env override               | Default            |
 |------------------------------------------|----------------------------|--------------------|

@@ -30,6 +30,28 @@ from code_doc_monitor.settings import (  # noqa: E402
 
 _FIXED_CLOCK = "2026-06-22T00:00:00+00:00"
 
+_CDMON_ENV = (
+    "CDMON_SERVER_HOST",
+    "CDMON_SERVER_PORT",
+    "CDMON_SERVER_LOG_LEVEL",
+    "CDMON_TRUSTED_HOSTS",
+    "CDMON_CORS_ORIGINS",
+    "CDMON_RATE_LIMIT_RPM",
+    "CDMON_ALLOWED_GIT_HOSTS",
+    "CDMON_GIT_CLONE_TIMEOUT",
+    "CDMON_ADMIN_TOKEN",
+    "CDMON_DATABASE_URL",
+    "CDMON_SECRET_KEY",
+)
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_cdmon_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip the settings/secret CDMON_* env so baseline assertions hold regardless of
+    the host (K10); a test that needs one sets it via its own monkeypatch afterward."""
+    for name in _CDMON_ENV:
+        monkeypatch.delenv(name, raising=False)
+
 
 # ── GET /settings (open read, redacted) ──────────────────────────────────────
 
