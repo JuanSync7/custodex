@@ -2,7 +2,7 @@
 
 Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate.
 
-**44 public modules**, 0 without a catalogued feature.
+**45 public modules**, 0 without a catalogued feature.
 
 ## `_v2base`
 
@@ -37,20 +37,20 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `doctor`, `index`, `init`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`
+- Public symbols: `app`, `build`, `check`, `coverage`, `doctor`, `index`, `init`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `staleness`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`
 
 ## `config`
 
 - Path: `config.py`
-- Public symbols: `AgentConfig`, `Audience`, `BackendConfig`, `CONFIG_TEMPLATE`, `CentralConfig`, `CodeRef`, `ConfigBundle`, `ContextRef`, `CoverageConfig`, `DEFAULT_CENTRAL_TOKEN_ENV`, `DocumentSpec`, `IgnoreFile`, `IgnoreFrontmatter`, `IndexFile`, `IndexFrontmatter`, `IndexUnitRef`, `MonitorConfig`, `RESERVED_UNIT_STEMS`, `RegionColumn`, `RegionMode`, `RegionTemplate`, `UnitFile`, `UnitFrontmatter`, `WaiverEntry`, `__all__`, `add_code_ref`, `central_config_template`, `dump_unit_file`, `effective_coverage`, `gitignore_to_globs`, `load_bundle`, `load_config`, `load_config_dir`, `load_ignore_file`, `load_index_file`, `load_unit_file`, `regenerate_index`, `remove_code_ref`, `resolve_repo_root`, `set_context_refs`, `set_document_owner`, `unit_for_path`, `upsert_document`, `write_index`, `write_template`
-- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`, `FEAT-CONFIGV2-017`, `FEAT-OWNERSHIP-001`, `FEAT-OWNERSHIP-008`
+- Public symbols: `AgentConfig`, `Audience`, `BackendConfig`, `CONFIG_TEMPLATE`, `CentralConfig`, `CodeRef`, `ConfigBundle`, `ContextRef`, `CoverageConfig`, `DEFAULT_CENTRAL_TOKEN_ENV`, `DocumentSpec`, `IgnoreFile`, `IgnoreFrontmatter`, `IndexFile`, `IndexFrontmatter`, `IndexUnitRef`, `MonitorConfig`, `RESERVED_UNIT_STEMS`, `RegionColumn`, `RegionMode`, `RegionTemplate`, `StalenessConfig`, `UnitFile`, `UnitFrontmatter`, `WaiverEntry`, `__all__`, `add_code_ref`, `central_config_template`, `dump_unit_file`, `effective_coverage`, `gitignore_to_globs`, `load_bundle`, `load_config`, `load_config_dir`, `load_ignore_file`, `load_index_file`, `load_unit_file`, `regenerate_index`, `remove_code_ref`, `resolve_repo_root`, `set_context_refs`, `set_document_owner`, `unit_for_path`, `upsert_document`, `write_index`, `write_template`
+- Implemented by: `FEAT-CONFIG-001`, `FEAT-CONFIG-002`, `FEAT-CONFIG-003`, `FEAT-CONFIG-004`, `FEAT-CONFIG-005`, `FEAT-CONFIG-006`, `FEAT-CONFIG-007`, `FEAT-CONFIG-008`, `FEAT-CONFIG-009`, `FEAT-CONFIG-010`, `FEAT-CONFIG-011`, `FEAT-CONFIGV2-001`, `FEAT-CONFIGV2-002`, `FEAT-CONFIGV2-003`, `FEAT-CONFIGV2-004`, `FEAT-CONFIGV2-005`, `FEAT-CONFIGV2-006`, `FEAT-CONFIGV2-007`, `FEAT-CONFIGV2-008`, `FEAT-CONFIGV2-009`, `FEAT-CONFIGV2-010`, `FEAT-CONFIGV2-014`, `FEAT-CONFIGV2-016`, `FEAT-CONFIGV2-017`, `FEAT-OWNERSHIP-001`, `FEAT-OWNERSHIP-008`, `FEAT-STALENESS-003`
 
 ## `configsync`
 
 - Path: `configsync.py`
 - Public symbols: `GitInfo`, `SyncResult`, `__all__`, `read_config_at`, `run_sync`
-- Implemented by: `FEAT-CONFIGV2-012`, `FEAT-GITSYNC-005`
+- Implemented by: `FEAT-CONFIGV2-012`, `FEAT-GITSYNC-005`, `FEAT-STALENESS-005`
 
 ## `coverage`
 
@@ -206,7 +206,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `server/__init__.py`
 - Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `ReassignOwnerEdit`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
-- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-OWNERSHIP-009`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`, `FEAT-SETTINGS-004`, `FEAT-SETTINGS-005`, `FEAT-SETTINGS-006`, `FEAT-SETTINGS-007`
+- Implemented by: `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-OWNERSHIP-009`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`, `FEAT-SETTINGS-004`, `FEAT-SETTINGS-005`, `FEAT-SETTINGS-006`, `FEAT-SETTINGS-007`, `FEAT-STALENESS-005`, `FEAT-STALENESS-006`
 
 ## `settings`
 
@@ -231,6 +231,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Path: `srcindex.py`
 - Public symbols: `ModuleIndex`, `SourceIndex`, `__all__`, `build_source_index`, `render_source_wiki_md`
 - Implemented by: `FEAT-REFERENCE-005`, `FEAT-REFERENCE-006`
+
+## `staleness`
+
+- Path: `staleness.py`
+- Public symbols: `ReviewedDoc`, `StalenessFinding`, `StalenessStatus`, `__all__`, `detect_stale`, `grade_doc`, `render_staleness_text`, `resolve_sla_days`, `reviewed_docs_from_config`
+- Implemented by: `FEAT-STALENESS-001`, `FEAT-STALENESS-002`, `FEAT-STALENESS-003`
 
 ## `syncpr`
 

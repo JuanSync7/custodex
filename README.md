@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 2fc6d711d61a9ff3
+  fingerprint: 26adcc20b8d53970
   fingerprint_tiers:
-    composite: 2fc6d711d61a9ff3
-    signature: 2fc6d711d61a9ff3
+    composite: 26adcc20b8d53970
+    signature: 26adcc20b8d53970
   schema_version: 1.0.0
 ---
 # code-doc-monitor

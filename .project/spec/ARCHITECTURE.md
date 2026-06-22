@@ -2815,3 +2815,43 @@ resolved settings + secret presence; loud ConfigError → exit 1. Mirrors `schem
 **SVR-02** middleware + host/port/log_level + git timeout/allowlist wiring · **SVR-03** `GET /settings`
 + `cdmon settings` · **SVR-04** console Settings page · **SVR-05** Docker/compose/DEPLOY · **SVR-06**
 demo + final gate. New `settings` catalog subsystem grown in lockstep; each slice TDD + full gate green.
+
+## EPIC SLA — time-based staleness / review SLA
+
+The time-based half of accountability (EPIC OWN was the departure-based half): a doc
+not re-reviewed within its SLA is flagged so its accountable owner re-reviews it.
+**Config-as-truth** (like ownership): a human stamps `reviewed` in config; staleness is
+computed against an injected `now` (K10), audience-aware (K3).
+
+**Config (additive, K6).** `DocumentSpec.reviewed: str | None = None` (ISO date the doc
+was last reviewed). `MonitorConfig.staleness: StalenessConfig` —
+`default_days: int = 90` + `audience_days: dict[Audience,int] = {}` (a user-guide may get
+a longer SLA than an eng-guide, K3).
+
+**Core — `code_doc_monitor/staleness.py` (pure, clock-free except the injected `now`).**
+```python
+class StalenessStatus(str, Enum): FRESH / STALE / NEVER_REVIEWED
+class ReviewedDoc(BaseModel):  # frozen
+    doc_id: str; doc_path: str; audience: Audience; reviewed: str | None = None
+class StalenessFinding(BaseModel):
+    doc_id, doc_path, audience, status, reviewed, sla_days: int, age_days: int | None, detail
+def resolve_sla_days(audience, *, default_days, audience_days=None) -> int
+def detect_stale(docs, *, now, default_days, audience_days=None, include_fresh=False)
+    -> tuple[StalenessFinding, ...]   # sorted by doc_id (K10); no wall-clock
+def reviewed_docs_from_config(config) -> tuple[ReviewedDoc, ...]
+```
+`reviewed is None` ⇒ NEVER_REVIEWED; `age = now - reviewed` (days) > sla ⇒ STALE; else FRESH.
+
+**CLI — `cdmon staleness [--config][--now ISO][--json][--fail-on-stale]`** (read-only,
+K1/K4): resolves reviewed-docs from config, runs `detect_stale` against `now` (default the
+wall clock, injectable), prints a table; `--fail-on-stale` exits 1 on any STALE/NEVER_REVIEWED.
+
+**Server — `GET /repos/{id}/staleness`** (open read, read-time like `/ownership`): the synced
+`ConfigDocument.reviewed` + audience → `detect_stale` against the app `clock()`, so a doc goes
+stale on the NEXT read with no re-sync. `ConfigDocument` gains additive `reviewed`;
+`configsync._build_rows` projects it. Frontend surfaces it on the Ownership page (a Reviewed /
+SLA column) — accountability + freshness in one view. New `staleness` catalog subsystem.
+
+**Slices:** **SLA-00** pin (this) · **SLA-01** `staleness.py` pure core · **SLA-02** config
+`reviewed`/`StalenessConfig` + `cdmon staleness` · **SLA-03** `ConfigDocument.reviewed` +
+`/staleness` route · **SLA-04** frontend column · **SLA-05** demo + final gate. Each TDD, full gate.

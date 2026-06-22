@@ -441,3 +441,56 @@ def test_build_rows_derives_accountable_durable(tmp_path: Path) -> None:
         "team-x",
         "team-x",
     )
+
+
+def test_build_rows_projects_reviewed_and_resolved_sla(tmp_path: Path) -> None:
+    """EPIC SLA: _build_rows carries each doc's `reviewed` + the audience-resolved
+    `sla_days` from the bundle's staleness policy into the mirror (config = truth)."""
+    d = tmp_path / "cdmon"
+    d.mkdir()
+    (d / "index.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "repo: probe\n"
+        "generated-by: cdmon\n"
+        'updated: "2026-06-07"\n'
+        "---\n"
+        'root: "."\n'
+        'version: "2.0.0"\n'
+        "staleness:\n"
+        "  default_days: 30\n"
+        "  audience_days:\n"
+        "    user-guide: 365\n"
+        "units:\n"
+        "  - file: core.yaml\n",
+        encoding="utf-8",
+    )
+    (d / "core.yaml").write_text(
+        "---\n"
+        'cdmon-config-version: "2.0.0"\n'
+        "unit: core\n"
+        'title: "Core unit"\n'
+        "owner: team-x\n"
+        'created: "2026-06-07"\n'
+        'updated: "2026-06-07"\n'
+        "---\n"
+        "dir-covered:\n"
+        "  - src\n"
+        "source-files-format:\n"
+        '  - ".py"\n'
+        "documents:\n"
+        "  - id: api\n"
+        "    path: docs/api.md\n"
+        "    audience: eng-guide\n"
+        '    reviewed: "2026-01-01"\n'
+        "  - id: guide\n"
+        "    path: docs/guide.md\n"
+        "    audience: user-guide\n",  # no reviewed → None
+        encoding="utf-8",
+    )
+    docs, _refs = _build_rows(load_bundle(d), "r", mode="git", ref=None, now=_NOW)
+    by_id = {x.doc_id: x for x in docs}
+    # eng-guide resolves to the default 30; reviewed projected verbatim
+    assert (by_id["api"].reviewed, by_id["api"].sla_days) == ("2026-01-01", 30)
+    # user-guide gets its audience override; no reviewed stamp → None
+    assert (by_id["guide"].reviewed, by_id["guide"].sla_days) == (None, 365)

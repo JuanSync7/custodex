@@ -496,3 +496,25 @@ def test_central_ownership_view_shows_departed_dri_orphan() -> None:
     statuses = {f["doc_id"]: f["status"] for f in body["findings"]}
     assert statuses["core-api"] == "orphan_dri_vacant"
     assert dogfood["orphan_count"] == 0  # cdmon-team is active
+
+
+def test_central_staleness_view_flags_overdue_doc() -> None:
+    """SLA-05: the seeded /staleness view flags core-api (reviewed long ago) as STALE
+    while a recently-reviewed user-guide (getting-started) is FRESH — graded at READ
+    time against an injected clock for determinism.
+
+    Features: FEAT-STALENESS-006
+    """
+    from code_doc_monitor.server import create_app
+
+    app = create_app(build_seeded_store(), clock=lambda: "2026-06-22T00:00:00Z")
+    with TestClient(app) as client:
+        body = client.get("/repos/demo-taskflow/staleness").json()
+        full = client.get("/repos/demo-taskflow/staleness?include_fresh=true").json()
+    statuses = {f["doc_id"]: f["status"] for f in body["findings"]}
+    assert statuses["core-api"] == "stale"  # reviewed 2024-06-01, past the 90-day SLA
+    assert "getting-started" not in statuses  # fresh → omitted from the default view
+    assert body["stale_count"] >= 1
+    # include_fresh surfaces the fresh user-guide too
+    full_statuses = {f["doc_id"]: f["status"] for f in full["findings"]}
+    assert full_statuses["getting-started"] == "fresh"

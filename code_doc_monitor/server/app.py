@@ -49,6 +49,7 @@ from ..registry import RegistrationPayload
 from ..schema import Resolution, ResolutionRecord, ReviewRecord, Verdict
 from ..settings import GitSettings, Settings, resolve_settings, secret_presence
 from ..sinks import IngestEnvelope
+from ..staleness import StalenessFinding, StalenessStatus, grade_doc
 from ..templates_v2 import V2_TEMPLATES
 from .edits import ConfigEdit, StoredConfigEdit
 from .store import (
@@ -1216,6 +1217,59 @@ def create_app(
             "owners": [o.model_dump(mode="json") for o in owners],
             "findings": [f.model_dump(mode="json") for f in findings],
             "orphan_count": orphan_count,
+        }
+
+    @app.get("/repos/{repo_id:path}/staleness")
+    def staleness_for(
+        repo_id: str,
+        store: Store = Depends(get_store),
+        sync_kind: str | None = None,
+        include_fresh: bool = False,
+    ) -> dict[str, object]:
+        """Per-document staleness vs the review SLA, graded at READ time (EPIC SLA).
+
+        Reads the synced documents (which carry ``reviewed`` + the resolved, audience-
+        aware ``sla_days``) and grades each against the app clock — so a doc goes stale
+        on the NEXT read with no re-sync (mirrors the ``/ownership`` read-time model).
+        Open read; deduped by ``doc_id`` (one config across sync_kinds); the table omits
+        FRESH docs unless ``include_fresh``.
+        """
+        from ..config import Audience
+
+        _require_known_repo(store, repo_id)
+        now = clock()
+        findings: list[StalenessFinding] = []
+        seen: set[str] = set()
+        for d in store.config_documents_for(repo_id, sync_kind):
+            if d.doc_id in seen:
+                continue
+            seen.add(d.doc_id)
+            sla = d.sla_days if d.sla_days is not None else 90
+            status, age, detail = grade_doc(d.reviewed, now, sla)
+            if status is StalenessStatus.FRESH and not include_fresh:
+                continue
+            findings.append(
+                StalenessFinding(
+                    doc_id=d.doc_id,
+                    doc_path=d.path,
+                    audience=Audience(d.audience),
+                    status=status,
+                    reviewed=d.reviewed,
+                    sla_days=sla,
+                    age_days=age,
+                    detail=detail,
+                )
+            )
+        findings.sort(key=lambda f: f.doc_id)
+        stale_count = sum(
+            1
+            for f in findings
+            if f.status in (StalenessStatus.STALE, StalenessStatus.NEVER_REVIEWED)
+        )
+        return {
+            "findings": [f.model_dump(mode="json") for f in findings],
+            "stale_count": stale_count,
+            "now": now,
         }
 
     # `{repo_id:path}` so a repo_id containing slashes (e.g. "acme/widget", the

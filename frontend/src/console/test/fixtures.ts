@@ -13,6 +13,7 @@ import type {
   ResolutionRecord,
   ReviewRecord,
   SettingsData,
+  StalenessData,
   StoredConfigEdit,
   SyncRun,
 } from "../types";
@@ -589,4 +590,43 @@ export const applyFixResponse: ApplyFixResponse = {
   doc_path: "docs/guide/getting-started.md",
   diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
   sync_run: syncRunLocal,
+};
+
+// ── EPIC SLA fixture (per-repo review staleness) ─────────────────────────────
+
+export const staleness: StalenessData = {
+  findings: [
+    {
+      doc_id: "core-api",
+      doc_path: "docs/api/core-api.md",
+      audience: "eng-guide",
+      status: "stale",
+      reviewed: "2026-01-01",
+      sla_days: 90,
+      age_days: 172,
+      detail: "reviewed 172 days ago; SLA is 90 days — re-review due",
+    },
+    {
+      doc_id: "io-api",
+      doc_path: "docs/api/io-api.md",
+      audience: "eng-guide",
+      status: "never_reviewed",
+      reviewed: null,
+      sla_days: 90,
+      age_days: null,
+      detail: "never reviewed; SLA is 90 days",
+    },
+    {
+      doc_id: "getting-started",
+      doc_path: "docs/getting-started.md",
+      audience: "user-guide",
+      status: "fresh",
+      reviewed: "2026-06-20",
+      sla_days: 365,
+      age_days: 2,
+      detail: "reviewed 2 days ago; within the 365-day SLA",
+    },
+  ],
+  stale_count: 2,
+  now: "2026-06-22T00:00:00Z",
 };

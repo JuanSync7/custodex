@@ -1,17 +1,18 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 37c3730c72873ecd
+  fingerprint: 3d49af736a34cc60
   fingerprint_tiers:
-    composite: 37c3730c72873ecd
-    docstring: 262863ce0d8559c9
-    signature: 7e5ec966238959f3
+    composite: 3d49af736a34cc60
+    docstring: a4a226b72f3220c6
+    signature: e4af42cf882cb105
   region_anchors:
     symbols:
     - 01b8016fdce455c4
     - 051af376199dec21
     - 09ab528f037a044d
     - 0a12e5898c92bfc6
+    - 0c9d51b72e16a207
     - 0d4275088d28bef2
     - 0d6e4079e36703eb
     - 0dad8198442ebc15
@@ -71,7 +72,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: bd4db70f75922a56
+    symbols: 2f88cef59a87808e
   schema_version: 1.0.0
 ---
 # ops
@@ -139,6 +140,7 @@ cdm:
 | serve | function | def serve(host: str = typer.Option('127.0.0.1', '--host', help='Host/interface to bind the standalone server to.'), port: int = typer.Option(0, '--port', help='Port to bind (0 = let the OS pick a free port).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Repo id for the standalone view. Defaults to the bundle's index `repo` field (else the current directory name)."), no_open: bool = typer.Option(False, '--no-open', help='Do not open a browser tab (accepted for parity; never auto-opens).')) -> None |
 | settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
 | should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdmon should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
+| staleness | function | def staleness(config: Path = _CONFIG_OPTION, now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade freshness against (default: the current time).'), as_json: bool = typer.Option(False, '--json', help='Emit {findings} as JSON (includes fresh docs).'), fail_on_stale: bool = typer.Option(False, '--fail-on-stale', help='Exit 1 if any document is stale or never reviewed (a review gate).')) -> None |
 | surface | function | def surface(config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help="Dump each document's surface as a JSON list.")) -> None |
 | surface_gaps | function | def surface_gaps(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the issue plan WITHOUT opening an issue (never builds a transport, so no provider env is required).'), provider: str = typer.Option('gitlab', '--provider', help='Issue tracker to open the coverage-gap issue on (gitlab \| github).')) -> None |
 | sync | function | def sync(mode: str = typer.Option('local', '--mode', help="Which sync to run: 'local' (the working tree / feature branch) or 'git' (the default branch baseline)."), remote: str \| None = typer.Option(None, '--remote', metavar='URL', help='Central-server URL to POST the sync to. Without it the sync runs locally and prints the summary (no central access required).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Stable repo id. REQUIRED with --remote; for a local sync it defaults to the bundle's index `repo` field (else the directory name)."), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the remote bearer token is read from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), default_branch: str = typer.Option('main', '--default-branch', help='The default branch the local sync compares against (commits_ahead).'), as_json: bool = typer.Option(False, '--json', help='Emit the SyncRun as JSON instead of the human summary.')) -> None |

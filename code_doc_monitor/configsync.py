@@ -52,6 +52,7 @@ from .server.store import (
     ConfigDocument,
     SyncRun,
 )
+from .staleness import resolve_sla_days
 
 __all__ = ["GitInfo", "SyncResult", "read_config_at", "run_sync"]
 
@@ -328,6 +329,13 @@ def _build_rows(
         accountable, durable = resolve_accountable_durable(
             spec.owner, spec.team, spec.dri, unit_owner
         )
+        # EPIC SLA: resolve each doc's audience-aware review SLA at sync (where the
+        # staleness policy is available), so /staleness grades against the mirror.
+        sla_days = resolve_sla_days(
+            spec.audience,
+            default_days=bundle.config.staleness.default_days,  # type: ignore[attr-defined]
+            audience_days=bundle.config.staleness.audience_days,  # type: ignore[attr-defined]
+        )
         documents.append(
             ConfigDocument(
                 repo_id=repo_id,
@@ -340,6 +348,8 @@ def _build_rows(
                 dri=spec.dri,
                 accountable=accountable,
                 durable=durable,
+                reviewed=spec.reviewed,
+                sla_days=sla_days,
                 region_keys=tuple(spec.region_keys),
                 context_refs=tuple(
                     ConfigContextRef(path=cr.path, note=cr.note)

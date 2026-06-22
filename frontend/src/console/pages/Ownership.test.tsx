@@ -2,7 +2,24 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Ownership, { type OwnershipApi } from "./Ownership";
-import type { OwnershipData } from "../types";
+import type { OwnershipData, StalenessData } from "../types";
+
+const SLA: StalenessData = {
+  findings: [
+    {
+      doc_id: "core-api",
+      doc_path: "docs/api/core-api.md",
+      audience: "eng-guide",
+      status: "stale",
+      reviewed: "2026-01-01",
+      sla_days: 90,
+      age_days: 172,
+      detail: "reviewed 172 days ago; SLA is 90 days — re-review due",
+    },
+  ],
+  stale_count: 1,
+  now: "2026-06-22T00:00:00Z",
+};
 
 const DATA: OwnershipData = {
   owners: [
@@ -46,6 +63,7 @@ const DATA: OwnershipData = {
 function fakeApi(overrides: Partial<OwnershipApi> = {}): OwnershipApi {
   return {
     ownershipFor: async (): Promise<OwnershipData> => DATA,
+    stalenessFor: async (): Promise<StalenessData> => SLA,
     ...overrides,
   };
 }
@@ -102,6 +120,27 @@ describe("Ownership page", () => {
     );
     expect(
       await screen.findByText(/no ownership recorded yet/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the Review SLA section flagging documents past their SLA", async () => {
+    renderOwnership(fakeApi());
+    expect(
+      await screen.findByRole("heading", { name: /review sla/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/past the review SLA/i)).toBeInTheDocument();
+    // the stale doc's reason is surfaced to assistive tech (sr-only)
+    expect(screen.getByText(/reviewed 172 days ago/i)).toBeInTheDocument();
+  });
+
+  it("shows a clean Review SLA banner when nothing is stale", async () => {
+    renderOwnership(
+      fakeApi({
+        stalenessFor: async () => ({ findings: [], stale_count: 0, now: "n" }),
+      }),
+    );
+    expect(
+      await screen.findByText(/within its review SLA/i),
     ).toBeInTheDocument();
   });
 });

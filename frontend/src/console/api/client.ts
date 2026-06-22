@@ -15,6 +15,7 @@ import type {
   ResolutionRecord,
   ReviewRecord,
   SettingsData,
+  StalenessData,
   StoredConfigEdit,
   SyncMode,
   SyncRun,
@@ -180,6 +181,13 @@ export class ApiClient {
   ownershipFor(repoId: string): Promise<OwnershipData> {
     return this.getJson<OwnershipData>(
       `/repos/${encodeRepoId(repoId)}/ownership`,
+    );
+  }
+
+  /** GET {base}/repos/{repoId}/staleness → StalenessData (EPIC SLA, read-time). */
+  stalenessFor(repoId: string): Promise<StalenessData> {
+    return this.getJson<StalenessData>(
+      `/repos/${encodeRepoId(repoId)}/staleness?include_fresh=true`,
     );
   }
 

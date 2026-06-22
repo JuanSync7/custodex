@@ -572,3 +572,23 @@ export interface SettingsData {
   settings: Settings;
   secrets: SecretPresence;
 }
+
+// ── EPIC SLA — review staleness (GET /repos/:id/staleness) ──────────────────
+// server: code_doc_monitor/staleness.py::StalenessFinding
+export interface StalenessFinding {
+  doc_id: string;
+  doc_path: string;
+  audience: string;
+  status: string; // "fresh" | "stale" | "never_reviewed"
+  reviewed: string | null;
+  sla_days: number;
+  age_days: number | null;
+  detail: string;
+}
+
+// server: GET /repos/:id/staleness → {findings, stale_count, now}
+export interface StalenessData {
+  findings: StalenessFinding[];
+  stale_count: number;
+  now: string;
+}

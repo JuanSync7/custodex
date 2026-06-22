@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**216 features** across 21 subsystems.
+**222 features** across 22 subsystems.
 
 ## agent
 
@@ -1188,3 +1188,38 @@ GET /settings is an OPEN read returning the effective non-secret settings plus t
 ### `FEAT-SETTINGS-008` — cdmon settings CLI
 
 The read-only `cdmon settings [--settings PATH] [--json]` command resolves the effective settings (file → env → defaults) and prints the host/port + hardening knobs and the secret presence, never a secret value; a malformed file is a loud ConfigError → exit 1. Offline, no backend (K1/K4).
+
+## staleness
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-STALENESS-001` | Pure staleness grading engine | staleness | K1, K10 | — | — | implemented |
+| `FEAT-STALENESS-002` | Fresh / stale / never-reviewed classification | staleness | K8, K10 | — | — | implemented |
+| `FEAT-STALENESS-003` | Config-as-truth reviewed stamp + audience-aware SLA | staleness, config | K3, K6 | — | — | implemented |
+| `FEAT-STALENESS-004` | cdmon staleness CLI | cli | K1, K3, K4 | — | — | implemented |
+| `FEAT-STALENESS-005` | Reviewed + resolved SLA mirrored at sync | server, configsync | K6, K10 | — | — | implemented |
+| `FEAT-STALENESS-006` | Read-time GET /staleness view | server | K10 | — | — | implemented |
+
+### `FEAT-STALENESS-001` — Pure staleness grading engine
+
+staleness.grade_doc / detect_stale grade a document's `reviewed` date against an INJECTED `now` (no wall clock, K10) and its SLA — the one shared core reused by the CLI and the server route. Pure + offline (K1): no I/O, no backend, no clock read.
+
+### `FEAT-STALENESS-002` — Fresh / stale / never-reviewed classification
+
+A doc with no `reviewed` stamp is NEVER_REVIEWED; one reviewed longer than its SLA ago is STALE (with the age in days); otherwise FRESH (omitted from the report unless asked). Findings are deterministically sorted by doc_id (K10); a malformed `reviewed` date is a loud ConfigError (K8).
+
+### `FEAT-STALENESS-003` — Config-as-truth reviewed stamp + audience-aware SLA
+
+DocumentSpec.reviewed (an ISO date, config = truth, additive K6) is the last-review source; StalenessConfig (default_days + per-audience audience_days) sets the SLA so a user-guide may get a longer window than an eng-guide (audience changes the verdict, K3). reviewed_docs_from_config projects a loaded config into the engine's input.
+
+### `FEAT-STALENESS-004` — cdmon staleness CLI
+
+The read-only `cdmon staleness [--config][--now ISO][--json][--fail-on-stale]` command resolves the reviewed-docs from config and grades them against `--now` (default the wall clock) + the audience-aware SLA; the table shows only docs needing review, --json shows all, --fail-on-stale is a CI review gate. Pure + offline (K1/K4).
+
+### `FEAT-STALENESS-005` — Reviewed + resolved SLA mirrored at sync
+
+configsync._build_rows projects each document's `reviewed` plus the audience-resolved `sla_days` (from the bundle's staleness policy) into ConfigDocument's existing JSON (additive, K6), so the server grades against the mirror without re-deriving the policy.
+
+### `FEAT-STALENESS-006` — Read-time GET /staleness view
+
+GET /repos/{id}/staleness grades the synced docs' `reviewed` + `sla_days` against the app clock at READ time (deduped by doc_id, FRESH omitted unless include_fresh), so a doc goes stale on the NEXT read with no re-sync — mirroring the ownership read-time cascade. Open read, deterministic.

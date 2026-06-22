@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 1e6db667ba3ec216
+  fingerprint: 061f0bdb7def27b9
   fingerprint_tiers:
-    composite: 1e6db667ba3ec216
-    docstring: 3a558162fc754b83
-    signature: 2edcf879620eecc6
+    composite: 061f0bdb7def27b9
+    docstring: b85549ece57af112
+    signature: 9db9fe40bba9a50a
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -43,6 +43,7 @@ cdm:
     - 3920de84732eea78
     - 3e00b4ad560e5de7
     - 4054d8813d8e592f
+    - 419b5f4b65b9c5f5
     - 4a2ca79bf708f89c
     - 4a36f89dafb0a101
     - 4f4f218b97d301a9
@@ -79,6 +80,7 @@ cdm:
     - 98117ea616dd3e9f
     - 991d9c74dd497040
     - 9c1e4e21a8ba9712
+    - a296a735a048dacd
     - a36f1a6c53893358
     - a47dddeeda46352d
     - a6517d7d72f73eb9
@@ -128,7 +130,7 @@ cdm:
     - fd87e7b303770609
     - ff51b2032355ac8b
   region_hashes:
-    symbols: 0c3f9724c5a3e600
+    symbols: 1f239a6a6315c45a
   schema_version: 1.0.0
 ---
 # code-doc-monitor — foundation (engineering reference)
@@ -190,6 +192,8 @@ cdm:
 | STYLE_CATEGORIES | variable | STYLE_CATEGORIES: tuple[tuple[str, str], ...] = ... |
 | SchemaError | class | class SchemaError(CodeDocMonitorError) |
 | SecretError | class | class SecretError(CodeDocMonitorError) |
+| StalenessConfig | class | class StalenessConfig(BaseModel) |
+| StalenessConfig._positive_days | method | def _positive_days(self) -> StalenessConfig |
 | SyncError | class | class SyncError(CodeDocMonitorError) |
 | TransportError | class | class TransportError(CodeDocMonitorError) |
 | UNIT_TEMPLATE | variable | UNIT_TEMPLATE = ... |

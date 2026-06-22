@@ -130,6 +130,11 @@ class ConfigDocument(BaseModel):
     dri: str | None = None
     accountable: str | None = None
     durable: str | None = None
+    # EPIC SLA — last-reviewed stamp + the resolved (audience-aware) SLA, mirrored at
+    # sync (additive, K6). GET /staleness grades `reviewed` vs the app clock + the
+    # `sla_days` at READ time, so a doc goes stale on the next read with no re-sync.
+    reviewed: str | None = None
+    sla_days: int | None = None
     region_keys: tuple[str, ...] = ()
     context_refs: tuple[ConfigContextRef, ...] = ()
     sync_kind: str
