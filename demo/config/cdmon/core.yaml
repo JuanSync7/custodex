@@ -31,6 +31,10 @@ documents:
     owner: demo-team
     team: demo-team
     dri: dana
+    # EPIC SLA — last reviewed long ago (config = truth), so GET /staleness +
+    # `cdmon staleness` flag core-api STALE (past its 90-day review SLA). This doc is
+    # thus BOTH a soft ownership orphan (Dana departed) AND overdue for review.
+    reviewed: "2024-06-01"
     region_keys: ["symbols"]
     code_refs:
       - path: src/taskflow/core/model.py
@@ -43,6 +47,8 @@ documents:
   - id: getting-started
     path: docs/guide/getting-started.md
     audience: user-guide
+    # EPIC SLA — recently reviewed, so this user-guide is FRESH (within its SLA).
+    reviewed: "2026-06-15"
     region_keys: ["symbols"]
     code_refs:
       - path: src/taskflow/core/model.py

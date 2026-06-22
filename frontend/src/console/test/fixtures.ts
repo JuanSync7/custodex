@@ -12,6 +12,8 @@ import type {
   RepoStatus,
   ResolutionRecord,
   ReviewRecord,
+  SettingsData,
+  StalenessData,
   StoredConfigEdit,
   SyncRun,
 } from "../types";
@@ -202,6 +204,38 @@ export const configTemplates: {
   index: "# config/cdmon/index.yaml\nrepo: acme/widget\ndocuments:\n  - doc_id: guide/install\n    path: ../../docs/install.md\n",
   ignore: "# config/cdmon/ignore.yaml\nignore:\n  - ../../**/generated/**\n",
   doc_style: "# config/cdmon/doc-style.yaml\nstyles:\n  user-guide: ../../templates/writing/user-guide.md\n",
+};
+
+// ── EPIC SVR fixture (the resolved server settings + secret presence) ────────
+
+export const serverSettings: SettingsData = {
+  settings: {
+    version: "1.0.0",
+    server: {
+      host: "0.0.0.0",
+      port: 33333,
+      log_level: "info",
+      trusted_hosts: ["*"],
+      cors: {
+        allow_origins: [],
+        allow_credentials: false,
+        allow_methods: ["*"],
+        allow_headers: ["*"],
+      },
+      rate_limit: { requests_per_minute: null },
+      git: {
+        allowed_hosts: ["github.com", "gitlab.com"],
+        extra_allowed_hosts: [],
+        allow_file_scheme: true,
+        clone_timeout_seconds: null,
+      },
+    },
+  },
+  secrets: {
+    admin_token_configured: false,
+    database_url_set: false,
+    secret_key_set: false,
+  },
 };
 
 // ── W-01 fixture (config documents + their code_refs; the relationship view) ─
@@ -556,4 +590,43 @@ export const applyFixResponse: ApplyFixResponse = {
   doc_path: "docs/guide/getting-started.md",
   diff: "--- a\n+++ b\n@@ -1 +1 @@\n-old\n+new\n",
   sync_run: syncRunLocal,
+};
+
+// ── EPIC SLA fixture (per-repo review staleness) ─────────────────────────────
+
+export const staleness: StalenessData = {
+  findings: [
+    {
+      doc_id: "core-api",
+      doc_path: "docs/api/core-api.md",
+      audience: "eng-guide",
+      status: "stale",
+      reviewed: "2026-01-01",
+      sla_days: 90,
+      age_days: 172,
+      detail: "reviewed 172 days ago; SLA is 90 days — re-review due",
+    },
+    {
+      doc_id: "io-api",
+      doc_path: "docs/api/io-api.md",
+      audience: "eng-guide",
+      status: "never_reviewed",
+      reviewed: null,
+      sla_days: 90,
+      age_days: null,
+      detail: "never reviewed; SLA is 90 days",
+    },
+    {
+      doc_id: "getting-started",
+      doc_path: "docs/getting-started.md",
+      audience: "user-guide",
+      status: "fresh",
+      reviewed: "2026-06-20",
+      sla_days: 365,
+      age_days: 2,
+      detail: "reviewed 2 days ago; within the 365-day SLA",
+    },
+  ],
+  stale_count: 2,
+  now: "2026-06-22T00:00:00Z",
 };

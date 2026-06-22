@@ -51,6 +51,7 @@ __all__ = [
     "DocumentSpec",
     "WaiverEntry",
     "CoverageConfig",
+    "StalenessConfig",
     "MonitorConfig",
     "load_config",
     "write_template",
@@ -336,6 +337,9 @@ class DocumentSpec(BaseModel):
     owner: str | None = None  # accountable identity (a person OR a team handle)
     team: str | None = None  # durable group accountability (survives a person leaving)
     dri: str | None = None  # current Directly-Responsible-Individual (vacatable)
+    # EPIC SLA — last-reviewed stamp (config = truth): an ISO date a human asserts the
+    # doc was last reviewed. Staleness is computed against it; None = never reviewed.
+    reviewed: str | None = None
 
     @model_validator(mode="after")
     def _region_modes_reference_declared_regions(self) -> DocumentSpec:
@@ -427,6 +431,31 @@ class CoverageConfig(BaseModel):
     waive: tuple[WaiverEntry, ...] = ()
 
 
+class StalenessConfig(BaseModel):
+    """The ``staleness:`` block — the review SLA (EPIC SLA, additive K6).
+
+    ``default_days`` is how long any document may go un-reviewed before it is flagged;
+    ``audience_days`` overrides it per audience — a ``user-guide`` may get a longer SLA
+    than an ``eng-guide`` (audience changes the verdict, K3). Both must be positive.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    default_days: int = 90
+    audience_days: dict[Audience, int] = {}
+
+    @model_validator(mode="after")
+    def _positive_days(self) -> StalenessConfig:
+        if self.default_days <= 0:
+            raise ValueError("staleness.default_days must be a positive integer")
+        for audience, days in self.audience_days.items():
+            if days <= 0:
+                raise ValueError(
+                    f"staleness.audience_days[{audience.value}] must be positive"
+                )
+        return self
+
+
 class MonitorConfig(BaseModel):
     """Top-level config: documents plus backend/central/apply settings."""
 
@@ -441,6 +470,7 @@ class MonitorConfig(BaseModel):
     central: CentralConfig = CentralConfig()
     apply_default: bool = False  # monitor auto-applies FIX by default?
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (additive)
+    staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     # P-01: opt-in body-AST fingerprint tier. Default OFF keeps surface_hash bytes
     # identical to the pre-P1 contract, so stored fingerprints stay valid; ON folds
     # function/method bodies into non-user-guide hashes (a deliberate re-baseline).
@@ -815,6 +845,7 @@ class IndexFile(BaseModel):
     central: CentralConfig = CentralConfig()
     region_templates: dict[str, RegionTemplate] = {}
     coverage: CoverageConfig = CoverageConfig()
+    staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     fingerprint_body_tier: bool = False  # P-01: mirrors MonitorConfig (lifted in merge)
     units: tuple[IndexUnitRef, ...]
     ignore: str = "ignore.yaml"
@@ -1062,6 +1093,7 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
         central=index.central,
         apply_default=index.apply_default,
         coverage=index.coverage,
+        staleness=index.staleness,
         fingerprint_body_tier=index.fingerprint_body_tier,
     )
     base_bundle = ConfigBundle(
@@ -1527,6 +1559,8 @@ def _document_to_yaml(doc: DocumentSpec) -> dict:
         out["team"] = doc.team
     if doc.dri is not None:
         out["dri"] = doc.dri
+    if doc.reviewed is not None:
+        out["reviewed"] = doc.reviewed
     if doc.region_keys:
         out["region_keys"] = list(doc.region_keys)
     if doc.region_modes:

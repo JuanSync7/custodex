@@ -1,0 +1,104 @@
+# Feature catalog — `settings` subsystem (EPIC SVR: central-server hardening +
+# operator runtime settings). The deployment tunables that used to be hardcoded at
+# the uvicorn leaf (host/port/log level) plus the hardening knobs that had no home
+# (CORS, TrustedHost, a request rate limit, the git clone timeout + SSRF allowlist)
+# move into ONE versioned, frozen settings file (config/settings.yaml), are wired
+# into FastAPI middleware + the launch, and are surfaced read-only (REDACTED) in the
+# CLI + console. Golden source of truth (EPIC R discipline). Secrets stay in the
+# environment; only their PRESENCE is ever reported.
+features:
+  - id: FEAT-SETTINGS-001
+    title: Frozen versioned settings model
+    summary: >-
+      settings.Settings/ServerSettings (+ nested CorsSettings/RateLimitSettings/
+      GitSettings) is a frozen, extra="forbid" pydantic model whose every field
+      defaults to today's server behavior (host 0.0.0.0, port 33333, CORS off,
+      TrustedHost off via ["*"], no rate limit, the github.com/gitlab.com git
+      allowlist + file:// allowed), so an absent settings.yaml is a no-op
+      (back-compat, K6). Pure core (pydantic + pyyaml only, K0); a port out of range
+      or a non-positive rate-limit/timeout is a loud validation error.
+    subsystem: settings
+    modules: [settings]
+    constraints: [K0, K6, K8, K10]
+
+  - id: FEAT-SETTINGS-002
+    title: Loud settings YAML loader
+    summary: >-
+      settings.load_settings reads config/settings.yaml and validates it, wrapping
+      every failure (bad suffix, unreadable file, malformed yaml, non-mapping top
+      level, unknown key, out-of-range value) in a typed ConfigError (K8). An empty
+      file resolves to the built-in defaults. Deterministic (K10).
+    subsystem: settings
+    modules: [settings]
+    constraints: [K8, K10]
+
+  - id: FEAT-SETTINGS-003
+    title: Env overlay + precedence + secret presence
+    summary: >-
+      settings.settings_from_env overlays CDMON_SERVER_* / CDMON_TRUSTED_HOSTS /
+      CDMON_CORS_ORIGINS / CDMON_RATE_LIMIT_RPM / CDMON_ALLOWED_GIT_HOSTS /
+      CDMON_GIT_CLONE_TIMEOUT onto a loaded Settings (env WINS over the file, with an
+      injectable env for tests); resolve_settings layers file → env → defaults.
+      secret_presence reports ONLY whether $CDMON_ADMIN_TOKEN / $CDMON_DATABASE_URL /
+      $CDMON_SECRET_KEY are set — never their values (K8). A bad env value is loud.
+    subsystem: settings
+    modules: [settings]
+    constraints: [K8, K10]
+
+  - id: FEAT-SETTINGS-004
+    title: Hardening middleware wired from settings
+    summary: >-
+      create_app installs CORS, TrustedHost and a per-process rate-limit middleware,
+      each ONLY when the operator configures it (origins listed / hosts restricted /
+      a request cap set), so the default app is byte-identical to the pre-SVR server
+      (back-compat). TrustedHost rejects a spoofed Host (400); CORS answers a
+      configured cross-origin preflight; the rate limiter returns 429 past the cap
+      (clock-injected, deterministic; per-worker — documented in DEPLOY.md).
+    subsystem: settings
+    modules: [server]
+    constraints: [K4, K8, K10]
+
+  - id: FEAT-SETTINGS-005
+    title: Git SSRF allowlist + clone timeout from settings
+    summary: >-
+      The clone-on-demand / docs-PR SSRF guard (_allowed_git_hosts /
+      _check_remote_allowed) is driven by server.git (allowed_hosts +
+      extra_allowed_hosts, and allow_file_scheme can forbid file:// in a shared
+      deployment), and server.git.clone_timeout_seconds threads to the clone
+      subprocess so a hung clone is a loud SyncError instead of a stuck worker.
+      Defaults preserve today's behavior.
+    subsystem: settings
+    modules: [server, gitfetch]
+    constraints: [K8]
+
+  - id: FEAT-SETTINGS-006
+    title: Settings-driven uvicorn launch
+    summary: >-
+      The central server main() binds host/port and sets the uvicorn log level from
+      the resolved settings (config/settings.yaml + env) instead of the hardcoded
+      0.0.0.0:33333, and the FastAPI app version is single-sourced from the package
+      metadata (it was duplicated as "0.1.0" in two places).
+    subsystem: settings
+    modules: [server]
+    constraints: [K6, K10]
+
+  - id: FEAT-SETTINGS-007
+    title: Redacted GET /settings endpoint
+    summary: >-
+      GET /settings is an OPEN read returning the effective non-secret settings plus
+      the secret PRESENCE booleans (never the secret values, K8) — the payload the
+      console Settings page renders. Defined before the SPA catch-all mount.
+    subsystem: settings
+    modules: [server]
+    constraints: [K8, K10]
+
+  - id: FEAT-SETTINGS-008
+    title: cdmon settings CLI
+    summary: >-
+      The read-only `cdmon settings [--settings PATH] [--json]` command resolves the
+      effective settings (file → env → defaults) and prints the host/port + hardening
+      knobs and the secret presence, never a secret value; a malformed file is a loud
+      ConfigError → exit 1. Offline, no backend (K1/K4).
+    subsystem: settings
+    modules: [cli]
+    constraints: [K1, K4, K8]

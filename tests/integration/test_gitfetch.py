@@ -190,3 +190,23 @@ def test_bogus_file_url_is_loud_sync_error_and_cleans_up(tmp_path: Path) -> None
     )
     with pytest.raises(SyncError, match="clone"), cloned_repo(spec, None):
         pass  # pragma: no cover — never reached (clone failed)
+
+
+def test_clone_timeout_threads_through_and_is_loud(tmp_path, monkeypatch) -> None:
+    """EPIC SVR: server.git.clone_timeout_seconds threads to the clone subprocess; a
+    timed-out clone is a loud SyncError (not a hung worker), and the temp dir is torn
+    down. The subprocess is mocked so no real clone runs (K4)."""
+    seen: dict[str, object] = {}
+
+    def _capture(*args: object, **kwargs: object) -> object:
+        seen["timeout"] = kwargs.get("timeout")
+        raise subprocess.TimeoutExpired(cmd="git clone", timeout=3)
+
+    monkeypatch.setattr(subprocess, "run", _capture)
+    spec = RemoteSpec(remote_url="file:///nonexistent", provider="github")
+    with (
+        pytest.raises(SyncError, match="timed out after 3s"),
+        cloned_repo(spec, None, clone_timeout=3),
+    ):
+        pass  # pragma: no cover — clone raises before yield
+    assert seen["timeout"] == 3  # the cap reached subprocess.run

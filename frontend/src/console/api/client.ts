@@ -14,6 +14,8 @@ import type {
   RepoStatus,
   ResolutionRecord,
   ReviewRecord,
+  SettingsData,
+  StalenessData,
   StoredConfigEdit,
   SyncMode,
   SyncRun,
@@ -182,6 +184,13 @@ export class ApiClient {
     );
   }
 
+  /** GET {base}/repos/{repoId}/staleness → StalenessData (EPIC SLA, read-time). */
+  stalenessFor(repoId: string): Promise<StalenessData> {
+    return this.getJson<StalenessData>(
+      `/repos/${encodeRepoId(repoId)}/staleness?include_fresh=true`,
+    );
+  }
+
   /**
    * POST {base}/repos/{repoId}/resolutions — the FIRST write path (F-04). Sends the
    * SHARED `ResolutionRecord` with `Authorization: Bearer <token>`; returns the
@@ -221,6 +230,14 @@ export class ApiClient {
       ignore: string;
       doc_style: string;
     }>("/config/templates");
+  }
+
+  /**
+   * GET {base}/settings → SettingsData (EPIC SVR, GLOBAL + open read). The effective
+   * non-secret runtime settings + secret PRESENCE booleans (never the values).
+   */
+  serverSettings(): Promise<SettingsData> {
+    return this.getJson<SettingsData>("/settings");
   }
 
   /**

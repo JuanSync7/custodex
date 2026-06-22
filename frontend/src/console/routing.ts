@@ -34,6 +34,11 @@ export function linkToConfig(): string {
   return "/config";
 }
 
+/** Build the href for the GLOBAL server settings page (EPIC SVR, not per-repo). */
+export function linkToSettings(): string {
+  return "/settings";
+}
+
 function encodePath(repoId: string): string {
   return repoId
     .split("/")

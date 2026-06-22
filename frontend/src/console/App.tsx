@@ -3,6 +3,7 @@ import AppShell from "./components/AppShell";
 import Config from "./pages/Config";
 import Repos from "./pages/Repos";
 import RepoRoute from "./pages/RepoRoute";
+import Settings from "./pages/Settings";
 
 // The base shell (AppShell) frames every view; routes render into it.
 //   /                        → Repos — the fleet overview (F-01)
@@ -12,6 +13,7 @@ import RepoRoute from "./pages/RepoRoute";
 //   /repos/:repoId/documents → documents & relationship view (W-01)
 //   /repos/:repoId/mapping   → editable document↔code mapping (EDITOR E-09)
 //   /config                  → config/cdmon/ format reference (W-02, GLOBAL)
+//   /settings                → server runtime settings (EPIC SVR, GLOBAL)
 // The feature wikis are NOW native Astro pages at `/wiki/*` (EPIC ASTRO) — reached
 // via a real link in AppShell, not a client route here (no more React Wiki page).
 // A repo id may contain a slash (org/name), which a `:param` can't capture, so a
@@ -23,6 +25,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Repos />} />
         <Route path="/config" element={<Config />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/repos/*" element={<RepoRoute />} />
       </Routes>
     </AppShell>

@@ -4,7 +4,14 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import ConnectionStatus from "./ConnectionStatus";
-import { BrandMark, DocIcon, ExternalIcon, FleetIcon, PulseIcon } from "./icons";
+import {
+  BrandMark,
+  DocIcon,
+  ExternalIcon,
+  FleetIcon,
+  GearIcon,
+  PulseIcon,
+} from "./icons";
 
 /** The API base, used to deep-link the server's own Swagger docs. Default "" =
  *  same-origin (single-port deploy), so the Swagger link resolves to `/docs`. */
@@ -22,6 +29,7 @@ function pageLabel(pathname: string): string {
   if (pathname.endsWith("/ownership")) return "Ownership";
   if (pathname.endsWith("/mapping")) return "Mapping";
   if (pathname === "/config") return "Config Format";
+  if (pathname === "/settings") return "Settings";
   if (pathname.startsWith("/repos")) return "Drift Timeline";
   return "Console";
 }
@@ -34,6 +42,7 @@ export function AppShell({ children }: AppShellProps) {
   const { pathname } = useLocation();
   const onFleet = pathname === "/" || pathname.startsWith("/repos");
   const onConfig = pathname === "/config";
+  const onSettings = pathname === "/settings";
   const root = apiBase().replace(/\/$/, "");
   const docsHref = `${root}/docs`;
   const openApiHref = `${root}/openapi.json`;
@@ -66,6 +75,14 @@ export function AppShell({ children }: AppShellProps) {
           >
             <DocIcon className="nav__icon" aria-hidden />
             Format
+          </Link>
+          <Link
+            to="/settings"
+            className={`nav__item${onSettings ? " nav__item--active" : ""}`}
+            aria-current={onSettings ? "page" : undefined}
+          >
+            <GearIcon className="nav__icon" aria-hidden />
+            Settings
           </Link>
         </nav>
 

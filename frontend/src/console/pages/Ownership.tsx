@@ -2,11 +2,12 @@ import { useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { apiClient } from "../api/client";
 import { useApi } from "../hooks/useApi";
-import type { OwnershipData } from "../types";
+import type { OwnershipData, StalenessData } from "../types";
 
 /** The slice of the API this page needs — fakeable in tests (no network). */
 export interface OwnershipApi {
   ownershipFor(repoId: string): Promise<OwnershipData>;
+  stalenessFor(repoId: string): Promise<StalenessData>;
 }
 
 export interface OwnershipProps {
@@ -28,12 +29,27 @@ function statusLabel(status: string): string {
   return status.replace(/_/g, " ");
 }
 
+/** Staleness status → signal dot + colour class (stale is a hard signal). */
+const SLA_DOT: Record<string, string> = {
+  fresh: "dot--sync",
+  stale: "dot--drift",
+  never_reviewed: "dot--review",
+};
+const SLA_STATUS: Record<string, string> = {
+  fresh: "status-documented",
+  stale: "status-undocumented",
+  never_reviewed: "status-waived",
+};
+
 export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProps) {
   const params = useParams();
   const repoId = repoIdProp ?? params.repoId ?? "";
 
   const loader = useCallback(() => api.ownershipFor(repoId), [api, repoId]);
   const state = useApi<OwnershipData>(loader, [loader]);
+
+  const slaLoader = useCallback(() => api.stalenessFor(repoId), [api, repoId]);
+  const slaState = useApi<StalenessData>(slaLoader, [slaLoader]);
 
   if (state.phase === "loading") {
     return (
@@ -146,6 +162,48 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
           })}
         </tbody>
       </table>
+
+      <h2>Review SLA</h2>
+      {slaState.phase === "loading" ? (
+        <p role="status">Loading review status…</p>
+      ) : slaState.phase === "error" ? (
+        <p role="alert" className="error">
+          Failed to load review status: {slaState.message}
+        </p>
+      ) : slaState.data.stale_count > 0 ? (
+        <>
+          <p role="status" className="error">
+            {slaState.data.stale_count} document
+            {slaState.data.stale_count === 1 ? "" : "s"} need a review — past the SLA
+            or never reviewed. The accountable owner should re-review (stamp{" "}
+            <code>reviewed</code> in <code>config/cdmon</code> or run{" "}
+            <code>cdmon staleness</code>).
+          </p>
+          <ul className="settings-secrets">
+            {slaState.data.findings
+              .filter((f) => f.status !== "fresh")
+              .map((f) => (
+                <li key={f.doc_id}>
+                  <span
+                    className={`file-status ${SLA_STATUS[f.status] ?? ""}`}
+                    title={f.detail}
+                  >
+                    <span
+                      className={`dot ${SLA_DOT[f.status] ?? "dot--sync"}`}
+                      aria-hidden="true"
+                    />
+                    {f.doc_id}: {statusLabel(f.status)}
+                  </span>
+                  <span className="sr-only">{f.detail}</span>
+                </li>
+              ))}
+          </ul>
+        </>
+      ) : (
+        <p className="coverage-summary">
+          Every document is within its review SLA.
+        </p>
+      )}
     </section>
   );
 }

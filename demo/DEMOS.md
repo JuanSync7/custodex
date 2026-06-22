@@ -1018,3 +1018,119 @@ clickable on first load, not an empty state.
 `orphan_dri_vacant`; `GET /repos/code-doc-monitor/ownership` returns `orphan_count: 0`.
 Pinned by `tests/system/test_demo_e2e.py::test_central_ownership_view_shows_departed_dri_orphan`.
 Features: FEAT-OWNERSHIP-009
+
+### DEMO-068 — Settings model defaults reproduce today's server behavior
+**What it shows.** `Settings()` with no file present is exactly the un-hardened
+server: host `0.0.0.0`, port `33333`, CORS off, TrustedHost off (`["*"]`), no rate
+limit, the `github.com`/`gitlab.com` git allowlist with `file://` allowed. The model
+is frozen + `extra="forbid"`, so a typo'd key or an out-of-range port is loud.
+**How to observe.** `Settings().server.port == 33333`; a bad key raises. Pinned by
+`tests/unit/test_settings.py`.
+Features: FEAT-SETTINGS-001
+
+### DEMO-069 — Loud settings loader
+**What it shows.** `load_settings(config/settings.yaml)` validates the file and turns
+any malformed input (bad suffix, unreadable, bad yaml, non-mapping, unknown key,
+out-of-range value) into a typed `ConfigError`; an empty file is the defaults.
+**How to observe.** `load_settings(config/settings.yaml) == Settings()` (the shipped
+file encodes the defaults). Pinned by `tests/unit/test_settings.py`.
+Features: FEAT-SETTINGS-002
+
+### DEMO-070 — Env overrides the file; secrets only ever report presence
+**What it shows.** `CDMON_SERVER_PORT=7007` (and the other `CDMON_*` knobs) override
+the file value (env wins); `secret_presence()` reports whether the admin token / DB
+url / KEK are set — never their values.
+**How to observe.** `cdmon settings` with `CDMON_SERVER_PORT=7007` prints
+`server.port: 7007`; with `CDMON_ADMIN_TOKEN` set prints `admin_token_configured: set`
+but never the token. Pinned by `tests/unit/test_settings.py` + `tests/system/test_settings_cli.py`.
+Features: FEAT-SETTINGS-003
+
+### DEMO-071 — Hardening middleware appears only when configured
+**What it shows.** With default settings the app installs NO CORS/TrustedHost/rate-limit
+middleware (identical to before); set `trusted_hosts` and a spoofed `Host` is a 400;
+list `cors.allow_origins` and a cross-origin preflight is answered; set
+`rate_limit.requests_per_minute` and requests past the cap get 429.
+**How to observe.** `GET /health` with a bad `Host` → 400 when `trusted_hosts` is set.
+Pinned by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-004
+
+### DEMO-072 — Git SSRF allowlist + clone timeout from settings
+**What it shows.** `server.git.extra_allowed_hosts` adds a self-hosted GHE/GitLab host
+to the clone/PR allowlist, `allow_file_scheme: false` forbids `file://` in a shared
+deployment, and `clone_timeout_seconds` makes a hung clone a loud `SyncError`.
+**How to observe.** `_check_remote_allowed("https://ghe.corp.io/x", git=...)` passes
+when listed; a clone that exceeds the timeout raises. Pinned by
+`tests/integration/test_server_settings.py` + `tests/integration/test_gitfetch.py`.
+Features: FEAT-SETTINGS-005
+
+### DEMO-073 — The central server binds from settings
+**What it shows.** `main()` reads host/port/log level from the resolved settings
+instead of the hardcoded `0.0.0.0:33333`, and the app version is single-sourced from
+the package metadata (it was duplicated).
+**How to observe.** The FastAPI `app.version` and the `/` landing `version` are the
+same single value. Pinned by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-006
+
+### DEMO-074 — Redacted GET /settings
+**What it shows.** `GET /settings` returns the effective non-secret settings plus the
+secret presence booleans — the payload the console Settings page renders — and never
+leaks a secret value even when the env secrets are set.
+**How to observe.** On the live demo, `GET /settings` returns `{settings, secrets}`
+with `secrets.admin_token_configured` a boolean and no token string anywhere. Pinned
+by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-007
+
+### DEMO-075 — cdmon settings shows the effective configuration
+**What it shows.** `cdmon settings` prints the resolved host/port + hardening knobs and
+the secret presence (never values); `--json` emits the same; a malformed file exits 1.
+**How to observe.** `cdmon settings --json` emits `{settings, secrets}`; a bad
+`--settings` file exits 1 with `error:`. Pinned by `tests/system/test_settings_cli.py`.
+Features: FEAT-SETTINGS-008
+
+### DEMO-076 — Pure staleness grading
+**What it shows.** `grade_doc`/`detect_stale` grade a document's `reviewed` date against
+an INJECTED `now` — never the wall clock — so the verdict is deterministic and testable.
+**How to observe.** `detect_stale([...], now="2026-06-22T00:00:00Z", default_days=90)`
+returns the same findings every run. Pinned by `tests/unit/test_staleness.py`.
+Features: FEAT-STALENESS-001
+
+### DEMO-077 — Fresh / stale / never-reviewed
+**What it shows.** A doc reviewed within its SLA is FRESH (omitted from the report), one
+reviewed longer ago is STALE (with the age in days), one with no `reviewed` stamp is
+NEVER_REVIEWED; findings are sorted by doc_id and a bad date is loud.
+**How to observe.** Three docs (reviewed 172 days ago / 2 days ago / never) → STALE +
+NEVER_REVIEWED, FRESH omitted. Pinned by `tests/unit/test_staleness.py`.
+Features: FEAT-STALENESS-002
+
+### DEMO-078 — Config-as-truth review stamp + audience-aware SLA
+**What it shows.** The document's `reviewed` date lives in config (the source of truth),
+and `staleness.audience_days` gives a `user-guide` a longer SLA than an `eng-guide` — the
+SAME old review date is fresh for one audience and stale for the other.
+**How to observe.** With `audience_days: {user-guide: 365}`, a user-guide reviewed 172
+days ago is FRESH while an eng-guide is STALE. Pinned by `tests/unit/test_staleness.py`.
+Features: FEAT-STALENESS-003
+
+### DEMO-079 — cdmon staleness CLI
+**What it shows.** `cdmon staleness --now <ISO>` lists the docs needing a review; `--json`
+shows all; `--fail-on-stale` turns it into a CI review gate (exit 1 on any stale/never).
+**How to observe.** `cdmon staleness --config <cfg> --now 2026-06-22T00:00:00Z` prints the
+stale/never docs; `--fail-on-stale` exits 1. Pinned by `tests/system/test_staleness_cli.py`.
+Features: FEAT-STALENESS-004
+
+### DEMO-080 — Reviewed + resolved SLA mirrored at sync
+**What it shows.** A sync projects each document's `reviewed` date plus the audience-resolved
+`sla_days` into the server mirror, so the server grades against the mirror without
+re-deriving the policy.
+**How to observe.** `_build_rows` over a config with `staleness.default_days: 30` +
+`audience_days: {user-guide: 365}` yields ConfigDocuments carrying `reviewed` + the resolved
+`sla_days`. Pinned by `tests/integration/test_configsync.py`.
+Features: FEAT-STALENESS-005
+
+### DEMO-081 — Read-time GET /staleness
+**What it shows.** `GET /repos/{id}/staleness` grades the synced docs against the app clock
+at read time (deduped, FRESH omitted unless `include_fresh`), so a doc goes stale on the
+next read with no re-sync.
+**How to observe.** With a fixed clock, `GET /repos/acme%2Fwidget/staleness` returns the
+stale + never-reviewed docs and a `stale_count`. Pinned by
+`tests/integration/test_staleness_server.py`.
+Features: FEAT-STALENESS-006

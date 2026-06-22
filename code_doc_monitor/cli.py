@@ -87,6 +87,13 @@ from .reviewlog import (
     summarize_with_resolutions,
 )
 from .schema import Resolution, ResolutionRecord, Verdict, review_record_schema
+from .settings import Settings, resolve_settings, secret_presence
+from .staleness import (
+    StalenessStatus,
+    detect_stale,
+    render_staleness_text,
+    reviewed_docs_from_config,
+)
 from .syncpr import should_sync, sync_pr
 from .templates_v2 import scaffold_config_dir
 from .traceability import TraceMatrix, build_matrix
@@ -1675,6 +1682,67 @@ def schema(
     typer.echo(text)
 
 
+def _settings_lines(resolved: Settings, presence: dict[str, bool]) -> list[str]:
+    """A deterministic human render of the resolved settings + secret presence (K10)."""
+    srv = resolved.server
+    rpm = srv.rate_limit.requests_per_minute
+    timeout = srv.git.clone_timeout_seconds
+    cors = ", ".join(srv.cors.allow_origins) or "(disabled)"
+    extra_hosts = ", ".join(srv.git.extra_allowed_hosts) or "(none)"
+    rpm_str = str(rpm) if rpm is not None else "(none)"
+    timeout_str = str(timeout) if timeout is not None else "(none)"
+    lines = [
+        f"settings version: {resolved.version}",
+        f"server.host: {srv.host}",
+        f"server.port: {srv.port}",
+        f"server.log_level: {srv.log_level}",
+        f"server.trusted_hosts: {', '.join(srv.trusted_hosts)}",
+        f"server.cors.allow_origins: {cors}",
+        f"server.rate_limit.requests_per_minute: {rpm_str}",
+        f"server.git.allowed_hosts: {', '.join(srv.git.allowed_hosts)}",
+        f"server.git.extra_allowed_hosts: {extra_hosts}",
+        f"server.git.allow_file_scheme: {srv.git.allow_file_scheme}",
+        f"server.git.clone_timeout_seconds: {timeout_str}",
+        "secrets (presence only — values never shown):",
+    ]
+    lines.extend(
+        f"  {key}: {'set' if presence[key] else 'unset'}" for key in sorted(presence)
+    )
+    return lines
+
+
+@app.command()
+def settings(
+    settings_path: Path = typer.Option(
+        Path("config/settings.yaml"),
+        "--settings",
+        help="Path to the operator settings YAML.",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the resolved settings + secret presence as JSON."
+    ),
+) -> None:
+    """Show the EFFECTIVE server settings: file → env → defaults (read-only, K1).
+
+    Resolves ``config/settings.yaml`` (if present) with env overrides applied and
+    prints the host/port + the CORS/TrustedHost/rate-limit/git hardening knobs,
+    plus whether each environment SECRET (admin token / database url / secret key) is
+    configured — never the secret value. Offline (K4): no backend, no network.
+    """
+    try:
+        resolved = resolve_settings(settings_path)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    presence = secret_presence()
+    if as_json:
+        payload = {"settings": resolved.model_dump(mode="json"), "secrets": presence}
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        for line in _settings_lines(resolved, presence):
+            typer.echo(line)
+
+
 @app.command()
 def ownership(
     config: Path = _CONFIG_OPTION,
@@ -1733,6 +1801,55 @@ def ownership(
     if fail_on_orphan and any(
         f.status
         in (OwnershipStatus.ORPHAN_OWNER_DEPARTED, OwnershipStatus.ORPHAN_DRI_VACANT)
+        for f in findings
+    ):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def staleness(
+    config: Path = _CONFIG_OPTION,
+    now: str | None = typer.Option(
+        None,
+        "--now",
+        help="ISO timestamp to grade freshness against (default: the current time).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit {findings} as JSON (includes fresh docs)."
+    ),
+    fail_on_stale: bool = typer.Option(
+        False,
+        "--fail-on-stale",
+        help="Exit 1 if any document is stale or never reviewed (a review gate).",
+    ),
+) -> None:
+    """Flag documents past their review SLA — time-based accountability (K1/K3/K4).
+
+    Config is the source of truth: each document's ``reviewed`` date is graded against
+    ``now`` and the (audience-aware) ``staleness`` SLA. The table shows only the docs
+    that need a review; ``--json`` shows all; ``--fail-on-stale`` makes it a CI gate.
+    Pure + offline (K4); no backend, no network.
+    """
+    try:
+        cfg, _config_dir = _load(config)
+        docs = reviewed_docs_from_config(cfg)
+        findings = detect_stale(
+            docs,
+            now=now or _now(),
+            default_days=cfg.staleness.default_days,
+            audience_days=cfg.staleness.audience_days,
+            include_fresh=as_json,
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    if as_json:
+        payload = {"findings": [f.model_dump(mode="json") for f in findings]}
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        typer.echo(render_staleness_text(findings))
+    if fail_on_stale and any(
+        f.status in (StalenessStatus.STALE, StalenessStatus.NEVER_REVIEWED)
         for f in findings
     ):
         raise typer.Exit(code=1)

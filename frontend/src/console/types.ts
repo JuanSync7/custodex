@@ -524,3 +524,71 @@ export interface OwnershipData {
   findings: OwnershipFinding[];
   orphan_count: number;
 }
+
+// ── EPIC SVR — operator runtime settings (GET /settings) ────────────────────
+// server: code_doc_monitor/settings.py::Settings (mirrored field-for-field).
+export interface CorsSettings {
+  allow_origins: string[];
+  allow_credentials: boolean;
+  allow_methods: string[];
+  allow_headers: string[];
+}
+
+export interface RateLimitSettings {
+  requests_per_minute: number | null;
+}
+
+export interface GitSettings {
+  allowed_hosts: string[];
+  extra_allowed_hosts: string[];
+  allow_file_scheme: boolean;
+  clone_timeout_seconds: number | null;
+}
+
+export interface ServerSettings {
+  host: string;
+  port: number;
+  log_level: string;
+  trusted_hosts: string[];
+  cors: CorsSettings;
+  rate_limit: RateLimitSettings;
+  git: GitSettings;
+}
+
+export interface Settings {
+  version: string;
+  server: ServerSettings;
+}
+
+// server: code_doc_monitor/settings.py::secret_presence — PRESENCE only, never values.
+export interface SecretPresence {
+  admin_token_configured: boolean;
+  database_url_set: boolean;
+  secret_key_set: boolean;
+}
+
+// server: GET /settings → {settings, secrets}.
+export interface SettingsData {
+  settings: Settings;
+  secrets: SecretPresence;
+}
+
+// ── EPIC SLA — review staleness (GET /repos/:id/staleness) ──────────────────
+// server: code_doc_monitor/staleness.py::StalenessFinding
+export interface StalenessFinding {
+  doc_id: string;
+  doc_path: string;
+  audience: string;
+  status: string; // "fresh" | "stale" | "never_reviewed"
+  reviewed: string | null;
+  sla_days: number;
+  age_days: number | null;
+  detail: string;
+}
+
+// server: GET /repos/:id/staleness → {findings, stale_count, now}
+export interface StalenessData {
+  findings: StalenessFinding[];
+  stale_count: number;
+  now: string;
+}
