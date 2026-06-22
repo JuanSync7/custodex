@@ -1018,3 +1018,71 @@ clickable on first load, not an empty state.
 `orphan_dri_vacant`; `GET /repos/code-doc-monitor/ownership` returns `orphan_count: 0`.
 Pinned by `tests/system/test_demo_e2e.py::test_central_ownership_view_shows_departed_dri_orphan`.
 Features: FEAT-OWNERSHIP-009
+
+### DEMO-068 — Settings model defaults reproduce today's server behavior
+**What it shows.** `Settings()` with no file present is exactly the un-hardened
+server: host `0.0.0.0`, port `33333`, CORS off, TrustedHost off (`["*"]`), no rate
+limit, the `github.com`/`gitlab.com` git allowlist with `file://` allowed. The model
+is frozen + `extra="forbid"`, so a typo'd key or an out-of-range port is loud.
+**How to observe.** `Settings().server.port == 33333`; a bad key raises. Pinned by
+`tests/unit/test_settings.py`.
+Features: FEAT-SETTINGS-001
+
+### DEMO-069 — Loud settings loader
+**What it shows.** `load_settings(config/settings.yaml)` validates the file and turns
+any malformed input (bad suffix, unreadable, bad yaml, non-mapping, unknown key,
+out-of-range value) into a typed `ConfigError`; an empty file is the defaults.
+**How to observe.** `load_settings(config/settings.yaml) == Settings()` (the shipped
+file encodes the defaults). Pinned by `tests/unit/test_settings.py`.
+Features: FEAT-SETTINGS-002
+
+### DEMO-070 — Env overrides the file; secrets only ever report presence
+**What it shows.** `CDMON_SERVER_PORT=7007` (and the other `CDMON_*` knobs) override
+the file value (env wins); `secret_presence()` reports whether the admin token / DB
+url / KEK are set — never their values.
+**How to observe.** `cdmon settings` with `CDMON_SERVER_PORT=7007` prints
+`server.port: 7007`; with `CDMON_ADMIN_TOKEN` set prints `admin_token_configured: set`
+but never the token. Pinned by `tests/unit/test_settings.py` + `tests/system/test_settings_cli.py`.
+Features: FEAT-SETTINGS-003
+
+### DEMO-071 — Hardening middleware appears only when configured
+**What it shows.** With default settings the app installs NO CORS/TrustedHost/rate-limit
+middleware (identical to before); set `trusted_hosts` and a spoofed `Host` is a 400;
+list `cors.allow_origins` and a cross-origin preflight is answered; set
+`rate_limit.requests_per_minute` and requests past the cap get 429.
+**How to observe.** `GET /health` with a bad `Host` → 400 when `trusted_hosts` is set.
+Pinned by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-004
+
+### DEMO-072 — Git SSRF allowlist + clone timeout from settings
+**What it shows.** `server.git.extra_allowed_hosts` adds a self-hosted GHE/GitLab host
+to the clone/PR allowlist, `allow_file_scheme: false` forbids `file://` in a shared
+deployment, and `clone_timeout_seconds` makes a hung clone a loud `SyncError`.
+**How to observe.** `_check_remote_allowed("https://ghe.corp.io/x", git=...)` passes
+when listed; a clone that exceeds the timeout raises. Pinned by
+`tests/integration/test_server_settings.py` + `tests/integration/test_gitfetch.py`.
+Features: FEAT-SETTINGS-005
+
+### DEMO-073 — The central server binds from settings
+**What it shows.** `main()` reads host/port/log level from the resolved settings
+instead of the hardcoded `0.0.0.0:33333`, and the app version is single-sourced from
+the package metadata (it was duplicated).
+**How to observe.** The FastAPI `app.version` and the `/` landing `version` are the
+same single value. Pinned by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-006
+
+### DEMO-074 — Redacted GET /settings
+**What it shows.** `GET /settings` returns the effective non-secret settings plus the
+secret presence booleans — the payload the console Settings page renders — and never
+leaks a secret value even when the env secrets are set.
+**How to observe.** On the live demo, `GET /settings` returns `{settings, secrets}`
+with `secrets.admin_token_configured` a boolean and no token string anywhere. Pinned
+by `tests/integration/test_server_settings.py`.
+Features: FEAT-SETTINGS-007
+
+### DEMO-075 — cdmon settings shows the effective configuration
+**What it shows.** `cdmon settings` prints the resolved host/port + hardening knobs and
+the secret presence (never values); `--json` emits the same; a malformed file exits 1.
+**How to observe.** `cdmon settings --json` emits `{settings, secrets}`; a bad
+`--settings` file exits 1 with `error:`. Pinned by `tests/system/test_settings_cli.py`.
+Features: FEAT-SETTINGS-008

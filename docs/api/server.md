@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d7760b7ff77bc65c
+  fingerprint: 6314d57e91ccc826
   fingerprint_tiers:
-    composite: d7760b7ff77bc65c
-    docstring: a1d3d84f35b25b71
-    signature: dead65ed2de28222
+    composite: 6314d57e91ccc826
+    docstring: 5842344ccc02cfc1
+    signature: 165c0c5b590ec882
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -22,6 +22,7 @@ cdm:
     - 0cacb8ca5eedea2a
     - 0d6e4079e36703eb
     - 0da26345c95767b0
+    - 1099d81b55f6c7f5
     - 1103be93877e8ee3
     - 11192a3ac2c801a0
     - 11c8b69ce1ef8fa5
@@ -118,8 +119,10 @@ cdm:
     - 99e2ad2b1f73cdf2
     - 9a3b73a7aaa6fb99
     - 9bac928da4b1f265
+    - 9ce1334603429194
     - 9db38499b75f5cf2
     - 9f0966e45edd0ca9
+    - 9ff072818b589840
     - a0660fe9e34e2695
     - a0926f0073c9c247
     - a2b2bac5098995ec
@@ -166,11 +169,12 @@ cdm:
     - f182307bbd168034
     - f2f3868ff1559642
     - f501838065644127
+    - f5b51ff22aee7020
     - f7e36c5633592985
     - f95e33eaf5a43c96
     - fa2f6597462ddabd
   region_hashes:
-    symbols: 065827139c5fbc7e
+    symbols: f4bf2c697ecd3081
   schema_version: 1.0.0
 ---
 # server
@@ -310,13 +314,17 @@ cdm:
 | _IGNORED_FILES_CAP | variable | _IGNORED_FILES_CAP = 200 |
 | _LOG | variable | _LOG = logging.getLogger('code_doc_monitor.server') |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |
+| _RateLimitMiddleware | class | class _RateLimitMiddleware(BaseHTTPMiddleware) |
+| _RateLimitMiddleware.__init__ | method | def __init__(self, app: Any, *, limit: int, now_epoch: Callable[[], int]) -> None |
+| _RateLimitMiddleware.dispatch | method | async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
-| _allowed_git_hosts | function | def _allowed_git_hosts() -> set[str] |
-| _check_remote_allowed | function | def _check_remote_allowed(remote_url: str) -> None |
+| _allowed_git_hosts | function | def _allowed_git_hosts(git: GitSettings \| None = None) -> set[str] |
+| _app_version | function | def _app_version() -> str |
+| _check_remote_allowed | function | def _check_remote_allowed(remote_url: str, *, git: GitSettings \| None = None) -> None |
 | _compute_health | function | def _compute_health(store: Store, repo_id: str) -> RepoHealth |
 | _compute_status | function | def _compute_status(store: Store, repo_id: str) -> RepoStatus |
 | _compute_telemetry | function | def _compute_telemetry(store: Store, repo_id: str) -> RepoTelemetry |
@@ -336,7 +344,7 @@ cdm:
 | build_standalone_app | function | def build_standalone_app(repo_root: Path, *, repo_id: str \| None = None, now: str) -> object |
 | build_standalone_store | function | def build_standalone_store(repo_root: Path, *, repo_id: str \| None = None, now: str) -> InMemoryStore |
 | create_all | function | def create_all(engine: Engine) -> None |
-| create_app | function | def create_app(store: Store \| None = None, *, static_dir: Path \| None = None, wiki_dir: Path \| None = None, clock: Callable[[], str] = _default_now, cloner: Any = None, pr_transport_factory: Callable[[str, str, str \| None], Any] \| None = None, token_exchange_http: Any = None, admin_token: str \| None = None) -> FastAPI |
+| create_app | function | def create_app(store: Store \| None = None, *, static_dir: Path \| None = None, wiki_dir: Path \| None = None, clock: Callable[[], str] = _default_now, cloner: Any = None, pr_transport_factory: Callable[[str, str, str \| None], Any] \| None = None, token_exchange_http: Any = None, admin_token: str \| None = None, settings: Settings \| None = None) -> FastAPI |
 | effective_identity | function | def effective_identity(payload: RegistrationPayload) -> RepoIdentity |
 | engine_from_url | function | def engine_from_url(url: str) -> Engine |
 | hash_token | function | def hash_token(token: str) -> str |

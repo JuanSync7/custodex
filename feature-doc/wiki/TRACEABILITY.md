@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdmon trace` (R-07 `cdmon wiki`) to regenerate.
 
-**208 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**216 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -214,6 +214,14 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-SERVER-017` | system/test_cli.py, system/test_example_external.py, unit/test_registry.py | DEMOS.md |
 | `FEAT-SERVER-018` | system/test_cli_sync.py | DEMOS.md |
 | `FEAT-SERVER-019` | integration/test_server.py | DEMOS.md |
+| `FEAT-SETTINGS-001` | unit/test_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-002` | unit/test_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-003` | unit/test_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-004` | integration/test_server_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-005` | integration/test_server_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-006` | integration/test_server_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-007` | integration/test_server_settings.py | DEMOS.md |
+| `FEAT-SETTINGS-008` | system/test_settings_cli.py | DEMOS.md |
 
 ## Gaps
 

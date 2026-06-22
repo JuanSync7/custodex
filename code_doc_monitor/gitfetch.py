@@ -127,7 +127,15 @@ class _GitCloner:
     (it reads ``$CDMON_GIT_TOKEN`` from the child env — never argv, never the URL)
     written into a private temp dir that is removed in a ``finally``. A non-zero
     exit is a loud :class:`SyncError` with the secret scrubbed from stderr.
+
+    ``timeout`` (EPIC SVR hardening, ``server.git.clone_timeout_seconds``) is a hard
+    wall-clock cap on the clone subprocess; ``None`` (the default) means no timeout
+    (the prior behavior). A timed-out clone is a loud :class:`SyncError`, not a hung
+    worker.
     """
+
+    def __init__(self, *, timeout: int | None = None) -> None:
+        self._timeout = timeout
 
     def clone(self, spec: RemoteSpec, secret: str | None, dest: Path) -> None:
         argv = ["git", *_build_clone_argv(spec, dest, secret=secret)]
@@ -143,9 +151,19 @@ class _GitCloner:
                 script.chmod(0o700)
                 env["GIT_ASKPASS"] = str(script)
                 env["CDMON_GIT_TOKEN"] = secret
-            result = subprocess.run(  # noqa: S603 (argv is fixed git verbs, no shell)
-                argv, capture_output=True, text=True, env=env
-            )
+            try:
+                result = subprocess.run(  # noqa: S603 (fixed git verbs, no shell)
+                    argv,
+                    capture_output=True,
+                    text=True,
+                    env=env,
+                    timeout=self._timeout,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise SyncError(
+                    f"git clone timed out after {self._timeout}s "
+                    "(server.git.clone_timeout_seconds)"
+                ) from exc
             if result.returncode != 0:
                 raise SyncError(
                     f"git clone failed (exit {result.returncode}): "
@@ -158,7 +176,11 @@ class _GitCloner:
 
 @contextmanager
 def cloned_repo(
-    spec: RemoteSpec, secret: str | None, *, cloner: _Cloner | None = None
+    spec: RemoteSpec,
+    secret: str | None,
+    *,
+    cloner: _Cloner | None = None,
+    clone_timeout: int | None = None,
 ) -> Iterator[Path]:
     """Clone ``spec`` into a throwaway temp tree and yield it; tear it down after.
 
@@ -167,8 +189,13 @@ def cloned_repo(
     mode. On exit (success OR exception) the entire temp dir is removed (K1), so
     the server's own filesystem is never left holding a clone. ``cloner`` is the
     injected network leaf (K4); production builds a :class:`_GitCloner`.
+    ``clone_timeout`` (EPIC SVR, ``server.git.clone_timeout_seconds``) caps the real
+    clone subprocess; ``None`` = no timeout (prior behavior). Ignored when a test
+    ``cloner`` is injected.
     """
-    active: _Cloner = cloner if cloner is not None else _GitCloner()
+    active: _Cloner = (
+        cloner if cloner is not None else _GitCloner(timeout=clone_timeout)
+    )
     tmp = Path(tempfile.mkdtemp(prefix="cdmon-fetch-"))
     dest = tmp / "repo"
     try:

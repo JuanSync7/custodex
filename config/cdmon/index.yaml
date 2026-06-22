@@ -68,6 +68,8 @@ coverage:
       reason: "EPIC R wiki regeneration; documented in feature-doc/, api doc owned by R-08 cdmon wiki"
     - path: "code_doc_monitor/ownership.py"
       reason: "EPIC OWN ownership/accountability core; documented in feature-doc/catalog/ownership.yaml (api doc owned by cdmon wiki)"
+    - path: "code_doc_monitor/settings.py"
+      reason: "EPIC SVR operator runtime settings core; documented in feature-doc/catalog/settings.yaml (api doc owned by cdmon wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 

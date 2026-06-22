@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: e24c45c87f20fff1
+  fingerprint: 37c3730c72873ecd
   fingerprint_tiers:
-    composite: e24c45c87f20fff1
-    docstring: 2bd6ddf66ee3d95e
-    signature: 07715e3688207ca5
+    composite: 37c3730c72873ecd
+    docstring: 262863ce0d8559c9
+    signature: 7e5ec966238959f3
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -56,11 +56,13 @@ cdm:
     - bb54068aea85faa7
     - c3a3091b9d32267d
     - ca8e9a370614b71a
+    - cde0fb0dec1400c5
     - d3a3ed1c7e737699
     - d42417752e8efd40
     - d734efde26c583c9
     - da966368ea663ea5
     - df0ad6e43880f09c
+    - df2a20195d34af2d
     - e31271f86c854de9
     - e62f7af7ce023782
     - eafe895eb8119e6e
@@ -69,7 +71,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: b8e102cf88369662
+    symbols: bd4db70f75922a56
   schema_version: 1.0.0
 ---
 # ops
@@ -109,6 +111,7 @@ cdm:
 | _region_mode_lines | function | def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str] |
 | _resolve_config | function | def _resolve_config(config: Path) -> tuple[MonitorConfig, Path] |
 | _run_uvicorn | function | def _run_uvicorn(app_obj: Any, *, host: str, port: int) -> None |
+| _settings_lines | function | def _settings_lines(resolved: Settings, presence: dict[str, bool]) -> list[str] |
 | _sync_run_lines | function | def _sync_run_lines(run: dict) -> list[str] |
 | _trace_lines | function | def _trace_lines(matrix: TraceMatrix) -> list[str] |
 | _unit_owner_map | function | def _unit_owner_map(config_dir: Path) -> dict[str, str] |
@@ -134,6 +137,7 @@ cdm:
 | run_checks | function | def run_checks(config: MonitorConfig, config_dir: Path) -> list[Check] |
 | schema | function | def schema(out: Path \| None = typer.Option(None, '--out', help='Write the schema to this file instead of stdout.')) -> None |
 | serve | function | def serve(host: str = typer.Option('127.0.0.1', '--host', help='Host/interface to bind the standalone server to.'), port: int = typer.Option(0, '--port', help='Port to bind (0 = let the OS pick a free port).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Repo id for the standalone view. Defaults to the bundle's index `repo` field (else the current directory name)."), no_open: bool = typer.Option(False, '--no-open', help='Do not open a browser tab (accepted for parity; never auto-opens).')) -> None |
+| settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
 | should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdmon should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
 | surface | function | def surface(config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help="Dump each document's surface as a JSON list.")) -> None |
 | surface_gaps | function | def surface_gaps(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the issue plan WITHOUT opening an issue (never builds a transport, so no provider env is required).'), provider: str = typer.Option('gitlab', '--provider', help='Issue tracker to open the coverage-gap issue on (gitlab \| github).')) -> None |

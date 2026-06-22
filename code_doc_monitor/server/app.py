@@ -28,9 +28,14 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from ..ownership import (
     EffectiveOwner,
@@ -42,6 +47,7 @@ from ..ownership import (
 from ..promotion import PromotionCandidate, detect_promotions
 from ..registry import RegistrationPayload
 from ..schema import Resolution, ResolutionRecord, ReviewRecord, Verdict
+from ..settings import GitSettings, Settings, resolve_settings, secret_presence
 from ..sinks import IngestEnvelope
 from ..templates_v2 import V2_TEMPLATES
 from .edits import ConfigEdit, StoredConfigEdit
@@ -78,6 +84,47 @@ __all__ = [
 _IGNORED_FILES_CAP = 200
 
 _LOG = logging.getLogger("code_doc_monitor.server")
+
+
+def _app_version() -> str:
+    """The package version (one source of truth — was hardcoded twice as "0.1.0")."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("code-doc-monitor")
+    except PackageNotFoundError:  # pragma: no cover - only when run from a non-install
+        return "0.1.0"
+
+
+class _RateLimitMiddleware(BaseHTTPMiddleware):
+    """A per-process, per-client fixed-window request cap (EPIC SVR hardening).
+
+    Enabled only when ``server.rate_limit.requests_per_minute`` is set. The window is
+    keyed by client host; ``now_epoch`` is injected (derived from the app clock) so the
+    limiter is deterministic under test (K10). NOT distributed: with N workers the
+    effective limit is N× — documented in DEPLOY.md.
+    """
+
+    def __init__(self, app: Any, *, limit: int, now_epoch: Callable[[], int]) -> None:
+        super().__init__(app)
+        self._limit = limit
+        self._now = now_epoch
+        self._hits: dict[str, tuple[int, int]] = {}  # client -> (window_start, count)
+
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Any]
+    ) -> Response:
+        client = request.client.host if request.client else "?"
+        window = self._now() // 60
+        start, count = self._hits.get(client, (window, 0))
+        if start != window:
+            start, count = window, 0
+        count += 1
+        self._hits[client] = (start, count)
+        if count > self._limit:
+            return JSONResponse({"detail": "rate limit exceeded"}, status_code=429)
+        return await call_next(request)
+
 
 # The EPIC-R wikis surfaced by `GET /wiki`, in deterministic display order
 # (features, traceability, tests, source). Each tuple is
@@ -684,42 +731,52 @@ def _disk_editable_parts(
     return undocumented, ignored, unit_files, doc_styles
 
 
-def _allowed_git_hosts() -> set[str]:
-    """The clone/PR host allowlist (SSRF guard, GIT-04).
+def _allowed_git_hosts(git: GitSettings | None = None) -> set[str]:
+    """The clone/PR host allowlist (SSRF guard, GIT-04 + EPIC SVR).
 
-    The two public providers plus any host in ``$CDMON_ALLOWED_GIT_HOSTS``
-    (comma-separated) for self-hosted GitHub Enterprise / GitLab. ENV-only — no
-    config/cdmon knob (that file is a coverage unit).
+    With ``git`` settings (EPIC SVR) the allowlist is ``allowed_hosts`` +
+    ``extra_allowed_hosts`` (``$CDMON_ALLOWED_GIT_HOSTS`` is already folded into the
+    latter by ``settings_from_env``). Without it (back-compat callers) it is the two
+    public providers plus ``$CDMON_ALLOWED_GIT_HOSTS`` read directly from the env.
     """
+    if git is not None:
+        return set(git.allowed_hosts) | set(git.extra_allowed_hosts)
     hosts = {"github.com", "gitlab.com"}
     extra = os.environ.get("CDMON_ALLOWED_GIT_HOSTS", "")
     return hosts | {h.strip() for h in extra.split(",") if h.strip()}
 
 
-def _check_remote_allowed(remote_url: str) -> None:
+def _check_remote_allowed(remote_url: str, *, git: GitSettings | None = None) -> None:
     """Reject a ``remote_url`` not on the https allowlist (nor a ``file://``) (K8).
 
     The server clones an ADOPTER-supplied URL, so it must not be coaxed into
     reaching an arbitrary internal host (SSRF). ``https`` is allowed only to a host
     on :func:`_allowed_git_hosts`; ``file://`` (a local path/mirror — no network
-    egress) is allowed; any other scheme/host is a loud 400.
+    egress) is allowed UNLESS ``git.allow_file_scheme`` is False (EPIC SVR — a
+    shared deployment may forbid it); any other scheme/host is a loud 400.
     """
     from urllib.parse import urlparse
 
     parsed = urlparse(remote_url)
     if parsed.scheme == "file":
+        if git is not None and not git.allow_file_scheme:
+            raise HTTPException(
+                status_code=400,
+                detail="file:// remote urls are disabled by server settings",
+            )
         return
     if parsed.scheme != "https":
         raise HTTPException(
             status_code=400,
             detail=f"remote_url must be https:// or file://, got {parsed.scheme or '?'}://",
         )
-    if parsed.hostname not in _allowed_git_hosts():
+    if parsed.hostname not in _allowed_git_hosts(git):
         raise HTTPException(
             status_code=400,
             detail=(
                 f"remote_url host {parsed.hostname!r} is not on the git host "
-                "allowlist (set $CDMON_ALLOWED_GIT_HOSTS for self-hosted providers)"
+                "allowlist (set server.git.extra_allowed_hosts / "
+                "$CDMON_ALLOWED_GIT_HOSTS for self-hosted providers)"
             ),
         )
 
@@ -768,6 +825,7 @@ def create_app(
     pr_transport_factory: Callable[[str, str, str | None], Any] | None = None,
     token_exchange_http: Any = None,
     admin_token: str | None = None,
+    settings: Settings | None = None,
 ) -> FastAPI:
     """Build the central FastAPI app over ``store`` (DI; defaults to in-memory).
 
@@ -801,9 +859,20 @@ def create_app(
     (GIT-05, PHASE 2) is the injected leaf the App/OAuth short-lived-token mint uses
     (:mod:`code_doc_monitor.gitauth`); default real, faked in tests so minting is
     offline.
+
+    ``settings`` (optional, EPIC SVR) are the operator runtime settings; ``None``
+    resolves them from ``config/settings.yaml`` + env + defaults. They drive the
+    CORS / TrustedHost / rate-limit middleware (each added only when configured, so
+    the default is byte-identical to the un-hardened app), the git SSRF allowlist,
+    and (via :func:`main`) the uvicorn host/port/log level.
     """
     resolved: Store = store if store is not None else InMemoryStore()
     resolved_wiki_dir: Path | None = wiki_dir if wiki_dir is not None else _wiki_dir()
+    # EPIC SVR: the operator runtime settings (host/port + the CORS/TrustedHost/
+    # rate-limit/git-allowlist hardening knobs). ``None`` ⇒ resolve from
+    # config/settings.yaml + env + defaults (defaults reproduce today's behavior).
+    app_settings: Settings = settings if settings is not None else resolve_settings()
+    srv = app_settings.server
     # EPIC OWN: the GLOBAL admin token gating cross-repo roster mutations. From the
     # param or $CDMON_ADMIN_TOKEN; held only as a sha256 hash (never plaintext). None
     # ⇒ the roster routes stay open (offline/dev), exactly like a token-less repo.
@@ -828,7 +897,28 @@ def create_app(
                 "repo, so an unauthenticated caller can poison ownership "
                 "server-wide. Set CDMON_ADMIN_TOKEN in any shared/prod deployment."
             )
-    app = FastAPI(title="code-doc-monitor central server", version="0.1.0")
+    app = FastAPI(title="code-doc-monitor central server", version=_app_version())
+
+    # EPIC SVR hardening middleware — each added ONLY when the operator configures it,
+    # so an un-tuned deployment is byte-identical to the pre-SVR app (back-compat).
+    # add_middleware applies LAST-added-outermost; the SPA catch-all mount (registered
+    # last, far below) is wrapped by all of these, so they guard the whole app.
+    if srv.cors.allow_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(srv.cors.allow_origins),
+            allow_credentials=srv.cors.allow_credentials,
+            allow_methods=list(srv.cors.allow_methods),
+            allow_headers=list(srv.cors.allow_headers),
+        )
+    if srv.rate_limit.requests_per_minute is not None:
+        app.add_middleware(
+            _RateLimitMiddleware,
+            limit=srv.rate_limit.requests_per_minute,
+            now_epoch=lambda: _iso_to_epoch(clock()),
+        )
+    if srv.trusted_hosts != ("*",):  # ["*"] is a no-op (accept any Host) — today
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(srv.trusted_hosts))
 
     spa_index: Path | None = None
     if static_dir is not None:
@@ -915,7 +1005,7 @@ def create_app(
             return FileResponse(str(spa_index))
         return {
             "service": "code-doc-monitor central server",
-            "version": "0.1.0",
+            "version": _app_version(),
             "docs": "/docs",
             "openapi": "/openapi.json",
             "endpoints": ["/health", "/repos", "/repos/{repo_id}/status"],
@@ -925,6 +1015,20 @@ def create_app(
     def health() -> dict[str, str]:
         """Unauthenticated liveness probe (200 ``{"status": "ok"}``) for ops/k8s."""
         return {"status": "ok"}
+
+    @app.get("/settings")
+    def server_settings() -> dict[str, object]:
+        """The effective operator runtime settings + secret PRESENCE (EPIC SVR).
+
+        GLOBAL + public read (the console Settings page renders it). SECRETS are
+        REDACTED: the model carries no secret values, and the env secrets
+        ($CDMON_ADMIN_TOKEN / $CDMON_DATABASE_URL / $CDMON_SECRET_KEY) are reported
+        only as presence booleans — never their values (K8). Deterministic (K10).
+        """
+        return {
+            "settings": app_settings.model_dump(mode="json"),
+            "secrets": secret_presence(),
+        }
 
     @app.get("/config/templates")
     def config_templates() -> dict[str, str]:
@@ -1231,7 +1335,7 @@ def create_app(
                 # Fetch it read-only into a throwaway tree (K1) and sync that. The
                 # token is the opened PAT (PHASE 1) or a freshly minted short-lived
                 # App/OAuth token (PHASE 2) — both resolved the same way.
-                _check_remote_allowed(remote_url)
+                _check_remote_allowed(remote_url, git=srv.git)
                 from ..gitfetch import RemoteSpec, cloned_repo
 
                 token = _resolve_provider_token(
@@ -1242,7 +1346,12 @@ def create_app(
                     provider=provider,
                     default_branch=default_branch,
                 )
-                with cloned_repo(spec, token, cloner=cloner) as tree:
+                with cloned_repo(
+                    spec,
+                    token,
+                    cloner=cloner,
+                    clone_timeout=srv.git.clone_timeout_seconds,
+                ) as tree:
                     result = run_sync(
                         tree,
                         repo_id,
@@ -1318,7 +1427,7 @@ def create_app(
                     "open a docs PR (re-register it with a github/gitlab remote_url)"
                 ),
             )
-        _check_remote_allowed(remote_url)
+        _check_remote_allowed(remote_url, git=srv.git)
         default_branch = repo.default_branch or repo.repo.default_branch or "main"
         from ..config import load_bundle
         from ..errors import SecretError, SyncError, TransportError
@@ -1343,7 +1452,9 @@ def create_app(
             remote_url=remote_url, provider=provider, default_branch=default_branch
         )
         try:
-            with cloned_repo(spec, token, cloner=cloner) as tree:
+            with cloned_repo(
+                spec, token, cloner=cloner, clone_timeout=srv.git.clone_timeout_seconds
+            ) as tree:
                 bundle = load_bundle(tree.joinpath("config", "cdmon"))
                 monitor = Monitor(
                     bundle.config, tree / "config" / "cdmon", now=lambda: stamp
@@ -1779,10 +1890,18 @@ def store_from_env() -> Store:
 def main() -> None:  # pragma: no cover - the real uvicorn launch leaf (K4)
     import uvicorn
 
+    # EPIC SVR: bind host/port/log level come from the resolved settings
+    # (config/settings.yaml + env), not hardcoded; defaults are 0.0.0.0:33333/info.
+    app_settings = resolve_settings()
     uvicorn.run(
-        create_app(store_from_env(), static_dir=_default_static_dir()),
-        host="0.0.0.0",
-        port=33333,
+        create_app(
+            store_from_env(),
+            static_dir=_default_static_dir(),
+            settings=app_settings,
+        ),
+        host=app_settings.server.host,
+        port=app_settings.server.port,
+        log_level=app_settings.server.log_level,
     )
 
 

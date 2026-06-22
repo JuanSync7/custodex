@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**208 features** across 20 subsystems.
+**216 features** across 21 subsystems.
 
 ## agent
 
@@ -1143,3 +1143,48 @@ sync_repo_remote POSTs {mode} to <url>/repos/{repo_id}/sync through an injected 
 ### `FEAT-SERVER-019` — Feature-wiki endpoint
 
 GET /wiki serves the committed EPIC-R wikis — the Feature Reference, Traceability Matrix, Test Wiki and Source Wiki — rendered to HTML via the engine's OWN dependency-free render_markdown (no new dep), as {"sections":[{"id","title","html"}...]} in the deterministic WIKI_SECTIONS order; it is GLOBAL and public (no auth, like /config/templates), a missing section file is omitted, and an absent feature-doc/ degrades to an empty payload rather than crashing.
+
+## settings
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-SETTINGS-001` | Frozen versioned settings model | settings | K0, K6, K8, K10 | — | — | implemented |
+| `FEAT-SETTINGS-002` | Loud settings YAML loader | settings | K8, K10 | — | — | implemented |
+| `FEAT-SETTINGS-003` | Env overlay + precedence + secret presence | settings | K8, K10 | — | — | implemented |
+| `FEAT-SETTINGS-004` | Hardening middleware wired from settings | server | K4, K8, K10 | — | — | implemented |
+| `FEAT-SETTINGS-005` | Git SSRF allowlist + clone timeout from settings | server, gitfetch | K8 | — | — | implemented |
+| `FEAT-SETTINGS-006` | Settings-driven uvicorn launch | server | K6, K10 | — | — | implemented |
+| `FEAT-SETTINGS-007` | Redacted GET /settings endpoint | server | K8, K10 | — | — | implemented |
+| `FEAT-SETTINGS-008` | cdmon settings CLI | cli | K1, K4, K8 | — | — | implemented |
+
+### `FEAT-SETTINGS-001` — Frozen versioned settings model
+
+settings.Settings/ServerSettings (+ nested CorsSettings/RateLimitSettings/ GitSettings) is a frozen, extra="forbid" pydantic model whose every field defaults to today's server behavior (host 0.0.0.0, port 33333, CORS off, TrustedHost off via ["*"], no rate limit, the github.com/gitlab.com git allowlist + file:// allowed), so an absent settings.yaml is a no-op (back-compat, K6). Pure core (pydantic + pyyaml only, K0); a port out of range or a non-positive rate-limit/timeout is a loud validation error.
+
+### `FEAT-SETTINGS-002` — Loud settings YAML loader
+
+settings.load_settings reads config/settings.yaml and validates it, wrapping every failure (bad suffix, unreadable file, malformed yaml, non-mapping top level, unknown key, out-of-range value) in a typed ConfigError (K8). An empty file resolves to the built-in defaults. Deterministic (K10).
+
+### `FEAT-SETTINGS-003` — Env overlay + precedence + secret presence
+
+settings.settings_from_env overlays CDMON_SERVER_* / CDMON_TRUSTED_HOSTS / CDMON_CORS_ORIGINS / CDMON_RATE_LIMIT_RPM / CDMON_ALLOWED_GIT_HOSTS / CDMON_GIT_CLONE_TIMEOUT onto a loaded Settings (env WINS over the file, with an injectable env for tests); resolve_settings layers file → env → defaults. secret_presence reports ONLY whether $CDMON_ADMIN_TOKEN / $CDMON_DATABASE_URL / $CDMON_SECRET_KEY are set — never their values (K8). A bad env value is loud.
+
+### `FEAT-SETTINGS-004` — Hardening middleware wired from settings
+
+create_app installs CORS, TrustedHost and a per-process rate-limit middleware, each ONLY when the operator configures it (origins listed / hosts restricted / a request cap set), so the default app is byte-identical to the pre-SVR server (back-compat). TrustedHost rejects a spoofed Host (400); CORS answers a configured cross-origin preflight; the rate limiter returns 429 past the cap (clock-injected, deterministic; per-worker — documented in DEPLOY.md).
+
+### `FEAT-SETTINGS-005` — Git SSRF allowlist + clone timeout from settings
+
+The clone-on-demand / docs-PR SSRF guard (_allowed_git_hosts / _check_remote_allowed) is driven by server.git (allowed_hosts + extra_allowed_hosts, and allow_file_scheme can forbid file:// in a shared deployment), and server.git.clone_timeout_seconds threads to the clone subprocess so a hung clone is a loud SyncError instead of a stuck worker. Defaults preserve today's behavior.
+
+### `FEAT-SETTINGS-006` — Settings-driven uvicorn launch
+
+The central server main() binds host/port and sets the uvicorn log level from the resolved settings (config/settings.yaml + env) instead of the hardcoded 0.0.0.0:33333, and the FastAPI app version is single-sourced from the package metadata (it was duplicated as "0.1.0" in two places).
+
+### `FEAT-SETTINGS-007` — Redacted GET /settings endpoint
+
+GET /settings is an OPEN read returning the effective non-secret settings plus the secret PRESENCE booleans (never the secret values, K8) — the payload the console Settings page renders. Defined before the SPA catch-all mount.
+
+### `FEAT-SETTINGS-008` — cdmon settings CLI
+
+The read-only `cdmon settings [--settings PATH] [--json]` command resolves the effective settings (file → env → defaults) and prints the host/port + hardening knobs and the secret presence, never a secret value; a malformed file is a loud ConfigError → exit 1. Offline, no backend (K1/K4).

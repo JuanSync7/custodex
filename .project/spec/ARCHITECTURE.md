@@ -2751,3 +2751,67 @@ roster + mirror + migration 0006 + admin token + routes (store parity, `pg` twin
 **OWN-05** `ReassignOwnerEdit` reassignment · **OWN-06** demo seeding + Ownership page
 + e2e. Each: TDD red-first, full gate green (ruff+mypy+pytest ≥90% branch + dogfood
 reheal + `cdmon trace`/`wiki --check` + `astro check`), STATUS row + LESSON.
+
+## EPIC SVR — central-server hardening + operator settings
+
+Extract every hardcoded RUNTIME tunable into one versioned file, wire the missing
+hardening middleware from it, and expose it read-only in the CLI + console. Secrets
+stay in the environment; the file holds only non-secret knobs (their PRESENCE is the
+only thing ever surfaced). Every default reproduces today's behavior (back-compat, K6).
+
+**Core model — `code_doc_monitor/settings.py` (pydantic + pyyaml only ⇒ CORE, K0).**
+```python
+_MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+DEFAULT_SETTINGS_PATH = Path("config/settings.yaml")
+
+class CorsSettings(BaseModel):        # empty allow_origins ⇒ CORS middleware OFF (today)
+    allow_origins: tuple[str,...] = (); allow_credentials: bool = False
+    allow_methods: tuple[str,...] = ("*",); allow_headers: tuple[str,...] = ("*",)
+class RateLimitSettings(BaseModel):   # None ⇒ no limit (today); per-process fixed window
+    requests_per_minute: int | None = None
+class GitSettings(BaseModel):         # the SSRF allowlist + clone hardening
+    allowed_hosts: tuple[str,...] = ("github.com","gitlab.com")
+    extra_allowed_hosts: tuple[str,...] = ()   # $CDMON_ALLOWED_GIT_HOSTS overlays here
+    allow_file_scheme: bool = True; clone_timeout_seconds: int | None = None
+class ServerSettings(BaseModel):
+    host: str = "0.0.0.0"; port: int = 33333; log_level: str = "info"
+    trusted_hosts: tuple[str,...] = ("*",)     # ["*"] ⇒ TrustedHost OFF (today)
+    cors: CorsSettings = ...; rate_limit: RateLimitSettings = ...; git: GitSettings = ...
+class Settings(BaseModel):
+    version: str = "1.0.0"; server: ServerSettings = ...
+
+def load_settings(path: Path) -> Settings: ...        # loud ConfigError (K8), yaml-only
+def settings_from_env(base, env=None) -> Settings: ...  # env wins; injectable env (K10)
+def resolve_settings(path=DEFAULT_SETTINGS_PATH, env=None) -> Settings: ...  # file→env→default
+def secret_presence(env=None) -> dict[str,bool]: ...  # admin_token_configured/database_url_set/secret_key_set
+```
+Precedence: **CLI flag > env (`CDMON_SERVER_*`, `CDMON_TRUSTED_HOSTS`, `CDMON_CORS_ORIGINS`,
+`CDMON_RATE_LIMIT_RPM`, `CDMON_ALLOWED_GIT_HOSTS`, `CDMON_GIT_CLONE_TIMEOUT`) > file > default.**
+Secrets (`CDMON_ADMIN_TOKEN`/`CDMON_DATABASE_URL`/`CDMON_SECRET_KEY`) are NOT modelled — the
+server resolves them directly; only presence is reported (K8 no-leak).
+
+**Server wiring (`server/app.py`).** `create_app(..., settings: Settings | None = None)`
+(resolve via `resolve_settings()` when None); right after `app = FastAPI(...)` add
+`CORSMiddleware` (only if `cors.allow_origins`), `TrustedHostMiddleware` (allowed_hosts =
+`trusted_hosts`), and a dependency-free per-process fixed-window rate-limit middleware (only
+if `rate_limit.requests_per_minute`; clock-injected, K10; per-worker caveat documented). `git.*`
+feeds `_check_remote_allowed`; `clone_timeout_seconds` threads to `gitfetch` `subprocess.run(timeout=)`.
+New OPEN read `GET /settings` → `{settings: <Settings dump>, secrets: <presence>}` (defined BEFORE
+the SPA catch-all mount). `main()` + `cdmon serve` read host/port/log_level from settings (CLI
+`--host/--port` still win). App version de-duped via `importlib.metadata`.
+
+**CLI — `cdmon settings [--settings PATH] [--json]`** (read-only, K1/K4): prints the effective
+resolved settings + secret presence; loud ConfigError → exit 1. Mirrors `schema`/`ownership`.
+
+**Frontend — global Settings page** (mirrors `/config`, NOT per-repo): `pages/Settings.tsx`,
+`GET /settings` via `apiClient.serverSettings()`, `ServerSettings` type, a `GearIcon` + a
+"Settings" entry in `AppShell` Console nav, `/settings` route in `App.tsx`. `astro check`/vitest.
+
+**Deploy — `Dockerfile` (node build stage → frontend/dist; python slim + `[server]` extra; CMD
+`cdmon-server`), `.dockerignore`, `docker-compose.yml` (server + postgres, `CDMON_DATABASE_URL`),
+`DEPLOY.md` runbook** (TLS/reverse-proxy, the settings knobs, the rate-limit per-worker caveat).
+
+**Slices:** **SVR-00** pin (this) · **SVR-01** `settings.py` + `config/settings.yaml` + loader/env ·
+**SVR-02** middleware + host/port/log_level + git timeout/allowlist wiring · **SVR-03** `GET /settings`
++ `cdmon settings` · **SVR-04** console Settings page · **SVR-05** Docker/compose/DEPLOY · **SVR-06**
+demo + final gate. New `settings` catalog subsystem grown in lockstep; each slice TDD + full gate green.

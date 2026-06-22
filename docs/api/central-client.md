@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 85b1d6f795c648dc
+  fingerprint: 401952f0b9412214
   fingerprint_tiers:
-    composite: 85b1d6f795c648dc
-    docstring: 410fa9c1e4a3f85b
-    signature: 485ed02d9070757b
+    composite: 401952f0b9412214
+    docstring: c138c248649408f2
+    signature: ea71974665dc46ea
   region_anchors:
     symbols:
     - 051af376199dec21
@@ -18,6 +18,7 @@ cdm:
     - 0a12e5898c92bfc6
     - 0a12e5898c92bfc6
     - 0a4b2d8421fb3e6f
+    - 0cf76e8b50602fd2
     - 0e93a13c25171bb5
     - 16678eb7552b38fc
     - 1b639558d1e54904
@@ -75,7 +76,7 @@ cdm:
     - f43f8cb24a1add81
     - f90c11e7613a8c7a
   region_hashes:
-    symbols: 8e9882d8e961ecfe
+    symbols: 29e4ce8a48fab63f
   schema_version: 1.0.0
 ---
 # central-client
@@ -110,6 +111,7 @@ cdm:
 | _Cloner.clone | method | def clone(self, spec: RemoteSpec, secret: str \| None, dest: Path) -> None |
 | _ENV_VAR | variable | _ENV_VAR = 'CDMON_SECRET_KEY' |
 | _GitCloner | class | class _GitCloner |
+| _GitCloner.__init__ | method | def __init__(self, *, timeout: int \| None = None) -> None |
 | _GitCloner.clone | method | def clone(self, spec: RemoteSpec, secret: str \| None, dest: Path) -> None |
 | _GitRunner | variable | _GitRunner = Callable[[list[str], Path], str] |
 | _JWT_BACKDATE_SECONDS | variable | _JWT_BACKDATE_SECONDS = 60 |
@@ -144,7 +146,7 @@ cdm:
 | _git_info | function | def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> GitInfo |
 | _open_repo | function | def _open_repo(local_path: Path, *, mode: str, branch: str, run_git: _GitRunner) -> Iterator[tuple[object, Path, GitInfo]] |
 | _scrub | function | def _scrub(text: str, secret: str \| None) -> str |
-| cloned_repo | function | def cloned_repo(spec: RemoteSpec, secret: str \| None, *, cloner: _Cloner \| None = None) -> Iterator[Path] |
+| cloned_repo | function | def cloned_repo(spec: RemoteSpec, secret: str \| None, *, cloner: _Cloner \| None = None, clone_timeout: int \| None = None) -> Iterator[Path] |
 | github_app_jwt | function | def github_app_jwt(app_id: str, private_key_pem: str, *, now: int) -> str |
 | mint_github_installation_token | function | def mint_github_installation_token(app_id: str, private_key_pem: str, installation_id: str, *, now: int, http: _TokenExchangeHttp \| None = None, api_url: str = 'https://api.github.com') -> str |
 | mint_gitlab_oauth_token | function | def mint_gitlab_oauth_token(token_url: str, *, client_id: str, client_secret: str, refresh_token: str, http: _TokenExchangeHttp \| None = None) -> str |
