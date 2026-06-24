@@ -2284,3 +2284,41 @@ details.mapping-ignored[open] > summary::before {
   padding: 1.2rem;
   overflow-y: auto;
 }
+
+/* ── Showcase demo ribbon (juansync.dev) ─────────────────────────────────────
+   A small fixed pill over the live console demo, marking it as sample data so a
+   visitor never mistakes the baked dataset for a real deployment. */
+.demo-ribbon {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.16);
+}
+.demo-ribbon a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.demo-ribbon a:hover {
+  text-decoration: underline;
+}
+.demo-ribbon__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--review);
+  box-shadow: 0 0 0 3px var(--review-tint);
+  flex: none;
+}

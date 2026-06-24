@@ -1,25 +1,33 @@
 ---
 // Static replica of the console's AppShell chrome (the left side NAV BAR), for
-// the native-Astro pages (the wiki) so they share the SAME navigation as the
-// main console. Reuses the console's own CSS classes (imported below), so it is
-// pixel-identical; nav items are REAL links (the console is a separate SPA,
-// reached via `/` and `/#/...`). The live connection pill is the one React island.
+// the native-Astro pages (the wiki + tutorial) so they share the SAME navigation
+// as the main console. Reuses the console's own CSS classes (imported below), so
+// it is pixel-identical; nav items are REAL links.
+//
+// Two modes, chosen at BUILD time:
+//  • default: the live-console nav (Fleet / Format / Wiki / API Docs / OpenAPI)
+//    plus the live connection pill — the chrome around the FastAPI-served site.
+//  • showcase (PUBLIC_SHOWCASE=true, the static juansync.dev Pages site): a nav
+//    with no backend-only links — Home / Live demo / Wiki / Tutorial / GitHub —
+//    and no connection pill (there is no server to connect to).
 import "../console/index.css";
 import ConnectionStatus from "../console/components/ConnectionStatus.tsx";
 
 interface Props {
   /** Which rail item is active on this page. */
-  active?: "fleet" | "wiki";
+  active?: "fleet" | "wiki" | "home" | "demo" | "tutorial";
   /** The page label (names the main landmark). */
   crumb: string;
 }
 const { active, crumb } = Astro.props;
+const showcase = import.meta.env.PUBLIC_SHOWCASE === "true";
 const item = (on: boolean) => `nav__item${on ? " nav__item--active" : ""}`;
+const REPO = "https://github.com/JuanSync7/custodex";
 ---
 
 <div class="app">
   <aside class="rail">
-    <a class="brand" href="/" aria-label="Custodex console">
+    <a class="brand" href="/" aria-label="Custodex">
       <svg class="brand__mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <rect x="1" y="1" width="30" height="30" rx="7" stroke="var(--accent)" stroke-opacity="0.4" stroke-width="1.4"></rect>
         <path d="M7 11c5 0 5 4 9 4M7 21c5 0 5-4 9-4" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"></path>
@@ -32,59 +40,118 @@ const item = (on: boolean) => `nav__item${on ? " nav__item--active" : ""}`;
       </span>
     </a>
 
-    <div class="rail__label">Console</div>
-    <nav class="nav" aria-label="primary">
-      <a class={item(active === "fleet")} href="/">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 3 3 7.5 12 12l9-4.5L12 3Z"></path><path d="M3 12l9 4.5L21 12"></path><path d="M3 16.5 12 21l9-4.5"></path>
-        </svg>
-        Fleet
-      </a>
-      <a class="nav__item" href="/#/config">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
-        </svg>
-        Format
-      </a>
-    </nav>
+    {
+      showcase ? (
+        <Fragment>
+          <div class="rail__label">Custodex</div>
+          <nav class="nav" aria-label="primary">
+            <a class={item(active === "home")} href="/">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" />
+              </svg>
+              Home
+            </a>
+            <a class={item(active === "demo")} href="/demo">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 3.5v17l13-8.5Z" />
+              </svg>
+              Live demo
+            </a>
+          </nav>
 
-    <div class="rail__label">Reference</div>
-    <nav class="nav" aria-label="reference">
-      <a class={item(active === "wiki")} href="/wiki/features">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
-        </svg>
-        Wiki
-      </a>
-      <a class="nav__item" href="/docs" target="_blank" rel="noreferrer">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"></path><path d="M14 3v5h5"></path><path d="m9 14 2 2 3-4"></path>
-        </svg>
-        API Docs
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
-          <path d="M14 4h6v6"></path><path d="M20 4 11 13"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path>
-        </svg>
-      </a>
-      <a class="nav__item" href="/openapi.json" target="_blank" rel="noreferrer">
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M3 12h4l2-6 4 12 2-6h6"></path>
-        </svg>
-        OpenAPI
-        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
-          <path d="M14 4h6v6"></path><path d="M20 4 11 13"></path><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"></path>
-        </svg>
-      </a>
-    </nav>
+          <div class="rail__label">Learn</div>
+          <nav class="nav" aria-label="reference">
+            <a class={item(active === "wiki")} href="/wiki/features">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
+              </svg>
+              Wiki
+            </a>
+            <a class={item(active === "tutorial")} href="/tutorial">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 6.5C10.5 5 8 4.5 4 5v13c4-.5 6.5 0 8 1.5 1.5-1.5 4-2 8-1.5V5c-4-.5-6.5 0-8 1.5Z" /><path d="M12 6.5V20" />
+              </svg>
+              Tutorial
+            </a>
+          </nav>
 
-    <div class="rail__spacer"></div>
+          <div class="rail__spacer"></div>
 
-    <div class="rail__label">Central server</div>
-    <ConnectionStatus client:load />
+          <nav class="nav" aria-label="external">
+            <a class="nav__item" href={REPO} target="_blank" rel="noreferrer">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.1-1.47-1.1-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+              </svg>
+              GitHub
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
+                <path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+              </svg>
+            </a>
+          </nav>
 
-    <div class="rail__foot">
-      <span>v0.1.0</span>
-      <span>FastAPI · E-06</span>
-    </div>
+          <div class="rail__foot">
+            <span>Custodex · cdx</span>
+            <span>sample data</span>
+          </div>
+        </Fragment>
+      ) : (
+        <Fragment>
+          <div class="rail__label">Console</div>
+          <nav class="nav" aria-label="primary">
+            <a class={item(active === "fleet")} href="/">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 3 3 7.5 12 12l9-4.5L12 3Z" /><path d="M3 12l9 4.5L21 12" /><path d="M3 16.5 12 21l9-4.5" />
+              </svg>
+              Fleet
+            </a>
+            <a class="nav__item" href="/#/config">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
+              </svg>
+              Format
+            </a>
+          </nav>
+
+          <div class="rail__label">Reference</div>
+          <nav class="nav" aria-label="reference">
+            <a class={item(active === "wiki")} href="/wiki/features">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
+              </svg>
+              Wiki
+            </a>
+            <a class="nav__item" href="/docs" target="_blank" rel="noreferrer">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
+              </svg>
+              API Docs
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
+                <path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+              </svg>
+            </a>
+            <a class="nav__item" href="/openapi.json" target="_blank" rel="noreferrer">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12h4l2-6 4 12 2-6h6" />
+              </svg>
+              OpenAPI
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left:auto;width:13px;height:13px">
+                <path d="M14 4h6v6" /><path d="M20 4 11 13" /><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+              </svg>
+            </a>
+          </nav>
+
+          <div class="rail__spacer"></div>
+
+          <div class="rail__label">Central server</div>
+          <ConnectionStatus client:load />
+
+          <div class="rail__foot">
+            <span>v0.1.0</span>
+            <span>FastAPI · E-06</span>
+          </div>
+        </Fragment>
+      )
+    }
   </aside>
 
   <main class="canvas" aria-label={crumb}>

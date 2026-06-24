@@ -15,6 +15,10 @@ cdm:
 > or escalates** it, recording every verdict for human review. This README is
 > itself monitored by `cdx` against the CLI surface it documents.
 
+**Live demo & docs:** [custodex.juansync.dev](https://custodex.juansync.dev) — a
+clickable demo of the console (on sample data), the feature wiki, and a
+getting-started tutorial. No install required.
+
 A **standardized, reusable** system that keeps documentation in sync with the
 code (and other docs) it describes — and, when it drifts, asks an LLM to **fix or
 invalidate** the drift while logging every decision for human review. Custodex is

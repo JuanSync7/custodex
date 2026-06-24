@@ -1,0 +1,102 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ConsoleChrome from "../components/ConsoleChrome.astro";
+
+// Static getting-started tutorial for the showcase (juansync.dev). Reuses the
+// wiki `.prose` typography inside the showcase chrome (active="tutorial").
+---
+
+<Layout title="Custodex — tutorial">
+  <ConsoleChrome active="tutorial" crumb="Tutorial · Getting started">
+    <article class="prose">
+      <h1>Getting started with Custodex</h1>
+      <p>
+        Custodex (<code>cdx</code>) keeps your documentation honest against the code
+        it describes — and keeps a named human accountable for every doc. This walks
+        through adopting it on your own repo. Everything here is offline; no LLM or
+        network is needed for the detection gates.
+      </p>
+
+      <h2>1 · Install</h2>
+      <pre><code>pip install custodex</code></pre>
+      <p>
+        That gives you the <code>cdx</code> CLI. (<code>cdmon</code> still works as a
+        deprecated alias if you adopted it under the old name.)
+      </p>
+
+      <h2>2 · Describe your repo</h2>
+      <p>
+        Scaffold the config — a <code>config/cdmon/</code> directory that maps groups
+        of code files (down to functions or line ranges) onto <strong>logical
+        documents</strong>, each tagged with an <strong>audience</strong>:
+      </p>
+      <pre><code>cdx init --v2</code></pre>
+      <p>
+        A <code>user-guide</code> only cares about the externally-visible surface
+        (comment-only or private changes are <em>invalidated</em>, not drift); an
+        <code>eng-guide</code> cares about the implementation too. Audience is what
+        makes a verdict trustworthy.
+      </p>
+
+      <h2>3 · Detect drift</h2>
+      <pre><code>cdx check</code></pre>
+      <p>
+        Pure and read-only — it exits non-zero when a doc has drifted from its code
+        surface (or from another doc). This is the gate you run in CI on every change.
+      </p>
+
+      <h2>4 · Heal it</h2>
+      <pre><code>cdx monitor --apply</code></pre>
+      <p>
+        On real drift, Custodex asks the configured backend to <strong>fix</strong> or
+        <strong>invalidate</strong> the doc, applies safe fixes idempotently, and
+        records every verdict — the original drift <em>and</em> the proposed fix — as
+        an auditable <code>ReviewRecord</code>. Auto-apply is opt-in; a human stays in
+        the loop.
+      </p>
+
+      <h2>5 · Add owners &amp; review SLAs</h2>
+      <p>
+        Peg a team and a DRI to each doc in the config, plus a last-reviewed date.
+        Then ask Custodex who's accountable — and what's overdue:
+      </p>
+      <pre><code>cdx ownership   # owners, and any orphaned docs (a departed DRI)
+cdx staleness   # docs past their audience-scoped review SLA</code></pre>
+
+      <h2>6 · Wire it into CI</h2>
+      <p>
+        Drop in the adopter templates (GitLab or GitHub). They run an offline
+        <code>cdx-gate</code> (doctor → check → lint) on every change, and a
+        default-branch <code>cdx-docs-pr</code> job that heals the docs and opens a
+        docs PR — guarded by <code>cdx should-sync</code> so the bot's own doc commit
+        never re-triggers the loop.
+      </p>
+
+      <h2>7 · Govern many repos (optional)</h2>
+      <p>
+        Stand up the central server (<code>cdx-server</code>, the <code>[server]</code>
+        extra) to clone repos on demand, open docs-PRs, and track coverage, ownership,
+        and staleness across a whole fleet from one console — the one you can click
+        through in the <a href="/demo">live demo</a>.
+      </p>
+
+      <p class="tut-next">
+        Next: explore the <a href="/wiki/features">feature wiki</a> (every capability,
+        traced 1:1 to a test and a demo) or open the
+        <a href="https://github.com/JuanSync7/custodex" target="_blank" rel="noreferrer">source on GitHub ↗</a>.
+      </p>
+    </article>
+  </ConsoleChrome>
+</Layout>
+
+<style>
+  .prose {
+    max-width: 760px;
+  }
+  .tut-next {
+    margin-top: 2rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted, #5b6472);
+  }
+</style>
