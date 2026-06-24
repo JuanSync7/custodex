@@ -1,13 +1,25 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import ConsoleApp from "../console/ConsoleApp.tsx";
+import Landing from "../components/Landing.astro";
 
-// The console (EPIC ASTRO). `/` hosts the ported React console as a single
-// `client:only="react"` island inside the Astro Layout (design system + chrome).
-// Hash-routed, so deep client routes (#/repos/…) never collide with the API the
-// same FastAPI process serves. Native `/wiki/*` pages (ASTRO-02) live alongside.
+// `/` has two modes, chosen at BUILD time (no runtime cost):
+//  • default (server build): the live React console island talking to the FastAPI
+//    backend on the same origin (EPIC ASTRO).
+//  • showcase build (PUBLIC_SHOWCASE=true, the static juansync.dev Pages site): a
+//    static landing page — no backend — that points at the live wikis, the
+//    tutorial, and the clickable /demo (the real console on sample data).
+const showcase = import.meta.env.PUBLIC_SHOWCASE === "true";
 ---
 
-<Layout title="Custodex — console">
-  <ConsoleApp client:only="react" />
-</Layout>
+{
+  showcase ? (
+    <Layout title="Custodex — keep code and docs in sync, owned, and accountable">
+      <Landing />
+    </Layout>
+  ) : (
+    <Layout title="Custodex — console">
+      <ConsoleApp client:only="react" />
+    </Layout>
+  )
+}

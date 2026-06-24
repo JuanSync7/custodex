@@ -1,0 +1,14 @@
+---
+import Layout from "../layouts/Layout.astro";
+import DemoConsole from "../console/DemoConsole.tsx";
+
+// The static demo (juansync.dev showcase). Hosts the REAL React console as a
+// `client:only` island wired to a baked sample dataset (see DemoConsole +
+// console/demo/*), so visitors click through Fleet → ownership → staleness →
+// coverage with no backend. Works in any build — the mock fetch is scoped to
+// this document.
+---
+
+<Layout title="Custodex — live demo">
+  <DemoConsole client:only="react" />
+</Layout>
