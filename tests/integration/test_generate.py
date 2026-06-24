@@ -3,9 +3,9 @@
 Two halves, all offline + deterministic (K10), operating on a COPY of the demo
 (the checked-in demo is NEVER mutated):
 
-* **Engine** (:func:`code_doc_monitor.generate.apply_edits_to_disk`, no server):
+* **Engine** (:func:`custodex.generate.apply_edits_to_disk`, no server):
   link the demo's intentionally-UNLINKED ``scheduler.py`` to a document, then
-  assert the unit yaml gains it on disk, the doc exists, ``cdmon check`` is clean,
+  assert the unit yaml gains it on disk, the doc exists, ``cdx check`` is clean,
   the coverage ``undocumented`` gap closes, and a SECOND identical run is a
   byte-identical no-op (K7). Plus ``set_context_refs`` and ``set_doc_style`` land
   on disk and re-load.
@@ -29,10 +29,10 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import load_unit_file
-from code_doc_monitor.docstyle import load_doc_style
-from code_doc_monitor.generate import apply_edits_to_disk
-from code_doc_monitor.server.edits import (
+from custodex.config import load_unit_file
+from custodex.docstyle import load_doc_style
+from custodex.generate import apply_edits_to_disk
+from custodex.server.edits import (
     AddCodeRefEdit,
     EditCodeRef,
     EditContextRef,
@@ -58,20 +58,20 @@ def _copy_demo(dest: Path) -> Path:
 def _check_clean(config_dir: Path) -> int:
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app as cli_app
+    from custodex.cli import app as cli_app
 
     res = CliRunner().invoke(cli_app, ["check", "--config", str(config_dir)])
     return res.exit_code
 
 
 def _undocumented(config_dir: Path) -> set[str]:
-    from code_doc_monitor import inventory
-    from code_doc_monitor.config import (
+    from custodex import inventory
+    from custodex.config import (
         effective_coverage,
         load_bundle,
         resolve_repo_root,
     )
-    from code_doc_monitor.coverage import resolve_coverage
+    from custodex.coverage import resolve_coverage
 
     bundle = load_bundle(config_dir)
     root = resolve_repo_root(config_dir, bundle.index.root)
@@ -105,7 +105,7 @@ def test_add_code_ref_links_scheduler_and_closes_gap(tmp_path: Path) -> None:
     assert "core" in result.affected_units
     assert "docs/api/core-api.md" in result.affected_docs
 
-    # The doc exists and `cdmon check` is clean (no drift).
+    # The doc exists and `cdx check` is clean (no drift).
     assert (repo / "docs" / "api" / "core-api.md").is_file()
     assert _check_clean(config_dir) == 0
 
@@ -133,7 +133,7 @@ def test_add_code_ref_second_run_is_byte_identical_noop(tmp_path: Path) -> None:
 
 
 def test_create_doc_for_scheduler_closes_gap(tmp_path: Path) -> None:
-    from code_doc_monitor.server.edits import CreateDocEdit
+    from custodex.server.edits import CreateDocEdit
 
     repo = _copy_demo(tmp_path)
     config_dir = repo / "config" / "cdmon"
@@ -209,15 +209,15 @@ pytest.importorskip(
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.store import Store  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.server.store import Store  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _REPO = "acme/widget"
 _OPEN_REPO = "acme/open"

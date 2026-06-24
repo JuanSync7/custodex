@@ -23,7 +23,7 @@ features:
       lint_config reads every existing document under config_dir/config.root and
       runs lint_doc on each, reporting malformed front matter as a
       MALFORMED_STRUCTURE issue rather than raising; a missing doc file is left
-      to `cdmon check`. It also lints declared HTML twins and runs the
+      to `cdx check`. It also lints declared HTML twins and runs the
       index-coverage check, returning the full LayoutIssue list.
     subsystem: layout
     modules: [layout]
@@ -37,7 +37,7 @@ features:
       audience, the composite fingerprint plus per-tier digests and symbol-table
       region anchors) and a body with title, placeholder purpose, and every
       declared region filled from the surface. The include_body flag must match
-      MonitorConfig.fingerprint_body_tier so the stamp agrees with `cdmon check`.
+      MonitorConfig.fingerprint_body_tier so the stamp agrees with `cdx check`.
     subsystem: layout
     modules: [layout]
     constraints: [K2, K7, K10]
@@ -47,7 +47,7 @@ features:
     summary: >-
       stamp_doc_meta rewrites a Doc's front matter with the standard's static keys
       (cdm.schema_version and cdm.audience), preserving the existing fingerprint
-      and body — the auto-fix behind `cdmon lint --fix`. It cannot repair
+      and body — the auto-fix behind `cdx lint --fix`. It cannot repair
       structural issues (title/purpose/regions/html), which require authoring.
     subsystem: layout
     modules: [layout]
@@ -86,7 +86,7 @@ features:
       region's RegionMode, whether the engine can render it (has_renderer), whether
       an llm-seeded region is locked by human edits, and whether it is advisory
       (heal never authors it). config_region_states is the file-reading driver
-      behind `cdmon lint --modes`; both are pure and never re-validate the modes
+      behind `cdx lint --modes`; both are pure and never re-validate the modes
       map.
     subsystem: layout
     modules: [layout]

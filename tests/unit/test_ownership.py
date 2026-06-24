@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     DocumentSpec,
     MonitorConfig,
@@ -26,8 +26,8 @@ from code_doc_monitor.config import (
     dump_unit_file,
     load_unit_file,
 )
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.ownership import (
+from custodex.errors import ConfigError
+from custodex.ownership import (
     EffectiveOwner,
     Identity,
     OwnershipFinding,
@@ -71,7 +71,7 @@ def _owned_unit() -> UnitFile:
     return UnitFile(
         **{
             "frontmatter": fm,
-            "dir-covered": ("code_doc_monitor",),
+            "dir-covered": ("custodex",),
             "source-files-format": (".py",),
             "documents": (owned, bare),
         }

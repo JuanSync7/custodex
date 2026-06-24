@@ -131,7 +131,7 @@ export function Repos({ api = apiClient }: ReposProps) {
           <div className="empty">
             <div className="empty__mark">⌀</div>
             No repositories registered yet. Point a repo at this server with{" "}
-            <code>cdmon init --central</code> and it will appear here.
+            <code>cdx init --central</code> and it will appear here.
           </div>
         </div>
       </section>

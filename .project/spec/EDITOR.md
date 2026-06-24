@@ -157,9 +157,9 @@ union (`action`): `create_doc`, `add_code_ref`, `remove_code_ref`,
 ## 8. Cleanup + invariants (E-13)
 
 - Update `.project/spec/CONFIGV2.md` cross-ref, `ARCHITECTURE.md`, READMEs.
-- Reheal dogfood docs after any tracked-source edit (`cdmon monitor --apply`).
+- Reheal dogfood docs after any tracked-source edit (`cdx monitor --apply`).
 - Final gates: full pytest `-m "not live_llm and not pg"` green; ruff + mypy
-  (`code_doc_monitor`) clean; dashboard vitest + build green; `cdmon check`/`lint`/
+  (`custodex`) clean; dashboard vitest + build green; `cdx check`/`lint`/
   `index --check`/`rpt`(idempotent)/`coverage --fail-under` over `config/cdmon` and
   `demo/config/cdmon` all pass; the new editable/generate/apply-fix flows covered
   by e2e tests over a temp repo (write → generate → live) on BOTH stores.

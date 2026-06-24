@@ -1,4 +1,4 @@
-"""EPIC SLA (SLA-02) — the ``cdmon staleness`` CLI (offline, read-only, K1/K3/K4).
+"""EPIC SLA (SLA-02) — the ``cdx staleness`` CLI (offline, read-only, K1/K3/K4).
 
 Grades each document's ``reviewed`` date against an injected ``--now`` and the
 audience-aware SLA; the table shows only docs needing review, ``--json`` shows all,
@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
+from custodex.cli import app
 
 runner = CliRunner()
 

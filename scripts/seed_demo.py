@@ -4,12 +4,12 @@ This is a small, committed launcher that makes the live instance on :33333 SHOW
 the T-01 structured ticket and the T-02 config-driven coverage file list, so a
 human can see the whole vertical working.
 
-It is stdlib + ``code_doc_monitor`` only (no new dependency, K0) and is
+It is stdlib + ``custodex`` only (no new dependency, K0) and is
 DETERMINISTIC (K10: fixed timestamps, the mock backend, a frozen tmp fixture):
 
 * :func:`build_seeded_store` registers a few demo repos and, for each, ingests
-  several **ticketed** :class:`~code_doc_monitor.schema.ReviewRecord`\\s produced
-  by running :class:`~code_doc_monitor.monitor.Monitor` over a tiny fixture repo
+  several **ticketed** :class:`~custodex.schema.ReviewRecord`\\s produced
+  by running :class:`~custodex.monitor.Monitor` over a tiny fixture repo
   with an injected clock (so each record carries a non-None ``ticket``). It also
   attaches a REAL coverage snapshot built from THIS repo's own
   ``resolve_coverage(load_config_dir("config/cdmon"))`` for one repo, so the dogfood
@@ -29,7 +29,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
@@ -37,20 +37,20 @@ from code_doc_monitor.config import (
     load_config_dir,
     resolve_repo_root,
 )
-from code_doc_monitor.configsync import SyncResult, run_sync
-from code_doc_monitor.coverage import coverage_snapshot, resolve_coverage
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.errors import CodeDocMonitorError
-from code_doc_monitor.extract import DocumentSurface, build_document_surface
-from code_doc_monitor.heal import regenerate_regions
-from code_doc_monitor.inventory import discover_files, discover_symbols
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.ownership import Identity
-from code_doc_monitor.registry import RegistrationPayload
-from code_doc_monitor.schema import ProposedFix, ReviewRecord, Verdict, new_record_id
-from code_doc_monitor.server import InMemoryStore
-from code_doc_monitor.sinks import RepoIdentity
-from code_doc_monitor.ticket import build_ticket
+from custodex.configsync import SyncResult, run_sync
+from custodex.coverage import coverage_snapshot, resolve_coverage
+from custodex.drift import Drift, DriftKind
+from custodex.errors import CodeDocMonitorError
+from custodex.extract import DocumentSurface, build_document_surface
+from custodex.heal import regenerate_regions
+from custodex.inventory import discover_files, discover_symbols
+from custodex.monitor import Monitor
+from custodex.ownership import Identity
+from custodex.registry import RegistrationPayload
+from custodex.schema import ProposedFix, ReviewRecord, Verdict, new_record_id
+from custodex.server import InMemoryStore
+from custodex.sinks import RepoIdentity
+from custodex.ticket import build_ticket
 
 # This repo's root (two levels up from scripts/seed_demo.py).
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -67,12 +67,12 @@ _DEMO_TOKEN = "demo-token"  # the per-repo bearer token every demo repo mints
 
 # The REAL repos shown in the dashboard. The synthetic ``acme-*`` placeholders
 # were removed — every row now maps to a real repo on disk. The dogfood
-# ``code-doc-monitor`` row gets this repo's own real coverage snapshot attached;
+# ``custodex`` row gets this repo's own real coverage snapshot attached;
 # the self-contained adopter demo (``demo-taskflow``) is registered separately
 # below (``_register_demo_taskflow``) with its ``local_path`` so its Sync button
 # operates on the real ``demo/`` working tree.
 _DEMO_REPOS: tuple[tuple[str, str, str], ...] = (
-    ("code-doc-monitor", "code-doc-monitor", "This very repo (dogfood)"),
+    ("custodex", "custodex", "This very repo (dogfood)"),
 )
 
 _DOCD_V1 = '''\
@@ -251,7 +251,7 @@ def _dogfood_sync() -> SyncResult | None:
     traverse. Falls back to **local** mode when git is unavailable (e.g. a CI
     detached-HEAD checkout with no local ``main`` ref; there those untracked trees
     are typically absent, so the walk stays cheap). Returns the full
-    :class:`~code_doc_monitor.configsync.SyncResult` (its ``coverage`` wire
+    :class:`~custodex.configsync.SyncResult` (its ``coverage`` wire
     snapshot is already stamped ``captured_at = _NOW``), or ``None`` if the config
     is absent / both modes fail. Best-effort: never raises (seeding must not break
     the launch, K8/K10).
@@ -262,7 +262,7 @@ def _dogfood_sync() -> SyncResult | None:
         try:
             return run_sync(
                 _REPO_ROOT,
-                "code-doc-monitor",
+                "custodex",
                 mode=mode,
                 default_branch="main",
                 now=_NOW,
@@ -467,7 +467,7 @@ def build_seeded_store() -> InMemoryStore:
         # mode) — it reads a CLEAN `git worktree` of tracked files in ~1s; "Sync
         # (local)" walks the whole working tree (incl. .venv/, node_modules, caches)
         # and is far slower, so the browser fetch can time out on a big repo.
-        local_path = str(_REPO_ROOT) if repo_id == "code-doc-monitor" else None
+        local_path = str(_REPO_ROOT) if repo_id == "custodex" else None
         identity = RepoIdentity(
             repo_id=repo_id,
             repo_name=repo_name,
@@ -484,7 +484,7 @@ def build_seeded_store() -> InMemoryStore:
         )
         for rec in records:
             store.add_record(repo_id, rec)
-        is_dogfood = repo_id == "code-doc-monitor" and dogfood_snapshot is not None
+        is_dogfood = repo_id == "custodex" and dogfood_snapshot is not None
         snapshot = dogfood_snapshot if is_dogfood else fixture_snapshot
         store.add_coverage_snapshot(repo_id, _NOW, snapshot)
 
@@ -504,7 +504,7 @@ def build_seeded_store() -> InMemoryStore:
     # the partition's sync_kind/ref.
     if dogfood is not None:
         store.replace_config(
-            "code-doc-monitor",
+            "custodex",
             dogfood.run.sync_kind,
             list(dogfood.documents),
             list(dogfood.code_refs),
@@ -513,7 +513,7 @@ def build_seeded_store() -> InMemoryStore:
         mirror = "local" if dogfood.run.sync_kind != "local" else "git"
         mirror_ref = "local" if mirror == "local" else dogfood.run.ref
         store.replace_config(
-            "code-doc-monitor",
+            "custodex",
             mirror,
             [
                 d.model_copy(update={"sync_kind": mirror, "ref": mirror_ref})
@@ -530,14 +530,14 @@ def build_seeded_store() -> InMemoryStore:
 
 def _default_static_dir() -> Path | None:
     """Re-export the package's built-SPA locator so the launch matches prod."""
-    from code_doc_monitor.server.app import _default_static_dir as locator
+    from custodex.server.app import _default_static_dir as locator
 
     return locator()
 
 
 def create_seeded_app() -> object:
     """The FastAPI app over a freshly seeded store, with the SPA mounted if built."""
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     return create_app(build_seeded_store(), static_dir=_default_static_dir())
 

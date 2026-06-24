@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     CodeRef,
     ContextRef,
@@ -31,7 +31,7 @@ from code_doc_monitor.config import (
     set_document_owner,
     upsert_document,
 )
-from code_doc_monitor.errors import ConfigError
+from custodex.errors import ConfigError
 
 NOW = "2026-06-08"
 
@@ -55,15 +55,13 @@ def _unit() -> UnitFile:
         region_keys=("symbols",),
         region_modes={"symbols": RegionMode.GENERATED},
         code_refs=(
-            CodeRef(path="code_doc_monitor/config.py"),
-            CodeRef(
-                path="code_doc_monitor/schema.py", symbols=("Verdict", "ProposedFix")
-            ),
-            CodeRef(path="code_doc_monitor/blocks.py", lines=((1, 10), (20, 25))),
+            CodeRef(path="custodex/config.py"),
+            CodeRef(path="custodex/schema.py", symbols=("Verdict", "ProposedFix")),
+            CodeRef(path="custodex/blocks.py", lines=((1, 10), (20, 25))),
         ),
         context_refs=(
             ContextRef(path="docs/api/index.md", note="the landing page"),
-            ContextRef(path="code_doc_monitor/errors.py"),
+            ContextRef(path="custodex/errors.py"),
         ),
     )
     index_doc = DocumentSpec(
@@ -76,7 +74,7 @@ def _unit() -> UnitFile:
     return UnitFile(
         **{
             "frontmatter": fm,
-            "dir-covered": ("code_doc_monitor",),
+            "dir-covered": ("custodex",),
             "source-files-format": (".py",),
             "documents": (foundation, index_doc),
         }
@@ -137,11 +135,11 @@ def test_upsert_document_replaces_in_place_and_appends(tmp_path: Path) -> None:
 def test_add_and_remove_code_ref(tmp_path: Path) -> None:
     """add_code_ref appends; remove_code_ref drops by path; both pure + round-trip."""
     unit = _unit()
-    ref = CodeRef(path="code_doc_monitor/heal.py", symbols=("apply_fix",))
+    ref = CodeRef(path="custodex/heal.py", symbols=("apply_fix",))
     added = add_code_ref(unit, "foundation", ref)
     assert ref in added.documents[0].code_refs
     assert unit.documents[0].code_refs != added.documents[0].code_refs  # no mutation
-    removed = remove_code_ref(added, "foundation", "code_doc_monitor/heal.py")
+    removed = remove_code_ref(added, "foundation", "custodex/heal.py")
     assert removed.documents[0].code_refs == unit.documents[0].code_refs
     assert _roundtrip(added, tmp_path) == added
 
@@ -170,7 +168,7 @@ def test_remove_code_ref_loud_on_missing_path() -> None:
     """Removing a code_ref that is not present is a loud ConfigError (K8)."""
     unit = _unit()
     with pytest.raises(ConfigError):
-        remove_code_ref(unit, "foundation", "code_doc_monitor/not-there.py")
+        remove_code_ref(unit, "foundation", "custodex/not-there.py")
 
 
 def test_set_context_refs_rejects_duplicate_path() -> None:

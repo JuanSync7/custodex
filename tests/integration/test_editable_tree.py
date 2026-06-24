@@ -28,16 +28,16 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server.app import create_app  # noqa: E402
-from code_doc_monitor.server.standalone import build_standalone_app  # noqa: E402
-from code_doc_monitor.server.store import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server.app import create_app  # noqa: E402
+from custodex.server.standalone import build_standalone_app  # noqa: E402
+from custodex.server.store import (  # noqa: E402
     ConfigCodeRef,
     ConfigContextRef,
     ConfigDocument,
     InMemoryStore,
 )
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _NOW = "2026-06-08T00:00:00Z"
 _REPO_ROOT = REPO_ROOT

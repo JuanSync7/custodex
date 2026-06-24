@@ -1,6 +1,6 @@
-# code-doc-monitor — feature reference (golden)
+# custodex — feature reference (golden)
 
-Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
+Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
 **222 features** across 22 subsystems.
 
@@ -98,116 +98,116 @@ A FixRequest carries additive authoring inputs — `context_refs` glance-through
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
 |----|---------|---------|-------------|-------|-------|--------|
-| `FEAT-CLI-001` | Config scaffold (cdmon init) | cli | K8 | — | — | implemented |
-| `FEAT-CLI-002` | Index regeneration (cdmon index) | cli | K1, K7 | — | — | implemented |
-| `FEAT-CLI-003` | Dir-layout coverage report (cdmon rpt) | cli | K1, K7 | — | — | implemented |
-| `FEAT-CLI-004` | Surface dump (cdmon surface) | cli | K1 | — | — | implemented |
-| `FEAT-CLI-005` | Drift gate (cdmon check) | cli | K1 | — | — | implemented |
-| `FEAT-CLI-006` | HTML twin build (cdmon build) | cli | K7 | — | — | implemented |
-| `FEAT-CLI-007` | Remediation run (cdmon monitor) | cli | K8 | — | — | implemented |
-| `FEAT-CLI-008` | Docs heal patch (cdmon sync-pr) | cli | K1, K4, K7, K10 | — | — | implemented |
-| `FEAT-CLI-009` | Loop-safety guard (cdmon should-sync) | cli | K1 | — | — | implemented |
-| `FEAT-CLI-010` | Docs merge request (cdmon open-docs-pr) | cli | K1, K4, K8, K10 | — | — | implemented |
-| `FEAT-CLI-011` | Central registration (cdmon register) | cli | K4, K8 | — | — | implemented |
-| `FEAT-CLI-012` | Config sync (cdmon sync) | cli | K1, K8, K10 | — | — | implemented |
-| `FEAT-CLI-013` | Standalone dashboard (cdmon serve) | cli | K8 | — | — | implemented |
-| `FEAT-CLI-014` | Preflight checks (cdmon doctor) | cli | K1, K4, K8, K10 | — | — | implemented |
-| `FEAT-CLI-015` | Review-log report (cdmon report) | cli | K1, K5 | — | — | implemented |
-| `FEAT-CLI-016` | Promotion candidates (cdmon promotions) | cli | K1, K10 | — | — | implemented |
-| `FEAT-CLI-017` | Doc coverage (cdmon coverage) | cli | K1, K7 | — | — | implemented |
-| `FEAT-CLI-018` | Coverage-gap issue (cdmon surface-gaps) | cli | K4, K8, K10 | — | — | implemented |
-| `FEAT-CLI-019` | Resolution recording (cdmon resolve) | cli | K5, K8, K10 | — | — | implemented |
-| `FEAT-CLI-020` | Layout lint (cdmon lint) | cli | K1, K8, K10 | — | — | implemented |
-| `FEAT-CLI-021` | Doc scaffold (cdmon new-doc) | cli | K8 | — | — | implemented |
-| `FEAT-CLI-022` | Schema export (cdmon schema) | cli | K6 | — | — | implemented |
+| `FEAT-CLI-001` | Config scaffold (cdx init) | cli | K8 | — | — | implemented |
+| `FEAT-CLI-002` | Index regeneration (cdx index) | cli | K1, K7 | — | — | implemented |
+| `FEAT-CLI-003` | Dir-layout coverage report (cdx rpt) | cli | K1, K7 | — | — | implemented |
+| `FEAT-CLI-004` | Surface dump (cdx surface) | cli | K1 | — | — | implemented |
+| `FEAT-CLI-005` | Drift gate (cdx check) | cli | K1 | — | — | implemented |
+| `FEAT-CLI-006` | HTML twin build (cdx build) | cli | K7 | — | — | implemented |
+| `FEAT-CLI-007` | Remediation run (cdx monitor) | cli | K8 | — | — | implemented |
+| `FEAT-CLI-008` | Docs heal patch (cdx sync-pr) | cli | K1, K4, K7, K10 | — | — | implemented |
+| `FEAT-CLI-009` | Loop-safety guard (cdx should-sync) | cli | K1 | — | — | implemented |
+| `FEAT-CLI-010` | Docs merge request (cdx open-docs-pr) | cli | K1, K4, K8, K10 | — | — | implemented |
+| `FEAT-CLI-011` | Central registration (cdx register) | cli | K4, K8 | — | — | implemented |
+| `FEAT-CLI-012` | Config sync (cdx sync) | cli | K1, K8, K10 | — | — | implemented |
+| `FEAT-CLI-013` | Standalone dashboard (cdx serve) | cli | K8 | — | — | implemented |
+| `FEAT-CLI-014` | Preflight checks (cdx doctor) | cli | K1, K4, K8, K10 | — | — | implemented |
+| `FEAT-CLI-015` | Review-log report (cdx report) | cli | K1, K5 | — | — | implemented |
+| `FEAT-CLI-016` | Promotion candidates (cdx promotions) | cli | K1, K10 | — | — | implemented |
+| `FEAT-CLI-017` | Doc coverage (cdx coverage) | cli | K1, K7 | — | — | implemented |
+| `FEAT-CLI-018` | Coverage-gap issue (cdx surface-gaps) | cli | K4, K8, K10 | — | — | implemented |
+| `FEAT-CLI-019` | Resolution recording (cdx resolve) | cli | K5, K8, K10 | — | — | implemented |
+| `FEAT-CLI-020` | Layout lint (cdx lint) | cli | K1, K8, K10 | — | — | implemented |
+| `FEAT-CLI-021` | Doc scaffold (cdx new-doc) | cli | K8 | — | — | implemented |
+| `FEAT-CLI-022` | Schema export (cdx schema) | cli | K6 | — | — | implemented |
 
-### `FEAT-CLI-001` — Config scaffold (cdmon init)
+### `FEAT-CLI-001` — Config scaffold (cdx init)
 
-`cdmon init` writes a documented config template, refusing to clobber unless `--force`. `--central URL` wires the `central:` HTTP-reporting block (`--repo-id`/`--token-env`/`--repo-url`); `--v2` scaffolds the multi-file `config/cdmon/` directory layout (`--config-dir`/`--repo`) instead.
+`cdx init` writes a documented config template, refusing to clobber unless `--force`. `--central URL` wires the `central:` HTTP-reporting block (`--repo-id`/`--token-env`/`--repo-url`); `--v2` scaffolds the multi-file `config/cdmon/` directory layout (`--config-dir`/`--repo`) instead.
 
-### `FEAT-CLI-002` — Index regeneration (cdmon index)
+### `FEAT-CLI-002` — Index regeneration (cdx index)
 
-`cdmon index` rebuilds `config/cdmon/index.yaml`'s `units:` from the on-disk unit files via `regenerate_index`/`write_index`, preserving every global. `--check` is a read-only CI gate that exits 1 on a real units-list change (ignoring the wall-clock `updated:` stamp via `_blank_updated`, N-06).
+`cdx index` rebuilds `config/cdmon/index.yaml`'s `units:` from the on-disk unit files via `regenerate_index`/`write_index`, preserving every global. `--check` is a read-only CI gate that exits 1 on a real units-list change (ignoring the wall-clock `updated:` stamp via `_blank_updated`, N-06).
 
-### `FEAT-CLI-003` — Dir-layout coverage report (cdmon rpt)
+### `FEAT-CLI-003` — Dir-layout coverage report (cdx rpt)
 
-`cdmon rpt` computes the `config/cdmon/` coverage report via `load_bundle`/`build_coverage_rpt`/`render_rpt` and prints it; `--write` writes a deterministic `config/cdmon/coverage.rpt` (idempotent), `--ref` stamps the report's provenance.
+`cdx rpt` computes the `config/cdmon/` coverage report via `load_bundle`/`build_coverage_rpt`/`render_rpt` and prints it; `--write` writes a deterministic `config/cdmon/coverage.rpt` (idempotent), `--ref` stamps the report's provenance.
 
-### `FEAT-CLI-004` — Surface dump (cdmon surface)
+### `FEAT-CLI-004` — Surface dump (cdx surface)
 
-`cdmon surface` prints each document's id/audience/symbol-count and surface hash via `build_document_surface` for debugging; `--json` dumps each surface (hash plus every symbol) as a JSON list.
+`cdx surface` prints each document's id/audience/symbol-count and surface hash via `build_document_surface` for debugging; `--json` dumps each surface (hash plus every symbol) as a JSON list.
 
-### `FEAT-CLI-005` — Drift gate (cdmon check)
+### `FEAT-CLI-005` — Drift gate (cdx check)
 
-`cdmon check` runs `Monitor.check()`, prints the report summary, and exits 1 when drift is present and 0 when clean — the read-only CI warning signal.
+`cdx check` runs `Monitor.check()`, prints the report summary, and exits 1 when drift is present and 0 when clean — the read-only CI warning signal.
 
-### `FEAT-CLI-006` — HTML twin build (cdmon build)
+### `FEAT-CLI-006` — HTML twin build (cdx build)
 
-`cdmon build` renders every `html: true` document to its derived `.html` twin via `build` (build_twins), echoing each written path and the twin count.
+`cdx build` renders every `html: true` document to its derived `.html` twin via `build` (build_twins), echoing each written path and the twin count.
 
-### `FEAT-CLI-007` — Remediation run (cdmon monitor)
+### `FEAT-CLI-007` — Remediation run (cdx monitor)
 
-`cdmon monitor` runs `Monitor.run` (detect → backend verdict → record → optionally apply → recheck), exiting 1 when drift remains. `--apply/--no-apply` overrides the config default; `--ref`/`--source-sha` (else `$CI_COMMIT_SHA`) stamps each record's `source_sha` provenance (C-05).
+`cdx monitor` runs `Monitor.run` (detect → backend verdict → record → optionally apply → recheck), exiting 1 when drift remains. `--apply/--no-apply` overrides the config default; `--ref`/`--source-sha` (else `$CI_COMMIT_SHA`) stamps each record's `source_sha` provenance (C-05).
 
-### `FEAT-CLI-008` — Docs heal patch (cdmon sync-pr)
+### `FEAT-CLI-008` — Docs heal patch (cdx sync-pr)
 
-`cdmon sync-pr` heals the docs and emits a unified-diff patch of exactly the changed docs via `sync_pr`, printing it (or writing it to `--out`). `--dry-run` computes the same patch with no working-tree mutation; a clean or second run yields an empty patch (idempotent).
+`cdx sync-pr` heals the docs and emits a unified-diff patch of exactly the changed docs via `sync_pr`, printing it (or writing it to `--out`). `--dry-run` computes the same patch with no working-tree mutation; a clean or second run yields an empty patch (idempotent).
 
-### `FEAT-CLI-009` — Loop-safety guard (cdmon should-sync)
+### `FEAT-CLI-009` — Loop-safety guard (cdx should-sync)
 
-`cdmon should-sync` is a read-only guard (`should_sync`) that exits 0 to proceed with a heal and 1 to skip — skipping when every changed file is a managed doc path (a bot doc-only commit) or the set is empty. Reads file paths from args or newline-separated stdin (C-04).
+`cdx should-sync` is a read-only guard (`should_sync`) that exits 0 to proceed with a heal and 1 to skip — skipping when every changed file is a managed doc path (a bot doc-only commit) or the set is empty. Reads file paths from args or newline-separated stdin (C-04).
 
-### `FEAT-CLI-010` — Docs merge request (cdmon open-docs-pr)
+### `FEAT-CLI-010` — Docs merge request (cdx open-docs-pr)
 
-`cdmon open-docs-pr` heals the docs then opens a docs merge request (branch + commit + MR) via the default `GitLabTransport`/`open_docs_pr` (`--target`/`--ref`). A clean repo is a no-op; `--dry-run` prints the MR plan as JSON from a dry sync with no mutation and no transport built.
+`cdx open-docs-pr` heals the docs then opens a docs merge request (branch + commit + MR) via the default `GitLabTransport`/`open_docs_pr` (`--target`/`--ref`). A clean repo is a no-op; `--dry-run` prints the MR plan as JSON from a dry sync with no mutation and no transport built.
 
-### `FEAT-CLI-011` — Central registration (cdmon register)
+### `FEAT-CLI-011` — Central registration (cdx register)
 
-`cdmon register` announces this repo to the central server by POSTing a `RegistrationPayload` (a `RepoIdentity` from `central.repo_id`) to `<central url>/repos` via `register_repo` (bearer from `central.auth_env`). `--dry-run` prints the payload it would send with no network call (E-02).
+`cdx register` announces this repo to the central server by POSTing a `RegistrationPayload` (a `RepoIdentity` from `central.repo_id`) to `<central url>/repos` via `register_repo` (bearer from `central.auth_env`). `--dry-run` prints the payload it would send with no network call (E-02).
 
-### `FEAT-CLI-012` — Config sync (cdmon sync)
+### `FEAT-CLI-012` — Config sync (cdx sync)
 
-`cdmon sync` runs a `local`/`git` config sync (`--mode`): without `--remote` it runs `configsync.run_sync` read-only against the cwd and prints the summary; with `--remote URL --repo-id ID` it POSTs to `<URL>/repos/{ID}/sync` via `sync_repo_remote`. `--json` emits the SyncRun; the clock is injected (K10).
+`cdx sync` runs a `local`/`git` config sync (`--mode`): without `--remote` it runs `configsync.run_sync` read-only against the cwd and prints the summary; with `--remote URL --repo-id ID` it POSTs to `<URL>/repos/{ID}/sync` via `sync_repo_remote`. `--json` emits the SyncRun; the clock is injected (K10).
 
-### `FEAT-CLI-013` — Standalone dashboard (cdmon serve)
+### `FEAT-CLI-013` — Standalone dashboard (cdx serve)
 
-`cdmon serve` launches the FastAPI dashboard for the current repo standalone via `build_standalone_app` — auto-registering and pre-syncing the cwd — on `--host`/`--port`. Loud K8 when the cwd has no `config/cdmon/index.yaml` (L-01).
+`cdx serve` launches the FastAPI dashboard for the current repo standalone via `build_standalone_app` — auto-registering and pre-syncing the cwd — on `--host`/`--port`. Loud K8 when the cwd has no `config/cdmon/index.yaml` (L-01).
 
-### `FEAT-CLI-014` — Preflight checks (cdmon doctor)
+### `FEAT-CLI-014` — Preflight checks (cdx doctor)
 
-`cdmon doctor` is an offline, read-only preflight: it loads the config (malformed → loud K8) then runs `run_checks` (config / documents / backend prereq / central wiring / extras), printing one `STATUS  name — detail` line each and exiting 1 only if any check FAILs (G-02).
+`cdx doctor` is an offline, read-only preflight: it loads the config (malformed → loud K8) then runs `run_checks` (config / documents / backend prereq / central wiring / extras), printing one `STATUS  name — detail` line each and exiting 1 only if any check FAILs (G-02).
 
-### `FEAT-CLI-015` — Review-log report (cdmon report)
+### `FEAT-CLI-015` — Review-log report (cdx report)
 
-`cdmon report` summarizes the review log via `summarize` plus the `summarize_with_resolutions` resolved/unresolved join; `--verdict V` lists the individual records of that verdict (e.g. the `ESCALATE`s a human must act on) via `select_by_verdict`, with `--json` for machine output.
+`cdx report` summarizes the review log via `summarize` plus the `summarize_with_resolutions` resolved/unresolved join; `--verdict V` lists the individual records of that verdict (e.g. the `ESCALATE`s a human must act on) via `select_by_verdict`, with `--json` for machine output.
 
-### `FEAT-CLI-016` — Promotion candidates (cdmon promotions)
+### `FEAT-CLI-016` — Promotion candidates (cdx promotions)
 
-`cdmon promotions` lists read-only promotion CANDIDATES via `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose resolved records (≥ `--min-count`) unanimously share one decision resolution and could become a deterministic rule. `--json` for machine output.
+`cdx promotions` lists read-only promotion CANDIDATES via `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose resolved records (≥ `--min-count`) unanimously share one decision resolution and could become a deterministic rule. `--json` for machine output.
 
-### `FEAT-CLI-017` — Doc coverage (cdmon coverage)
+### `FEAT-CLI-017` — Doc coverage (cdx coverage)
 
-`cdmon coverage` reports file/public-symbol coverage percentages plus the documented/undocumented/waived baskets via `discover_files`/`discover_symbols`/ `resolve_coverage`. `--fail-under N` gates on public-symbol coverage; `--write [PATH]` writes a deterministic manifest (idempotent); `--json` dumps the report.
+`cdx coverage` reports file/public-symbol coverage percentages plus the documented/undocumented/waived baskets via `discover_files`/`discover_symbols`/ `resolve_coverage`. `--fail-under N` gates on public-symbol coverage; `--write [PATH]` writes a deterministic manifest (idempotent); `--json` dumps the report.
 
-### `FEAT-CLI-018` — Coverage-gap issue (cdmon surface-gaps)
+### `FEAT-CLI-018` — Coverage-gap issue (cdx surface-gaps)
 
-`cdmon surface-gaps` turns doc coverage gaps into a tracker issue: it runs discover → `resolve_coverage` → `suggest_owners`, builds an `IssuePlan` via `plan_coverage_issue`, and opens it via the `--provider` (gitlab|github) transport. No gaps is a no-op; `--dry-run` prints the plan as JSON (H-04).
+`cdx surface-gaps` turns doc coverage gaps into a tracker issue: it runs discover → `resolve_coverage` → `suggest_owners`, builds an `IssuePlan` via `plan_coverage_issue`, and opens it via the `--provider` (gitlab|github) transport. No gaps is a no-op; `--dry-run` prints the plan as JSON (H-04).
 
-### `FEAT-CLI-019` — Resolution recording (cdmon resolve)
+### `FEAT-CLI-019` — Resolution recording (cdx resolve)
 
-`cdmon resolve RECORD_ID --resolution {accepted|overridden|rejected|invalidated}` records the human outcome of a handled drift as a separate append-only `ResolutionRecord` via `append_resolution`, validating the id exists (loud K8) and leaving the review log immutable. The timestamp is injected (K10).
+`cdx resolve RECORD_ID --resolution {accepted|overridden|rejected|invalidated}` records the human outcome of a handled drift as a separate append-only `ResolutionRecord` via `append_resolution`, validating the id exists (loud K8) and leaving the review log immutable. The timestamp is injected (K10).
 
-### `FEAT-CLI-020` — Layout lint (cdmon lint)
+### `FEAT-CLI-020` — Layout lint (cdx lint)
 
-`cdmon lint` validates doc structure against the Layout Standard via `lint_config`, exiting 1 on issues. `--fix` stamps missing static front matter (`stamp_doc_meta`); `--modes` prints each managed region's authority mode/lock/advisory state (informational, never changing the exit code, B-05).
+`cdx lint` validates doc structure against the Layout Standard via `lint_config`, exiting 1 on issues. `--fix` stamps missing static front matter (`stamp_doc_meta`); `--modes` prints each managed region's authority mode/lock/advisory state (informational, never changing the exit code, B-05).
 
-### `FEAT-CLI-021` — Doc scaffold (cdmon new-doc)
+### `FEAT-CLI-021` — Doc scaffold (cdx new-doc)
 
-`cdmon new-doc DOC_ID` scaffolds a conformant, in-sync Markdown document for a configured doc id via `build_document_surface`/`scaffold_doc`, refusing to overwrite an existing file unless `--force`.
+`cdx new-doc DOC_ID` scaffolds a conformant, in-sync Markdown document for a configured doc id via `build_document_surface`/`scaffold_doc`, refusing to overwrite an existing file unless `--force`.
 
-### `FEAT-CLI-022` — Schema export (cdmon schema)
+### `FEAT-CLI-022` — Schema export (cdx schema)
 
-`cdmon schema` emits the public review-record JSON schema (`review_record_schema`) to stdout, or to `--out FILE` — one source of truth for the record contract (K6).
+`cdx schema` emits the public review-record JSON schema (`review_record_schema`) to stdout, or to `--out FILE` — one source of truth for the record contract (K6).
 
 ## config
 
@@ -358,11 +358,11 @@ render_index renders a source='index' managed region as a Markdown table over th
 
 ### `FEAT-CONFIGV2-016` — README / narrative-document monitoring
 
-A narrative Markdown document such as README.md is a first-class monitored document: it is declared in a config/cdmon unit with code_refs naming the source files it describes and NO managed region, so the engine tracks it by the whole-doc fingerprint over that code surface and never authors its prose (K2). As a user-guide its drift is audience-gated — a comment/docstring or private change to a referenced source file is a non-event, only a real public-surface change drifts it (K3) — and the drift is recorded as a ReviewRecord for a human, never auto-rewritten (K5); monitor --apply only refreshes its fingerprint. To keep an eng-only api-index from being forced to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index region's audience kind, so an index need only link the documents it renders. cdmon dogfoods this on its own README.md.
+A narrative Markdown document such as README.md is a first-class monitored document: it is declared in a config/cdmon unit with code_refs naming the source files it describes and NO managed region, so the engine tracks it by the whole-doc fingerprint over that code surface and never authors its prose (K2). As a user-guide its drift is audience-gated — a comment/docstring or private change to a referenced source file is a non-event, only a real public-surface change drifts it (K3) — and the drift is recorded as a ReviewRecord for a human, never auto-rewritten (K5); monitor --apply only refreshes its fingerprint. To keep an eng-only api-index from being forced to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index region's audience kind, so an index need only link the documents it renders. cdx dogfoods this on its own README.md.
 
 ### `FEAT-CONFIGV2-017` — Test → test-doc mirror
 
-Test files are monitored exactly like source files: a config/cdmon unit whose code_refs point at tests/** and whose documents live under a top-level test-docs/ directory maps each test file 1:1 to a test-doc carrying a managed symbols region that lists the file's test_* functions. It is the SAME engine as source -> docs with no new code — a test file is just a .py file (K0), so the extractor, drift detector, healer, and coverage resolver all work unchanged. The test file is the source of truth and the test-doc is graded against it, never the reverse (K2); editing or renaming a test drifts its test-doc and records a ReviewRecord for a human (K5), and monitor --apply heals it idempotently (K7). The demo maps all four of its test files to test-docs 1:1, and cdmon dogfoods the pattern on its own tests/smoke boundary; the console surfaces test-docs in a dedicated Test docs section on the Documents, Drift, and Mapping pages.
+Test files are monitored exactly like source files: a config/cdmon unit whose code_refs point at tests/** and whose documents live under a top-level test-docs/ directory maps each test file 1:1 to a test-doc carrying a managed symbols region that lists the file's test_* functions. It is the SAME engine as source -> docs with no new code — a test file is just a .py file (K0), so the extractor, drift detector, healer, and coverage resolver all work unchanged. The test file is the source of truth and the test-doc is graded against it, never the reverse (K2); editing or renaming a test drifts its test-doc and records a ReviewRecord for a human (K5), and monitor --apply heals it idempotently (K7). The demo maps all four of its test files to test-docs 1:1, and cdx dogfoods the pattern on its own tests/smoke boundary; the console surfaces test-docs in a dedicated Test docs section on the Documents, Drift, and Mapping pages.
 
 ## coverage
 
@@ -609,15 +609,15 @@ lint_doc grades one parsed Doc's SHAPE against the Layout Standard — the manag
 
 ### `FEAT-LAYOUT-002` — Config-wide structural lint driver
 
-lint_config reads every existing document under config_dir/config.root and runs lint_doc on each, reporting malformed front matter as a MALFORMED_STRUCTURE issue rather than raising; a missing doc file is left to `cdmon check`. It also lints declared HTML twins and runs the index-coverage check, returning the full LayoutIssue list.
+lint_config reads every existing document under config_dir/config.root and runs lint_doc on each, reporting malformed front matter as a MALFORMED_STRUCTURE issue rather than raising; a missing doc file is left to `cdx check`. It also lints declared HTML twins and runs the index-coverage check, returning the full LayoutIssue list.
 
 ### `FEAT-LAYOUT-003` — Conformant document scaffolding
 
-scaffold_doc renders a fully-conformant, in-sync Markdown document for a DocumentSpec from a DocumentSurface — standard front matter (schema_version, audience, the composite fingerprint plus per-tier digests and symbol-table region anchors) and a body with title, placeholder purpose, and every declared region filled from the surface. The include_body flag must match MonitorConfig.fingerprint_body_tier so the stamp agrees with `cdmon check`.
+scaffold_doc renders a fully-conformant, in-sync Markdown document for a DocumentSpec from a DocumentSurface — standard front matter (schema_version, audience, the composite fingerprint plus per-tier digests and symbol-table region anchors) and a body with title, placeholder purpose, and every declared region filled from the surface. The include_body flag must match MonitorConfig.fingerprint_body_tier so the stamp agrees with `cdx check`.
 
 ### `FEAT-LAYOUT-004` — Front-matter auto-fix stamp
 
-stamp_doc_meta rewrites a Doc's front matter with the standard's static keys (cdm.schema_version and cdm.audience), preserving the existing fingerprint and body — the auto-fix behind `cdmon lint --fix`. It cannot repair structural issues (title/purpose/regions/html), which require authoring.
+stamp_doc_meta rewrites a Doc's front matter with the standard's static keys (cdm.schema_version and cdm.audience), preserving the existing fingerprint and body — the auto-fix behind `cdx lint --fix`. It cannot repair structural issues (title/purpose/regions/html), which require authoring.
 
 ### `FEAT-LAYOUT-005` — HTML-twin pairing check
 
@@ -629,7 +629,7 @@ The index-coverage rule (folded into lint_config) is a target-agnostic structura
 
 ### `FEAT-LAYOUT-007` — Per-region authority state surface
 
-region_states returns one read-only RegionState per region present in a Doc and declared in spec.region_keys (in region_keys order), reporting each region's RegionMode, whether the engine can render it (has_renderer), whether an llm-seeded region is locked by human edits, and whether it is advisory (heal never authors it). config_region_states is the file-reading driver behind `cdmon lint --modes`; both are pure and never re-validate the modes map.
+region_states returns one read-only RegionState per region present in a Doc and declared in spec.region_keys (in region_keys order), reporting each region's RegionMode, whether the engine can render it (has_renderer), whether an llm-seeded region is locked by human edits, and whether it is advisory (heal never authors it). config_region_states is the file-reading driver behind `cdx lint --modes`; both are pure and never re-validate the modes map.
 
 ### `FEAT-LAYOUT-008` — Dependency-free Markdown renderer
 
@@ -781,7 +781,7 @@ run builds each FixRequest with the drifted region's authority mode (RegionMode,
 | `FEAT-OWNERSHIP-001` | Per-document ownership-of-record | config | K0, K2, K6, K7 | — | — | implemented |
 | `FEAT-OWNERSHIP-002` | Pure ownership resolver + roster snapshot | ownership | K0, K1, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-003` | Orphan & DRI-vacant detection (pure) | ownership | K1, K5, K8, K10 | — | — | implemented |
-| `FEAT-OWNERSHIP-004` | cdmon ownership CLI (read-only accountability gate) | cli, ownership | K1, K4, K8, K10 | — | — | implemented |
+| `FEAT-OWNERSHIP-004` | cdx ownership CLI (read-only accountability gate) | cli, ownership | K1, K4, K8, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-005` | Central roster mirror (persisted, both stores) | server, ownership | K0, K4, K6, K10 | — | — | implemented |
 | `FEAT-OWNERSHIP-006` | Admin-token roster routes (global, not per-repo) | server | K0, K8 | — | — | implemented |
 | `FEAT-OWNERSHIP-007` | Per-repo /ownership view + cross-repo departure cascade | server, ownership | K0, K5, K10 | — | — | implemented |
@@ -800,9 +800,9 @@ ownership.resolve_ownership projects a loaded config into one EffectiveOwner per
 
 ownership.detect_orphans classifies each resolved document against the injected roster snapshot — UNOWNED (no identity named), ORPHAN_OWNER_DEPARTED (the accountable owner is departed/unknown with no active fallback), or ORPHAN_DRI_VACANT (the DRI left but the durable team still owns it — a soft orphan resolved by assigning a new DRI). An orphan is never healable (no code change fixes it); OK docs are omitted by default so the result is exactly what needs a human (K5). Pure, sorted, clock-free (K1/K10).
 
-### `FEAT-OWNERSHIP-004` — cdmon ownership CLI (read-only accountability gate)
+### `FEAT-OWNERSHIP-004` — cdx ownership CLI (read-only accountability gate)
 
-cdmon ownership lists every document's accountable/durable owner from config and, given an offline --roster YAML, cross-checks it to flag orphaned (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage gap, not a departure) does not trip it. load_roster is loud on a malformed roster (K8).
+cdx ownership lists every document's accountable/durable owner from config and, given an offline --roster YAML, cross-checks it to flag orphaned (departed-owner) documents — pure, offline (K1/K4), no backend. --json emits {owners, findings}; --fail-on-orphan turns a departed-owner orphan into a nonzero exit (an accountability CI gate), while an UNOWNED doc (a coverage gap, not a departure) does not trip it. load_roster is loud on a malformed roster (K8).
 
 ### `FEAT-OWNERSHIP-005` — Central roster mirror (persisted, both stores)
 
@@ -895,7 +895,7 @@ ticket_status maps a human ResolutionRecord outcome to a TicketStatus: None to P
 | `FEAT-QUALITY-005` | coverage.rpt builder over the real coverage engine | report | K1, K10 | — | — | implemented |
 | `FEAT-QUALITY-006` | Suggested-unit attribution for coverage gaps | report | K10 | — | — | implemented |
 | `FEAT-QUALITY-007` | Byte-stable .rpt render / parse round-trip | report | K7, K8, K10 | — | — | implemented |
-| `FEAT-QUALITY-008` | cdmon doctor offline adoption preflight | doctor | K1, K4, K10 | — | — | implemented |
+| `FEAT-QUALITY-008` | cdx doctor offline adoption preflight | doctor | K1, K4, K10 | — | — | implemented |
 | `FEAT-QUALITY-009` | WARN-vs-FAIL doctor grading philosophy | doctor | K8 | — | — | implemented |
 
 ### `FEAT-QUALITY-001` — Four-category writing-style map
@@ -916,7 +916,7 @@ dump_doc_style serializes a DocStyleMap back to canonical `---`-fenced frontmatt
 
 ### `FEAT-QUALITY-005` — coverage.rpt builder over the real coverage engine
 
-build_coverage_rpt produces a CoverageRpt (RptSummary + per-unit RptUnit slices + an RptUndocumented gap list) by reusing effective_coverage → inventory.discover_files/discover_symbols → coverage.resolve_coverage, so the report counts are the same facts `cdmon coverage` shows, never a parallel computation. Per-unit attribution is deepest-wins and waived files leave both sides of each percentage.
+build_coverage_rpt produces a CoverageRpt (RptSummary + per-unit RptUnit slices + an RptUndocumented gap list) by reusing effective_coverage → inventory.discover_files/discover_symbols → coverage.resolve_coverage, so the report counts are the same facts `cdx coverage` shows, never a parallel computation. Per-unit attribution is deepest-wins and waived files leave both sides of each percentage.
 
 ### `FEAT-QUALITY-006` — Suggested-unit attribution for coverage gaps
 
@@ -926,9 +926,9 @@ Each RptUndocumented gap file pairs its `path` with the `suggested_unit` it shou
 
 render_rpt emits a CoverageRpt as a `---` frontmatter block (report-version / kind / repo / ref / generated-by, no wall-clock) over a fixed-key-order YAML body with every list sorted and percentages at two decimals (`n/a` when the denominator is 0), and parse_rpt is its loud inverse so parse_rpt(render_rpt(r)) == r; write_rpt writes the text to config_dir/coverage.rpt.
 
-### `FEAT-QUALITY-008` — cdmon doctor offline adoption preflight
+### `FEAT-QUALITY-008` — cdx doctor offline adoption preflight
 
-run_checks answers "is this repo wired up correctly enough to run cdmon and report centrally?" with a deterministic, ordered list of Check results over config / documents / backend / central (and the agent extra), reading only os.environ / $PATH / installed distributions with no network and no mutation.
+run_checks answers "is this repo wired up correctly enough to run cdx and report centrally?" with a deterministic, ordered list of Check results over config / documents / backend / central (and the agent extra), reading only os.environ / $PATH / installed distributions with no network and no mutation.
 
 ### `FEAT-QUALITY-009` — WARN-vs-FAIL doctor grading philosophy
 
@@ -1014,11 +1014,11 @@ make_sink resolves a CentralConfig to the right sink (none / file / http), raisi
 | `FEAT-REFERENCE-004` | Test-wiki AST extractor | testwiki | K0, K1, K8, K10 | — | — | implemented |
 | `FEAT-REFERENCE-005` | Source index + no-orphan-capability check | srcindex | K0, K1, K8, K10 | — | — | implemented |
 | `FEAT-REFERENCE-006` | Rendered source wiki | srcindex | K7, K10 | — | — | implemented |
-| `FEAT-REFERENCE-007` | cdmon wiki regeneration + freshness gate | wiki | K0, K7, K8, K10 | — | — | implemented |
+| `FEAT-REFERENCE-007` | cdx wiki regeneration + freshness gate | wiki | K0, K7, K8, K10 | — | — | implemented |
 
 ### `FEAT-REFERENCE-001` — Golden feature catalog (typed, loadable)
 
-featurecatalog.load_catalog aggregates feature-doc/catalog/*.yaml into a validated, id-sorted FeatureCatalog of frozen Feature records (extra=forbid); it is loud (CatalogError) on a missing/empty dir, malformed yaml, a bad id pattern, a duplicate id across files, or a feature naming a non-existent module — the single machine-readable source of truth for every cdmon feature.
+featurecatalog.load_catalog aggregates feature-doc/catalog/*.yaml into a validated, id-sorted FeatureCatalog of frozen Feature records (extra=forbid); it is loud (CatalogError) on a missing/empty dir, malformed yaml, a bad id pattern, a duplicate id across files, or a feature naming a non-existent module — the single machine-readable source of truth for every cdx feature.
 
 ### `FEAT-REFERENCE-002` — Rendered human feature reference
 
@@ -1040,9 +1040,9 @@ srcindex.build_source_index inventories a package (reusing inventory.discover_fi
 
 srcindex.render_source_wiki_md renders the source wiki from a SourceIndex — per-module path, public symbols, and implementing-feature links, plus a Coverage summary that counts the public modules and names any orphan (un-catalogued) module — as a pure, byte-stable function (no clock), so the SOURCE view of the golden reference is regenerated, never hand-edited.
 
-### `FEAT-REFERENCE-007` — cdmon wiki regeneration + freshness gate
+### `FEAT-REFERENCE-007` — cdx wiki regeneration + freshness gate
 
-wiki.regenerate, driven by `cdmon wiki`, regenerates ALL of EPIC R's derived artifacts from their single sources in one command — feature-doc/FEATURES.md plus the test, source, and traceability wikis under feature-doc/wiki/ — via a shared WIKI_TARGETS (path -> render thunk) that is the single source of the output set, so write-mode and --check can never diverge. `cdmon wiki` writes every changed target (a second run is a no-op — idempotent K7); `cdmon wiki --check` is the read-only CI freshness gate that lists every stale file and exits nonzero without writing (loud K8). Deterministic (K10), no new dependency (K0). With `cdmon trace --fail-on-gap` wired into CI, the golden reference can no longer silently drift from the code, demos, or tests.
+wiki.regenerate, driven by `cdx wiki`, regenerates ALL of EPIC R's derived artifacts from their single sources in one command — feature-doc/FEATURES.md plus the test, source, and traceability wikis under feature-doc/wiki/ — via a shared WIKI_TARGETS (path -> render thunk) that is the single source of the output set, so write-mode and --check can never diverge. `cdx wiki` writes every changed target (a second run is a no-op — idempotent K7); `cdx wiki --check` is the read-only CI freshness gate that lists every stale file and exits nonzero without writing (loud K8). Deterministic (K10), no new dependency (K0). With `cdx trace --fail-on-gap` wired into CI, the golden reference can no longer silently drift from the code, demos, or tests.
 
 ## server
 
@@ -1061,16 +1061,16 @@ wiki.regenerate, driven by `cdmon wiki`, regenerates ALL of EPIC R's derived art
 | `FEAT-SERVER-011` | Staged config-edit tickets | server | K6, K8, K10 | — | — | implemented |
 | `FEAT-SERVER-012` | Generate staged edits to disk | server | K7, K8, K10 | — | — | implemented |
 | `FEAT-SERVER-013` | One-click apply of an LLM-proposed fix | server | K7, K8, K10 | — | — | implemented |
-| `FEAT-SERVER-014` | Standalone per-repo `cdmon serve` | server | K1, K4, K10 | — | — | implemented |
+| `FEAT-SERVER-014` | Standalone per-repo `cdx serve` | server | K1, K4, K10 | — | — | implemented |
 | `FEAT-SERVER-015` | Single-origin dashboard SPA + landing payload | server | K0 | — | — | implemented |
 | `FEAT-SERVER-016` | Public config-template reference endpoint | server | K10 | — | — | implemented |
-| `FEAT-SERVER-017` | Client-side `cdmon register` | registry | K0, K4, K6, K8 | — | — | implemented |
+| `FEAT-SERVER-017` | Client-side `cdx register` | registry | K0, K4, K6, K8 | — | — | implemented |
 | `FEAT-SERVER-018` | Client-side remote sync trigger | registry | K0, K4, K8 | — | — | implemented |
 | `FEAT-SERVER-019` | Feature-wiki endpoint | server | K0, K4, K8, K10 | — | — | implemented |
 
 ### `FEAT-SERVER-001` — Optional central FastAPI service
 
-create_app builds the central FastAPI app over a dependency-injected Store (defaulting to InMemoryStore); importing the server subpackage requires the [server] extra (fastapi), kept lazy so `import code_doc_monitor` core pulls in nothing from here, and main launches it via uvicorn on port 33333.
+create_app builds the central FastAPI app over a dependency-injected Store (defaulting to InMemoryStore); importing the server subpackage requires the [server] extra (fastapi), kept lazy so `import custodex` core pulls in nothing from here, and main launches it via uvicorn on port 33333.
 
 ### `FEAT-SERVER-002` — Repo registration over the shared schema
 
@@ -1120,7 +1120,7 @@ POST /config/generate makes selected pending edits live — applying them to the
 
 POST /repos/{id}/records/{record_id}/apply-fix applies a FIX-verdict record's proposed fix to its doc on disk via apply_record_fix (offline, scoped), appends an accepted ResolutionRecord, re-syncs to reproject the DB, and returns the ApplyFixResponse (applied / doc_path / diff / sync_run); a non-FIX or fix-less record is a 409 and a central-only repo a 409.
 
-### `FEAT-SERVER-014` — Standalone per-repo `cdmon serve`
+### `FEAT-SERVER-014` — Standalone per-repo `cdx serve`
 
 build_standalone_store / build_standalone_app build an InMemoryStore holding ONLY the current repo, auto-registered OPEN (no token), pre-synced read-only for both local (required) and git (best-effort) modes so the dashboard renders on first load with no central server, registration, token or network; resolve_repo_id picks the id from the bundle index or the directory name.
 
@@ -1132,7 +1132,7 @@ When a built dashboard SPA (dashboard/dist) is located via _default_static_dir a
 
 GET /config/templates returns the four canonical config/cdmon v2 template strings (unit, index, ignore, doc_style) as JSON with no auth, deterministic — the same bytes every call — for the dashboard Config page and adopters.
 
-### `FEAT-SERVER-017` — Client-side `cdmon register`
+### `FEAT-SERVER-017` — Client-side `cdx register`
 
 register_repo builds a RegistrationPayload (identity from repo_identity_from_config: repo_id/name/url plus commit from config or $CI_COMMIT_SHA) and submits it through an INJECTED RegisterTransport — or a lazily-built stdlib-only HttpRegisterTransport (no requests) — to <url>/repos; dry_run returns the would-send payload with no network, and a missing url/repo_id is a loud typed SchemaError.
 
@@ -1155,7 +1155,7 @@ GET /wiki serves the committed EPIC-R wikis — the Feature Reference, Traceabil
 | `FEAT-SETTINGS-005` | Git SSRF allowlist + clone timeout from settings | server, gitfetch | K8 | — | — | implemented |
 | `FEAT-SETTINGS-006` | Settings-driven uvicorn launch | server | K6, K10 | — | — | implemented |
 | `FEAT-SETTINGS-007` | Redacted GET /settings endpoint | server | K8, K10 | — | — | implemented |
-| `FEAT-SETTINGS-008` | cdmon settings CLI | cli | K1, K4, K8 | — | — | implemented |
+| `FEAT-SETTINGS-008` | cdx settings CLI | cli | K1, K4, K8 | — | — | implemented |
 
 ### `FEAT-SETTINGS-001` — Frozen versioned settings model
 
@@ -1185,9 +1185,9 @@ The central server main() binds host/port and sets the uvicorn log level from th
 
 GET /settings is an OPEN read returning the effective non-secret settings plus the secret PRESENCE booleans (never the secret values, K8) — the payload the console Settings page renders. Defined before the SPA catch-all mount.
 
-### `FEAT-SETTINGS-008` — cdmon settings CLI
+### `FEAT-SETTINGS-008` — cdx settings CLI
 
-The read-only `cdmon settings [--settings PATH] [--json]` command resolves the effective settings (file → env → defaults) and prints the host/port + hardening knobs and the secret presence, never a secret value; a malformed file is a loud ConfigError → exit 1. Offline, no backend (K1/K4).
+The read-only `cdx settings [--settings PATH] [--json]` command resolves the effective settings (file → env → defaults) and prints the host/port + hardening knobs and the secret presence, never a secret value; a malformed file is a loud ConfigError → exit 1. Offline, no backend (K1/K4).
 
 ## staleness
 
@@ -1196,7 +1196,7 @@ The read-only `cdmon settings [--settings PATH] [--json]` command resolves the e
 | `FEAT-STALENESS-001` | Pure staleness grading engine | staleness | K1, K10 | — | — | implemented |
 | `FEAT-STALENESS-002` | Fresh / stale / never-reviewed classification | staleness | K8, K10 | — | — | implemented |
 | `FEAT-STALENESS-003` | Config-as-truth reviewed stamp + audience-aware SLA | staleness, config | K3, K6 | — | — | implemented |
-| `FEAT-STALENESS-004` | cdmon staleness CLI | cli | K1, K3, K4 | — | — | implemented |
+| `FEAT-STALENESS-004` | cdx staleness CLI | cli | K1, K3, K4 | — | — | implemented |
 | `FEAT-STALENESS-005` | Reviewed + resolved SLA mirrored at sync | server, configsync | K6, K10 | — | — | implemented |
 | `FEAT-STALENESS-006` | Read-time GET /staleness view | server | K10 | — | — | implemented |
 
@@ -1212,9 +1212,9 @@ A doc with no `reviewed` stamp is NEVER_REVIEWED; one reviewed longer than its S
 
 DocumentSpec.reviewed (an ISO date, config = truth, additive K6) is the last-review source; StalenessConfig (default_days + per-audience audience_days) sets the SLA so a user-guide may get a longer window than an eng-guide (audience changes the verdict, K3). reviewed_docs_from_config projects a loaded config into the engine's input.
 
-### `FEAT-STALENESS-004` — cdmon staleness CLI
+### `FEAT-STALENESS-004` — cdx staleness CLI
 
-The read-only `cdmon staleness [--config][--now ISO][--json][--fail-on-stale]` command resolves the reviewed-docs from config and grades them against `--now` (default the wall clock) + the audience-aware SLA; the table shows only docs needing review, --json shows all, --fail-on-stale is a CI review gate. Pure + offline (K1/K4).
+The read-only `cdx staleness [--config][--now ISO][--json][--fail-on-stale]` command resolves the reviewed-docs from config and grades them against `--now` (default the wall clock) + the audience-aware SLA; the table shows only docs needing review, --json shows all, --fail-on-stale is a CI review gate. Pure + offline (K1/K4).
 
 ### `FEAT-STALENESS-005` — Reviewed + resolved SLA mirrored at sync
 

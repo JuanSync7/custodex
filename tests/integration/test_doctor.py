@@ -1,4 +1,4 @@
-"""G-02 — tests for `cdmon doctor` / `run_checks` (offline preflight).
+"""G-02 — tests for `cdx doctor` / `run_checks` (offline preflight).
 
 Features: FEAT-QUALITY-008, FEAT-QUALITY-009, FEAT-CLI-014
 """
@@ -9,8 +9,8 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import (
+from custodex.cli import app
+from custodex.config import (
     AgentConfig,
     Audience,
     BackendConfig,
@@ -18,7 +18,7 @@ from code_doc_monitor.config import (
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.doctor import Check, CheckStatus, run_checks
+from custodex.doctor import Check, CheckStatus, run_checks
 
 runner = CliRunner()
 
@@ -190,7 +190,7 @@ def test_backend_api_with_key_passes(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_backend_claude_code_missing_cli_warns(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("code_doc_monitor.doctor.shutil.which", lambda _: None)
+    monkeypatch.setattr("custodex.doctor.shutil.which", lambda _: None)
     cfg = MonitorConfig(
         documents=(
             DocumentSpec(id="g", path="docs/g.md", audience=Audience.ENG_GUIDE),
@@ -202,9 +202,7 @@ def test_backend_claude_code_missing_cli_warns(tmp_path: Path, monkeypatch) -> N
 
 
 def test_backend_claude_code_cli_present_passes(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "code_doc_monitor.doctor.shutil.which", lambda _: "/usr/bin/claude"
-    )
+    monkeypatch.setattr("custodex.doctor.shutil.which", lambda _: "/usr/bin/claude")
     cfg = MonitorConfig(
         documents=(
             DocumentSpec(id="g", path="docs/g.md", audience=Audience.ENG_GUIDE),
@@ -230,7 +228,7 @@ def test_agent_backend_extra_check(tmp_path: Path, monkeypatch) -> None:
 
 def test_agent_extra_passes_when_present(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "code_doc_monitor.doctor.importlib.util.find_spec",
+        "custodex.doctor.importlib.util.find_spec",
         lambda _: object(),
     )
     cfg = MonitorConfig(
@@ -245,9 +243,7 @@ def test_agent_extra_passes_when_present(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_agent_extra_warns_when_absent(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(
-        "code_doc_monitor.doctor.importlib.util.find_spec", lambda _: None
-    )
+    monkeypatch.setattr("custodex.doctor.importlib.util.find_spec", lambda _: None)
     cfg = MonitorConfig(
         documents=(
             DocumentSpec(id="g", path="docs/g.md", audience=Audience.ENG_GUIDE),
@@ -259,7 +255,7 @@ def test_agent_extra_warns_when_absent(tmp_path: Path, monkeypatch) -> None:
 
 
 # --------------------------------------------------------------------------
-# cdmon doctor — CLI / system
+# cdx doctor — CLI / system
 # --------------------------------------------------------------------------
 def _write(path: Path, text: str) -> Path:
     path.write_text(text, encoding="utf-8")

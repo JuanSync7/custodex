@@ -2,14 +2,14 @@
 
 This standard defines **how a managed document is written** — the file
 structure of the Markdown source and its derived HTML twin — so that every
-project adopting `code-doc-monitor` lays its docs out the same way. The content
+project adopting `custodex` lays its docs out the same way. The content
 of the managed regions is governed by the code surface (see `ARCHITECTURE.md`);
 this standard governs the *shape of the file around them*.
 
-It is **machine-checked**, not just documented: `cdmon lint` validates a doc
-against every rule below, and `cdmon new-doc` scaffolds a conformant file. A
-non-conforming doc fails `cdmon lint` the same way stale content fails
-`cdmon check`.
+It is **machine-checked**, not just documented: `cdx lint` validates a doc
+against every rule below, and `cdx new-doc` scaffolds a conformant file. A
+non-conforming doc fails `cdx lint` the same way stale content fails
+`cdx check`.
 
 ## 1. Canonical skeleton
 
@@ -100,7 +100,7 @@ HTML is a **pure derivation** of the Markdown — never hand-edited:
 - **1:1 path map** — `X.md` → `X.html` (same stem, `.html` suffix).
 - **Embedded source hash** — the HTML carries the Markdown body hash in a
   `<meta name="code-doc-md-sha256" content="…">` tag (or, for helium,
-  `helium-docs-md-sha256`). `cdmon lint` recomputes the hash of the current
+  `helium-docs-md-sha256`). `cdx lint` recomputes the hash of the current
   Markdown **body** and flags `HTML_STALE` on a mismatch and `HTML_MISSING` /
   `HTML_NOT_DERIVED` when the twin or its hash is absent.
 - **Do-not-edit banner** — the HTML states it is generated.
@@ -112,7 +112,7 @@ would see does. Audience split is preserved: humans read `*.html` /
 
 ## 5. Issue codes
 
-`cdmon lint` reports these codes (one per violation):
+`cdx lint` reports these codes (one per violation):
 
 | code | rule |
 |------|------|
@@ -135,11 +135,11 @@ would see does. Audience split is preserved: humans read `*.html` /
 ## 6. Workflow
 
 ```bash
-cdmon new-doc <doc-id>     # scaffold a conformant .md from the config + code
-cdmon lint                 # validate every doc against this standard (exit 1 on issues)
-cdmon lint --fix           # stamp missing static front matter (schema_version/audience)
-cdmon check                # content drift (orthogonal to lint — run both in CI)
-cdmon build                # (re)render html:true docs to their .html twins (keeps the §4 pairing fresh)
+cdx new-doc <doc-id>     # scaffold a conformant .md from the config + code
+cdx lint                 # validate every doc against this standard (exit 1 on issues)
+cdx lint --fix           # stamp missing static front matter (schema_version/audience)
+cdx check                # content drift (orthogonal to lint — run both in CI)
+cdx build                # (re)render html:true docs to their .html twins (keeps the §4 pairing fresh)
 ```
 
 `lint` (structure) and `check` (content) are orthogonal gates; CI should run
@@ -228,9 +228,9 @@ HASH and the REGION drift; the HASH heal regenerates the rendered regions +
 fingerprint but PRESERVES a no-renderer region's body byte-identical (it never
 blanks the prose), and the REGION fix authors the new body.
 
-### Inspecting region authority state (`cdmon lint --modes`)
+### Inspecting region authority state (`cdx lint --modes`)
 
-`cdmon lint --modes` prints each managed region's declared `mode` plus its
+`cdx lint --modes` prints each managed region's declared `mode` plus its
 renderer / lock / advisory state — one line per region:
 
 ```
@@ -253,7 +253,7 @@ region (re-purpose, rename, add, or remove a sibling and the index drifts until
 rebuilt). Set `kind: <audience>` to list only `user-guide` or `eng-guide` docs.
 
 Separately, set `index: true` on the document spec to enable the structural
-**completeness** lint: `cdmon lint` then emits `INDEX_INCOMPLETE` (§5) if the
+**completeness** lint: `cdx lint` then emits `INDEX_INCOMPLETE` (§5) if the
 landing page fails to link a document it indexes. The two flags are orthogonal —
 `source: index` drives the *generated table*, `index: true` drives the
 *link-completeness lint* — and a landing page typically sets both.
@@ -293,7 +293,7 @@ Each row is one document; a column's `field` selects a synthetic per-doc value:
 | `path` | the doc's repo-relative path |
 
 Because an index has no code surface, its fingerprint is stable and the
-meaningful drift signal is the region body itself; `cdmon monitor --apply`
+meaningful drift signal is the region body itself; `cdx monitor --apply`
 regenerates it (the engine renders the table with all-docs context and the
 backend applies it).
 

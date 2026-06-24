@@ -3,7 +3,7 @@ import { defineConfig } from "astro/config";
 import react from "@astrojs/react";
 import mdx from "@astrojs/mdx";
 
-// One Astro app for code-doc-monitor (EPIC ASTRO). Static output so a single
+// One Astro app for custodex (EPIC ASTRO). Static output so a single
 // FastAPI process serves the API and this site on one port (`StaticFiles` over
 // `frontend/dist`). React islands hydrate the interactive console (ASTRO-03);
 // markdown/MDX renders the EPIC-R wikis natively (ASTRO-02). Asset dir is the

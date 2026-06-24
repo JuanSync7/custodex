@@ -1,4 +1,4 @@
-"""L-01 — the per-repo STANDALONE app (``cdmon serve``) over a REAL temp git repo.
+"""L-01 — the per-repo STANDALONE app (``cdx serve``) over a REAL temp git repo.
 
 Builds a true on-disk dir-layout git repo (``git init`` / ``config/cdmon`` /
 healed in-sync docs / commit on ``main``), then drives the import-safe builders:
@@ -33,8 +33,8 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.errors import CodeDocMonitorError  # noqa: E402
-from code_doc_monitor.server.standalone import (  # noqa: E402
+from custodex.errors import CodeDocMonitorError  # noqa: E402
+from custodex.server.standalone import (  # noqa: E402
     build_standalone_app,
     build_standalone_store,
     resolve_repo_id,
@@ -51,7 +51,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: standalone-repo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -126,7 +126,7 @@ def _seed_docs(config_dir: Path) -> None:
     """Heal the docs to a clean baseline via the real monitor pipeline."""
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     result = CliRunner().invoke(
         app, ["monitor", "--config", str(config_dir), "--apply"]

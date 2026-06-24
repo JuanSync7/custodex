@@ -2,7 +2,7 @@
 
 Every test builds a true on-disk git repo (``git init`` / config / commit) with a
 ``config/cdmon/`` dir layout + source + healed docs, then drives
-:func:`code_doc_monitor.configsync.run_sync` in both modes:
+:func:`custodex.configsync.run_sync` in both modes:
 
 * clean repo → ``fully_synced`` True, correct counts + attribution;
 * a working-tree edit → ``local`` drift non-empty while ``git`` (the default
@@ -23,9 +23,9 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import load_bundle
-from code_doc_monitor.configsync import _build_rows, read_config_at, run_sync
-from code_doc_monitor.errors import SyncError
+from custodex.config import load_bundle
+from custodex.configsync import _build_rows, read_config_at, run_sync
+from custodex.errors import SyncError
 
 _NOW = "2026-06-07T00:00:00Z"
 
@@ -38,7 +38,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: gitrepo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -113,7 +113,7 @@ def _seed_docs(config_dir: Path) -> None:
     """Heal the docs to a clean baseline via the real monitor pipeline."""
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     result = CliRunner().invoke(
         app, ["monitor", "--config", str(config_dir), "--apply"]
@@ -397,7 +397,7 @@ def test_build_rows_derives_accountable_durable(tmp_path: Path) -> None:
         "---\n"
         'cdmon-config-version: "2.0.0"\n'
         "repo: probe\n"
-        "generated-by: cdmon\n"
+        "generated-by: cdx\n"
         'updated: "2026-06-07"\n'
         "---\n"
         'root: "."\n'
@@ -452,7 +452,7 @@ def test_build_rows_projects_reviewed_and_resolved_sla(tmp_path: Path) -> None:
         "---\n"
         'cdmon-config-version: "2.0.0"\n'
         "repo: probe\n"
-        "generated-by: cdmon\n"
+        "generated-by: cdx\n"
         'updated: "2026-06-07"\n'
         "---\n"
         'root: "."\n'

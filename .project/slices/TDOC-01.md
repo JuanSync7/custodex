@@ -21,13 +21,13 @@ real (and keeps the maintenance tax + coverage impact bounded).
    (`dir-covered: [tests/smoke]`, `source-files-format: [".py"]`) declares one
    test-doc per smoke test file, each with a managed `symbols` region and
    `code_refs` pointing at the test file. Docs live under `test-docs/smoke/`.
-2. **In sync.** After `cdmon new-doc` + reheal, `cdmon check` is clean and the
+2. **In sync.** After `cdx new-doc` + reheal, `cdx check` is clean and the
    test-doc's `symbols` region lists the file's test functions.
-3. **Coverage stays green.** `cdmon coverage` (symbol floor 95%) and the dogfood
+3. **Coverage stays green.** `cdx coverage` (symbol floor 95%) and the dogfood
    self-coverage threshold test stay ≥ threshold (test functions are documented).
-4. **Index in sync.** `cdmon index` lists `tests.yaml`; `index --check` is clean.
+4. **Index in sync.** `cdx index` lists `tests.yaml`; `index --check` is clean.
 5. **Self-heal.** Inducing drift in a smoke test file (add/rename a `test_*`
-   function) drifts its test-doc; `cdmon monitor --apply` heals it (idempotent).
+   function) drifts its test-doc; `cdx monitor --apply` heals it (idempotent).
 
 ## Design
 - **No engine change.** Reuse `build_document_surface`, `drift.detect`,
@@ -35,9 +35,9 @@ real (and keeps the maintenance tax + coverage impact bounded).
 - **`config/cdmon/tests.yaml`** (new unit): `unit: tests`, `dir-covered:
   [tests/smoke]`, two `eng-guide` docs (`test-smoke-boundaries`,
   `test-smoke-smoke`) with `region_keys: [symbols]`.
-- **`test-docs/smoke/*.md`** (new, generated): scaffolded via `cdmon new-doc`,
+- **`test-docs/smoke/*.md`** (new, generated): scaffolded via `cdx new-doc`,
   human blockquote describing what the test module guards; region machine-filled.
-- **`index.yaml`**: `cdmon index` adds `tests.yaml`; add a coverage waiver for
+- **`index.yaml`**: `cdx index` adds `tests.yaml`; add a coverage waiver for
   `tests/smoke/__init__.py` IF it surfaces as a gap (empirically determined).
 - **Copy-helper ripple.** Both `_copy_dogfood_tree` helpers (`test_dogfood.py`
   and `tests/regression/test_corpus_selfcoverage.py`) must also copy `test-docs/`
@@ -50,7 +50,7 @@ real (and keeps the maintenance tax + coverage impact bounded).
   `monitor --apply` re-syncs (mirrors the source self-heal contract for tests).
 - **dogfood (existing):** `test_dogfood_*` (check / lint / coverage / index)
   automatically validate the new unit + docs once rehealed.
-- Full gate green (ruff/mypy/pytest); coverage ≥ floor; `cdmon trace`/`wiki`
+- Full gate green (ruff/mypy/pytest); coverage ≥ floor; `cdx trace`/`wiki`
   handled in TDOC-03.
 
 ## Out of scope

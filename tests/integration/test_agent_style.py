@@ -16,13 +16,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.agent import PromptLibrary, render_context, select_artifacts
-from code_doc_monitor.agent.graph import build_graph
-from code_doc_monitor.backends import FixRequest
-from code_doc_monitor.config import AgentConfig, Audience, RegionMode
-from code_doc_monitor.docstyle import DocStyleSelection, read_style_guidance
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.extract import DocumentSurface, Symbol
+from custodex.agent import PromptLibrary, render_context, select_artifacts
+from custodex.agent.graph import build_graph
+from custodex.backends import FixRequest
+from custodex.config import AgentConfig, Audience, RegionMode
+from custodex.docstyle import DocStyleSelection, read_style_guidance
+from custodex.drift import Drift, DriftKind
+from custodex.extract import DocumentSurface, Symbol
 
 # Reuse the docstyle suite's template-tree builder so the bodies are assertable.
 from tests.unit.test_docstyle import _write_templates
@@ -148,8 +148,8 @@ def _monitor_with_doc_style(tmp_path: Path, doc_style: object | None):
     The config dir IS ``tmp_path`` and ``root`` defaults to ".", so
     ``self.root / templates/writing`` == the tree _write_templates lays down.
     """
-    from code_doc_monitor.config import MonitorConfig
-    from code_doc_monitor.monitor import Monitor
+    from custodex.config import MonitorConfig
+    from custodex.monitor import Monitor
 
     cfg = MonitorConfig(documents=())
     return Monitor(cfg, tmp_path, doc_style=doc_style)
@@ -159,7 +159,7 @@ def test_monitor_style_guidance_only_for_no_renderer_llm_region(
     tmp_path: Path,
 ) -> None:
     """_style_guidance_for fires for a no-renderer llm REGION; None otherwise."""
-    from code_doc_monitor.config import load_bundle
+    from custodex.config import load_bundle
 
     # A real bundle so doc_style is a genuine DocStyleMap.
     from tests.integration.test_config_v2 import _write_tree
@@ -171,7 +171,7 @@ def test_monitor_style_guidance_only_for_no_renderer_llm_region(
     (d / "doc-style.yaml").write_text(_DOC_STYLE_WITH_MAPPING, encoding="utf-8")
     bundle = load_bundle(d)
 
-    from code_doc_monitor.monitor import Monitor
+    from custodex.monitor import Monitor
 
     mon = Monitor(bundle.config, d, doc_style=bundle.doc_style)
 
@@ -205,13 +205,13 @@ def test_monitor_no_doc_style_yields_no_guidance(tmp_path: Path) -> None:
 
 def test_monitor_renderer_backed_llm_region_gets_no_guidance(tmp_path: Path) -> None:
     """A renderer-backed llm region is rendered, not authored ⇒ no guidance."""
-    from code_doc_monitor.config import (
+    from custodex.config import (
         MonitorConfig,
         RegionColumn,
         RegionTemplate,
     )
-    from code_doc_monitor.docstyle import DocStyleFrontmatter, DocStyleMap
-    from code_doc_monitor.monitor import Monitor
+    from custodex.docstyle import DocStyleFrontmatter, DocStyleMap
+    from custodex.monitor import Monitor
 
     root = _write_templates(tmp_path)
     ds = DocStyleMap(

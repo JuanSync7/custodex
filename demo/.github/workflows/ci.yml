@@ -27,15 +27,15 @@ jobs:
         run: pytest
 
   docs:
-    name: docs in sync (cdmon)
+    name: docs in sync (cdx)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install code-doc-monitor
-        run: pip install code-doc-monitor
+      - name: Install custodex
+        run: pip install custodex
       # Fail the build if a documented symbol drifted from its managed region.
       - name: Check docs are in sync
-        run: python -m code_doc_monitor.cli check --config config/cdmon
+        run: python -m custodex.cli check --config config/cdmon

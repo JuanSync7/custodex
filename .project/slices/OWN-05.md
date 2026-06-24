@@ -35,7 +35,7 @@ rewritten to disk through the existing EDITOR generate-to-disk pipeline.
 ## Dogfood
 `config.py`, `generate.py`, `server/edits.py` tracked → reheal `docs/api/*`. Add
 **FEAT-OWNERSHIP-008** (reassignment edit) to the catalog + DEMOS case + tagged
-test; `cdmon wiki`; `cdmon trace --fail-on-gap` exit 0.
+test; `cdx wiki`; `cdx trace --fail-on-gap` exit 0.
 
 ## Constraints
 K5 (reassignment = the human fix; config = truth), K6 (additive edit type),

@@ -1,10 +1,10 @@
-# code-doc-monitor central server image (EPIC SVR).
+# custodex central server image (EPIC SVR).
 #
 # Two stages: build the Astro console, then a slim Python runtime that installs the
 # [server] extra and serves the API + the built console single-origin on :33333.
 #
-#   docker build -t cdmon-server .
-#   docker run --rm -p 33333:33333 -e CDMON_ADMIN_TOKEN=... cdmon-server
+#   docker build -t cdx-server .
+#   docker run --rm -p 33333:33333 -e CDMON_ADMIN_TOKEN=... cdx-server
 #
 # For a real deployment with Postgres + secrets, prefer `docker compose up` (see
 # docker-compose.yml) and DEPLOY.md.
@@ -26,13 +26,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Run as a non-root user (defense-in-depth).
-RUN useradd --create-home --uid 10001 cdmon
+RUN useradd --create-home --uid 10001 cdx
 WORKDIR /app
 
 # Install the package + the [server] extra. Editable so app.py stays in /app and the
 # default static dir resolves to /app/frontend/dist (the relative-path contract).
 COPY pyproject.toml README.md ./
-COPY code_doc_monitor ./code_doc_monitor
+COPY custodex ./custodex
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 COPY feature-doc ./feature-doc
@@ -42,9 +42,9 @@ RUN pip install --no-cache-dir -e '.[server]'
 # The console built in stage 1, where _default_static_dir() looks (parents[2]/frontend/dist).
 COPY --from=frontend /build/frontend/dist ./frontend/dist
 
-USER cdmon
+USER cdx
 EXPOSE 33333
 
 # main() binds host/port/log level from config/settings.yaml + the CDMON_* env vars.
 # $CDMON_DATABASE_URL → a persistent SqlStore (else a loud-warning in-memory store).
-CMD ["cdmon-server"]
+CMD ["cdx-server"]

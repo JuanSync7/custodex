@@ -1,7 +1,7 @@
-# Golden multi-language example for code-doc-monitor.
+# Golden multi-language example for custodex.
 #
 # One small "greeter" tool implemented across FIVE source languages, each mapped
-# onto a managed document so a single `cdmon check` keeps every doc honest:
+# onto a managed document so a single `cdx check` keeps every doc honest:
 #
 #   greeter.py   (Python library)   -> library.md  (eng-guide, symbol table)
 #   cli.py       (argparse CLI)     -> cli.md       (user-guide, options table)
@@ -10,9 +10,9 @@
 #   gui.tcl      (tcl switches)     -> tools.md     (user-guide, switch table)
 #
 # Nothing here is engine code — every language-specific detail is config (K0).
-# Run:  cdmon check   (warn on drift)
-#       cdmon monitor --apply   (auto-close drift)
-#       cdmon build   (render the .html twins)
+# Run:  cdx check   (warn on drift)
+#       cdx monitor --apply   (auto-close drift)
+#       cdx build   (render the .html twins)
 
 version: "1.0.0"
 root: "."

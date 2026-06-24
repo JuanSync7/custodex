@@ -1,4 +1,4 @@
-# code-doc-monitor — project index
+# custodex — project index
 
 A standardized, reusable code→documentation drift monitor with LLM
 auto-remediation and human-reviewable audit logging.
@@ -13,7 +13,7 @@ auto-remediation and human-reviewable audit logging.
 | slice | module(s) | validable goal |
 |-------|-----------|----------------|
 | CDM-00 | bootstrap | skeleton + venv + tooling green; smoke test passes |
-| CDM-01 | errors, config, cli(init) | load yaml/json config into models; `cdmon init` writes a template; bad config raises ConfigError |
+| CDM-01 | errors, config, cli(init) | load yaml/json config into models; `cdx init` writes a template; bad config raises ConfigError |
 | CDM-02 | extract | per-document audience-aware surface from AST + sub-file selection; stable hash; user-guide ignores comments/privates |
 | CDM-03 | manifest, blocks, drift, heal | detect MISSING/HASH/REGION/UNHEALABLE drift audience-correctly; regenerate regions idempotently |
 | CDM-04 | schema, reviewlog, sinks | ReviewRecord + JSON schema; append/read JSONL; file/null sink offline |

@@ -15,20 +15,20 @@ from pathlib import Path
 
 import yaml
 
-from code_doc_monitor.backends import BackendResult, FixRequest
-from code_doc_monitor.blocks import symbol_table
-from code_doc_monitor.config import (
+from custodex.backends import BackendResult, FixRequest
+from custodex.blocks import symbol_table
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
     RegionMode,
 )
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.schema import ProposedFix, Verdict
-from code_doc_monitor.sinks import NullSink
-from code_doc_monitor.syncpr import SyncResult, should_sync, sync_pr
+from custodex.extract import build_document_surface
+from custodex.monitor import Monitor
+from custodex.schema import ProposedFix, Verdict
+from custodex.sinks import NullSink
+from custodex.syncpr import SyncResult, should_sync, sync_pr
 from tests._repo import REPO_ROOT
 
 FIXED_NOW = "2026-06-01T00:00:00+00:00"
@@ -317,14 +317,14 @@ def test_gitlab_ci_is_valid_yaml_with_docs_gate() -> None:
     gate = data["docs:gate"]
     # Runs the two offline doc gates against the dogfood config.
     script = "\n".join(gate["script"])
-    assert "cdmon check" in script
-    assert "cdmon lint" in script
+    assert "cdx check" in script
+    assert "cdx lint" in script
     # On MRs + branches, like tests:offline.
     assert gate["rules"]
 
 
 def test_gitlab_ci_heal_job_uses_should_sync_loop_guard() -> None:
-    """C-04: a heal/sync job guards on `cdmon should-sync` to skip doc-only commits."""
+    """C-04: a heal/sync job guards on `cdx should-sync` to skip doc-only commits."""
     ci_path = REPO_ROOT / ".gitlab-ci.yml"
     text = ci_path.read_text(encoding="utf-8")
     data = yaml.safe_load(text)

@@ -1,4 +1,4 @@
-# code-doc-monitor — lessons learnt
+# custodex — lessons learnt
 
 Append one entry per slice: what was non-obvious, why, how to apply it later.
 
@@ -10,7 +10,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   not incidentally.
 
 - [CDM-01] **A Typer app with exactly one command collapses into a
-  single-command CLI**, so `cdmon init ...` got parsed as `init` (the prog) plus
+  single-command CLI**, so `cdx init ...` got parsed as `init` (the prog) plus
   an unexpected `init` argument and exited 2. Adding a group-level
   `@app.callback()` forces Typer to keep it a multi-command group even while only
   `init` exists — which is also what we want once later slices add
@@ -154,7 +154,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   two implicit doc dialects (cdmon's `CDM:BEGIN` + front-matter fingerprint vs
   helium's `HELIUM:AUTOGEN … START/END` + html-embedded hash). Writing the
   Layout Standard as prose alone would have just added a third thing to keep in
-  sync. Encoding it as `cdmon lint` (a checkable gate) is what makes it real.
+  sync. Encoding it as `cdx lint` (a checkable gate) is what makes it real.
 - **Put static metadata where heal already preserves it.** `schema_version` and
   `audience` are static, so authoring them once and relying on `set_fingerprint`
   (which copies the whole `cdm:` mapping and only overwrites `fingerprint`) to
@@ -260,7 +260,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 - **Dogfood drift is from errors.py, not the new module.** Per the dogfood-reheal memory:
   inventory.py itself is unwired so it doesn't drift any doc, but adding `InventoryError`
   to the TRACKED errors.py drifts docs/api/foundation.md (HASH + symbols REGION).
-  `cdmon monitor --apply` heals it; `check`+`lint` then exit 0.
+  `cdx monitor --apply` heals it; `check`+`lint` then exit 0.
 
 ## A-02 — symbol-level inventory (discover_symbols)
 
@@ -284,7 +284,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   mode (collect per-file errors instead of raising). Deferred deliberately, not forgotten.
 - **No dogfood reheal this time.** Unlike A-01 (which touched the TRACKED `errors.py`),
   A-02 only edits `inventory.py` — which is NOT referenced by any `docs/api/*` symbol
-  table in `cdmon.yaml` — and adds nothing to `errors.py`. So `cdmon check`/`lint` stay
+  table in `cdmon.yaml` — and adds nothing to `errors.py`. So `cdx check`/`lint` stay
   green with zero reheal. The dogfood-reheal memory only bites when you edit a module
   that appears in a tracked doc's code_refs; verify before assuming you must reheal.
 - **`extract.Symbol` is already frozen + `extra="forbid"`** and re-exported from
@@ -330,9 +330,9 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   so the zero-division guard is real coverage, not dead code.
 
 - **No dogfood reheal (again).** `coverage.py` is unwired (not imported by cli/monitor) and
-  not referenced by any `docs/api/*` code_ref in `cdmon.yaml`, so `cdmon check` stays green
+  not referenced by any `docs/api/*` code_ref in `cdmon.yaml`, so `cdx check` stays green
   with zero reheal — consistent with the A-02 lesson: reheal only bites when you edit a
-  module that appears in a tracked doc's code_refs. Confirmed `cdmon check` exits 0.
+  module that appears in a tracked doc's code_refs. Confirmed `cdx check` exits 0.
 
 ## A-04 — config `coverage:` section + waivers
 
@@ -371,15 +371,15 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 
 - **Dogfood reheal DID bite this slice (unlike A-02/A-03).** `config.py` is a tracked module
   in `cdmon.yaml`'s `foundation` doc, so adding the two models drifted its symbol table +
-  fingerprint → `cdmon monitor --apply` healed foundation (HASH then REGION), after which
-  `cdmon check` and `cdmon lint` both exit 0. Rule of thumb confirmed: reheal bites iff the
+  fingerprint → `cdx monitor --apply` healed foundation (HASH then REGION), after which
+  `cdx check` and `cdx lint` both exit 0. Rule of thumb confirmed: reheal bites iff the
   edited module appears in a tracked doc's `code_refs`.
 
 - **Pydantic `@property` baskets are NOT in `model_dump()` — inject them for `--json`.**
   `CoverageReport`'s percentages and the documented/undocumented/waived baskets are
   computed `@property`s, so `report.model_dump(mode="json")` carries only the stored
   `files`/`symbols` tuples — `percent_public_symbols`, `undocumented_symbols`, etc. are
-  ABSENT. `cdmon coverage --json` therefore starts from `model_dump(mode="json")`
+  ABSENT. `cdx coverage --json` therefore starts from `model_dump(mode="json")`
   (lossless, JSON-safe: tuples → lists) and then adds each derived basket/percentage
   explicitly (`_coverage_payload` in cli.py). A consumer (and the gate-metric test) can
   then read `percent_public_symbols` straight from the JSON without recomputing it. If
@@ -393,7 +393,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   an explicit `raise typer.Exit(code=0)` on the success path so the gate branch and the
   pass branch are symmetric (and both testable).
 
-- **`cdmon coverage` self-scan is honestly low (files 22%, public symbols 18%) — that's the point.**
+- **`cdx coverage` self-scan is honestly low (files 22%, public symbols 18%) — that's the point.**
   Running the new command on this repo's own `cdmon.yaml` reports ~18% public-symbol
   coverage because the engine's own inventory/coverage/cli/agent modules aren't in any
   tracked doc yet. So the A-06 CI step is INFORMATIONAL only (no `--fail-under`): a hard
@@ -532,7 +532,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   "guarantee lives where the bytes are written" discipline.
 
 - **Dogfood reheal bit (manifest/heal/drift are all tracked).** Editing the three modules
-  drifted `docs/api/{pipeline,remediation}` (HASH+REGION); `cdmon monitor --apply` healed
+  drifted `docs/api/{pipeline,remediation}` (HASH+REGION); `cdx monitor --apply` healed
   them, `check`+`lint` exit 0, and the full suite is green POST-reheal (the dogfood in-sync
   tests must pass after, not just before, the heal).
 - **Process note:** finished by the orchestrator after the slice subagent hit the
@@ -581,7 +581,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   region's mode + lock/advisory via pure `region_states`/`config_region_states` reading
   `spec.mode_for` + the public manifest hash helpers — NOT a new `LayoutCode`/issue. The
   modes map is already validated at config-load (B-01), so re-validating in lint would
-  duplicate the gate; instead `cdmon lint --modes` prints an informational view and the
+  duplicate the gate; instead `cdx lint --modes` prints an informational view and the
   structural pass/fail exit code is untouched (pinned by
   `test_lint_modes_does_not_suppress_structural_failures`). → When a slice asks to
   "teach lint about X," distinguish a *gate* (drives exit code, needs an issue code)
@@ -591,7 +591,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 - **Dogfood reheal bit via a DOCSTRING edit on a tracked module.** I only changed
   `config.RegionMode`'s docstring (no signature change), but `config.py` is in the
   `foundation` doc and the eng-guide surface hash folds docstrings (K3), so it drifted
-  HASH. `cdmon monitor --apply` healed it; the same run also flushed accumulated
+  HASH. `cdx monitor --apply` healed it; the same run also flushed accumulated
   pipeline/remediation symbol-table lag from the earlier B-02/B-03 module edits (those
   docs reference `heal.py`/`drift.py`/`config.py` and had not been re-healed). `check`
   + `lint` exit 0 and the full suite is green POST-reheal. → A docstring-only edit on a
@@ -633,7 +633,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 
 - **`docs:gate` is an ORTHOGONAL CI signal, kept separate from `tests:offline`.** Drift
   is a different failure mode than a failing unit test, so it gets its own fast offline
-  job (`cdmon check` + `cdmon lint`) rather than being folded into the test job — a red
+  job (`cdx check` + `cdx lint`) rather than being folded into the test job — a red
   pipeline then tells you *which* kind of thing broke. Both gates are pure/offline (K1/
   K4), so neither spends a token. C-04 still needs to add the loop-safety path rule so
   the bot's own doc-only commits don't re-trigger the heal (noted in a CI comment).
@@ -671,7 +671,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   live path.
 
 - [C-03] **`--dry-run` must thread through to the *sync*, not just the transport.**
-  `cdmon open-docs-pr --dry-run` calls `sync_pr(dry_run=True)` so the working tree is
+  `cdx open-docs-pr --dry-run` calls `sync_pr(dry_run=True)` so the working tree is
   left byte-identical (the plan is computed from the would-be-healed content via the
   C-02 restore-including-delete), AND skips building/calling the transport — two
   independent "no side effect" guarantees from one flag. For C-04/05: the plan already
@@ -780,7 +780,7 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   module would have duplicated that machinery or created a circular read dependency for the
   join. Cohesion > file count.
 - **The CLI now has its OWN injectable `_now` seam (D-02).** `Monitor` injects `now` via its
-  ctor, but `cdmon resolve` builds a `ResolutionRecord` directly in the command. Rather than
+  ctor, but `cdx resolve` builds a `ResolutionRecord` directly in the command. Rather than
   thread a clock through, a module-level `cli._now()` (mirroring `monitor._default_now`) is the
   seam tests monkeypatch (`monkeypatch.setattr(cli, "_now", ...)`) for a deterministic
   `resolved_at` (K10). Pattern for any future CLI command that timestamps without a Monitor.
@@ -869,9 +869,9 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 
 - [E-03] **A `[server]` extra is genuinely lazy ONLY if core never imports the subpackage — verify it,
   don't assume.** The lazy boundary isn't a property of `server/__init__.py` (which DOES import fastapi
-  via `.app`); it's the property that `code_doc_monitor/__init__.py` and the engine modules never
+  via `.app`); it's the property that `custodex/__init__.py` and the engine modules never
   `import .server`. `server/__init__.py` can eagerly import fastapi and the boundary still holds, because
-  nothing pulls the subpackage in until you explicitly `import code_doc_monitor.server`. I proved it with
+  nothing pulls the subpackage in until you explicitly `import custodex.server`. I proved it with
   a `sys.modules` assertion (`'fastapi' not in sys.modules` after a bare core import) rather than trusting
   the structure. → When adding an optional-extra subpackage, the test that matters is "does a core import
   drag in the heavy dep", not "is the subpackage's own `__init__` lazy". Keep the PURE half (here
@@ -1034,9 +1034,9 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
 - **`dist/` was already gitignored at the repo root (Python `build/`+`dist/`) — but add an
   explicit `dashboard/dist/` + `dashboard/node_modules/` anyway for clarity**, plus a
   `dashboard/.gitignore`. `package-lock.json` IS committed (reproducible installs).
-- **The Python `cdmon` gate is undisturbed by the TS dir.** `cdmon check`/coverage scan
+- **The Python `cdx` gate is undisturbed by the TS dir.** `cdx check`/coverage scan
   `**/*.py` only; `dashboard/` has no `.py`, so it's invisible to dogfooding — confirmed
-  `cdmon check` exit 0 and pytest still 648 after the scaffold. Do NOT add the dashboard to
+  `cdx check` exit 0 and pytest still 648 after the scaffold. Do NOT add the dashboard to
   `cdmon.yaml`.
 
 ## F-02/03 — drift-timeline + coverage views (routing + 2 read views)
@@ -1058,8 +1058,8 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   `opts.fetchImpl ?? ((...a) => globalThis.fetch(...a))` — an explicit injected fake is still used
   verbatim, but the default now honors a later `vi.stubGlobal`. Lesson for any future singleton
   over a global: don't snapshot the global in the constructor.
-- **schema→TS is HALF the contract: `cdmon schema` emits ONLY the review record.** Running
-  `.venv/bin/cdmon schema --out dashboard/src/schema.review.json` gives the K6-true
+- **schema→TS is HALF the contract: `cdx schema` emits ONLY the review record.** Running
+  `.venv/bin/cdx schema --out dashboard/src/schema.review.json` gives the K6-true
   `ReviewRecord` JSON Schema (with `$defs` for `Audience`/`Verdict`/`ProposedFix`), which I
   mirrored 1:1 into TS interfaces — generated, honest, matches the rendered fields.
   But `ResolutionRecord` is NOT in that schema (the CLI only serializes the review record), and
@@ -1118,10 +1118,10 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   scales to N per-repo sub-views without per-view `:param` routes.
 
 - **G-02 — WARN vs FAIL: an absent runtime prereq is NOT a broken config.** The
-  hard call in `cdmon doctor` is grading. A config can be perfectly VALID and
+  hard call in `cdx doctor` is grading. A config can be perfectly VALID and
   still not be RUNNABLE on this particular machine: no `claude` CLI on `$PATH`,
   `$ANTHROPIC_API_KEY`/the central token unset, the optional `[agent]` extra not
-  installed, a missing doc FILE (which `cdmon new-doc`/the heal will scaffold).
+  installed, a missing doc FILE (which `cdx new-doc`/the heal will scaffold).
   Grading any of those as FAIL would make `doctor` a useless gate in CI (a job
   without the prod secrets would always red). So the rule we landed (and pinned in
   ARCHITECTURE.md + the `doctor.py` module docstring): **a merely-ABSENT prereq is
@@ -1179,44 +1179,44 @@ Append one entry per slice: what was non-obvious, why, how to apply it later.
   hand-rolled raw post had to add `{"Content-Type": "application/json"}`. Then 403
   (wrong token) and 202 (right token) on the SAME bytes prove the E-06 write path.
 - **G-03 — a template-honesty test must parse the COMMAND lines, not the file
-  text.** A first cut regex-scanned the whole YAML for `cdmon <word>` and tripped
-  on PROSE in comments ("the cdmon repo", "your committed cdmon config" →
+  text.** A first cut regex-scanned the whole YAML for `cdx <word>` and tripped
+  on PROSE in comments ("the cdx repo", "your committed cdx config" →
   `repo`/`config`). The honest check parses the YAML and collects only the actual
   script lines (GitLab top-level `script` lists + the shared `&cdmon-setup` anchor;
   GitHub `jobs.<id>.steps[].run` blocks — GitHub jobs are NESTED under `jobs:`,
   GitLab jobs are TOP-LEVEL), strips trailing `# …` comments, THEN regexes for
-  `cdmon <token>` and checks it against `typer.main.get_command(app).commands.keys()`
+  `cdx <token>` and checks it against `typer.main.get_command(app).commands.keys()`
   (the canonical click names — handles `name=`-overridden + function-derived like
   `new-doc`). Verified it bites: `check`→`verify` reds the test. Note GitHub's `on:`
   key parses to YAML boolean `True`, so iterate `doc.values()` defensively.
 - **G — an example fixture under `examples/` is insulated from the dogfood + the
   pytest run for free.** `examples/external-repo/src/widget.py` is NOT scanned by
-  the dogfood `cdmon.yaml` (which roots at `code_doc_monitor/`) and NOT collected by
-  pytest (`testpaths = ["tests"]`), so adding it cannot perturb `cdmon coverage`,
-  `cdmon check`, or test collection. Scaffold the fixture doc IN-SYNC with
-  `cdmon new-doc <id> --config <fixture cfg>` (then drop a real purpose line —
+  the dogfood `cdmon.yaml` (which roots at `custodex/`) and NOT collected by
+  pytest (`testpaths = ["tests"]`), so adding it cannot perturb `cdx coverage`,
+  `cdx check`, or test collection. Scaffold the fixture doc IN-SYNC with
+  `cdx new-doc <id> --config <fixture cfg>` (then drop a real purpose line —
   prose outside the managed region doesn't change the fingerprint), so the committed
   tree passes `check`+`lint` and the e2e test creates drift on a copy.
 
 ## H-02 — self-dogfood: documenting the engine's own modules + a hard coverage gate
 
 **Scope the coverage scan BEFORE measuring — the denominator is the whole story.**
-`cdmon coverage` defaults to `inventory.DEFAULT_INCLUDE = ("**/*.py",)` with only
+`cdx coverage` defaults to `inventory.DEFAULT_INCLUDE = ("**/*.py",)` with only
 dotfile/`__pycache__`/`.venv` excludes. On the repo itself that swept in `tests/`,
 `examples/`, `alembic/`, and `dashboard/node_modules/`, ballooning the universe to
 1106 public symbols and pinning the headline at 12.2%. None of those are the
 *engine's* documentable surface. Adding a `coverage.include:
-["code_doc_monitor/**/*.py"]` block scopes the metric to what the slice is actually
+["custodex/**/*.py"]` block scopes the metric to what the slice is actually
 about (engine self-coverage), which baselined honestly at 42.2% (135/320). This is
 a *scope* decision, not a waiver: out-of-scope trees leave the metric entirely;
 waivers are for in-scope engine code that intentionally needs no doc and must
 justify themselves.
 
 **The documentation loop is genuinely mechanical (K2 pays off).** Per group of
-modules: `cdmon new-doc <id>` writes a conformant scaffold (front matter + a
+modules: `cdx new-doc <id>` writes a conformant scaffold (front matter + a
 `> TODO` purpose line + a generated `CDM:BEGIN symbols` table) → add the
 `DocumentSpec` + `code_refs` to `cdmon.yaml` → edit ONLY the one-line `>` purpose
-→ `cdmon monitor --apply`. The apply does two things at once: heals each doc's
+→ `cdx monitor --apply`. The apply does two things at once: heals each doc's
 fingerprint after the prose edit, AND regenerates the `api-index` landing page —
 because its region is `source: index`, the new docs appear in the index table
 automatically (never hand-edit the index). 8 docs covered all 23 engine modules;
@@ -1230,7 +1230,7 @@ because they ARE engine files); a new test asserts every waiver carries a reason
 losslessness stays explicit. Result: 100.0% of scanned engine public symbols.
 
 **Make the win durable or it rots.** Two locks: (1) the CI step flips from the
-informational `cdmon coverage` to the hard `cdmon coverage --fail-under 95` (a
+informational `cdx coverage` to the hard `cdx coverage --fail-under 95` (a
 couple points below the achieved 100% for heal headroom); (2)
 `tests/test_dogfood.py` resolves the real report the same way the CLI does
 (`discover_files(include=cfg.coverage.include) → discover_symbols → resolve_coverage`)
@@ -1238,8 +1238,8 @@ and asserts `percent_public_symbols >= 95`. So a future slice that adds an engin
 module without documenting it fails BOTH the local suite and CI — the
 self-improvement can't silently regress. Note for H-01/H-03/H-04: the dogfood
 config now owns the *entire* engine public surface, so ANY edit to a tracked module
-drifts its `docs/api/*` doc — reheal (`cdmon monitor --apply --config cdmon.yaml`)
-is now mandatory after touching essentially any `code_doc_monitor/**` file, not just
+drifts its `docs/api/*` doc — reheal (`cdx monitor --apply --config cdmon.yaml`)
+is now mandatory after touching essentially any `custodex/**` file, not just
 the handful previously documented.
 
 ## H-01/H-04 — telemetry view math + injected issue transport (+ document the new module)
@@ -1278,8 +1278,8 @@ the dogfood owns the entire engine public surface, so adding `issues.py` without
 it to `cdmon.yaml` would have dropped doc self-coverage below the `--fail-under 95`
 self-gate and failed `test_dogfood`. The fix is one `code_refs:` line in a FITTING
 existing doc (here `pr-loop`, the natural home for the PR/issue transports) + a reheal
-(`cdmon monitor --apply`). Order of operations that worked: code green → add module to
-cdmon.yaml → reheal → `cdmon check`/`lint`/`coverage --fail-under 95` all exit 0 →
+(`cdx monitor --apply`). Order of operations that worked: code green → add module to
+cdmon.yaml → reheal → `cdx check`/`lint`/`coverage --fail-under 95` all exit 0 →
 re-run the full suite (the reheal mutates `docs/api/*`, which `test_dogfood` checks).
 For H-03: the regression corpus should include a "new undocumented engine module" case
 — it's the most likely future self-gate regression.
@@ -1293,7 +1293,7 @@ cases are thin re-assertions against the SAME engine seams the system/heal/drift
 schema/sinks/monitor tests already use (audience invalidation, heal idempotence,
 human/llm-seeded lock, should_sync, schema back-compat, reporting-never-raises,
 zero-backend-call rule, dogfood-in-sync). The ONE genuinely new guard is the H-01/
-H-04 finding turned standing: an UNLISTED `code_doc_monitor/**` module's public
+H-04 finding turned standing: an UNLISTED `custodex/**` module's public
 symbol must be detected as a gap AND drop self-coverage — no prior test pinned it,
 and it is the single most likely future self-gate regression. → When asked for a
 "corpus", curate the highest-value still-true invariants and ADD only where a lesson
@@ -1526,7 +1526,7 @@ was explicitly requested.
 
 **[R-01] The golden reference must be verified against source, not asserted from
 memory.** The 6 seed `extract` features were each checked with a live
-`hasattr(code_doc_monitor.extract, ...)` probe before committing the prose
+`hasattr(custodex.extract, ...)` probe before committing the prose
 (build_document_surface / surface_hash / Extractor / register_extractor /
 get_extractor / SurfaceFingerprint / anchor_id / ShellExtractor all confirmed to
 exist). A "golden" doc that's wrong is worse than no doc — it becomes the thing
@@ -1564,12 +1564,12 @@ reads wrong when they disagree. Folded the two client-side features into
 `subsystem: server`. → Decide the id-prefix⇄subsystem rule up front and state it in
 the subagent brief, or reconcile it in the orchestrator's merge pass.
 
-**[R-03] A new `cdmon <cmd>` ALWAYS drifts the cli api doc — reheal is part of the slice.**
-Adding `cdmon trace` to `cli.py` changed the cli module's public surface, so the
+**[R-03] A new `cdx <cmd>` ALWAYS drifts the cli api doc — reheal is part of the slice.**
+Adding `cdx trace` to `cli.py` changed the cli module's public surface, so the
 dogfood suite (`test_dogfood`, `regression/test_corpus_selfcoverage`) went red with
-HASH/REGION drift on the cli api doc until `cdmon monitor --apply` rehealed it. This
+HASH/REGION drift on the cli api doc until `cdx monitor --apply` rehealed it. This
 is expected and is step 6 of the slice contract — but it means the FULL gate can't be
-green BEFORE the reheal. Order: implement + new-module coverage waiver → `cdmon
+green BEFORE the reheal. Order: implement + new-module coverage waiver → `cdx
 monitor --apply` → THEN the full pytest gate is clean. (The new module itself is
 waived from coverage, but the cli command that USES it is a real surface change.)
 
@@ -1581,24 +1581,24 @@ docstrings, and STATUS/LESSON files that merely NAME ids don't pollute the matri
 `scan_refs` is FILE-level (one ref per tag line, 1-based line); R-05's AST refinement
 to test-function / demo-case nodes layers on top — it does not change the marker
 convention. Annotating a real demo/test = put one `Feature: <id>` line in its
-docstring or a top comment. `cdmon trace --fail-on-gap` is deliberately NOT in any CI
+docstring or a top comment. `cdx trace --fail-on-gap` is deliberately NOT in any CI
 gate yet (R-07 owns that) — on the real tree it reports 0/186 covered, which is
 correct until the demos/tests carry tags.
 
 **[R-04] DEMOS.md lives under demo/, NOT tracked source — so it never drifts the
 api docs.** Authoring `demo/DEMOS.md` is a pure-additive demo artifact: it is a
 markdown file under `demo/`, which is not in the dogfood `config/cdmon` coverage
-universe, so `cdmon check`/`lint` stayed at exit 0 with NO `cdmon monitor --apply`
-reheal (unlike R-03, where adding a `cdmon` subcommand changed the cli module's
+universe, so `cdx check`/`lint` stayed at exit 0 with NO `cdx monitor --apply`
+reheal (unlike R-03, where adding a `cdx` subcommand changed the cli module's
 public surface and DID drift the cli api doc). Rule for R-05: a doc-only/test-only
-slice that touches no `code_doc_monitor/*` module skips the reheal step — only a
+slice that touches no `custodex/*` module skips the reheal step — only a
 real source-surface change needs it. The full gate can be green BEFORE any reheal
 when there's no source edit.
 
 **[R-04] Tag honestly per the feature SUMMARY, and audit cross-journey leakage.**
 The temptation when chasing `features_without_demo() == ()` is to sprinkle a
 missing id onto whatever case is nearest. Two safeguards mattered: (1) read each
-feature's catalog summary before tagging — e.g. FEAT-CLI-009 (`cdmon should-sync`)
+feature's catalog summary before tagging — e.g. FEAT-CLI-009 (`cdx should-sync`)
 and FEAT-PR-003 (`should_sync`) are the docs-heal LOOP-BREAKER, not git-mode sync,
 so they belong on the PR-family case (DEMO-051), not the git-mode case (DEMO-031);
 (2) after the probe goes green, re-scan distinct-id vs ref counts (197 refs / 186
@@ -1610,7 +1610,7 @@ HONESTY — honesty is a human read.
 offline walkthrough can't execute the live LLM backends (api/claude-code/agent),
 the Postgres SqlStore, or the authenticated server write routes (K4 keeps it
 offline). Per the slice spec, a demo case that DESCRIBES the exact observable
-steps (the `cdmon serve` + POST sequence, the `CDMON_DATABASE_URL` export, the
+steps (the `cdx serve` + POST sequence, the `CDMON_DATABASE_URL` export, the
 `pip install [agent]` + config edit) counts as a demo — so these features are
 tagged on a self-contained "How to observe: reproducible recipe" case rather than
 a walkthrough step. No dishonest tagging, and the walkthrough stayed unchanged
@@ -1696,11 +1696,11 @@ features (its row is the honest minimum) — this is the convention Part B relie
 to make `features_without_test()` empty by tagging at the module-docstring level.
 
 **`testwiki.py` is intentionally not a tracked-doc module** (no api doc, no CLI
-command yet → `cdmon check` stays clean, no reheal). It is added to the
+command yet → `cdx check` stays clean, no reheal). It is added to the
 `config/cdmon/index.yaml` coverage *waiver* (copy the featurecatalog/traceability
-pattern, reason "EPIC R test wiki; ... api doc owned by R-07 cdmon wiki") so
-`cdmon coverage --fail-under 95` still reports 100%/100%. Pure-render engines that
-R-07's `cdmon wiki` will own follow this same waiver convention.
+pattern, reason "EPIC R test wiki; ... api doc owned by R-07 cdx wiki") so
+`cdx coverage --fail-under 95` still reports 100%/100%. Pure-render engines that
+R-07's `cdx wiki` will own follow this same waiver convention.
 
 **[R-06] The test's docstring is the single source of truth; the wiki is a
 projection.** `testwiki` AST-parses tests and renders a wiki from their existing
@@ -1720,8 +1720,8 @@ specific case. → Match annotation granularity to where the signal actually liv
 don't pay per-item cost for file-level truth.
 
 **[R-06] "Tested via the underlying function" ≠ "the CLI command is tested."**
-Four features showed as untested; two were merely untagged, but `cdmon build` and
-`cdmon serve` genuinely had NO CliRunner test — only their `build()` /
+Four features showed as untested; two were merely untagged, but `cdx build` and
+`cdx serve` genuinely had NO CliRunner test — only their `build()` /
 `build_standalone_app()` helpers were covered. The traceability gate caught the
 real gap a coverage % hid (the command wrappers were never invoked). → A feature
 defined as a user-facing command needs a test that invokes the COMMAND, not just
@@ -1755,7 +1755,7 @@ the wiki/JSON) while the accessor still reasons about the whole catalog. → Fro
 snapshot models should expose only the normalized result; keep build-time joins in
 private attrs so determinism/serialization isn't polluted.
 
-**[R-07] EPIC-R closed its own loop: cdmon now provably covers its entire public
+**[R-07] EPIC-R closed its own loop: cdx now provably covers its entire public
 surface.** Reconciling `modules_without_feature()` to empty forced honest catalog
 features for `traceability`, `testwiki`, and `srcindex` (the reference machinery
 that documents everything else was itself un-catalogued). Each new feature also
@@ -1765,38 +1765,38 @@ mutually reinforcing: you cannot add a public module without also catalogng,
 demonstrating, AND testing it. → A completeness gate is only honest once the gate's
 own implementing modules are inside the thing being gated.
 
-## R-08 — `cdmon wiki` regeneration + freshness gate (EPIC R close-out)
+## R-08 — `cdx wiki` regeneration + freshness gate (EPIC R close-out)
 
 - **One mapping, two modes — never two code paths.** `WIKI_TARGETS:
   dict[Path, Callable[[Path], str]]` is the SINGLE source of the output set; both
-  `cdmon wiki` (write) and `cdmon wiki --check` call ONE `regenerate(repo_root, *,
-  write)` over it. Modelled on `cdmon index --check`: in write mode "changed" means
+  `cdx wiki` (write) and `cdx wiki --check` call ONE `regenerate(repo_root, *,
+  write)` over it. Modelled on `cdx index --check`: in write mode "changed" means
   on-disk differs from the fresh render; in check mode the SAME boolean is
   re-labelled "stale" (missing OR differs). One function, one comparison, so the
   writer and the gate can never disagree about freshness.
 - **Render thunks take a `repo_root` arg — don't bake in `Path.cwd()`.** Making each
   thunk `Callable[[Path], str]` (not zero-arg) is what let the unit tests render
   against the real repo root but WRITE into an isolated tmp repo (seeded by
-  symlinking `feature-doc/catalog`, `tests`, `demo`, `code_doc_monitor`), proving
+  symlinking `feature-doc/catalog`, `tests`, `demo`, `custodex`), proving
   idempotency + the stale-detection + missing-file paths WITHOUT mutating the
-  committed tree. The CLI passes `Path.cwd()` — cdmon is always invoked from the
+  committed tree. The CLI passes `Path.cwd()` — cdx is always invoked from the
   repo root.
 - **System tests that touch the real tree MUST snapshot+restore.** The CLI suite
-  runs `cdmon wiki`/`--check`/`trace` against the REAL repo (CliRunner, chdir to
+  runs `cdx wiki`/`--check`/`trace` against the REAL repo (CliRunner, chdir to
   repo root). A `restore_wikis` fixture snapshots the four files' text up front and
   rewrites them verbatim in `finally`, so a deliberately-mutated wiki (to assert
   `--check` exits 1) leaves the tree byte-identical + fresh afterwards. Without it a
   failed assertion mid-test would leave a drifted wiki and redden the next run.
 - **The close-out feature must catalog ITSELF (R-07's lesson, again).** Adding
-  `cdmon wiki` introduced module `wiki.py`; the orphan check (`srcindex`) would flag
+  `cdx wiki` introduced module `wiki.py`; the orphan check (`srcindex`) would flag
   it, and the matrix would go incomplete, unless FEAT-REFERENCE-007 + a demo
   (DEMO-054) + a test tag were added in the SAME slice. The regeneration command is
   itself a catalogued, demonstrated, tested feature — the system documents the tool
   that regenerates its documentation.
 - **Order of operations at the end of the slice:** add the feature/demo/test FIRST,
-  then run `cdmon wiki` (it regenerates FEATURES.md + the wikis to INCLUDE the new
+  then run `cdx wiki` (it regenerates FEATURES.md + the wikis to INCLUDE the new
   reference feature), THEN reheal the dogfood (`monitor --apply` — the new CLI
-  command drifts the cli api doc), THEN `cdmon wiki --check` + `trace --fail-on-gap`
+  command drifts the cli api doc), THEN `cdx wiki --check` + `trace --fail-on-gap`
   + the full gate. Rehealing before regenerating, or regenerating before adding the
   feature, leaves one of FEATURES.md / docs/api / the matrix stale.
 
@@ -1812,7 +1812,7 @@ own implementing modules are inside the thing being gated.
   path) AND `monkeypatch.setattr(app_module, "_wiki_dir", lambda: None)` driving the
   create_app default-resolution → `None` → empty payload, end-to-end through the route.
   That single monkeypatched test covers BOTH the default-`None` resolution branch and
-  the helper's `None`-guard, and proves the real "non-cdmon repo → graceful empty (K8)"
+  the helper's `None`-guard, and proves the real "non-cdx repo → graceful empty (K8)"
   contract rather than just hitting a line.
 - **A non-existent injected dir is NOT `None` — test both empties separately.** The
   contract has two graceful-empty paths: (a) `wiki_dir` points at a dir that doesn't
@@ -1831,14 +1831,14 @@ own implementing modules are inside the thing being gated.
   convention).** `build.render_markdown` pulls in `config`/`layout`/`manifest`; the
   server module deliberately keeps every engine import inside the function body (the
   TestClient path only needs fastapi). Importing `render_markdown` at module top would
-  have broken that and slowed `import code_doc_monitor.server.app`. Lazy import inside
+  have broken that and slowed `import custodex.server.app`. Lazy import inside
   `_load_wiki_sections` keeps the no-new-dep (K0) reuse without paying the cost at load.
 - **The dogfood ORDER for a new server route: catalog+demo+test tag → regenerate wikis
   → reheal api doc → re-check wiki freshness.** Adding FEAT-SERVER-019 + tagging the
-  test changed the TEST_WIKI content, so a `cdmon wiki` run done BEFORE the final test
+  test changed the TEST_WIKI content, so a `cdx wiki` run done BEFORE the final test
   was added left `wiki --check` STALE. The new route + `create_app` param also drifted
-  the server api doc (HASH+REGION) needing `cdmon monitor --apply`. Sequence: finish ALL
-  code+test edits, THEN `cdmon wiki` (picks up the test-wiki delta), THEN reheal the api
+  the server api doc (HASH+REGION) needing `cdx monitor --apply`. Sequence: finish ALL
+  code+test edits, THEN `cdx wiki` (picks up the test-wiki delta), THEN reheal the api
   doc, THEN re-run `wiki --check` + `check` to confirm both settled. Doing the regen too
   early just means doing it twice.
 
@@ -1901,8 +1901,8 @@ own implementing modules are inside the thing being gated.
   `client:load` on the tag is what triggers it. The console islands (ASTRO-03) follow
   this pattern.
 - **Adding ANY test re-stales `TEST_WIKI.md`.** The test wiki catalogs every test from
-  its docstring, so the two new `test_server.py` cases made `cdmon wiki --check` fail
-  until `cdmon wiki` regenerated it — the dogfood gate covers tests, not just source.
+  its docstring, so the two new `test_server.py` cases made `cdx wiki --check` fail
+  until `cdx wiki` regenerated it — the dogfood gate covers tests, not just source.
   (Watch chained `;` in CI probes: a stale-wiki nonzero is masked if a passing command
   runs after it — use `&&` or check each exit code.)
 
@@ -2059,10 +2059,10 @@ own implementing modules are inside the thing being gated.
   `test_editable_tree`'s unit list. Both `_copy_dogfood_tree` helpers had to copy
   the new `test-docs/`+`tests/smoke/` trees (else surfaces don't resolve on the
   copy), and `demo_as_git.py`'s `DEMO_HISTORY` had to fold `test-docs` into the
-  adopt-cdmon commit (else a stray 9th catch-all commit). → After adding a unit,
+  adopt-cdx commit (else a stray 9th catch-all commit). → After adding a unit,
   get ground-truth counts from a real config load, grep EVERY pin (don't trust one
   test file), and check the tree-copying fixtures + the authentic-history builder.
 - [TDOC-03] **Renaming a test re-stales `TEST_WIKI.md`.** The wiki indexes test
   nodeids (`path::func`), so even a pure rename (`…_two_units` → `…_three_units`)
-  drifts it and the `wikis fresh` gate fails. → Run `cdmon wiki` as the LAST step
+  drifts it and the `wikis fresh` gate fails. → Run `cdx wiki` as the LAST step
   after any test add/remove/RENAME, not just after catalog edits.

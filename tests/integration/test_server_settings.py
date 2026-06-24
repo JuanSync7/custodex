@@ -18,9 +18,9 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 from fastapi import HTTPException  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.server import app as app_mod  # noqa: E402
-from code_doc_monitor.server import create_app  # noqa: E402
-from code_doc_monitor.settings import (  # noqa: E402
+from custodex.server import app as app_mod  # noqa: E402
+from custodex.server import create_app  # noqa: E402
+from custodex.settings import (  # noqa: E402
     CorsSettings,
     GitSettings,
     RateLimitSettings,

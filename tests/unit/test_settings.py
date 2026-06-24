@@ -14,8 +14,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.settings import (
+from custodex.errors import ConfigError
+from custodex.settings import (
     DEFAULT_SETTINGS_PATH,
     Settings,
     load_settings,

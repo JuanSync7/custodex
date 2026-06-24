@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import pkgutil
 
-import code_doc_monitor as _pkg
-from code_doc_monitor.featurecatalog import load_catalog
-from code_doc_monitor.traceability import EvidenceKind, build_matrix, scan_refs
+import custodex as _pkg
+from custodex.featurecatalog import load_catalog
+from custodex.traceability import EvidenceKind, build_matrix, scan_refs
 from tests._repo import REPO_ROOT
 
 _REPO_ROOT = REPO_ROOT

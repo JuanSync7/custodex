@@ -12,7 +12,7 @@ The demo (`demo/`, CONFIG-V2 §6) must be live and functional in every surface:
   into a SUBDIR + commits it on ``main``: ``run_sync(mode="git")`` reads the
   default branch correctly through configsync's NEW subdir-awareness, and leaves
   no stray worktree behind (K1).
-* **demo CLI smoke** — from ``demo/``, ``cdmon check`` exits 0 and ``cdmon rpt``
+* **demo CLI smoke** — from ``demo/``, ``cdx check`` exits 0 and ``cdx rpt``
   re-renders byte-identical to the committed ``coverage.rpt`` (idempotent, K7),
   with the per-unit waiver fix in place (per-unit ``percent: 100.00``).
 
@@ -41,14 +41,14 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.config import load_bundle  # noqa: E402
-from code_doc_monitor.configsync import run_sync  # noqa: E402
-from code_doc_monitor.report import (  # noqa: E402
+from custodex.config import load_bundle  # noqa: E402
+from custodex.configsync import run_sync  # noqa: E402
+from custodex.report import (  # noqa: E402
     build_coverage_rpt,
     parse_rpt,
     render_rpt,
 )
-from code_doc_monitor.server.standalone import build_standalone_app  # noqa: E402
+from custodex.server.standalone import build_standalone_app  # noqa: E402
 
 _NOW = "2026-06-07T00:00:00Z"
 
@@ -303,7 +303,7 @@ def test_git_mode_subdir_leaves_no_worktree(tmp_path: Path) -> None:
 
 def test_git_mode_uncommitted_subdir_is_loud(tmp_path: Path) -> None:
     """A repo whose default branch lacks <rel>/config/cdmon raises a loud SyncError."""
-    from code_doc_monitor.errors import SyncError
+    from custodex.errors import SyncError
 
     top = tmp_path / "outer"
     top.mkdir()
@@ -350,9 +350,9 @@ def test_sync_route_refreshes_coverage_when_a_file_is_added(tmp_path: Path) -> N
     """POST /sync persists a coverage snapshot of the just-synced tree: dropping a
     new undocumented source file and re-syncing surfaces it on GET /coverage (the
     dashboard Coverage page), with the file percentage dropping."""
-    from code_doc_monitor.registry import RegistrationPayload
-    from code_doc_monitor.server import InMemoryStore, create_app
-    from code_doc_monitor.sinks import RepoIdentity
+    from custodex.registry import RegistrationPayload
+    from custodex.server import InMemoryStore, create_app
+    from custodex.sinks import RepoIdentity
 
     _top, sub = _commit_demo_in_subdir(tmp_path)
     store = InMemoryStore()
@@ -388,14 +388,14 @@ def test_sync_route_refreshes_coverage_when_a_file_is_added(tmp_path: Path) -> N
 
 
 # --------------------------------------------------------------------------- #
-# demo CLI smoke — `cdmon check` exit 0; `cdmon rpt` matches committed report.
+# demo CLI smoke — `cdx check` exit 0; `cdx rpt` matches committed report.
 # --------------------------------------------------------------------------- #
 
 
 def test_demo_cli_check_exit_zero() -> None:
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     result = CliRunner().invoke(
         app, ["check", "--config", str(_DEMO_DIR / "config" / "cdmon")]
@@ -407,7 +407,7 @@ def test_demo_doc_style_exercises_all_four_categories() -> None:
     """The user-guide doc maps every template CATEGORY to a non-default value, so
     all four categories (document-type/tone/writing-style/vocabulary) are
     exercised somewhere in the demo, not just api-reference/precise/etc."""
-    from code_doc_monitor.docstyle import load_doc_style
+    from custodex.docstyle import load_doc_style
 
     cfg = _DEMO_DIR / "config" / "cdmon"
     style = load_doc_style(
@@ -436,7 +436,7 @@ def test_demo_rpt_matches_committed_coverage_report() -> None:
     committed = parse_rpt((cfg / "coverage.rpt").read_text(encoding="utf-8"))
 
     bundle = load_bundle(cfg)
-    from code_doc_monitor.report import report_repo_root
+    from custodex.report import report_repo_root
 
     repo_root = report_repo_root(cfg, bundle)
     rebuilt = build_coverage_rpt(bundle, repo_root, ref=None)
@@ -470,7 +470,7 @@ def test_demo_rpt_matches_committed_coverage_report() -> None:
 
 def _seeded_app() -> object:
     """The central app over a freshly seeded store (no SPA mount needed here)."""
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     return create_app(build_seeded_store())
 
@@ -488,7 +488,7 @@ def test_central_ownership_view_shows_departed_dri_orphan() -> None:
     with TestClient(app) as client:
         roster = {i["name"]: i["active"] for i in client.get("/roster").json()}
         body = client.get("/repos/demo-taskflow/ownership").json()
-        dogfood = client.get("/repos/code-doc-monitor/ownership").json()
+        dogfood = client.get("/repos/custodex/ownership").json()
     assert roster["dana"] is False and roster["demo-team"] is True
     owners = {o["doc_id"]: o["accountable"] for o in body["owners"]}
     assert owners["core-api"] == "dana"  # core-api's DRI
@@ -505,7 +505,7 @@ def test_central_staleness_view_flags_overdue_doc() -> None:
 
     Features: FEAT-STALENESS-006
     """
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     app = create_app(build_seeded_store(), clock=lambda: "2026-06-22T00:00:00Z")
     with TestClient(app) as client:

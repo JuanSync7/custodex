@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     ConfigBundle,
     IndexFile,
@@ -28,7 +28,7 @@ from code_doc_monitor.config import (
     load_unit_file,
     unit_for_path,
 )
-from code_doc_monitor.errors import CodeDocMonitorError, ConfigError
+from custodex.errors import CodeDocMonitorError, ConfigError
 
 # --------------------------------------------------------------------------- #
 # Fixture builders: a REAL ``config/cdmon/`` tree under tmp_path.
@@ -37,8 +37,8 @@ from code_doc_monitor.errors import CodeDocMonitorError, ConfigError
 _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
-repo: code-doc-monitor
-generated-by: cdmon
+repo: custodex
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -53,7 +53,7 @@ region_templates:
       - {header: Doc, field: doc_id}
 coverage:
   waive:
-    - {path: "code_doc_monitor/__init__.py", reason: "re-export aggregator"}
+    - {path: "custodex/__init__.py", reason: "re-export aggregator"}
 units:
   - file: foundation.yaml
   - file: agent-workflow.yaml
@@ -69,7 +69,7 @@ created: "2026-06-07"
 updated: "2026-06-07"
 ---
 dir-covered:
-  - code_doc_monitor/config.py
+  - custodex/config.py
 source-files-format:
   - ".py"
 documents:
@@ -78,13 +78,13 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/config.py
+      - path: custodex/config.py
         symbols: [load_config]
   - id: errors-guide
     path: docs/api/errors.md
     audience: user-guide
     code_refs:
-      - path: code_doc_monitor/errors.py
+      - path: custodex/errors.py
 """
 
 _AGENT_YAML = """\
@@ -97,7 +97,7 @@ created: "2026-06-07"
 updated: "2026-06-07"
 ---
 dir-covered:
-  - code_doc_monitor/agent
+  - custodex/agent
 source-files-format:
   - ".py"
 documents:
@@ -106,8 +106,8 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/agent/backend.py
-      - path: code_doc_monitor/agent/graph.py
+      - path: custodex/agent/backend.py
+      - path: custodex/agent/graph.py
 """
 
 
@@ -183,7 +183,7 @@ def test_unit_file_alias_round_trip(tmp_path: Path) -> None:
     unit = load_unit_file(d / "agent-workflow.yaml")
     assert unit.frontmatter.cdmon_config_version == "2.0.0"
     assert unit.frontmatter.unit == "agent-workflow"
-    assert unit.dir_covered == ("code_doc_monitor/agent",)
+    assert unit.dir_covered == ("custodex/agent",)
     assert unit.source_files_format == (".py",)
     assert unit.documents[0].id == "agent-workflow"
 
@@ -192,7 +192,7 @@ def test_index_file_alias_round_trip(tmp_path: Path) -> None:
     """index.yaml hyphenated keys + defaults load correctly."""
     d = _write_tree(tmp_path)
     index = load_index_file(d / "index.yaml")
-    assert index.frontmatter.generated_by == "cdmon"
+    assert index.frontmatter.generated_by == "cdx"
     assert index.root == "../.."
     assert index.apply_default is True
     assert index.doc_style == "doc-style.yaml"  # default alias
@@ -298,10 +298,10 @@ def test_load_config_dir_merges_documents_in_index_order(tmp_path: Path) -> None
     config_guide = cfg.documents[0]
     assert config_guide.path == "docs/api/config.md"
     assert config_guide.audience is Audience.ENG_GUIDE
-    assert config_guide.code_refs[0].path == "code_doc_monitor/config.py"
+    assert config_guide.code_refs[0].path == "custodex/config.py"
     assert config_guide.code_refs[0].symbols == ("load_config",)
     assert cfg.documents[1].audience is Audience.USER_GUIDE
-    assert cfg.documents[2].code_refs[1].path == "code_doc_monitor/agent/graph.py"
+    assert cfg.documents[2].code_refs[1].path == "custodex/agent/graph.py"
 
 
 def test_load_config_dir_globals_from_index(tmp_path: Path) -> None:
@@ -314,7 +314,7 @@ def test_load_config_dir_globals_from_index(tmp_path: Path) -> None:
     assert cfg.backend.kind == "mock"
     assert "api-index" in cfg.region_templates
     assert cfg.region_templates["api-index"].source == "index"
-    assert cfg.coverage.waive[0].path == "code_doc_monitor/__init__.py"
+    assert cfg.coverage.waive[0].path == "custodex/__init__.py"
     assert cfg.coverage.waive[0].reason == "re-export aggregator"
 
 
@@ -359,10 +359,10 @@ def test_identical_dir_covered_across_units_is_loud(tmp_path: Path) -> None:
     Nesting is now allowed; only an identical (normalized) directory in two units
     genuinely conflicts (neither could win the deepest-match tie).
     """
-    # foundation owns 'code_doc_monitor/agent'; agent-workflow owns the same.
+    # foundation owns 'custodex/agent'; agent-workflow owns the same.
     identical = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py",
-        "  - code_doc_monitor/agent",
+        "  - custodex/config.py",
+        "  - custodex/agent",
         1,
     )
     d = _write_tree(tmp_path, foundation=identical)
@@ -373,9 +373,9 @@ def test_identical_dir_covered_across_units_is_loud(tmp_path: Path) -> None:
 def test_identical_dir_covered_normalized_spelling_is_loud(tmp_path: Path) -> None:
     """An equivalent spelling (trailing slash / ./) of the same dir is still loud."""
     identical = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py",
+        "  - custodex/config.py",
         # same dir as agent-workflow, spelled differently
-        "  - ./code_doc_monitor/agent/",
+        "  - ./custodex/agent/",
         1,
     )
     d = _write_tree(tmp_path, foundation=identical)
@@ -385,11 +385,11 @@ def test_identical_dir_covered_normalized_spelling_is_loud(tmp_path: Path) -> No
 
 def test_nested_dir_covered_across_units_is_ok(tmp_path: Path) -> None:
     """A parent + child dir-covered across two units now LOADS (Z-01a nesting)."""
-    # foundation owns the parent 'code_doc_monitor'; agent-workflow owns the
-    # child 'code_doc_monitor/agent' under it — nesting, not a conflict.
+    # foundation owns the parent 'custodex'; agent-workflow owns the
+    # child 'custodex/agent' under it — nesting, not a conflict.
     nested = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py",
-        "  - code_doc_monitor",
+        "  - custodex/config.py",
+        "  - custodex",
         1,
     )
     d = _write_tree(tmp_path, foundation=nested)
@@ -400,8 +400,8 @@ def test_nested_dir_covered_across_units_is_ok(tmp_path: Path) -> None:
 def test_disjoint_dir_covered_is_ok(tmp_path: Path) -> None:
     """Sibling dirs that share a prefix component but are disjoint are fine."""
     foundation = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py",
-        "  - code_doc_monitor/agentry",  # NOT under code_doc_monitor/agent
+        "  - custodex/config.py",
+        "  - custodex/agentry",  # NOT under custodex/agent
         1,
     )
     d = _write_tree(tmp_path, foundation=foundation)
@@ -434,11 +434,11 @@ def test_bundle_unit_for_document(tmp_path: Path) -> None:
 # Z-01a — deepest-wins unit_for_path attribution.
 # --------------------------------------------------------------------------- #
 
-# A nested layout: ``core`` owns the parent ``code_doc_monitor``; ``agent-workflow``
-# owns the child ``code_doc_monitor/agent`` under it.
+# A nested layout: ``core`` owns the parent ``custodex``; ``agent-workflow``
+# owns the child ``custodex/agent`` under it.
 _NESTED_FOUNDATION = _FOUNDATION_YAML.replace(
-    "  - code_doc_monitor/config.py",
-    "  - code_doc_monitor",
+    "  - custodex/config.py",
+    "  - custodex",
     1,
 )
 
@@ -447,18 +447,18 @@ def test_unit_for_path_child_file_attributes_to_child(tmp_path: Path) -> None:
     """A file under the child dir attributes to the CHILD unit, not the parent."""
     d = _write_tree(tmp_path, foundation=_NESTED_FOUNDATION)
     bundle = load_bundle(d)
-    unit = unit_for_path(bundle, "code_doc_monitor/agent/backend.py")
+    unit = unit_for_path(bundle, "custodex/agent/backend.py")
     assert unit is not None
     assert unit.frontmatter.unit == "agent-workflow"
     # The ConfigBundle method form agrees.
-    assert bundle.unit_for_path("code_doc_monitor/agent/backend.py") is unit
+    assert bundle.unit_for_path("custodex/agent/backend.py") is unit
 
 
 def test_unit_for_path_parent_file_attributes_to_parent(tmp_path: Path) -> None:
     """A file directly in the parent dir (not under the child) → the PARENT unit."""
     d = _write_tree(tmp_path, foundation=_NESTED_FOUNDATION)
     bundle = load_bundle(d)
-    unit = unit_for_path(bundle, "code_doc_monitor/config.py")
+    unit = unit_for_path(bundle, "custodex/config.py")
     assert unit is not None
     assert unit.frontmatter.unit == "foundation"
 
@@ -474,17 +474,17 @@ def test_unit_for_path_sibling_prefix_not_nested(tmp_path: Path) -> None:
     """Component-wise match: a file under ``.../agentry`` is NOT attributed to the
     unit owning ``.../agent`` (string-prefix would wrongly match)."""
     foundation = _FOUNDATION_YAML.replace(
-        "  - code_doc_monitor/config.py",
-        "  - code_doc_monitor/agentry",
+        "  - custodex/config.py",
+        "  - custodex/agentry",
         1,
     )
     d = _write_tree(tmp_path, foundation=foundation)
     bundle = load_bundle(d)
-    # agentry file → the foundation unit (owns code_doc_monitor/agentry).
-    f = unit_for_path(bundle, "code_doc_monitor/agentry/x.py")
+    # agentry file → the foundation unit (owns custodex/agentry).
+    f = unit_for_path(bundle, "custodex/agentry/x.py")
     assert f is not None and f.frontmatter.unit == "foundation"
     # agent file → the agent-workflow unit; agentry's owner must NOT claim it.
-    a = unit_for_path(bundle, "code_doc_monitor/agent/backend.py")
+    a = unit_for_path(bundle, "custodex/agent/backend.py")
     assert a is not None and a.frontmatter.unit == "agent-workflow"
 
 
@@ -495,7 +495,7 @@ def test_unit_for_path_sibling_prefix_not_nested(tmp_path: Path) -> None:
 
 def test_resolve_config_single_file_unchanged(tmp_path: Path) -> None:
     """A single-file --config still loads via _resolve_config (back-compat)."""
-    from code_doc_monitor.cli import _resolve_config
+    from custodex.cli import _resolve_config
 
     cfg_path = tmp_path / "cdmon.yaml"
     cfg_path.write_text(
@@ -518,7 +518,7 @@ def test_resolve_config_single_file_unchanged(tmp_path: Path) -> None:
 
 def test_resolve_config_directory_uses_dir_loader(tmp_path: Path) -> None:
     """Passing a directory uses the dir loader and returns it as config_dir."""
-    from code_doc_monitor.cli import _resolve_config
+    from custodex.cli import _resolve_config
 
     d = _write_tree(tmp_path)
     cfg, config_dir = _resolve_config(d)
@@ -534,7 +534,7 @@ def test_resolve_config_autodetect_when_missing_single_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """No --config file present but config/cdmon/index.yaml exists → dir layout."""
-    from code_doc_monitor.cli import _resolve_config
+    from custodex.cli import _resolve_config
 
     _write_tree(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -548,7 +548,7 @@ def test_resolve_config_explicit_file_wins_over_autodetect(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An existing explicit single file is honored even if a dir layout exists."""
-    from code_doc_monitor.cli import _resolve_config
+    from custodex.cli import _resolve_config
 
     _write_tree(tmp_path)
     cfg_path = tmp_path / "cdmon.yaml"
@@ -565,7 +565,7 @@ def test_resolve_config_explicit_file_wins_over_autodetect(
 
 def test_unit_whitespace_dir_covered_entry_is_loud(tmp_path: Path) -> None:
     """A blank dir-covered entry → loud ConfigError."""
-    bad = _FOUNDATION_YAML.replace("  - code_doc_monitor/config.py", '  - "   "', 1)
+    bad = _FOUNDATION_YAML.replace("  - custodex/config.py", '  - "   "', 1)
     d = _write_tree(tmp_path, foundation=bad)
     with pytest.raises(ConfigError, match="non-empty"):
         load_unit_file(d / "foundation.yaml")

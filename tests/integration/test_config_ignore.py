@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import (
+from custodex.config import (
     _DEFAULT_EXCLUDE,
     CoverageConfig,
     IgnoreFile,
@@ -33,9 +33,9 @@ from code_doc_monitor.config import (
     load_config_dir,
     load_ignore_file,
 )
-from code_doc_monitor.coverage import resolve_coverage
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.inventory import _translate, discover_files, discover_symbols
+from custodex.coverage import resolve_coverage
+from custodex.errors import ConfigError
+from custodex.inventory import _translate, discover_files, discover_symbols
 
 # --------------------------------------------------------------------------- #
 # gitignore_to_globs — translation MATCHES inventory _translate ** semantics.
@@ -218,7 +218,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -472,7 +472,7 @@ _NEST_INDEX = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."

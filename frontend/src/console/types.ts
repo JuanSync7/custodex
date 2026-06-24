@@ -1,12 +1,12 @@
 // TypeScript mirrors of the central server's SHARED models (one source of truth =
 // the Python server). Hand-written here for the two small shapes F-01 consumes;
-// F-02+ can generate ReviewRecord/ResolutionRecord from `cdmon schema` (JSON Schema).
+// F-02+ can generate ReviewRecord/ResolutionRecord from `cdx schema` (JSON Schema).
 //
-//   server: code_doc_monitor/sinks.py::RepoIdentity
-//   server: code_doc_monitor/server/store.py::RegisteredRepo
-//   server: code_doc_monitor/server/app.py::RepoStatus
-//   server: code_doc_monitor/schema.py::Verdict
-//   server: code_doc_monitor/ticket.py::DriftTicket
+//   server: custodex/sinks.py::RepoIdentity
+//   server: custodex/server/store.py::RegisteredRepo
+//   server: custodex/server/app.py::RepoStatus
+//   server: custodex/schema.py::Verdict
+//   server: custodex/ticket.py::DriftTicket
 
 /** Which repo a review record came from (sinks.RepoIdentity). */
 export interface RepoIdentity {
@@ -59,10 +59,10 @@ export interface RepoHealth {
 // ── F-02/F-03: record + resolution + coverage shapes ────────────────────────
 //
 // `RecordVerdict`/`ProposedFix`/`ReviewRecord` below are GENERATED from the
-// real Python schema: `.venv/bin/cdmon schema --out src/schema.review.json`
+// real Python schema: `.venv/bin/cdx schema --out src/schema.review.json`
 // (schema.py::ReviewRecord, the K6 single source of truth). The JSON lives at
 // `src/schema.review.json` and these interfaces mirror its `properties` exactly
-// (rendered fields are a subset). `cdmon schema` ONLY emits the review record,
+// (rendered fields are a subset). `cdx schema` ONLY emits the review record,
 // so `Resolution`/`ResolutionRecord` are hand-written from
 // schema.py::ResolutionRecord and `CoverageSnapshot` from the server's opaque
 // snapshot dict (app.py reads `ratio`; the basket counts are optional) — noted
@@ -84,7 +84,7 @@ export interface ProposedFix {
 
 // ── T-03: the human-validatable DriftTicket ─────────────────────────────────
 //
-// Mirrors `code_doc_monitor/ticket.py` (T-01): the Jira-style artifact that
+// Mirrors `custodex/ticket.py` (T-01): the Jira-style artifact that
 // replaces the `ProposedFix.rationale` one-liner. Hand-written here from the
 // frozen pydantic models in ticket.py (server: ticket.py::DriftTicket /
 // ticket.py::AcceptanceCheck). The `ticket` rides on the existing recordsFor
@@ -163,7 +163,7 @@ export type Resolution =
 
 /**
  * The public outcome for one handled drift (schema.py::ResolutionRecord).
- * Hand-written — `cdmon schema` emits ONLY the review record, not this. Linked
+ * Hand-written — `cdx schema` emits ONLY the review record, not this. Linked
  * to a {@link ReviewRecord} by `record_id`.
  */
 export interface ResolutionRecord {
@@ -303,9 +303,9 @@ export interface SyncRun {
 // ── EDITOR (E-04..E-08): editable config tree + staged edits + generate/apply ─
 //
 // TypeScript mirrors of the EDITOR server models:
-//   server: code_doc_monitor/server/app.py::EditableConfigTree / EditableDocument
+//   server: custodex/server/app.py::EditableConfigTree / EditableDocument
 //            / DocStyleOptions / GenerateRequest / GenerateResponse / ApplyFixResponse
-//   server: code_doc_monitor/server/edits.py::ConfigEdit (tagged union) / StoredConfigEdit
+//   server: custodex/server/edits.py::ConfigEdit (tagged union) / StoredConfigEdit
 // The editable tree is a COMPUTED VIEW (documents + the working-tree-derived gap +
 // selectable doc-style options); a `ConfigEdit` is one staged "mapping ticket".
 
@@ -526,7 +526,7 @@ export interface OwnershipData {
 }
 
 // ── EPIC SVR — operator runtime settings (GET /settings) ────────────────────
-// server: code_doc_monitor/settings.py::Settings (mirrored field-for-field).
+// server: custodex/settings.py::Settings (mirrored field-for-field).
 export interface CorsSettings {
   allow_origins: string[];
   allow_credentials: boolean;
@@ -560,7 +560,7 @@ export interface Settings {
   server: ServerSettings;
 }
 
-// server: code_doc_monitor/settings.py::secret_presence — PRESENCE only, never values.
+// server: custodex/settings.py::secret_presence — PRESENCE only, never values.
 export interface SecretPresence {
   admin_token_configured: boolean;
   database_url_set: boolean;
@@ -574,7 +574,7 @@ export interface SettingsData {
 }
 
 // ── EPIC SLA — review staleness (GET /repos/:id/staleness) ──────────────────
-// server: code_doc_monitor/staleness.py::StalenessFinding
+// server: custodex/staleness.py::StalenessFinding
 export interface StalenessFinding {
   doc_id: string;
   doc_path: string;

@@ -1,6 +1,6 @@
 """N-04 — tests for the ``coverage.rpt`` report (CONFIG-V2 §3, K1/K7/K8/K10).
 
-Covers the new :mod:`code_doc_monitor.report` surface: the frozen
+Covers the new :mod:`custodex.report` surface: the frozen
 :class:`CoverageRpt`/:class:`RptSummary`/:class:`RptUnit`/:class:`RptUndocumented`
 models; :func:`build_coverage_rpt` (which REUSES ``effective_coverage`` +
 ``discover_files``/``discover_symbols``/``resolve_coverage`` — never forks the
@@ -8,7 +8,7 @@ coverage engine); deterministic 2-dp percent formatting (``n/a`` when the
 denominator is 0); per-unit attribution by ``dir-covered``; ``suggested_unit``
 resolution (matching unit / format mismatch / no-unit → null+reason);
 :func:`render_rpt` (``---`` frontmatter + YAML body, NO wall-clock so it is
-byte-stable); the parse round-trip; and the ``cdmon rpt`` CLI (default prints,
+byte-stable); the parse round-trip; and the ``cdx rpt`` CLI (default prints,
 ``--write`` writes idempotently, ``--ref`` lands in frontmatter).
 
 Features: FEAT-QUALITY-005, FEAT-QUALITY-006, FEAT-QUALITY-007, FEAT-CLI-003
@@ -23,10 +23,10 @@ import pytest
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import load_bundle
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.report import (
+from custodex.cli import app
+from custodex.config import load_bundle
+from custodex.errors import ConfigError
+from custodex.report import (
     CoverageRpt,
     RptSummary,
     RptUndocumented,
@@ -49,7 +49,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -259,7 +259,7 @@ _INDEX_WAIVED = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -345,7 +345,7 @@ def test_suggested_unit_format_match_resolves(tmp_path: Path) -> None:
     util = _UTIL_YAML.replace('  - ".py"', '  - ".log"')
     repo, cfg = _build_repo(tmp_path, util_text=util, ignore_text=_IGNORE_EMPTY)
     bundle = load_bundle(cfg)
-    from code_doc_monitor.report import _suggest_unit
+    from custodex.report import _suggest_unit
 
     su, reason = _suggest_unit(bundle, "util/run.log")
     assert su == "util.yaml"
@@ -356,7 +356,7 @@ def test_suggested_unit_no_unit_dir_match(tmp_path: Path) -> None:
     """A file under no unit's dir-covered → suggested_unit null with a reason."""
     repo, cfg = _build_repo(tmp_path)
     bundle = load_bundle(cfg)
-    from code_doc_monitor.report import _suggest_unit
+    from custodex.report import _suggest_unit
 
     su, reason = _suggest_unit(bundle, "outside/thing.py")
     assert su is None
@@ -366,7 +366,7 @@ def test_suggested_unit_no_unit_dir_match(tmp_path: Path) -> None:
 def test_suggested_unit_dir_match_format_mismatch_null(tmp_path: Path) -> None:
     repo, cfg = _build_repo(tmp_path)
     bundle = load_bundle(cfg)
-    from code_doc_monitor.report import _suggest_unit
+    from custodex.report import _suggest_unit
 
     # core's dir contains it, but .md is not in core's source-files-format.
     su, reason = _suggest_unit(bundle, "core/readme.md")
@@ -386,7 +386,7 @@ _NEST_INDEX = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -517,7 +517,7 @@ def test_render_has_frontmatter_and_body(tmp_path: Path) -> None:
     assert text.startswith("---\n")
     assert "cdmon-report-version: 1.0.0" in text
     assert "kind: coverage" in text
-    assert "generated-by: cdmon rpt" in text
+    assert "generated-by: cdx rpt" in text
     assert "ref: main" in text
     # Body markers.
     assert "\nsummary:" in text
@@ -534,7 +534,7 @@ def test_render_golden_exact_text(tmp_path: Path) -> None:
         "kind: coverage\n"
         "repo: demo\n"
         "ref: main\n"
-        "generated-by: cdmon rpt\n"
+        "generated-by: cdx rpt\n"
         "---\n"
         "summary:\n"
         "  scanned_files: 3\n"

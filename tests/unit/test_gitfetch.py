@@ -1,6 +1,6 @@
 """GIT-00 — clone-on-demand orchestration (pure + fake-cloner unit tests).
 
-These exercise :mod:`code_doc_monitor.gitfetch` WITHOUT a real git or network:
+These exercise :mod:`custodex.gitfetch` WITHOUT a real git or network:
 
 * ``_build_clone_argv`` is a pure function — the security-critical guarantee is
   asserted here (the token NEVER lands in argv; only the provider *username* is
@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.errors import SyncError
-from code_doc_monitor.gitfetch import (
+from custodex.errors import SyncError
+from custodex.gitfetch import (
     RemoteSpec,
     _build_clone_argv,
     _scrub,

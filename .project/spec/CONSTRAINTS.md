@@ -1,4 +1,4 @@
-# code-doc-monitor — binding constraints
+# custodex — binding constraints
 
 These are non-negotiable rules every slice must uphold. Numbered for citation in
 tickets, commits, and the STATUS log.
@@ -8,11 +8,11 @@ tickets, commits, and the STATUS log.
   enters through the config. The **core** package depends only on `pydantic`,
   `typer`, `pyyaml` (plus dev tools); the default `mock` path and the
   single-shot `claude-code`/`api` backends import nothing else. The LangGraph
-  remediation agent (`backend.kind: agent`, the `code_doc_monitor.agent`
+  remediation agent (`backend.kind: agent`, the `custodex.agent`
   subpackage) is the one optional, opt-in extra: it adds `langgraph` under the
   `[agent]` extra and is imported lazily, only when that backend is selected, so
   installing without the extra leaves the core dependency surface intact.
-- **K1 — Detect-only `check`.** `cdmon check` and the `drift` module never mutate
+- **K1 — Detect-only `check`.** `cdx check` and the `drift` module never mutate
   files or call a backend. Detection is pure and side-effect free.
 - **K2 — Single source of truth = the code.** A document's machine-managed
   regions and fingerprint are derived from the extracted surface, never the
@@ -37,7 +37,7 @@ tickets, commits, and the STATUS log.
   (`monitor --apply`), defaults to off-or-configured, and INVALIDATE/ESCALATE are
   always recorded, never silently dropped.
 - **K6 — Public schema is versioned & stable.** The review-record schema carries
-  a `schema_version`; fields are additive across versions. `cdmon schema` emits
+  a `schema_version`; fields are additive across versions. `cdx schema` emits
   it from the pydantic models (one source of truth — no hand-written schema).
 - **K7 — Safe, idempotent fixes.** Applying a FIX touches only the document's
   managed regions / the file the verdict targets; re-running `monitor` with no

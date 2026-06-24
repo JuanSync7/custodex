@@ -1,6 +1,6 @@
 """Layout Standard: structure lint, html pairing, scaffold, fix (CDM-08). TDD (K9).
 
-Covers the pure surface of :mod:`code_doc_monitor.layout` — every issue code, the
+Covers the pure surface of :mod:`custodex.layout` — every issue code, the
 md/html hash helpers, the html-twin pairing rule, the scaffolder (which must
 produce a doc that passes its own linter), and the front-matter auto-fix.
 
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import Audience, CodeRef, DocumentSpec
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.layout import (
+from custodex.config import Audience, CodeRef, DocumentSpec
+from custodex.extract import build_document_surface
+from custodex.layout import (
     LAYOUT_VERSION,
     LayoutCode,
     embedded_md_hash,
@@ -25,7 +25,7 @@ from code_doc_monitor.layout import (
     scaffold_doc,
     stamp_doc_meta,
 )
-from code_doc_monitor.manifest import parse_text
+from custodex.manifest import parse_text
 
 # --- a tiny target module so surfaces resolve against real AST ----------------
 
@@ -205,8 +205,8 @@ def test_stamp_doc_meta_fills_static_keys_and_preserves_fingerprint() -> None:
 
 
 def test_lint_config_skips_missing_doc_and_reports_malformed(tmp_path: Path) -> None:
-    from code_doc_monitor.config import MonitorConfig
-    from code_doc_monitor.layout import lint_config
+    from custodex.config import MonitorConfig
+    from custodex.layout import lint_config
 
     (tmp_path / "mod.py").write_text(_MODULE, encoding="utf-8")
     # doc A: file is absent -> lint skips it (check owns existence).
@@ -247,9 +247,9 @@ def _write_index(tmp_path: Path, body_links: str) -> None:
 
 
 def test_index_coverage_flags_unlinked_doc(tmp_path: Path) -> None:
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import MonitorConfig
-    from code_doc_monitor.layout import lint_config
+    from custodex.config import Audience as A
+    from custodex.config import MonitorConfig
+    from custodex.layout import lint_config
 
     idx = DocumentSpec(
         id="index", path="index.md", audience=A.USER_GUIDE, index=True, html=True
@@ -267,9 +267,9 @@ def test_index_coverage_flags_unlinked_doc(tmp_path: Path) -> None:
 
 
 def test_index_coverage_accepts_md_or_html_links(tmp_path: Path) -> None:
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import MonitorConfig
-    from code_doc_monitor.layout import lint_config
+    from custodex.config import Audience as A
+    from custodex.config import MonitorConfig
+    from custodex.layout import lint_config
 
     idx = DocumentSpec(
         id="index", path="index.md", audience=A.USER_GUIDE, index=True, html=True
@@ -293,9 +293,9 @@ def test_index_coverage_respects_index_template_audience_kind(tmp_path: Path) ->
     ``template.kind``): the eng-only api-index renders only eng-guide docs, so it
     is not flagged for omitting a user-guide doc the engine never lists there.
     """
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import MonitorConfig, RegionColumn, RegionTemplate
-    from code_doc_monitor.layout import _index_coverage_issues
+    from custodex.config import Audience as A
+    from custodex.config import MonitorConfig, RegionColumn, RegionTemplate
+    from custodex.layout import _index_coverage_issues
 
     idx = DocumentSpec(
         id="index",
@@ -340,10 +340,10 @@ def test_index_coverage_requires_all_when_template_kind_is_none(tmp_path: Path) 
     """An index whose index region renders ALL audiences (``kind`` is None) keeps
     the original target-agnostic rule: every other document must be linked,
     regardless of audience (back-compat with the pre-FEAT-CONFIGV2-016 behavior)."""
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import MonitorConfig, RegionColumn, RegionTemplate
-    from code_doc_monitor.layout import LayoutCode as LC
-    from code_doc_monitor.layout import _index_coverage_issues
+    from custodex.config import Audience as A
+    from custodex.config import MonitorConfig, RegionColumn, RegionTemplate
+    from custodex.layout import LayoutCode as LC
+    from custodex.layout import _index_coverage_issues
 
     idx = DocumentSpec(
         id="index",
@@ -403,9 +403,9 @@ def _doc_with_region(rid: str, body: str, *, fm: str | None = None) -> object:
 
 
 def test_region_states_default_mode_is_generated() -> None:
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.layout import region_states
+    from custodex.blocks import known_region_ids
+    from custodex.config import RegionMode
+    from custodex.layout import region_states
 
     spec = _spec(region_keys=("symbols",))  # no region_modes -> generated
     doc = _doc_with_region("symbols", "body")
@@ -422,9 +422,9 @@ def test_region_states_default_mode_is_generated() -> None:
 
 
 def test_region_states_human_is_advisory() -> None:
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.layout import region_states
+    from custodex.blocks import known_region_ids
+    from custodex.config import RegionMode
+    from custodex.layout import region_states
 
     spec = _spec(region_keys=("symbols",), region_modes={"symbols": RegionMode.HUMAN})
     doc = _doc_with_region("symbols", "human prose")
@@ -437,10 +437,10 @@ def test_region_states_human_is_advisory() -> None:
 
 
 def test_region_states_llm_seeded_lock_state_tracks_hash() -> None:
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.layout import region_states
-    from code_doc_monitor.manifest import region_body_hash
+    from custodex.blocks import known_region_ids
+    from custodex.config import RegionMode
+    from custodex.layout import region_states
+    from custodex.manifest import region_body_hash
 
     body = "seeded then edited"
     known = known_region_ids(None)
@@ -466,9 +466,9 @@ def test_region_states_llm_seeded_lock_state_tracks_hash() -> None:
 def test_region_states_llm_interim_has_no_renderer() -> None:
     """A pure-`llm` region with no built-in renderer is reported has_renderer=False
     (interim rule: behaves like generated; B-06 will add prose authoring)."""
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.layout import region_states
+    from custodex.blocks import known_region_ids
+    from custodex.config import RegionMode
+    from custodex.layout import region_states
 
     spec = _spec(region_keys=("intro",), region_modes={"intro": RegionMode.LLM})
     doc = _doc_with_region("intro", "prose")
@@ -480,8 +480,8 @@ def test_region_states_llm_interim_has_no_renderer() -> None:
 
 
 def test_region_states_ordered_by_region_keys_and_skips_undeclared() -> None:
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.layout import region_states
+    from custodex.blocks import known_region_ids
+    from custodex.layout import region_states
 
     spec = _spec(region_keys=("symbols", "intro"))
     body = (
@@ -500,9 +500,9 @@ def test_region_states_ordered_by_region_keys_and_skips_undeclared() -> None:
 
 
 def test_config_region_states_across_docs(tmp_path: Path) -> None:
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import CodeRef, MonitorConfig, RegionMode
-    from code_doc_monitor.layout import config_region_states
+    from custodex.config import Audience as A
+    from custodex.config import CodeRef, MonitorConfig, RegionMode
+    from custodex.layout import config_region_states
 
     (tmp_path / "mod.py").write_text(_MODULE, encoding="utf-8")
     (tmp_path / "a.md").write_text(
@@ -526,9 +526,9 @@ def test_config_region_states_across_docs(tmp_path: Path) -> None:
 
 
 def test_config_region_states_skips_malformed_doc(tmp_path: Path) -> None:
-    from code_doc_monitor.config import Audience as A
-    from code_doc_monitor.config import MonitorConfig
-    from code_doc_monitor.layout import config_region_states
+    from custodex.config import Audience as A
+    from custodex.config import MonitorConfig
+    from custodex.layout import config_region_states
 
     # An unterminated region -> parse_doc -> regions() raises DriftError, which
     # config_region_states swallows (lint_doc reports the structural issue).

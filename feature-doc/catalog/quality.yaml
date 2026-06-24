@@ -1,5 +1,5 @@
 # Feature catalog — `quality` subsystem (doc-style conformance, coverage.rpt,
-# `cdmon doctor` adoption preflight).
+# `cdx doctor` adoption preflight).
 # Golden source of truth (EPIC R). Do not duplicate this prose elsewhere; the
 # rendered feature-doc/FEATURES.md and the R-07 source wiki read from here.
 features:
@@ -57,7 +57,7 @@ features:
       build_coverage_rpt produces a CoverageRpt (RptSummary + per-unit RptUnit
       slices + an RptUndocumented gap list) by reusing effective_coverage →
       inventory.discover_files/discover_symbols → coverage.resolve_coverage, so the
-      report counts are the same facts `cdmon coverage` shows, never a parallel
+      report counts are the same facts `cdx coverage` shows, never a parallel
       computation. Per-unit attribution is deepest-wins and waived files leave both
       sides of each percentage.
     subsystem: quality
@@ -90,9 +90,9 @@ features:
     constraints: [K7, K8, K10]
 
   - id: FEAT-QUALITY-008
-    title: cdmon doctor offline adoption preflight
+    title: cdx doctor offline adoption preflight
     summary: >-
-      run_checks answers "is this repo wired up correctly enough to run cdmon and
+      run_checks answers "is this repo wired up correctly enough to run cdx and
       report centrally?" with a deterministic, ordered list of Check results over
       config / documents / backend / central (and the agent extra), reading only
       os.environ / $PATH / installed distributions with no network and no mutation.

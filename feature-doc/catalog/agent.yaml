@@ -1,7 +1,7 @@
 # Feature catalog — `agent` subsystem (the optional LangGraph remediation agent).
 # Golden source of truth (EPIC R, slice R-02). Do not duplicate this prose
 # elsewhere; the rendered feature-doc/FEATURES.md and the R-07 source wiki read
-# from here. Owns the code_doc_monitor/agent/ subpackage (backend, graph,
+# from here. Owns the custodex/agent/ subpackage (backend, graph,
 # prompts, runtime, state).
 features:
   - id: FEAT-AGENT-001

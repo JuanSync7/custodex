@@ -29,20 +29,20 @@ pytest.importorskip(
 
 from sqlalchemy import inspect  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.schema import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.schema import (  # noqa: E402
     ProposedFix,
     Resolution,
     ResolutionRecord,
     ReviewRecord,
     Verdict,
 )
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 # shared fixtures / builders (mirror test_server.py's shared schema instances)
@@ -124,7 +124,7 @@ def store() -> SqlStore:
 
 
 def test_sql_store_satisfies_store_protocol(store: SqlStore) -> None:
-    from code_doc_monitor.server.store import Store
+    from custodex.server.store import Store
 
     assert isinstance(store, Store)
 
@@ -359,7 +359,7 @@ def test_sql_provider_secret_plaintext_never_in_stored_payload(store: SqlStore) 
     column (GIT-02)."""
     from sqlalchemy import select
 
-    from code_doc_monitor.server.db import RepoRow
+    from custodex.server.db import RepoRow
 
     payload = RegistrationPayload(
         repo=_identity(), default_branch="main", provider_secret="PLAINTEXT-XYZ"
@@ -549,7 +549,7 @@ def test_server_round_trip_against_sql_store(store: SqlStore) -> None:
     fastapi = pytest.importorskip("fastapi")  # noqa: F841
     from fastapi.testclient import TestClient
 
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     client = TestClient(create_app(store))
 
@@ -557,7 +557,7 @@ def test_server_round_trip_against_sql_store(store: SqlStore) -> None:
     assert reg.status_code == 201
     assert reg.json() == {"repo_id": "acme/widget"}
 
-    from code_doc_monitor.sinks import IngestEnvelope
+    from custodex.sinks import IngestEnvelope
 
     env = IngestEnvelope(repo=_identity(), record=_record()).model_dump(mode="json")
     ing = client.post("/ingest", json=env)
@@ -587,7 +587,7 @@ def test_server_lists_against_sql_store(store: SqlStore) -> None:
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     client = TestClient(create_app(store))
     assert client.get("/repos").json() == []

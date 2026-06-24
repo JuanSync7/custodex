@@ -1,4 +1,4 @@
-# code-doc-monitor — tickets
+# custodex — tickets
 
 Each slice is TDD (tests before code), leaves ruff+mypy clean and the suite
 green (≥90% coverage, K9), and implements its modules' contracts from
@@ -8,9 +8,9 @@ ARCHITECTURE.md exactly. Cite constraints (Kn) in the STATUS evidence.
 Skeleton, venv, tooling, `.project` specs. Goal: tooling green + smoke test.
 
 ## CDM-01 — config + init
-`errors.py`, `config.py`, `cdmon init`.
+`errors.py`, `config.py`, `cdx init`.
 Goal: `load_config` reads a YAML *and* a JSON config into `MonitorConfig`;
-unknown/invalid fields raise `ConfigError` (K8); `write_template`/`cdmon init`
+unknown/invalid fields raise `ConfigError` (K8); `write_template`/`cdx init`
 emit a documented `CONFIG_TEMPLATE` that itself round-trips through
 `load_config`. Tests: valid yaml, valid json, bad path, malformed body, template
 round-trip, defaults.
@@ -49,13 +49,13 @@ audience-aware.
 ## CDM-06 — monitor + cli
 `monitor.py`, `cli.py`. Goal: `Monitor.run` does detect→backend→record→sink→
 (apply)→recheck with injected backend/sink/now; `MonitorResult` exposes handled/
-remaining/records; full `cdmon` CLI (init/surface/check/monitor/report/schema)
+remaining/records; full `cdx` CLI (init/surface/check/monitor/report/schema)
 with correct exit codes. Integration tests with the mock backend, offline.
 
 ## CDM-07 — e2e + dogfood + docs
 System tests on a fixture repo (shared files → user-guide + eng-guide docs)
 proving the audience-split acceptance from SPEC; dogfood: a `cdmon.yaml` mapping
-code-doc-monitor's own source onto its own docs, exercised in tests; ≥90%
+custodex's own source onto its own docs, exercised in tests; ≥90%
 coverage; README + a generated schema doc; STATUS/LESSON finalized.
 
 ## CDM-08 — document layout standard + lint
@@ -65,5 +65,5 @@ one canonical skeleton (front matter → title → purpose → prose → CDM:BEG
 regions), one marker grammar (helium's AUTOGEN markers as a documented alias),
 the managed front-matter schema (schema_version/audience/fingerprint), and the
 html-twin pairing rule (1:1 path, embedded body hash, derived-not-edited) —
-**machine-checked** by `cdmon lint [--fix]` (orthogonal to `check`) and
-scaffolded by `cdmon new-doc`. Pure linter; offline; dogfood docs conform.
+**machine-checked** by `cdx lint [--fix]` (orthogonal to `check`) and
+scaffolded by `cdx new-doc`. Pure linter; offline; dogfood docs conform.

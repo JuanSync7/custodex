@@ -1,6 +1,6 @@
 # Feature catalog — `reference` subsystem (EPIC R: the golden reference machinery
 # itself — the feature catalog, traceability, and wiki export). Self-describing:
-# cdmon documents its own documentation system here.
+# cdx documents its own documentation system here.
 features:
   - id: FEAT-REFERENCE-001
     title: Golden feature catalog (typed, loadable)
@@ -9,7 +9,7 @@ features:
       validated, id-sorted FeatureCatalog of frozen Feature records (extra=forbid);
       it is loud (CatalogError) on a missing/empty dir, malformed yaml, a bad id
       pattern, a duplicate id across files, or a feature naming a non-existent
-      module — the single machine-readable source of truth for every cdmon feature.
+      module — the single machine-readable source of truth for every cdx feature.
     subsystem: reference
     modules: [featurecatalog]
     constraints: [K0, K1, K8, K10]
@@ -81,17 +81,17 @@ features:
     constraints: [K7, K10]
 
   - id: FEAT-REFERENCE-007
-    title: cdmon wiki regeneration + freshness gate
+    title: cdx wiki regeneration + freshness gate
     summary: >-
-      wiki.regenerate, driven by `cdmon wiki`, regenerates ALL of EPIC R's derived
+      wiki.regenerate, driven by `cdx wiki`, regenerates ALL of EPIC R's derived
       artifacts from their single sources in one command — feature-doc/FEATURES.md
       plus the test, source, and traceability wikis under feature-doc/wiki/ — via a
       shared WIKI_TARGETS (path -> render thunk) that is the single source of the
-      output set, so write-mode and --check can never diverge. `cdmon wiki` writes
-      every changed target (a second run is a no-op — idempotent K7); `cdmon wiki
+      output set, so write-mode and --check can never diverge. `cdx wiki` writes
+      every changed target (a second run is a no-op — idempotent K7); `cdx wiki
       --check` is the read-only CI freshness gate that lists every stale file and
       exits nonzero without writing (loud K8). Deterministic (K10), no new
-      dependency (K0). With `cdmon trace --fail-on-gap` wired into CI, the golden
+      dependency (K0). With `cdx trace --fail-on-gap` wired into CI, the golden
       reference can no longer silently drift from the code, demos, or tests.
     subsystem: reference
     modules: [wiki]

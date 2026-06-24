@@ -2,8 +2,8 @@
 
 The central store gained six methods (``replace_config`` + the document/code-ref/
 sync-run reads) with TWO implementations behind the SAME ``Store`` Protocol: the
-dict-backed :class:`~code_doc_monitor.server.store.InMemoryStore` and the
-SQLAlchemy :class:`~code_doc_monitor.server.db.SqlStore` (Postgres-first; SQLite for
+dict-backed :class:`~custodex.server.store.InMemoryStore` and the
+SQLAlchemy :class:`~custodex.server.db.SqlStore` (Postgres-first; SQLite for
 the offline gate, K4). This module asserts byte-for-byte PARITY: every test is
 PARAMETRIZED over both backends via the ``store`` fixture, so the SAME behavior is
 proven for in-memory AND the real SQLite-backed DB store — covering replace
@@ -26,12 +26,12 @@ pytest.importorskip(
     "sqlalchemy", reason="the [server] extra (sqlalchemy) is not installed"
 )
 
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.edits import (  # noqa: E402
+from custodex.server.edits import (  # noqa: E402
     AddCodeRefEdit,
     CreateDocEdit,
     EditCodeRef,
@@ -40,7 +40,7 @@ from code_doc_monitor.server.edits import (  # noqa: E402
     SetContextRefsEdit,
     SetDocStyleEdit,
 )
-from code_doc_monitor.server.store import (  # noqa: E402
+from custodex.server.store import (  # noqa: E402
     ConfigCodeRef,
     ConfigContextRef,
     ConfigDocument,

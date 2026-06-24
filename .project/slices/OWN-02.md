@@ -30,8 +30,8 @@ inputs. Property-style: every input doc yields exactly one finding when
 
 ## Dogfood
 `ownership.py` not tracked-doc yet (waiver). Add **FEAT-OWNERSHIP-003**
-(orphan detection) to the catalog + DEMOS case + tagged test; `cdmon wiki`;
-`cdmon trace --fail-on-gap` exit 0.
+(orphan detection) to the catalog + DEMOS case + tagged test; `cdx wiki`;
+`cdx trace --fail-on-gap` exit 0.
 
 ## Constraints
 K1/K10 (pure, deterministic, no clock), K5 (orphan is a recorded signal, not a

@@ -35,7 +35,7 @@ is EPIC ASTRO.)
   `frontend/dist/index.html`; falls back to `dashboard/dist`; `None` when neither.
 - **frontend build smoke (manual + CI):** `npm --prefix frontend run build`
   exits 0; `frontend/dist/index.html` exists. Verified in-process (no curl).
-- **gate:** ruff/mypy/pytest ≥90% branch green; `cdmon check`/`lint` exit 0. No
+- **gate:** ruff/mypy/pytest ≥90% branch green; `cdx check`/`lint` exit 0. No
   catalog change yet (serving is internal); FEAT-FRONTEND-* land in ASTRO-02/03.
 
 ## Design

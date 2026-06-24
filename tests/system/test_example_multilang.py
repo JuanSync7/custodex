@@ -15,10 +15,10 @@ from __future__ import annotations
 
 import pytest
 
-from code_doc_monitor.config import load_config
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.layout import lint_config
-from code_doc_monitor.monitor import Monitor
+from custodex.config import load_config
+from custodex.extract import build_document_surface
+from custodex.layout import lint_config
+from custodex.monitor import Monitor
 from tests._repo import REPO_ROOT
 
 _EXAMPLE = REPO_ROOT / "examples" / "multilang"

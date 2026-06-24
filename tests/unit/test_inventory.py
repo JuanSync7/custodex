@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.inventory (A-01).
+"""Tests for custodex.inventory (A-01).
 
 File-level repo code-file discovery: deterministic, sorted, lossless output
 (K10), pure with no FS mutation (K1), stdlib-only glob matching (K0), and a
@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.errors import CodeDocMonitorError, ExtractionError, InventoryError
-from code_doc_monitor.inventory import (
+from custodex.errors import CodeDocMonitorError, ExtractionError, InventoryError
+from custodex.inventory import (
     DEFAULT_EXCLUDE,
     DEFAULT_INCLUDE,
     CodeFile,
@@ -231,7 +231,7 @@ def test_file_as_root_raises_inventory_error(tmp_path: Path) -> None:
         discover_files(f)
 
 
-def test_inventory_error_is_code_doc_monitor_error(tmp_path: Path) -> None:
+def test_inventory_error_is_custodex_error(tmp_path: Path) -> None:
     with pytest.raises(CodeDocMonitorError):
         discover_files(tmp_path / "nope")
 
@@ -349,7 +349,7 @@ def test_symbol_inventory_order_matches_file_inventory(tmp_path: Path) -> None:
 
 def test_discover_symbols_reuses_extract_file_symbols(tmp_path: Path) -> None:
     # The stored symbols are exactly what extract.extract_file produces, in order.
-    from code_doc_monitor.extract import extract_file
+    from custodex.extract import extract_file
 
     _build_symbol_repo(tmp_path)
     sinv = _symbol_inv(tmp_path)
@@ -394,7 +394,7 @@ def test_unparseable_python_file_raises_extraction_error(tmp_path: Path) -> None
     assert "bad.py" in str(exc.value)
 
 
-def test_extraction_error_is_code_doc_monitor_error(tmp_path: Path) -> None:
+def test_extraction_error_is_custodex_error(tmp_path: Path) -> None:
     _touch(tmp_path, "bad.py", "class :\n")
     inv = discover_files(tmp_path)
     with pytest.raises(CodeDocMonitorError):

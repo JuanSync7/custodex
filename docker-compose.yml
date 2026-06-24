@@ -1,4 +1,4 @@
-# code-doc-monitor central server + Postgres (EPIC SVR).
+# custodex central server + Postgres (EPIC SVR).
 #
 #   export CDMON_ADMIN_TOKEN=$(openssl rand -hex 32)
 #   export CDMON_SECRET_KEY=$(openssl rand -base64 32)
@@ -13,13 +13,13 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: cdmon
+      POSTGRES_USER: cdx
       POSTGRES_PASSWORD: ${CDMON_DB_PASSWORD:-change-me-in-prod}
-      POSTGRES_DB: cdmon
+      POSTGRES_DB: cdx
     volumes:
-      - cdmon-db:/var/lib/postgresql/data
+      - cdx-db:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U cdmon"]
+      test: ["CMD-SHELL", "pg_isready -U cdx"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -31,13 +31,13 @@ services:
         condition: service_healthy
     environment:
       # On startup store_from_env() migrates the schema (alembic) and uses a SqlStore.
-      CDMON_DATABASE_URL: postgresql+psycopg://cdmon:${CDMON_DB_PASSWORD:-change-me-in-prod}@db:5432/cdmon
+      CDMON_DATABASE_URL: postgresql+psycopg://cdx:${CDMON_DB_PASSWORD:-change-me-in-prod}@db:5432/cdx
       # REQUIRED in a shared deployment: the GLOBAL admin token + the credential KEK.
       CDMON_ADMIN_TOKEN: ${CDMON_ADMIN_TOKEN:?set a strong admin token (openssl rand -hex 32)}
       CDMON_SECRET_KEY: ${CDMON_SECRET_KEY:?set a base64 32-byte KEK (openssl rand -base64 32)}
       # Example hardening overrides (otherwise from config/settings.yaml):
-      # CDMON_TRUSTED_HOSTS: cdmon.example.com
-      # CDMON_CORS_ORIGINS: https://cdmon.example.com
+      # CDMON_TRUSTED_HOSTS: custodex.example.com
+      # CDMON_CORS_ORIGINS: https://custodex.example.com
       # CDMON_RATE_LIMIT_RPM: "120"
     ports:
       - "33333:33333"
@@ -57,4 +57,4 @@ services:
       start_period: 20s
 
 volumes:
-  cdmon-db:
+  cdx-db:

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import textwrap
 
-from code_doc_monitor.blocks import known_region_ids, render_template
-from code_doc_monitor.config import (
+from custodex.blocks import known_region_ids, render_template
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
@@ -22,8 +22,8 @@ from code_doc_monitor.config import (
     RegionTemplate,
     load_config,
 )
-from code_doc_monitor.extract import DocumentSurface, Record, Symbol
-from code_doc_monitor.monitor import Monitor
+from custodex.extract import DocumentSurface, Record, Symbol
+from custodex.monitor import Monitor
 
 # --------------------------------------------------------------------------- #
 # render_template unit

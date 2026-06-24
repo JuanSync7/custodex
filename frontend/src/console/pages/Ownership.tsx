@@ -177,7 +177,7 @@ export function Ownership({ api = apiClient, repoId: repoIdProp }: OwnershipProp
             {slaState.data.stale_count === 1 ? "" : "s"} need a review — past the SLA
             or never reviewed. The accountable owner should re-review (stamp{" "}
             <code>reviewed</code> in <code>config/cdmon</code> or run{" "}
-            <code>cdmon staleness</code>).
+            <code>cdx staleness</code>).
           </p>
           <ul className="settings-secrets">
             {slaState.data.findings

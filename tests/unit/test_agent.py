@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.agent import (
+from custodex.agent import (
     AgentBackend,
     Artifact,
     PromptLibrary,
@@ -27,10 +27,10 @@ from code_doc_monitor.agent import (
     resolve_driver,
     select_artifacts,
 )
-from code_doc_monitor.agent import runtime as agent_runtime
-from code_doc_monitor.backends import FixRequest, make_backend
-from code_doc_monitor.blocks import symbol_table
-from code_doc_monitor.config import (
+from custodex.agent import runtime as agent_runtime
+from custodex.backends import FixRequest, make_backend
+from custodex.blocks import symbol_table
+from custodex.config import (
     AgentConfig,
     Audience,
     BackendConfig,
@@ -40,12 +40,12 @@ from code_doc_monitor.config import (
     load_config,
     write_template,
 )
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.extract import DocumentSurface, Symbol, build_document_surface
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.reviewlog import read_all
-from code_doc_monitor.schema import Verdict
-from code_doc_monitor.sinks import NullSink
+from custodex.drift import Drift, DriftKind
+from custodex.extract import DocumentSurface, Symbol, build_document_surface
+from custodex.monitor import Monitor
+from custodex.reviewlog import read_all
+from custodex.schema import Verdict
+from custodex.sinks import NullSink
 
 FIXED_NOW = "2026-06-01T00:00:00+00:00"
 
@@ -205,7 +205,7 @@ def test_render_context_includes_context_refs_block(tmp_path: Path) -> None:
     """E-02: the agent's render_context surfaces the document's context_refs as a
     reference block (mirroring build_prompt) — header, paths, note, and a .py
     ref's public symbol glance."""
-    from code_doc_monitor.config import ContextRef
+    from custodex.config import ContextRef
 
     src = tmp_path / "engine.py"
     src.write_text("def schedule(job):\n    return job\n", encoding="utf-8")
@@ -266,7 +266,7 @@ def test_library_directory_accessor() -> None:
 
 
 def test_driver_raising_backend_error_propagates_unwrapped(monkeypatch) -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     def raise_typed(argv, stdin, timeout):
         raise BackendError("already typed")
@@ -304,7 +304,7 @@ def test_malformed_reply_is_reasked_once_then_succeeds() -> None:
 
 
 def test_exhausted_retries_raise_backend_error() -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     backend = AgentBackend(
         AgentConfig(max_parse_retries=1), driver=lambda p: "never json"
@@ -314,7 +314,7 @@ def test_exhausted_retries_raise_backend_error() -> None:
 
 
 def test_zero_retries_fails_on_first_bad_reply() -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     calls = {"n": 0}
 
@@ -366,7 +366,7 @@ def test_claude_code_command_template_substitutes_prompt(monkeypatch) -> None:
 
 
 def test_api_driver_requires_key_and_calls_leaf(monkeypatch) -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     monkeypatch.delenv("CDM_TEST_API_KEY", raising=False)
     with pytest.raises(BackendError) as exc:
@@ -389,7 +389,7 @@ def test_api_driver_requires_key_and_calls_leaf(monkeypatch) -> None:
 
 
 def test_local_driver_requires_base_url_and_calls_leaf(monkeypatch) -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     with pytest.raises(BackendError) as exc:
         resolve_driver(AgentConfig(driver="local"))
@@ -411,7 +411,7 @@ def test_local_driver_requires_base_url_and_calls_leaf(monkeypatch) -> None:
 
 
 def test_driver_failure_is_wrapped_in_backend_error(monkeypatch) -> None:
-    from code_doc_monitor.errors import BackendError
+    from custodex.errors import BackendError
 
     def boom(argv, stdin, timeout):
         raise RuntimeError("subprocess blew up")
@@ -541,13 +541,13 @@ def _exemplar(
     resolved_text: str | None = None,
     region_body: str = "| past region body |",
 ):
-    from code_doc_monitor.schema import (
+    from custodex.schema import (
         ProposedFix,
         Resolution,
         ResolutionRecord,
         ReviewRecord,
     )
-    from code_doc_monitor.similar import Exemplar
+    from custodex.similar import Exemplar
 
     rec = ReviewRecord(
         record_id=record_id,
@@ -588,7 +588,7 @@ def test_exemplars_artifact_is_packaged_and_loadable() -> None:
 
 
 def test_select_artifacts_includes_exemplars_only_when_present() -> None:
-    from code_doc_monitor.schema import Resolution
+    from custodex.schema import Resolution
 
     # Absent by default -> not selected.
     assert Artifact.EXEMPLARS not in select_artifacts(
@@ -604,7 +604,7 @@ def test_select_artifacts_includes_exemplars_only_when_present() -> None:
 
 
 def test_render_context_renders_exemplar_and_resolved_text() -> None:
-    from code_doc_monitor.schema import Resolution
+    from custodex.schema import Resolution
 
     req = _req()
     with_ex = req.model_copy(
@@ -634,7 +634,7 @@ def test_render_context_without_exemplars_is_byte_identical_to_pre_d04(
 
 
 def test_composed_prompt_includes_exemplar_text_when_present() -> None:
-    from code_doc_monitor.schema import Resolution
+    from custodex.schema import Resolution
 
     req = _req()
     with_ex = req.model_copy(

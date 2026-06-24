@@ -1,6 +1,6 @@
 """add repos.provider_secret for at-rest sealed git provider credentials (GIT-02).
 
-ADDITIVE migration mirroring ``code_doc_monitor.server.db.RepoRow.provider_secret``:
+ADDITIVE migration mirroring ``custodex.server.db.RepoRow.provider_secret``:
 a nullable ``LargeBinary`` column on ``repos`` holding the AES-256-GCM SEALED bytes
 of a repo's git provider credential (a PAT / project token / minted App token). It
 is sealed, not hashed, because a git credential must be REPLAYED to the provider —

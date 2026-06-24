@@ -1,10 +1,10 @@
 """Store-parity HTTP integration suite — every route through BOTH Store backends.
 
 The central server is a thin FastAPI shell over the ``Store`` Protocol
-(``code_doc_monitor.server.store``), which has TWO production implementations: the
+(``custodex.server.store``), which has TWO production implementations: the
 in-process
-:class:`~code_doc_monitor.server.InMemoryStore` and the persistent
-:class:`~code_doc_monitor.server.db.SqlStore` (E-04, Postgres-first; SQLite for the
+:class:`~custodex.server.InMemoryStore` and the persistent
+:class:`~custodex.server.db.SqlStore` (E-04, Postgres-first; SQLite for the
 offline gate, K4). ``test_server.py`` exercises every route through ``TestClient`` —
 but only over ``InMemoryStore``; ``test_db.py`` exercises ``SqlStore`` — but mostly
 through DIRECT store-method calls, not through HTTP. That left the HTTP↔DB boundary
@@ -41,22 +41,22 @@ pytest.importorskip(
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.schema import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.schema import (  # noqa: E402
     ProposedFix,
     Resolution,
     ResolutionRecord,
     ReviewRecord,
     Verdict,
 )
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.store import Store  # noqa: E402
-from code_doc_monitor.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
+from custodex.server.store import Store  # noqa: E402
+from custodex.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
 
 _REPO = "acme/widget"
 _TOKEN = "s3cret-token"  # the per-repo bearer token the suite registers with
@@ -595,9 +595,9 @@ def test_unknown_repo_is_404_on_every_read_route(client: TestClient, path: str) 
 def test_full_ticket_and_coverage_vertical_over_either_store(
     client: TestClient,
 ) -> None:
-    from code_doc_monitor.config import Audience
-    from code_doc_monitor.drift import Drift, DriftKind
-    from code_doc_monitor.ticket import build_ticket
+    from custodex.config import Audience
+    from custodex.drift import Drift, DriftKind
+    from custodex.ticket import build_ticket
 
     _register(client)
 

@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.reviewlog (CDM-04).
+"""Tests for custodex.reviewlog (CDM-04).
 
 The review log is append-only JSONL (K5): each handled drift is one line and
 existing lines are never rewritten. A corrupt line is loud, not silent (K8).
@@ -13,9 +13,9 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.errors import SchemaError
-from code_doc_monitor.reviewlog import (
+from custodex.config import Audience
+from custodex.errors import SchemaError
+from custodex.reviewlog import (
     append,
     append_resolution,
     read_all,
@@ -25,7 +25,7 @@ from code_doc_monitor.reviewlog import (
     summarize,
     summarize_with_resolutions,
 )
-from code_doc_monitor.schema import (
+from custodex.schema import (
     ProposedFix,
     Resolution,
     ResolutionRecord,

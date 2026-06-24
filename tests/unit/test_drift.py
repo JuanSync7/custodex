@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.drift (CDM-03).
+"""Tests for custodex.drift (CDM-03).
 
 Detection is pure and side-effect free (K1). Covers each DriftKind, the
 healable/audience fields, and — end to end through `detect` — the audience rule
@@ -14,17 +14,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.blocks import expected_region, symbol_table
-from code_doc_monitor.config import (
+from custodex.blocks import expected_region, symbol_table
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
     RegionMode,
 )
-from code_doc_monitor.drift import Drift, DriftKind, DriftReport, detect
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.manifest import (
+from custodex.drift import Drift, DriftKind, DriftReport, detect
+from custodex.extract import build_document_surface
+from custodex.manifest import (
     render_doc,
     set_fingerprint,
     set_fingerprint_tiers,
@@ -250,7 +250,7 @@ def test_detect_ignores_region_not_declared_by_spec(tmp_path: Path) -> None:
 def test_detect_human_region_stale_is_reported_unhealable(tmp_path: Path) -> None:
     """B-02: a human-owned renderer-backed region that is stale → REGION,
     healable=False (reported for review, but the engine will not auto-edit)."""
-    from code_doc_monitor.config import RegionMode
+    from custodex.config import RegionMode
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -286,7 +286,7 @@ def test_detect_human_region_stale_is_reported_unhealable(tmp_path: Path) -> Non
 def test_detect_human_region_no_renderer_suppresses_unhealable(tmp_path: Path) -> None:
     """B-02: a human region the engine cannot render is intentional, not an
     error — the UNHEALABLE drift is suppressed for it."""
-    from code_doc_monitor.config import RegionMode
+    from custodex.config import RegionMode
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -316,7 +316,7 @@ def test_detect_human_region_no_renderer_suppresses_unhealable(tmp_path: Path) -
 
 def test_detect_generated_region_no_renderer_still_unhealable(tmp_path: Path) -> None:
     """B-02 additive: a NON-human region with no renderer is still UNHEALABLE."""
-    from code_doc_monitor.config import RegionMode
+    from custodex.config import RegionMode
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -374,7 +374,7 @@ def _llm_seeded_spec_drift() -> DocumentSpec:
 
 def _seeded_doc_text(spec: DocumentSpec, root: Path, body: str | None = None) -> str:
     """A doc whose symbols region is filled + stamped with its body hash."""
-    from code_doc_monitor.manifest import region_body_hash, set_region_hash
+    from custodex.manifest import region_body_hash, set_region_hash
 
     surface = build_document_surface(spec, root)
     filled = symbol_table(surface) if body is None else body
@@ -417,7 +417,7 @@ def test_llm_seeded_locked_behaves_like_human(tmp_path: Path) -> None:
     # Seed with a human-edited body whose hash is stamped to the ORIGINAL fill
     # (so the current human body diverges from the stamp -> locked).
     surface = build_document_surface(spec, root)
-    from code_doc_monitor.manifest import region_body_hash, set_region_hash
+    from custodex.manifest import region_body_hash, set_region_hash
 
     body = "# Title\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n"
     body, _ = set_region(body, "symbols", "a human took this over\n")
@@ -440,7 +440,7 @@ def test_llm_seeded_locked_behaves_like_human(tmp_path: Path) -> None:
 def test_human_region_advisory_persists_across_fingerprint_heal(tmp_path: Path) -> None:
     """B-02 retrofit: a human region with a stamped hash keeps firing its
     advisory even after the fingerprint is in sync — until the body changes."""
-    from code_doc_monitor.manifest import region_body_hash, set_region_hash
+    from custodex.manifest import region_body_hash, set_region_hash
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -487,7 +487,7 @@ def _llm_no_renderer_doc(
     The prose region (`overview`) has no template and no built-in renderer, so
     `expected_region` returns None for it: it is authored by the backend (B-06).
     """
-    from code_doc_monitor.config import RegionMode
+    from custodex.config import RegionMode
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -548,7 +548,7 @@ def test_detect_llm_no_renderer_code_moved_is_healable_region(tmp_path: Path) ->
 def test_detect_non_llm_no_renderer_still_unhealable(tmp_path: Path) -> None:
     """B-06: a NON-`llm` (generated) no-renderer region is still UNHEALABLE even
     when the code moves — there is genuinely no authoring path (loud, K8)."""
-    from code_doc_monitor.config import RegionMode
+    from custodex.config import RegionMode
 
     root = _setup(tmp_path)
     _write_code(root, CODE_V1)
@@ -755,7 +755,7 @@ def test_hash_drift_without_stored_tiers_falls_back(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 # P-04: anchor delta on a HASH drift (symbol moved/stable vs added/removed)     #
 # --------------------------------------------------------------------------- #
-from code_doc_monitor.extract import anchor_id  # noqa: E402
+from custodex.extract import anchor_id  # noqa: E402
 
 # CODE_V1 + a NEW public function (signature tier moves → HASH drift).
 CODE_PLUS_SYMBOL = '''\

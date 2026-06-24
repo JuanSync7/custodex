@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.registry (E-02 — repo registration client).
+"""Tests for custodex.registry (E-02 — repo registration client).
 
 A repo announces itself to the central server via an INJECTED transport, so
 tests never touch the network (K4) and HTTP uses the stdlib only (K0). The
@@ -12,15 +12,15 @@ from __future__ import annotations
 
 import pytest
 
-from code_doc_monitor.config import CentralConfig
-from code_doc_monitor.errors import SchemaError
-from code_doc_monitor.registry import (
+from custodex.config import CentralConfig
+from custodex.errors import SchemaError
+from custodex.registry import (
     HttpRegisterTransport,
     RegistrationPayload,
     register_repo,
     repo_identity_from_config,
 )
-from code_doc_monitor.sinks import RepoIdentity
+from custodex.sinks import RepoIdentity
 
 
 def _repo() -> RepoIdentity:
@@ -104,7 +104,7 @@ def test_http_register_transport_lazy_build_posts_to_repos(
 ) -> None:
     # When no http leaf is injected, register() builds a stdlib leaf lazily; we
     # stub its request() so the lazy-build branch runs with NO real network (K4).
-    import code_doc_monitor.registry as registry_mod
+    import custodex.registry as registry_mod
 
     posted: list[tuple[str, str, dict | None, str]] = []
 
@@ -131,7 +131,7 @@ def test_http_register_transport_lazy_build_posts_to_repos(
 def test_http_register_transport_no_token_when_env_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import code_doc_monitor.registry as registry_mod
+    import custodex.registry as registry_mod
 
     seen: list[str] = []
 
@@ -153,7 +153,7 @@ def test_register_repo_default_transport_lazy_build(
 ) -> None:
     # register_repo with transport=None builds the default HttpRegisterTransport
     # and submits through it (the leaf stubbed so there is NO network, K4).
-    import code_doc_monitor.registry as registry_mod
+    import custodex.registry as registry_mod
 
     posted: list[str] = []
 

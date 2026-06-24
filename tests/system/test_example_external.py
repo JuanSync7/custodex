@@ -1,14 +1,14 @@
 """The external-repo adopter example, proven end-to-end (G-04 — capstone).
 
 ``examples/external-repo/`` is a SMALL self-contained stand-in for "some other
-team's repo" that ADOPTS cdmon: its own ``src/widget.py`` + ``docs/api.md``
+team's repo" that ADOPTS cdx: its own ``src/widget.py`` + ``docs/api.md``
 (managed ``symbols`` region) + ``cdmon.yaml`` (an http ``central:`` block). This
 test drives the WHOLE adopter loop offline (K4):
 
     client config -> heal (check -> monitor --apply) -> report -> server stores
     -> query
 
-It copies the fixture under ``tmp_path``, mutates ``src/widget.py`` so ``cdmon
+It copies the fixture under ``tmp_path``, mutates ``src/widget.py`` so ``cdx
 check`` reports drift, heals it with ``monitor --apply``, then registers the repo
 and reports the healed records to an IN-PROCESS central server (FastAPI
 ``TestClient``) — wiring the ``HttpSink``'s injected ``client`` to call the
@@ -38,16 +38,16 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.config import load_config  # noqa: E402
-from code_doc_monitor.monitor import Monitor  # noqa: E402
-from code_doc_monitor.registry import (  # noqa: E402
+from custodex.config import load_config  # noqa: E402
+from custodex.monitor import Monitor  # noqa: E402
+from custodex.registry import (  # noqa: E402
     HttpRegisterTransport,
     register_repo,
     repo_identity_from_config,
 )
-from code_doc_monitor.schema import ReviewRecord  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.sinks import HttpSink, RepoIdentity  # noqa: E402
+from custodex.schema import ReviewRecord  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.sinks import HttpSink, RepoIdentity  # noqa: E402
 
 _EXAMPLE = REPO_ROOT / "examples" / "external-repo"
 _TOKEN = "adopter-s3cret"
@@ -122,7 +122,7 @@ def _http_sink(client: TestClient, identity: RepoIdentity, outbox: Path) -> Http
 
 
 def test_committed_example_is_in_sync() -> None:
-    """The checked-in fixture is clean: cdmon check finds no drift (read-only K1)."""
+    """The checked-in fixture is clean: cdx check finds no drift (read-only K1)."""
     cfg = load_config(_EXAMPLE / "cdmon.yaml")
     assert Monitor(cfg, _EXAMPLE).check().ok
 

@@ -93,9 +93,9 @@ features:
     constraints: [K8, K10]
 
   - id: FEAT-SETTINGS-008
-    title: cdmon settings CLI
+    title: cdx settings CLI
     summary: >-
-      The read-only `cdmon settings [--settings PATH] [--json]` command resolves the
+      The read-only `cdx settings [--settings PATH] [--json]` command resolves the
       effective settings (file → env → defaults) and prints the host/port + hardening
       knobs and the secret presence, never a secret value; a malformed file is a loud
       ConfigError → exit 1. Offline, no backend (K1/K4).

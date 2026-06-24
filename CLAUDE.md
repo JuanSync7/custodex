@@ -6,20 +6,35 @@ for *changing* the code.
 
 ## What this is
 
-`code-doc-monitor` (`cdmon`) is a standardized, reusable code→documentation drift
+**Custodex** (`cdx`) is a standardized, reusable code-and-docs governance
 monitor: it extracts a code surface, fingerprints it, detects drift against the
-managed docs, and — when drift is found — asks an LLM backend to **fix or
-invalidate** it, recording every verdict as an auditable `ReviewRecord`. It
-**dogfoods itself**: this repo's own engineering docs under `docs/api/` are
-monitored against `code_doc_monitor/**`.
+managed docs (code↔doc and doc↔doc), and — when drift is found — asks an LLM
+backend to **fix or invalidate** it, recording every verdict as an auditable
+`ReviewRecord`. It also pegs an accountable **owner** to every doc and tracks
+**review SLAs** (staleness). It **dogfoods itself**: this repo's own engineering
+docs under `docs/api/` are monitored against `custodex/**`.
+
+## Naming (the rebrand)
+
+The tool is **Custodex**; the CLI is **`cdx`** and the Python package is
+**`custodex`** (`pip install custodex`, `import custodex`). `cdmon` /
+`cdmon-server` are **deprecated aliases** kept working for back-compat — don't
+remove them.
+
+These `cdmon`-era **convention names are deliberately kept** (renaming them
+breaks deployed adopters for no real gain) — do NOT "fix" them to `cdx`:
+- the `config/cdmon/` config directory + the `cdmon.yaml`/`.json` single-file form,
+- the `.cdmon/` runtime state directory (review log, resolutions, coverage manifest),
+- the `cdmon-config-version` config-format key,
+- the `CDMON_*` environment-variable prefix (tokens, DB URL, server tunables).
 
 ## The validation gate (run before declaring any change done)
 
 ```bash
 .venv/bin/ruff format --check .
 .venv/bin/ruff check .
-.venv/bin/mypy code_doc_monitor
-.venv/bin/pytest -q --cov=code_doc_monitor --cov-branch   # branch coverage, fail_under=90
+.venv/bin/mypy custodex
+.venv/bin/pytest -q --cov=custodex --cov-branch   # branch coverage, fail_under=90
 ```
 
 All four must be clean. This is the same gate `.project/STATUS.md` records for
@@ -33,8 +48,8 @@ matching `docs/api/*.md` doc — and the dogfood test (`tests/system/test_dogfoo
 will then fail. After changing a tracked module:
 
 ```bash
-.venv/bin/cdmon monitor --apply --config config/cdmon   # reheal the docs/api/* regions + fingerprints
-.venv/bin/cdmon check --config config/cdmon             # confirm 0 drift
+.venv/bin/cdx monitor --apply --config config/cdmon   # reheal the docs/api/* regions + fingerprints
+.venv/bin/cdx check --config config/cdmon             # confirm 0 drift
 ```
 
 Commit the rehealed docs alongside the code change. Which modules are tracked is
@@ -50,7 +65,7 @@ them in commits/PRs):
   `pyyaml`. `langgraph` (`[agent]`), `fastapi`/`sqlalchemy`/`cryptography`
   (`[server]`) are opt-in extras, imported lazily — a core-only install must stay
   minimal.
-- **K1** — `cdmon check` and `drift` are detect-only: pure, no file mutation, no
+- **K1** — `cdx check` and `drift` are detect-only: pure, no file mutation, no
   backend call.
 - **K2** — Single source of truth = the code; docs are graded against the surface,
   never the reverse.
@@ -60,7 +75,7 @@ them in commits/PRs):
   or a real LLM/DB.
 - **K5** — Human in the loop: every handled drift produces a `ReviewRecord` with
   BOTH the original drift and the proposed fix; auto-apply is opt-in.
-- **K6** — Public schema is versioned & additive; `cdmon schema` emits it from the
+- **K6** — Public schema is versioned & additive; `cdx schema` emits it from the
   pydantic models (no hand-written schema).
 - **K7** — Safe, idempotent fixes: re-running `monitor` with no code change
   produces no new changes/records.
@@ -74,8 +89,8 @@ them in commits/PRs):
 ## Repository layout
 
 ```
-code_doc_monitor/        the engine (one module per concern)
-  cli.py                 the `cdmon` Typer CLI (24 subcommands)
+custodex/        the engine (one module per concern)
+  cli.py                 the `cdx` Typer CLI (24 subcommands)
   config.py / _v2base.py / configsync.py   config models + config/cdmon loader + sync engine
   extract.py             AST/registry extraction → per-document surface (never imports the target)
   drift.py / blocks.py / manifest.py / heal.py   detect drift, manage regions/fingerprints, heal
@@ -105,20 +120,20 @@ tests/{unit,integration,system,smoke,regression}/   the suite (markers auto-appl
 The canonical config form is the multi-file `config/cdmon/` directory (an
 `index.yaml` frontmatter+globals file plus per-area unit files: `core.yaml`,
 `agent.yaml`, `server.yaml`, …). A single `cdmon.yaml`/`.json` file is a supported
-back-compat path (used by `examples/`). `cdmon` auto-detects `config/cdmon/` with
-no `--config`. After adding/removing unit files, run `cdmon index` to regenerate
-`index.yaml`'s `units:` list (`cdmon index --check` is the CI guard).
+back-compat path (used by `examples/`). `cdx` auto-detects `config/cdmon/` with
+no `--config`. After adding/removing unit files, run `cdx index` to regenerate
+`index.yaml`'s `units:` list (`cdx index --check` is the CI guard).
 
 ## Do NOT hand-edit generated docs
 
-- `docs/api/*.md` — dogfood-generated. Reheal with `cdmon monitor --apply`; the
+- `docs/api/*.md` — dogfood-generated. Reheal with `cdx monitor --apply`; the
   prose blockquotes are human-maintained but the `CDM:BEGIN/END` regions and
   fingerprints are machine-managed.
-- `feature-doc/FEATURES.md` and `feature-doc/wiki/*` — generated by `cdmon wiki`
+- `feature-doc/FEATURES.md` and `feature-doc/wiki/*` — generated by `cdx wiki`
   from `feature-doc/catalog/*.yaml` + test docstrings + source. Edit the catalog
-  yaml (the single source) and regenerate; `cdmon wiki --check` is the CI gate.
+  yaml (the single source) and regenerate; `cdx wiki --check` is the CI gate.
 - New feature? Add it to `feature-doc/catalog/<subsystem>.yaml` AND tag its demo +
-  test with an inline `Feature: <FEAT-ID>` comment, or `cdmon trace --fail-on-gap`
+  test with an inline `Feature: <FEAT-ID>` comment, or `cdx trace --fail-on-gap`
   will fail (it requires every feature to trace 1:1 to a demo and a test).
 
 ## Tests

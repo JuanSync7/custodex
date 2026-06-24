@@ -1,6 +1,6 @@
 """initial schema: repos, records, resolutions, coverage_snapshots (E-04).
 
-Mirrors ``code_doc_monitor.server.db`` 1:1 — the "indexed columns + full JSON"
+Mirrors ``custodex.server.db`` 1:1 — the "indexed columns + full JSON"
 hybrid (K6): a portable JSON column (``JSONB`` on Postgres, JSON on SQLite via the
 SAME ``_json_type`` the models use) holding the FULL shared pydantic model, plus
 indexed scalar columns for E-05 queries. ``upgrade`` creates the four tables;
@@ -19,7 +19,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from code_doc_monitor.server.db import _json_type
+from custodex.server.db import _json_type
 
 # revision identifiers, used by Alembic.
 revision: str = "0001_initial"

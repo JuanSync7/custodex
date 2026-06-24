@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.featurecatalog (EPIC R, R-01).
+"""Tests for custodex.featurecatalog (EPIC R, R-01).
 
 The golden feature-catalog loader: a frozen, typed ``Feature`` model and a
 deterministic, loud (K8) ``load_catalog`` over ``feature-doc/catalog/*.yaml``.
@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.errors import CatalogError, CodeDocMonitorError
-from code_doc_monitor.featurecatalog import (
+from custodex.errors import CatalogError, CodeDocMonitorError
+from custodex.featurecatalog import (
     FEATURE_ID_RE,
     Feature,
     FeatureCatalog,
@@ -236,7 +236,7 @@ def _real_catalog_dir() -> Path:
 def _real_modules() -> set[str]:
     import pkgutil
 
-    import code_doc_monitor as pkg
+    import custodex as pkg
 
     return {m.name for m in pkgutil.iter_modules(pkg.__path__)}
 

@@ -3,12 +3,12 @@
 Two halves, all offline + deterministic (K10), operating on a COPY of the demo
 (the checked-in demo is NEVER mutated):
 
-* **Engine** (:func:`code_doc_monitor.generate.apply_record_fix`, no server):
+* **Engine** (:func:`custodex.generate.apply_record_fix`, no server):
   induce a real drift on a documented source file (add a public method to the
   demo's ``engine.py``), run :class:`Monitor` over the temp copy WITHOUT applying
   to obtain a real :class:`ReviewRecord` with a ``FIX`` verdict + a ``fix``, then
   call :func:`apply_record_fix` and assert it applied, the diff is non-empty, and
-  ``cdmon check`` is now clean. A SECOND apply of the same record is a no-op (empty
+  ``cdx check`` is now clean. A SECOND apply of the same record is a no-op (empty
   diff, ``applied=False``, K7). A record with no applicable fix is a loud K8 error.
 * **Route** (a ``TestClient`` over BOTH stores, against a temp demo git copy): a
   token-protected repo whose ``local_path`` is the temp copy ingests the drift
@@ -31,12 +31,12 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import load_config_dir
-from code_doc_monitor.errors import CodeDocMonitorError
-from code_doc_monitor.generate import apply_record_fix
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.schema import ReviewRecord, Verdict
-from code_doc_monitor.sinks import NullSink
+from custodex.config import load_config_dir
+from custodex.errors import CodeDocMonitorError
+from custodex.generate import apply_record_fix
+from custodex.monitor import Monitor
+from custodex.schema import ReviewRecord, Verdict
+from custodex.sinks import NullSink
 from tests._repo import REPO_ROOT
 
 _NOW = "2026-06-08T00:00:00Z"
@@ -72,7 +72,7 @@ def _induce_drift(repo: Path) -> None:
 def _check_clean(config_dir: Path) -> int:
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app as cli_app
+    from custodex.cli import app as cli_app
 
     res = CliRunner().invoke(cli_app, ["check", "--config", str(config_dir)])
     return res.exit_code
@@ -154,15 +154,15 @@ pytest.importorskip(
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.store import Store  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.server.store import Store  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _REPO = "acme/widget"
 _NO_LOCAL_REPO = "acme/central-only"

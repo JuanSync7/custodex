@@ -50,11 +50,11 @@ export function AppShell({ children }: AppShellProps) {
   return (
     <div className="app">
       <aside className="rail">
-        <Link to="/" className="brand" aria-label="code-doc-monitor console">
+        <Link to="/" className="brand" aria-label="Custodex console">
           <BrandMark className="brand__mark" aria-hidden />
           <span className="brand__text">
-            <span className="brand__title">drift console</span>
-            <span className="brand__sub">code · doc · monitor</span>
+            <span className="brand__title">Custodex</span>
+            <span className="brand__sub">code · doc · custody</span>
           </span>
         </Link>
 

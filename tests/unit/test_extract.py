@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.extract (CDM-02).
+"""Tests for custodex.extract (CDM-02).
 
 Covers AST-only extraction (K0), the audience filter (K3), sub-file selection,
 and deterministic, audience-normalized hashing (K10). Written before the
@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import Audience, CodeRef, DocumentSpec
-from code_doc_monitor.errors import ExtractionError
-from code_doc_monitor.extract import (
+from custodex.config import Audience, CodeRef, DocumentSpec
+from custodex.errors import ExtractionError
+from custodex.extract import (
     DocumentSurface,
     Extractor,
     PythonAstExtractor,
@@ -455,7 +455,7 @@ def test_register_extractor_roundtrip(tmp_path: Path) -> None:
         register_extractor(_Toy())
         assert isinstance(get_extractor("toy"), _Toy)
     finally:
-        from code_doc_monitor.extract import _EXTRACTORS
+        from custodex.extract import _EXTRACTORS
 
         _EXTRACTORS.pop("toy", None)
 
@@ -795,7 +795,7 @@ class _ToySymbolExtractor:
 
 
 def _unregister_toy() -> None:
-    from code_doc_monitor.extract import _EXTRACTORS, _SYMBOL_LANG_BY_SUFFIX
+    from custodex.extract import _EXTRACTORS, _SYMBOL_LANG_BY_SUFFIX
 
     _EXTRACTORS.pop("toy", None)
     _SYMBOL_LANG_BY_SUFFIX.pop(".toy", None)
@@ -826,7 +826,7 @@ def test_symbols_auto_infers_registered_suffix(tmp_path: Path) -> None:
 def test_register_extractor_maps_suffix() -> None:
     try:
         register_extractor(_ToySymbolExtractor(), suffixes=(".toy",))
-        from code_doc_monitor.extract import _SYMBOL_LANG_BY_SUFFIX
+        from custodex.extract import _SYMBOL_LANG_BY_SUFFIX
 
         assert _SYMBOL_LANG_BY_SUFFIX[".toy"] == "toy"
     finally:
@@ -881,7 +881,7 @@ def test_shell_extractor_is_registered_by_default() -> None:
 
 
 def test_shell_suffixes_map_to_shell() -> None:
-    from code_doc_monitor.extract import _SYMBOL_LANG_BY_SUFFIX
+    from custodex.extract import _SYMBOL_LANG_BY_SUFFIX
 
     assert _SYMBOL_LANG_BY_SUFFIX[".sh"] == "shell"
     assert _SYMBOL_LANG_BY_SUFFIX[".bash"] == "shell"
@@ -1044,7 +1044,7 @@ def test_symbols_python_still_default_for_auto(tmp_path: Path) -> None:
 # P-04: stable symbol anchors (lineno-free identity)                           #
 # --------------------------------------------------------------------------- #
 def test_anchor_id_is_deterministic_and_short() -> None:
-    from code_doc_monitor.extract import anchor_id
+    from custodex.extract import anchor_id
 
     a = anchor_id("pkg.Widget.render")
     assert a == anchor_id("pkg.Widget.render")
@@ -1052,13 +1052,13 @@ def test_anchor_id_is_deterministic_and_short() -> None:
 
 
 def test_anchor_id_changes_on_rename() -> None:
-    from code_doc_monitor.extract import anchor_id
+    from custodex.extract import anchor_id
 
     assert anchor_id("foo") != anchor_id("bar")
 
 
 def test_symbol_anchor_id_matches_function(tmp_path: Path) -> None:
-    from code_doc_monitor.extract import anchor_id
+    from custodex.extract import anchor_id
 
     syms = _by_name(extract_file(_write(tmp_path)))
     assert syms["foo"].anchor_id == anchor_id("foo")

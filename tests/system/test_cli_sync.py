@@ -1,15 +1,15 @@
-"""Y-03 — the ``cdmon sync`` CLI (local + remote) over a REAL temp git repo.
+"""Y-03 — the ``cdx sync`` CLI (local + remote) over a REAL temp git repo.
 
 Features: FEAT-CLI-012, FEAT-CONFIGV2-012, FEAT-SERVER-018
 
 The client-facing trigger for a config sync. Two paths, both offline (K4):
 
-* **local** (no ``--remote``): runs :func:`code_doc_monitor.configsync.run_sync`
+* **local** (no ``--remote``): runs :func:`custodex.configsync.run_sync`
   against the current repo (cwd) and prints the run summary; ``--json`` parses to
   the engine's :class:`SyncRun` shape; ``--mode git`` works; a working-tree edit
   shows drift. Exit 0; a loud, traceback-free error otherwise (K8).
 * **remote** (``--remote URL --repo-id ID``): POSTs to ``{URL}/repos/{ID}/sync``
-  via the SAME HTTP+auth seam as ``cdmon register`` (the stdlib leaf is stubbed so
+  via the SAME HTTP+auth seam as ``cdx register`` (the stdlib leaf is stubbed so
   there is NO network, K4); prints the returned server summary. A missing token is
   harmless (empty bearer) but an HTTP error / missing ``--repo-id`` is a loud
   non-zero exit (K8).
@@ -32,10 +32,10 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import code_doc_monitor.cli as cli_mod
-import code_doc_monitor.registry as registry_mod
-from code_doc_monitor.cli import app
-from code_doc_monitor.configsync import run_sync
+import custodex.cli as cli_mod
+import custodex.registry as registry_mod
+from custodex.cli import app
+from custodex.configsync import run_sync
 
 _NOW = "2026-06-07T00:00:00Z"
 
@@ -47,7 +47,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: gitrepo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -382,7 +382,7 @@ def test_remote_sync_requires_repo_id() -> None:
 
 def test_remote_sync_http_error_is_loud(monkeypatch: pytest.MonkeyPatch) -> None:
     """An HTTP failure in the leaf surfaces as a loud non-zero exit (K8)."""
-    from code_doc_monitor.errors import SchemaError
+    from custodex.errors import SchemaError
 
     def boom(
         self: object, method: str, url: str, *, body: dict | None, token: str

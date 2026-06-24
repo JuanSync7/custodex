@@ -13,15 +13,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     DocumentSpec,
     MonitorConfig,
     RegionColumn,
     RegionTemplate,
 )
-from code_doc_monitor.index import render_index
-from code_doc_monitor.monitor import Monitor
+from custodex.index import render_index
+from custodex.monitor import Monitor
 
 _TEMPLATE = RegionTemplate(
     source="index",
@@ -75,9 +75,9 @@ def _write_targets(root: Path, cfg: MonitorConfig | None = None) -> None:
     for stage, (title, purpose) in contents.items():
         body = _doc(stage, title, purpose)
         if stage in specs:
-            from code_doc_monitor.extract import build_document_surface
-            from code_doc_monitor.layout import LAYOUT_VERSION
-            from code_doc_monitor.manifest import (
+            from custodex.extract import build_document_surface
+            from custodex.layout import LAYOUT_VERSION
+            from custodex.manifest import (
                 render_doc,
                 set_fingerprint,
                 stamp_standard_meta,
@@ -141,9 +141,9 @@ def test_render_index_empty_collection_uses_empty_text(tmp_path: Path) -> None:
 
 def _seed_in_sync(tmp_path: Path) -> MonitorConfig:
     """Write the targets + a fully in-sync index doc; return the config."""
-    from code_doc_monitor.extract import build_document_surface
-    from code_doc_monitor.layout import LAYOUT_VERSION
-    from code_doc_monitor.manifest import (
+    from custodex.extract import build_document_surface
+    from custodex.layout import LAYOUT_VERSION
+    from custodex.manifest import (
         render_doc,
         set_fingerprint,
         stamp_standard_meta,

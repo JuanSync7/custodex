@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.schema (CDM-04).
+"""Tests for custodex.schema (CDM-04).
 
 The review-record schema is public and versioned (K6) and derived from the
 pydantic models (one source of truth — no hand-written schema). Records are
@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import json
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.schema import (
+from custodex.config import Audience
+from custodex.schema import (
     ProposedFix,
     Resolution,
     ResolutionRecord,
@@ -193,7 +193,7 @@ def test_pre_t01_record_without_ticket_still_parses() -> None:
 
 def test_record_with_ticket_round_trips() -> None:
     """T-01: a record carrying a DriftTicket round-trips through JSON (K6)."""
-    from code_doc_monitor.ticket import DriftTicket, TicketSeverity
+    from custodex.ticket import DriftTicket, TicketSeverity
 
     ticket = DriftTicket(
         ticket_id="CDM-abc123",

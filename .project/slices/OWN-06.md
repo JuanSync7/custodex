@@ -31,9 +31,9 @@ Make the whole feature visible and clickable on the live :33333 demo.
 
 ## Dogfood
 `seed_demo.py`/`demo_as_git.py` are scripts (not tracked-doc); demo config change
-ripples the demo trace count (`cdmon trace` over `demo/`). Add **FEAT-OWNERSHIP-009**
+ripples the demo trace count (`cdx trace` over `demo/`). Add **FEAT-OWNERSHIP-009**
 (demo roster + ownership view) + **FEAT-OWNERSHIP-010** (reassignment-clears-orphan
-demo) to the catalog + DEMOS cases + tagged tests; `cdmon wiki`; `cdmon trace
+demo) to the catalog + DEMOS cases + tagged tests; `cdx wiki`; `cdx trace
 --fail-on-gap` exit 0; demo 1:1 restored. Mark **EPIC OWN COMPLETE** in STATUS.
 
 ## Constraints

@@ -37,25 +37,25 @@ tables) and keeps the store-parity suite green on both backends.
 |-------|-------|----------------------|
 | OWN-01 | `DocumentSpec.owner/team/dri` + serialization round-trip + `ownership.resolve_ownership` + `Identity`/`RosterSnapshot`/`EffectiveOwner` | FEAT-OWNERSHIP-001/002 |
 | OWN-02 | `ownership.detect_orphans` + `OwnershipFinding`/`OwnershipStatus` | FEAT-OWNERSHIP-003 |
-| OWN-03 | `cdmon ownership` CLI (read-only) + offline roster-file loader | FEAT-OWNERSHIP-004 |
+| OWN-03 | `cdx ownership` CLI (read-only) + offline roster-file loader | FEAT-OWNERSHIP-004 |
 | OWN-04 | server roster + ownership mirror + migration 0006 + admin token + 4 routes (store parity, `pg` twin) | FEAT-OWNERSHIP-005/006/007 |
 | OWN-05 | `ReassignOwnerEdit` + `config.set_document_owner` + generate dispatch | FEAT-OWNERSHIP-008 |
 | OWN-06 | demo roster (with a departure) + demo config owners + Ownership frontend page + e2e | FEAT-OWNERSHIP-009/010 |
 
 Catalog entries are added **in the slice that also adds their demo + test tag** so
-`cdmon trace --fail-on-gap` / `cdmon wiki --check` stay green throughout (never
+`cdx trace --fail-on-gap` / `cdx wiki --check` stay green throughout (never
 add a feature ahead of its evidence).
 
 ## Out of scope (whole epic, v1)
 Code-ref-level direct ownership (covered transitively via code→doc→human);
 staleness/SLA (`detect_stale` seam pinned, deferred — needs a `last_reviewed`
 field); auto-emitting GitLab/GitHub orphan issues via the PR transports (the
-`/ownership` view + `cdmon ownership --fail-on-orphan` are the v1 surfaces);
+`/ownership` view + `cdx ownership --fail-on-orphan` are the v1 surfaces);
 real OIDC/JWT admin auth (a hashed global token is the v1).
 
 ## Constraints
 K0 (config is the only ownership entry point; core stays pydantic/typer/pyyaml),
-K1 (`cdmon ownership` + `detect_orphans` are pure/read-only), K2 (scope note),
+K1 (`cdx ownership` + `detect_orphans` are pure/read-only), K2 (scope note),
 K4 (offline default — roster is a file/InMemoryStore offline; `pg` opt-in),
 K5 (orphans are recorded, reassignment is the human-in-the-loop fix),
 K6 (every new field/route additive), K10 (sorted, clock injected).

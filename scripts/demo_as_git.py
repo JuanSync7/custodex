@@ -7,7 +7,7 @@ point the server at — completely OFFLINE (a local ``file://`` origin, no netwo
 EDR-safe; no ``curl``/``wget``).
 
 Why a script and not just "git init demo/"? The demo lives in a SUBDIR of the
-outer code-doc-monitor repo, so it cannot host its own ``.git`` without nesting a
+outer custodex repo, so it cannot host its own ``.git`` without nesting a
 repository inside another. Instead this exports a COPY of the tree to a target
 directory and lays down an authentic, multi-commit history (the project's
 plausible evolution, mirroring ``demo/CHANGELOG.md``) plus a BARE origin — the
@@ -23,7 +23,7 @@ It then prints the exact, network-free Python snippet that registers the repo
 with the central server (by its ``file://`` URL) and runs a clone-on-demand
 ``POST /sync`` over it via the in-process FastAPI ``TestClient``.
 
-It is stdlib + ``code_doc_monitor`` only (K0) and DETERMINISTIC (K10: pinned git
+It is stdlib + ``custodex`` only (K0) and DETERMINISTIC (K10: pinned git
 identity + a fixed commit date), so the materialized repo is byte-stable. Import
 :func:`materialize` to get the repo paths without the prints (the tests do).
 """
@@ -50,7 +50,7 @@ _FIXED_DATE = "2026-01-02T03:04:05 +0000"
 # is swept into a final catch-all commit, so the end state always matches the
 # demo tree exactly. The arc mirrors demo/CHANGELOG.md — model, then engine, then
 # io, then the scheduler helper, then tests, packaging/CI, and finally adopting
-# code-doc-monitor (its config + docs + templates).
+# custodex (its config + docs + templates).
 DEMO_HISTORY: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("chore: project scaffolding", (".editorconfig", ".gitignore", "LICENSE")),
     ("feat: domain model — Status, Task, TaskGraph", ("src/taskflow/core/model.py",)),
@@ -74,7 +74,7 @@ DEMO_HISTORY: tuple[tuple[str, tuple[str, ...]], ...] = (
         ("pyproject.toml", ".github", "CONTRIBUTING.md", "CHANGELOG.md"),
     ),
     (
-        "docs: adopt code-doc-monitor (config + docs + test-docs + templates)",
+        "docs: adopt custodex (config + docs + test-docs + templates)",
         (
             "config",
             "docs",
@@ -184,9 +184,9 @@ def _print_next_steps(paths: Mapping[str, Path], branch: str) -> None:
     )
     snippet = f'''\
 python - <<'PY'
-from code_doc_monitor.server import InMemoryStore, create_app
-from code_doc_monitor.registry import RegistrationPayload
-from code_doc_monitor.sinks import RepoIdentity
+from custodex.server import InMemoryStore, create_app
+from custodex.registry import RegistrationPayload
+from custodex.sinks import RepoIdentity
 from fastapi.testclient import TestClient
 
 client = TestClient(create_app(InMemoryStore(), clock=lambda: "2026-06-11T00:00:00Z"))

@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from code_doc_monitor.server.edits import (
+from custodex.server.edits import (
     AddCodeRefEdit,
     ConfigEdit,
     CreateDocEdit,

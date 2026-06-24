@@ -1,6 +1,6 @@
 """config_edits pending-edit table (EDITOR E-03).
 
-ADDITIVE migration mirroring ``code_doc_monitor.server.db``'s ``ConfigEditRow`` 1:1 —
+ADDITIVE migration mirroring ``custodex.server.db``'s ``ConfigEditRow`` 1:1 —
 the "indexed columns + full JSON" hybrid (K6): a portable JSON column (``JSONB`` on
 Postgres, JSON on SQLite via the SAME ``_json_type`` the model uses) holding the FULL
 typed :class:`ConfigEdit` (the staged "mapping ticket"), plus indexed scalar columns
@@ -20,7 +20,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from code_doc_monitor.server.db import _json_type
+from custodex.server.db import _json_type
 
 # revision identifiers, used by Alembic.
 revision: str = "0004_config_edits"

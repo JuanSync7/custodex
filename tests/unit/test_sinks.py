@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.sinks (CDM-04).
+"""Tests for custodex.sinks (CDM-04).
 
 The central sink is offline by default (K4): NullSink/FileSink need no network
 and FileSink is the offline stand-in for the central system. HttpSink is
@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import Audience, CentralConfig
-from code_doc_monitor.errors import SchemaError
-from code_doc_monitor.reviewlog import read_all
-from code_doc_monitor.schema import ProposedFix, ReviewRecord, Verdict
-from code_doc_monitor.sinks import (
+from custodex.config import Audience, CentralConfig
+from custodex.errors import SchemaError
+from custodex.reviewlog import read_all
+from custodex.schema import ProposedFix, ReviewRecord, Verdict
+from custodex.sinks import (
     FileSink,
     HttpSink,
     IngestEnvelope,
@@ -172,7 +172,7 @@ def test_http_sink_lazily_builds_stdlib_client_without_network(
 ) -> None:
     # When no client is injected, emit() builds a stdlib _UrllibClient lazily.
     # We stub its post() so the lazy-build branch runs with NO real network (K4).
-    import code_doc_monitor.sinks as sinks_mod
+    import custodex.sinks as sinks_mod
 
     posted: list[tuple[str, bytes]] = []
 

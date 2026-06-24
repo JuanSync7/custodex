@@ -1,4 +1,4 @@
-"""Dogfood (CDM-07): code-doc-monitor monitors its OWN source against its docs.
+"""Dogfood (CDM-07): custodex monitors its OWN source against its docs.
 
 cdmon's canonical self-config is the CONFIG-V2 multi-file ``config/cdmon/`` dir
 layout (Z-02 removed the redundant single-file root ``cdmon.yaml``). The units
@@ -25,17 +25,17 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from code_doc_monitor import inventory
-from code_doc_monitor.cli import _blank_updated
-from code_doc_monitor.config import (
+from custodex import inventory
+from custodex.cli import _blank_updated
+from custodex.config import (
     load_bundle,
     load_config,
     load_config_dir,
     regenerate_index,
 )
-from code_doc_monitor.coverage import resolve_coverage
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.monitor import Monitor
+from custodex.coverage import resolve_coverage
+from custodex.extract import build_document_surface
+from custodex.monitor import Monitor
 from tests._repo import REPO_ROOT
 
 _ROOT = REPO_ROOT
@@ -48,7 +48,7 @@ _CONFIG_DIR = _ROOT / "config" / "cdmon"
 _SINGLE_FILE_FIXTURE = _ROOT / "examples" / "external-repo" / "cdmon.yaml"
 
 # H-02: the committed self-coverage floor — the SAME threshold the CI
-# `cdmon coverage --fail-under` gate uses (kept a couple points below the
+# `cdx coverage --fail-under` gate uses (kept a couple points below the
 # achieved 100% for headroom). This test makes the self-improvement durable:
 # if a new engine module's public symbols land undocumented, self-coverage
 # drops and this fails before it can silently regress.
@@ -66,7 +66,7 @@ def _copy_dogfood_tree(dst: Path) -> Path:
     ``config/cdmon``.
     """
     dst.mkdir(exist_ok=True)
-    shutil.copytree(_ROOT / "code_doc_monitor", dst / "code_doc_monitor")
+    shutil.copytree(_ROOT / "custodex", dst / "custodex")
     shutil.copytree(_ROOT / "docs", dst / "docs")
     shutil.copytree(_ROOT / "config", dst / "config")
     shutil.copytree(_ROOT / "templates", dst / "templates")
@@ -111,7 +111,7 @@ def test_dogfood_surfaces_resolve_against_real_code() -> None:
 
 
 def test_dogfood_docs_are_in_sync() -> None:
-    """The checked-in docs match the checked-in code (`cdmon monitor --apply`)."""
+    """The checked-in docs match the checked-in code (`cdx monitor --apply`)."""
     cfg = load_config_dir(_CONFIG_DIR)
     report = Monitor(cfg, _CONFIG_DIR).check()
     assert report.ok, report.summary()
@@ -127,7 +127,7 @@ def test_dogfood_self_heals_on_a_copy(tmp_path: Path) -> None:
     assert Monitor(cfg, config_dir).check().ok  # copy starts clean
 
     # Mutate a real source file: add a public function to config.py.
-    target = dst / "code_doc_monitor" / "config.py"
+    target = dst / "custodex" / "config.py"
     target.write_text(
         target.read_text(encoding="utf-8")
         + "\n\ndef brand_new_public_helper(x: int) -> int:\n    return x\n",
@@ -143,7 +143,7 @@ def test_dogfood_self_heals_on_a_copy(tmp_path: Path) -> None:
 
 
 def _dogfood_coverage_report() -> object:
-    """Resolve the real dogfood coverage report exactly as `cdmon coverage` does."""
+    """Resolve the real dogfood coverage report exactly as `cdx coverage` does."""
     cfg = load_config_dir(_CONFIG_DIR)
     root = _CONFIG_DIR / cfg.root
     inv = inventory.discover_files(
@@ -158,7 +158,7 @@ def _dogfood_coverage_report() -> object:
 def test_dogfood_self_coverage_meets_committed_threshold() -> None:
     """H-02: engine public-symbol self-coverage stays >= the committed floor.
 
-    Mirrors the CI `cdmon coverage --fail-under` gate so the self-improvement
+    Mirrors the CI `cdx coverage --fail-under` gate so the self-improvement
     cannot silently regress: a new undocumented engine symbol drops the % below
     the threshold and fails here (and in CI) until it is documented or waived.
     """
@@ -193,7 +193,7 @@ def test_dogfood_own_index_is_in_sync() -> None:
     """cdmon's OWN ``config/cdmon/index.yaml`` passes its own ``index --check``.
 
     Regression guard for Z-04: the shipped index's ``units:`` list MUST match what
-    ``regenerate_index`` emits (alphabetical), or ``cdmon index --check`` (the CI
+    ``regenerate_index`` emits (alphabetical), or ``cdx index --check`` (the CI
     gate) exits 1 — yet the shipped file shipped out of sync because no test
     covered the dogfood index itself. This exercises the SAME codepath the
     ``index --check`` CLI uses: compare the on-disk text to a freshly regenerated
@@ -204,7 +204,7 @@ def test_dogfood_own_index_is_in_sync() -> None:
     regenerated = regenerate_index(_CONFIG_DIR)
     assert _blank_updated(on_disk) == _blank_updated(regenerated), (
         "config/cdmon/index.yaml is OUT OF SYNC with regenerate_index — run "
-        "`cdmon index` (the units: list must be alphabetical) and reheal the docs"
+        "`cdx index` (the units: list must be alphabetical) and reheal the docs"
     )
 
 
@@ -213,7 +213,7 @@ def test_dogfood_single_file_back_compat_loads() -> None:
     capability — proven against a SEPARATE fixture (an external-repo adopter),
     NOT cdmon's own config (which is the dir layout now).
 
-    Keeps coverage of ``load_config`` even though cdmon no longer ships a
+    Keeps coverage of ``load_config`` even though cdx no longer ships a
     single-file ``cdmon.yaml``: a typo'd or removed loader would red here.
     """
     cfg = load_config(_SINGLE_FILE_FIXTURE)
@@ -223,7 +223,7 @@ def test_dogfood_single_file_back_compat_loads() -> None:
 
 def test_dogfood_docs_conform_to_layout_standard() -> None:
     """CDM-08: the checked-in docs satisfy the Document Layout Standard."""
-    from code_doc_monitor.layout import lint_config
+    from custodex.layout import lint_config
 
     cfg = load_config_dir(_CONFIG_DIR)
     issues = lint_config(cfg, _ROOT)
@@ -238,15 +238,15 @@ def test_dogfood_readme_is_a_monitored_user_guide_doc() -> None:
     so it is tracked by the whole-doc fingerprint over that surface. The eng-only
     ``api-index`` is NOT flagged for omitting it — its ``kind: eng-guide`` audience
     scope excludes a user-guide doc (the INDEX_INCOMPLETE refinement)."""
-    from code_doc_monitor.config import Audience
-    from code_doc_monitor.layout import LayoutCode, _index_coverage_issues
+    from custodex.config import Audience
+    from custodex.layout import LayoutCode, _index_coverage_issues
 
     cfg = load_config_dir(_CONFIG_DIR)
     readme = next(d for d in cfg.documents if d.id == "readme")
     assert readme.path == "README.md"
     assert readme.audience is Audience.USER_GUIDE
     assert readme.region_keys == ()  # no managed region — fingerprint-tracked only
-    assert "code_doc_monitor/cli.py" in {r.path for r in readme.code_refs}
+    assert "custodex/cli.py" in {r.path for r in readme.code_refs}
     # It tracks a real surface (cli.py has public commands to fingerprint).
     surface = build_document_surface(readme, _ROOT)
     assert surface.symbols, "readme: no symbols extracted from the CLI surface"
@@ -272,7 +272,7 @@ def test_dogfood_readme_drifts_on_public_cli_change_and_reheals(tmp_path: Path) 
     original = readme_path.read_text(encoding="utf-8")
 
     # Add a PUBLIC command-shaped function to cli.py: the user-guide surface moves.
-    cli = dst / "code_doc_monitor" / "cli.py"
+    cli = dst / "custodex" / "cli.py"
     cli.write_text(
         cli.read_text(encoding="utf-8")
         + "\n\ndef brand_new_public_command(name: str) -> str:\n"
@@ -299,7 +299,7 @@ def test_dogfood_api_index_is_a_landing_page_that_links_every_doc() -> None:
     """The api-index doc is declared `index: true`, and the active INDEX_INCOMPLETE
     lint it turns on holds: the landing page links every OTHER document. Removing
     a doc's link (or adding an unlinked doc) is then caught by CI."""
-    from code_doc_monitor.layout import LayoutCode, _index_coverage_issues
+    from custodex.layout import LayoutCode, _index_coverage_issues
 
     cfg = load_config_dir(_CONFIG_DIR)
     landing = [s for s in cfg.documents if s.index]

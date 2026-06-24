@@ -1,4 +1,4 @@
-"""Taskflow — a tiny task-dependency engine (cdmon demo adopter app).
+"""Taskflow — a tiny task-dependency engine (cdx demo adopter app).
 
 Re-export aggregator: the package's public surface is assembled from the
 ``core`` and ``io`` subpackages so an adopter can ``from taskflow import

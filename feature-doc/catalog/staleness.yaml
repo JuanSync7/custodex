@@ -38,9 +38,9 @@ features:
     constraints: [K3, K6]
 
   - id: FEAT-STALENESS-004
-    title: cdmon staleness CLI
+    title: cdx staleness CLI
     summary: >-
-      The read-only `cdmon staleness [--config][--now ISO][--json][--fail-on-stale]` command
+      The read-only `cdx staleness [--config][--now ISO][--json][--fail-on-stale]` command
       resolves the reviewed-docs from config and grades them against `--now` (default the
       wall clock) + the audience-aware SLA; the table shows only docs needing review, --json
       shows all, --fail-on-stale is a CI review gate. Pure + offline (K1/K4).

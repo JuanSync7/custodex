@@ -1,4 +1,4 @@
-"""CDM-11: `cdmon build` renders managed .md docs to derived .html twins.
+"""CDM-11: `cdx build` renders managed .md docs to derived .html twins.
 
 Reusable + offline (K0): a small stdlib Markdown renderer (no third-party dep),
 deterministic output (K10), CDM markers stripped, an embedded source hash that
@@ -9,8 +9,8 @@ Features: FEAT-LAYOUT-008, FEAT-LAYOUT-009, FEAT-LAYOUT-005
 
 from __future__ import annotations
 
-from code_doc_monitor.build import build, render_markdown
-from code_doc_monitor.config import (
+from custodex.build import build, render_markdown
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
@@ -18,8 +18,8 @@ from code_doc_monitor.config import (
     RegionColumn,
     RegionTemplate,
 )
-from code_doc_monitor.layout import embedded_md_hash, lint_html_twin, md_source_hash
-from code_doc_monitor.manifest import parse_doc
+from custodex.layout import embedded_md_hash, lint_html_twin, md_source_hash
+from custodex.manifest import parse_doc
 
 # --------------------------------------------------------------------------- #
 # render_markdown unit

@@ -1,6 +1,6 @@
 """GIT-01 — at-rest secret sealing (AES-256-GCM) + the K0 lazy-extra boundary.
 
-:mod:`code_doc_monitor.secrets` seals a per-repo provider credential at rest. A
+:mod:`custodex.secrets` seals a per-repo provider credential at rest. A
 git credential must be REPLAYED, so it is ENCRYPTED (reversible), not hashed —
 the conscious fork from the E-06 token-hash model. These tests prove the
 round-trip, the random-nonce property, loud failure on every malformed-KEK /
@@ -21,8 +21,8 @@ import sys
 
 import pytest
 
-from code_doc_monitor.errors import SecretError
-from code_doc_monitor.secrets import SecretBox, secret_box_from_env
+from custodex.errors import SecretError
+from custodex.secrets import SecretBox, secret_box_from_env
 
 # A FIXED 32-byte key (deterministic, K10), base64 as $CDMON_SECRET_KEY carries it.
 _KEY = bytes(range(32))
@@ -119,8 +119,8 @@ def test_secret_box_ctor_rejects_wrong_length() -> None:
 
 def test_core_engine_import_does_not_pull_cryptography() -> None:
     code = (
-        "import sys, code_doc_monitor.configsync, code_doc_monitor.gitfetch, "
-        "code_doc_monitor.monitor, code_doc_monitor.pr;"
+        "import sys, custodex.configsync, custodex.gitfetch, "
+        "custodex.monitor, custodex.pr;"
         "loaded = sorted(m for m in sys.modules if 'cryptograph' in m);"
         "assert not loaded, loaded"
     )
@@ -130,8 +130,6 @@ def test_core_engine_import_does_not_pull_cryptography() -> None:
 
 def test_importing_secrets_module_is_lazy() -> None:
     # Importing the module (without sealing) must NOT load cryptography.
-    code = (
-        "import sys, code_doc_monitor.secrets;assert 'cryptography' not in sys.modules"
-    )
+    code = "import sys, custodex.secrets;assert 'cryptography' not in sys.modules"
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr

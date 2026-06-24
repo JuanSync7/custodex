@@ -6,7 +6,7 @@ updated: "2026-06-07"
 ---
 # Body: one writing template per category. Each value names a stem under
 # templates/writing/<category>/<stem>.md (resolved against the repo root). Every
-# cdmon engineering doc is an eng-guide API reference, so the defaults below cover
+# cdx engineering doc is an eng-guide API reference, so the defaults below cover
 # all 12 documents; no per-document overrides are needed.
 
 # Defaults used for any document without an explicit mapping below.

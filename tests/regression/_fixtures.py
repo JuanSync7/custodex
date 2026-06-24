@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import Audience, CodeRef, DocumentSpec, MonitorConfig
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import regenerate_regions
-from code_doc_monitor.monitor import Monitor
+from custodex.config import Audience, CodeRef, DocumentSpec, MonitorConfig
+from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions
+from custodex.monitor import Monitor
 
 NOW = "2026-06-01T00:00:00Z"
 

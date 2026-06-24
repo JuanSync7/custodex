@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.manifest (CDM-03).
+"""Tests for custodex.manifest (CDM-03).
 
 Covers front-matter parsing (with + without), managed-region parsing including
 malformed regions raising DriftError (K8), set_region preserving bytes outside
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.errors import DriftError
-from code_doc_monitor.extract import SurfaceFingerprint
-from code_doc_monitor.manifest import (
+from custodex.errors import DriftError
+from custodex.extract import SurfaceFingerprint
+from custodex.manifest import (
     Doc,
     parse_doc,
     parse_text,
@@ -237,7 +237,7 @@ def test_region_body_hash_normalizes_line_endings() -> None:
 
 def test_region_body_hash_matches_layout_md_source_hash() -> None:
     """Mirrors the layout standard's md_source_hash algorithm exactly."""
-    from code_doc_monitor.layout import md_source_hash
+    from custodex.layout import md_source_hash
 
     assert region_body_hash("x\r\ny\n") == md_source_hash("x\r\ny\n")
 
@@ -338,7 +338,7 @@ def test_set_fingerprint_tiers_is_additive() -> None:
 # P-04: region anchors (stable symbol-identity set per region, additive)       #
 # --------------------------------------------------------------------------- #
 def test_region_anchors_round_trip() -> None:
-    from code_doc_monitor.manifest import set_region_anchors, stored_region_anchors
+    from custodex.manifest import set_region_anchors, stored_region_anchors
 
     meta = set_region_anchors({}, "symbols", ("bbbb", "aaaa"))
     # Stored sorted for diff-stable front matter (K10).
@@ -346,7 +346,7 @@ def test_region_anchors_round_trip() -> None:
 
 
 def test_region_anchors_absent_returns_none() -> None:
-    from code_doc_monitor.manifest import stored_region_anchors
+    from custodex.manifest import stored_region_anchors
 
     assert stored_region_anchors(parse_text("# x\n"), "symbols") is None
     assert (
@@ -357,7 +357,7 @@ def test_region_anchors_absent_returns_none() -> None:
 
 def test_set_region_anchors_is_additive() -> None:
     """Stamping anchors preserves the composite fingerprint, tiers, region hashes."""
-    from code_doc_monitor.manifest import (
+    from custodex.manifest import (
         set_region_anchors,
         stored_region_anchors,
         stored_region_hash,

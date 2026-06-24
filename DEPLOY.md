@@ -1,9 +1,9 @@
-# Deploying the code-doc-monitor central server
+# Deploying the custodex central server
 
-The central server (`cdmon-server`) ingests review records from many repos, syncs
+The central server (`cdx-server`) ingests review records from many repos, syncs
 configs, opens docs-PRs, and serves the console. This is the operator runbook for
 running it for real. (For a single local repo with no central state, you don't need
-any of this — just `cdmon serve`.)
+any of this — just `cdx serve`.)
 
 ## TL;DR — Docker Compose (server + Postgres)
 
@@ -24,7 +24,7 @@ store (everything is lost on restart) — fine for a demo, never for production.
 Non-secret runtime tunables live in `config/settings.yaml` (mounted read-only in the
 compose file). Every value defaults to the historical behavior, so the file is
 optional. Precedence is **environment variable > file > built-in default** (the central server
-reads no CLI flags; `cdmon serve`'s own `--host`/`--port` only affect the standalone
+reads no CLI flags; `cdx serve`'s own `--host`/`--port` only affect the standalone
 dashboard, which keeps its localhost defaults).
 
 | Setting (`config/settings.yaml`)         | Env override               | Default            |
@@ -38,7 +38,7 @@ dashboard, which keeps its localhost defaults).
 | `server.git.extra_allowed_hosts`         | `CDMON_ALLOWED_GIT_HOSTS`  | `[]`               |
 | `server.git.clone_timeout_seconds`       | `CDMON_GIT_CLONE_TIMEOUT`  | `null` (no timeout)|
 
-Inspect the **effective** resolved settings any time with `cdmon settings` (or
+Inspect the **effective** resolved settings any time with `cdx settings` (or
 `GET /settings`) — it prints the values above plus whether each secret is configured,
 never the secret values.
 
@@ -74,7 +74,7 @@ Per-repo write tokens are passed at registration and stored only as sha256 hashe
 ## Health & operations
 
 - **Liveness:** `GET /health` → `{"status": "ok"}` (unauthenticated).
-- **Effective config:** `GET /settings` (open, redacted) or `cdmon settings`.
+- **Effective config:** `GET /settings` (open, redacted) or `cdx settings`.
 - **Migrations** run automatically on startup from `$CDMON_DATABASE_URL`; to run them
   by hand: `CDMON_DATABASE_URL=... alembic upgrade head`.
 - **Scaling:** the store is the only shared state, so you can run multiple replicas
@@ -83,11 +83,11 @@ Per-repo write tokens are passed at registration and stored only as sha256 hashe
 ## Building the image standalone
 
 ```bash
-docker build -t cdmon-server .
+docker build -t cdx-server .
 docker run --rm -p 33333:33333 \
   -e CDMON_DATABASE_URL=postgresql+psycopg://user:pw@host/db \
   -e CDMON_ADMIN_TOKEN=... -e CDMON_SECRET_KEY=... \
-  cdmon-server
+  cdx-server
 ```
 
 The image builds the Astro console in a node stage and serves it single-origin, so

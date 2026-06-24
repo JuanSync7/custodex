@@ -17,19 +17,19 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import Audience, RegionMode
-from code_doc_monitor.drift import DriftKind
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import regenerate_regions
-from code_doc_monitor.manifest import (
+from custodex.config import Audience, RegionMode
+from custodex.drift import DriftKind
+from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions
+from custodex.manifest import (
     parse_doc,
     region_body_hash,
     regions,
     set_region,
     stored_region_hash,
 )
-from code_doc_monitor.schema import Verdict
-from code_doc_monitor.syncpr import should_sync
+from custodex.schema import Verdict
+from custodex.syncpr import should_sync
 
 from ._fixtures import (
     DOC_STUB,
@@ -118,7 +118,7 @@ def test_heal_is_idempotent_no_perpetual_region_drift(tmp_path: Path) -> None:
 
 
 def _human_eng_spec(root: Path) -> object:
-    from code_doc_monitor.config import CodeRef, DocumentSpec
+    from custodex.config import CodeRef, DocumentSpec
 
     return DocumentSpec(
         id="eng",
@@ -143,7 +143,7 @@ def test_human_region_never_auto_edited(tmp_path: Path) -> None:
     reds. (The redundant `preserve` set in `monitor.run` is belt-and-suspenders;
     the load-bearing guard is the modes-derived lock in heal.)
     """
-    from code_doc_monitor.config import MonitorConfig
+    from custodex.config import MonitorConfig
 
     root, _ = make_repo(tmp_path)
     spec = _human_eng_spec(root)
@@ -186,11 +186,11 @@ def test_human_advisory_persists_until_human_edits(tmp_path: Path) -> None:
     advisory survive `--apply` and clear only when the body changes. Guards the
     drift advisory-persistence property at the unit seam.
     """
-    from code_doc_monitor.drift import detect
+    from custodex.drift import detect
 
     root, _ = make_repo(tmp_path)
     spec = _human_eng_spec(root)
-    from code_doc_monitor.config import MonitorConfig
+    from custodex.config import MonitorConfig
 
     cfg = MonitorConfig(root=".", documents=(spec,))  # type: ignore[arg-type]
     md_path = root / spec.path  # type: ignore[attr-defined]
@@ -236,7 +236,7 @@ def test_llm_seeded_fill_then_lock_three_phase(tmp_path: Path) -> None:
     an empty set unlocks the human-edited body → phase 3's `--apply` re-authors it
     → the `== human_body` assertion reds.
     """
-    from code_doc_monitor.config import CodeRef, DocumentSpec, MonitorConfig
+    from custodex.config import CodeRef, DocumentSpec, MonitorConfig
 
     root, _ = make_repo(tmp_path)
     spec = DocumentSpec(
@@ -292,7 +292,7 @@ def test_llm_seeded_unlocked_regenerates_on_code_move(tmp_path: Path) -> None:
     The foil to the lock case: until a human edits it, an llm-seeded region is
     treated like `generated`, so a code move heals it cleanly.
     """
-    from code_doc_monitor.config import CodeRef, DocumentSpec, MonitorConfig
+    from custodex.config import CodeRef, DocumentSpec, MonitorConfig
 
     root, _ = make_repo(tmp_path)
     spec = DocumentSpec(
@@ -344,7 +344,7 @@ def test_both_drift_shapes_close_in_one_apply(tmp_path: Path) -> None:
 
 
 def _doc_only_config() -> object:
-    from code_doc_monitor.config import DocumentSpec, MonitorConfig
+    from custodex.config import DocumentSpec, MonitorConfig
 
     return MonitorConfig(
         root=".",
@@ -406,9 +406,9 @@ def test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched(
     (so a no-renderer `llm` region falls back to UNHEALABLE) reds (1) — the drift
     is UNHEALABLE and `--apply` never authors `compute` into the prose.
     """
-    from code_doc_monitor.blocks import symbol_table
-    from code_doc_monitor.config import CodeRef, DocumentSpec, MonitorConfig
-    from code_doc_monitor.manifest import render_doc, set_fingerprint
+    from custodex.blocks import symbol_table
+    from custodex.config import CodeRef, DocumentSpec, MonitorConfig
+    from custodex.manifest import render_doc, set_fingerprint
 
     root, _ = make_repo(tmp_path)
     spec = DocumentSpec(

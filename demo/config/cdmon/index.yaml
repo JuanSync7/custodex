@@ -2,7 +2,7 @@
 # Frontmatter (REQUIRED): repo identity + provenance.
 cdmon-config-version: "2.0.0"
 repo: "demo-taskflow"
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-13T03:29:03.849107+00:00"
 ---
 # Body: the globals that merge into one MonitorConfig + the ordered unit index.
@@ -39,7 +39,7 @@ coverage:
       reason: "docstring-only test-package marker; no documentable surface (the test-doc mirror covers the test modules themselves)"
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
-# *.yaml unit on disk MUST be listed (run `cdmon index` to regenerate).
+# *.yaml unit on disk MUST be listed (run `cdx index` to regenerate).
 units:
   - file: core.yaml
   - file: io.yaml

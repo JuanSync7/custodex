@@ -20,10 +20,10 @@ venv/
 htmlcov/
 coverage.xml
 
-# cdmon runtime output (the local review log is generated, not source)
+# cdx runtime output (the local review log is generated, not source)
 .cdmon/
 
-# Generated HTML twins (produced by `cdmon build`; derived-not-edited)
+# Generated HTML twins (produced by `cdx build`; derived-not-edited)
 docs/**/*.html
 
 # frontend/ (EPIC ASTRO) Astro app build artifacts / deps. package-lock.json IS

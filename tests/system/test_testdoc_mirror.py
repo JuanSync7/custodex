@@ -5,7 +5,7 @@ The engine is generic over any ``.py`` file (K0), so monitoring a test file need
 no new code — only the config convention: a unit whose ``code_refs`` point at
 ``tests/**`` and whose docs live under a top-level ``test-docs/`` directory. These
 tests prove (a) the generic mechanism extracts a test file's ``test_*`` functions
-into a documentable surface and heals idempotently, and (b) cdmon dogfoods this on
+into a documentable surface and heals idempotently, and (b) cdx dogfoods this on
 its own ``tests/smoke/`` boundary (the ``tests`` unit + the ``test-docs/smoke/*``
 docs are in sync with the code).
 
@@ -16,16 +16,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     load_config_dir,
 )
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import regenerate_regions
-from code_doc_monitor.layout import scaffold_doc
-from code_doc_monitor.monitor import Monitor
+from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions
+from custodex.layout import scaffold_doc
+from custodex.monitor import Monitor
 from tests._repo import REPO_ROOT
 
 _CONFIG_DIR = REPO_ROOT / "config" / "cdmon"
@@ -87,7 +87,7 @@ def test_testdoc_region_heals_and_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_dogfood_tests_unit_monitors_the_smoke_boundary() -> None:
-    """cdmon dogfoods the mirror: a ``tests`` unit declares one test-doc per
+    """cdx dogfoods the mirror: a ``tests`` unit declares one test-doc per
     ``tests/smoke/`` file, each tracked against the test file's functions, and the
     checked-in test-docs are in sync with the code."""
     cfg = load_config_dir(_CONFIG_DIR)

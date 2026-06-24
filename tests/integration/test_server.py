@@ -25,13 +25,13 @@ pytest.importorskip("fastapi", reason="the [server] extra (fastapi) is not insta
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.schema import (  # noqa: E402
+from custodex.schema import (  # noqa: E402
     ProposedFix,
     ReviewRecord,
     Verdict,
 )
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
 
 
 def _identity(repo_id: str = "acme/widget") -> RepoIdentity:
@@ -106,7 +106,7 @@ def test_root_landing_points_at_docs(client: TestClient) -> None:
     resp = client.get("/")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["service"] == "code-doc-monitor central server"
+    assert body["service"] == "custodex central server"
     assert body["docs"] == "/docs"
     assert "/health" in body["endpoints"]
 
@@ -150,7 +150,7 @@ def test_static_dir_without_index_falls_back_to_json_landing(tmp_path: Path) -> 
 
     root = client.get("/")
     assert root.status_code == 200
-    assert root.json()["service"] == "code-doc-monitor central server"
+    assert root.json()["service"] == "custodex central server"
     assert client.get("/assets/anything.js").status_code == 404  # nothing mounted
     assert client.get("/health").json() == {"status": "ok"}
 
@@ -202,7 +202,7 @@ def test_serves_astro_underscore_assets_dir(tmp_path: Path) -> None:
 def test_default_static_dir_resolves_frontend_dist(tmp_path: Path) -> None:
     # EPIC ASTRO (ASTRO-04): `_default_static_dir` resolves the built
     # `frontend/dist` Astro app, or None when it has not been built.
-    from code_doc_monitor.server.app import _default_static_dir
+    from custodex.server.app import _default_static_dir
 
     assert _default_static_dir(tmp_path) is None  # not built
 
@@ -287,7 +287,7 @@ def test_wiki_empty_dir_yields_empty_sections(tmp_path: Path) -> None:
 
 def test_wiki_nonexistent_dir_yields_empty_sections(tmp_path: Path) -> None:
     # An explicit wiki_dir pointing at a dir that does not exist → empty payload
-    # (graceful for a non-cdmon repo with no feature-doc/, K8) — never a 500.
+    # (graceful for a non-cdx repo with no feature-doc/, K8) — never a 500.
     missing = tmp_path / "feature-doc"  # never created
     client = TestClient(create_app(InMemoryStore(), wiki_dir=missing))
     assert client.get("/wiki").json() == {"sections": []}
@@ -296,11 +296,11 @@ def test_wiki_nonexistent_dir_yields_empty_sections(tmp_path: Path) -> None:
 def test_wiki_absent_feature_doc_yields_empty_sections(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The live default path on a NON-cdmon repo: create_app left to auto-resolve
+    # The live default path on a NON-cdx repo: create_app left to auto-resolve
     # wiki_dir, but feature-doc/ is absent so _wiki_dir() is None → the route
     # returns {"sections": []} (graceful, K8) instead of 500ing. Drives the
     # default-None resolution AND the _load_wiki_sections(None) branch end-to-end.
-    from code_doc_monitor.server import app as app_module
+    from custodex.server import app as app_module
 
     monkeypatch.setattr(app_module, "_wiki_dir", lambda: None)
     client = TestClient(create_app(InMemoryStore()))  # no wiki_dir → auto-resolve
@@ -398,7 +398,7 @@ def test_create_app_defaults_to_in_memory_store() -> None:
 
 def test_in_memory_store_repeat_register_updates_in_place() -> None:
     store = InMemoryStore()
-    from code_doc_monitor.registry import RegistrationPayload
+    from custodex.registry import RegistrationPayload
 
     store.add_repo(RegistrationPayload(repo=_identity(), description="v1"))
     store.add_repo(RegistrationPayload(repo=_identity(), description="v2"))
@@ -409,7 +409,7 @@ def test_in_memory_store_repeat_register_updates_in_place() -> None:
 
 def test_records_preserve_insertion_order() -> None:
     store = InMemoryStore()
-    from code_doc_monitor.registry import RegistrationPayload
+    from custodex.registry import RegistrationPayload
 
     store.add_repo(RegistrationPayload(repo=_identity()))
     r1 = _record()
@@ -545,7 +545,7 @@ def test_status_summary(client: TestClient) -> None:
 def test_status_with_resolutions_and_coverage() -> None:
     # Drive an InMemoryStore directly so we can seed resolutions + a coverage snapshot
     # (their store helpers) and exercise the status aggregate's resolved/coverage paths.
-    from code_doc_monitor.schema import Resolution, ResolutionRecord
+    from custodex.schema import Resolution, ResolutionRecord
 
     store = InMemoryStore()
     client = TestClient(create_app(store))
@@ -660,7 +660,7 @@ def _resolution(
     resolved_text: str | None = None,
     note: str | None = None,
 ) -> dict:
-    from code_doc_monitor.schema import Resolution, ResolutionRecord
+    from custodex.schema import Resolution, ResolutionRecord
 
     return ResolutionRecord(
         record_id=record_id,
@@ -767,7 +767,7 @@ def test_health_metrics_arithmetic_exact(client: TestClient) -> None:
     store = InMemoryStore()
     client = TestClient(create_app(store))
     _seed_mixed(client)  # r0..r3, detected 2026-06-01..04; r2 is the ESCALATE
-    from code_doc_monitor.schema import Resolution, ResolutionRecord
+    from custodex.schema import Resolution, ResolutionRecord
 
     # r0 detected 06-01T00:00:00Z, resolved 60s later -> 60.0
     store.add_resolution(
@@ -872,7 +872,7 @@ def _seed_shapes(store: InMemoryStore, client: TestClient) -> None:
         rec = _record("acme/widget", **spec)  # type: ignore[arg-type]
         env = IngestEnvelope(repo=_identity(), record=rec).model_dump(mode="json")
         assert client.post("/ingest", json=env).status_code == 202
-    from code_doc_monitor.schema import Resolution, ResolutionRecord
+    from custodex.schema import Resolution, ResolutionRecord
 
     # one REGION/eng record overridden, the SURFACE/eng record overridden
     store.add_resolution(
@@ -927,7 +927,7 @@ def test_telemetry_promotion_candidates() -> None:
     store = InMemoryStore()
     client = TestClient(create_app(store))
     client.post("/repos", json=_registration())
-    from code_doc_monitor.schema import Resolution, ResolutionRecord
+    from custodex.schema import Resolution, ResolutionRecord
 
     for i in range(3):
         rec = _record(
@@ -1039,7 +1039,7 @@ def test_post_coverage_open_when_repo_has_no_token(client: TestClient) -> None:
 
 def test_telemetry_works_on_sqlstore() -> None:
     # The view computes from records_for + resolutions_for_repo, so SqlStore works too.
-    from code_doc_monitor.server.db import SqlStore, create_all, engine_from_url
+    from custodex.server.db import SqlStore, create_all, engine_from_url
 
     engine = engine_from_url("sqlite:///:memory:")
     create_all(engine)

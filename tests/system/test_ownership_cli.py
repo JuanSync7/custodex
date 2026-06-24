@@ -1,4 +1,4 @@
-"""EPIC OWN (OWN-03) — the ``cdmon ownership`` CLI (offline, read-only, K1/K4).
+"""EPIC OWN (OWN-03) — the ``cdx ownership`` CLI (offline, read-only, K1/K4).
 
 Drives the command via CliRunner over a self-contained single-file config + an
 offline roster YAML: lists per-document ownership, cross-checks against the roster
@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
+from custodex.cli import app
 
 runner = CliRunner()
 
@@ -51,7 +51,7 @@ def _dir_cfg(tmp_path: Path) -> Path:
         "---\n"
         'cdmon-config-version: "2.0.0"\n'
         "repo: probe\n"
-        "generated-by: cdmon\n"
+        "generated-by: cdx\n"
         'updated: "2026-06-07"\n'
         "---\n"
         'root: "."\n'
