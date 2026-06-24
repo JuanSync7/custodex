@@ -11,8 +11,9 @@ import mdx from "@astrojs/mdx";
 // collides with the API's real paths (`/health`, `/repos*`, `/config*`, ...).
 export default defineConfig({
   // The public showcase (PUBLIC_SHOWCASE build) is served at this custom domain on
-  // GitHub Pages (see .github/workflows/deploy-pages.yml + public/CNAME). Used only
-  // to build absolute URLs (canonical/OG); the server build is unaffected.
+  // GitHub Pages (see .github/workflows/deploy-pages.yml + public/CNAME). `site` is
+  // the deploy origin Astro uses to build absolute URLs — the Layout reads it for
+  // the canonical + OpenGraph/Twitter link-preview tags.
   site: "https://custodex.juansync.dev",
   integrations: [react(), mdx()],
   output: "static",
