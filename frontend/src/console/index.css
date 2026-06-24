@@ -2299,8 +2299,8 @@ details.mapping-ignored[open] > summary::before {
   gap: 0.55rem;
   padding: 0.5rem 0.9rem;
   font-size: 0.82rem;
-  color: var(--ink);
-  background: var(--panel);
+  color: var(--text);
+  background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.16);
