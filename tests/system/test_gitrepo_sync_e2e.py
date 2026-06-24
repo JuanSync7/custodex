@@ -41,9 +41,9 @@ pytest.importorskip("fastapi", reason="the [server] extra is not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _NOW = "2026-06-11T00:00:00Z"
 _DEMO = REPO_ROOT / "demo"
@@ -58,7 +58,7 @@ _HISTORY = (
     ),
     ("feat: implementation", ("src", "pkg", "alpha", "beta")),
     (
-        "docs: documentation + cdmon adoption",
+        "docs: documentation + cdx adoption",
         ("docs", "config", "README.md", "CHANGELOG.md", "templates"),
     ),
     ("test: unit tests", ("tests",)),
@@ -74,7 +74,7 @@ def _heal(config_dir: Path) -> None:
     """Regenerate the managed doc regions so the tree is in sync before commit."""
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     result = CliRunner().invoke(
         app, ["monitor", "--config", str(config_dir), "--apply"]
@@ -97,7 +97,7 @@ def _minimal_tree(root: Path) -> Path:
     cfg = root / "config" / "cdmon"
     cfg.mkdir(parents=True)
     (cfg / "index.yaml").write_text(
-        '---\ncdmon-config-version: "2.0.0"\nrepo: minimal\ngenerated-by: cdmon\n'
+        '---\ncdmon-config-version: "2.0.0"\nrepo: minimal\ngenerated-by: cdx\n'
         'updated: "2026-06-11"\n---\nroot: "../.."\nversion: "2.0.0"\n'
         "apply_default: false\nbackend: {kind: mock}\ncentral: {sink: none}\n"
         "units:\n  - file: core.yaml\nignore: ignore.yaml\n",
@@ -133,7 +133,7 @@ def _multiunit_tree(root: Path) -> Path:
     cfg = root / "config" / "cdmon"
     cfg.mkdir(parents=True)
     (cfg / "index.yaml").write_text(
-        '---\ncdmon-config-version: "2.0.0"\nrepo: multi\ngenerated-by: cdmon\n'
+        '---\ncdmon-config-version: "2.0.0"\nrepo: multi\ngenerated-by: cdx\n'
         'updated: "2026-06-11"\n---\nroot: "../.."\nversion: "2.0.0"\n'
         "apply_default: false\nbackend: {kind: mock}\ncentral: {sink: none}\n"
         "units:\n  - file: alpha.yaml\n  - file: beta.yaml\nignore: ignore.yaml\n",
@@ -374,7 +374,7 @@ def store(request: pytest.FixtureRequest) -> Any:
     if request.param == "memory":
         return InMemoryStore()
     pytest.importorskip("sqlalchemy", reason="the [server] extra is not installed")
-    from code_doc_monitor.server.db import SqlStore, create_all, engine_from_url
+    from custodex.server.db import SqlStore, create_all, engine_from_url
 
     engine = engine_from_url("sqlite:///:memory:")
     create_all(engine)
@@ -416,7 +416,7 @@ def test_clone_on_demand_demo_sync_is_store_parity(store: Any, tmp_path: Path) -
 def test_git_mode_sync_reads_default_branch_over_authentic_history(
     tmp_path: Path,
 ) -> None:
-    from code_doc_monitor.configsync import run_sync
+    from custodex.configsync import run_sync
 
     origin = repo_from_tree(_minimal_tree(tmp_path / "src"), tmp_path / "repo")
     main_tip = origin.head()

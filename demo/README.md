@@ -7,14 +7,14 @@ cdm:
     signature: da0e063e607dc1ba
   schema_version: 1.0.0
 ---
-# demo-taskflow — a cdmon adopter repo
+# demo-taskflow — a cdx adopter repo
 
-> A demo adopter repo monitored end-to-end by `cdmon` — including this README,
+> A demo adopter repo monitored end-to-end by `cdx` — including this README,
 > tracked as a user-guide narrative against the `taskflow` core model it
 > describes (FEAT-CONFIGV2-016): edit `model.py`'s public surface and this README
 > drifts for review; a comment-only change is a non-event.
 
-A small, self-contained adopter repo that **code-doc-monitor** (`cdmon`)
+A small, self-contained adopter repo that **custodex** (`cdx`)
 monitors end to end via the multi-file `config/cdmon/` layout. It exists to drive
 and demonstrate the CONFIG-V2 features: frontmatter unit files, `dir-covered`
 scoping, `source-files-format`, `index.yaml`, `ignore.yaml` (+ a `.gitignore`),
@@ -34,7 +34,7 @@ scoping, `source-files-format`, `index.yaml`, `ignore.yaml` (+ a `.gitignore`),
 
 `core/notes.log` is a deliberate **non-source** file under a `dir-covered`
 directory: because `source-files-format` is `['.py']` (and `*.log` is ignored),
-cdmon never counts it toward coverage.
+cdx never counts it toward coverage.
 
 ### A real coverage gap — `scheduler.py`
 
@@ -43,7 +43,7 @@ Because it is `.py` and under the `core` unit's `dir-covered`, it counts toward
 the denominator and surfaces as a gap. The committed `coverage.rpt` therefore
 reports overall coverage of **88.9%** (`core` unit 66.67%, `io` unit 100%, `tests`
 unit 100%), with `scheduler.py` the lone file listed under `undocumented:` and a
-`suggested_unit` of `core`. It is a COVERAGE gap, not drift — `cdmon check` still
+`suggested_unit` of `core`. It is a COVERAGE gap, not drift — `cdx check` still
 exits 0.
 
 It is left unlinked **on purpose**: on the dashboard's **Mapping page** (`/repos/
@@ -63,10 +63,10 @@ this exact flow offline (its `[8/8] link → generate` section).
 | `tests.yaml`    | unit owning `tests/` → four **test-docs** (the test→test-doc mirror, FEAT-CONFIGV2-017) |
 | `ignore.yaml`   | `gitignore: true` + `*.rpt`/`*.log`/`__pycache__` patterns |
 | `doc-style.yaml`| writing-template map (defaults + per-doc) |
-| `coverage.rpt`  | **generated** by `cdmon rpt --write` |
+| `coverage.rpt`  | **generated** by `cdx rpt --write` |
 
 The docs the units carry live under `docs/` (and `test-docs/`, below) with a
-managed `CDM:BEGIN/END symbols` region that cdmon keeps in sync with the code
+managed `CDM:BEGIN/END symbols` region that cdx keeps in sync with the code
 surface:
 
 | doc id | path | audience | what it shows |
@@ -100,7 +100,7 @@ managed `symbols` region listing that file's `test_*` functions:
 | `tests/test_model.py`     | `test-docs/test_model.md`     |
 | `tests/test_scheduler.py` | `test-docs/test_scheduler.md` |
 
-Add, rename, or remove a test and its test-doc drifts for review; `cdmon monitor
+Add, rename, or remove a test and its test-doc drifts for review; `cdx monitor
 --apply` heals it — exactly like a source doc. The `tests` unit is fully
 documented (100%), so the only remaining gap is still the deliberate
 `scheduler.py` source gap. Note the symmetry: `scheduler.py`'s SOURCE is
@@ -125,7 +125,7 @@ context_refs:
 `context_refs` are **additive and NOT coverage**: distinct from `code_refs` (the
 documented surface), they never enter the coverage denominator, never cause drift,
 and never count toward the `.rpt` — adding them leaves the demo's 88.9% unchanged and
-`cdmon check`/`lint`/`rpt` byte-identical. They flow into the editable mapping tree
+`cdx check`/`lint`/`rpt` byte-identical. They flow into the editable mapping tree
 (shown on the Mapping page under the document, visually distinct from `code_refs`)
 and into the generation prompt as reference material.
 
@@ -148,34 +148,34 @@ self-contained.
 
 ## Driving the demo
 
-All commands run **from this `demo/` directory** — cdmon auto-detects
+All commands run **from this `demo/` directory** — cdx auto-detects
 `config/cdmon/index.yaml` relative to the working directory.
 
 ```bash
 cd demo
 
-# Activate the cdmon venv (adjust the path to your checkout).
+# Activate the cdx venv (adjust the path to your checkout).
 source ../.venv/bin/activate
 
 # 1. Is every doc in sync with its code surface? (exit 0 = clean)
-python -m code_doc_monitor.cli check
+python -m custodex.cli check
 
 # 2. Coverage: file/symbol percentages + documented/undocumented/waived baskets.
 #    The .log/.rpt files are NOT in the universe.
-python -m code_doc_monitor.cli coverage
+python -m custodex.cli coverage
 
 # 3. (Re)generate the deterministic coverage report.
-python -m code_doc_monitor.cli rpt --write   # writes config/cdmon/coverage.rpt
+python -m custodex.cli rpt --write   # writes config/cdmon/coverage.rpt
 
 # 4. Heal drift after editing the source (regenerates managed regions).
-python -m code_doc_monitor.cli monitor --apply
+python -m custodex.cli monitor --apply
 
 # 5. Serve the standalone, per-repo dashboard for this repo (no central server).
-python -m code_doc_monitor.cli serve
+python -m custodex.cli serve
 ```
 
 Try it: change a signature in `src/taskflow/core/engine.py`, run
-`cdmon check` (it now reports drift, exit 1), then `cdmon monitor --apply` to
+`cdx check` (it now reports drift, exit 1), then `cdx monitor --apply` to
 heal the `symbols` table back in sync.
 
 ## Guided tour: see the heal loop
@@ -189,30 +189,30 @@ python demo/walkthrough.py
 ```
 
 It copies this demo into a temp directory (it never mutates the canonical demo),
-induces real drift on `engine.py`, then drives `cdmon` through its core loop on
+induces real drift on `engine.py`, then drives `cdx` through its core loop on
 the copy, printing a clear section header for each stage:
 
-1. **drift detected** — `cdmon check` reports the drift and exits non-zero.
-2. **healed** — `cdmon monitor --apply` regenerates the managed region with the
+1. **drift detected** — `cdx check` reports the drift and exits non-zero.
+2. **healed** — `cdx monitor --apply` regenerates the managed region with the
    offline mock backend (no network, no API key).
-3. **clean** — `cdmon check` is clean again (exit 0).
-4. **review log** — `cdmon report` shows the recorded `FIX` verdict/provenance.
-5. **coverage gap** — `cdmon rpt` shows the undocumented `scheduler.py`.
-6. **doctor pass** — `cdmon doctor` preflight passes.
+3. **clean** — `cdx check` is clean again (exit 0).
+4. **review log** — `cdx report` shows the recorded `FIX` verdict/provenance.
+5. **coverage gap** — `cdx rpt` shows the undocumented `scheduler.py`.
+6. **doctor pass** — `cdx doctor` preflight passes.
 7. **apply-fix** — the `Apply fix (LLM)` button's engine
    (`generate.apply_record_fix`): induce drift, capture a `FIX` record carrying a
    proposed fix, apply it (prints the unified diff), and prove a second call is an
    idempotent no-op.
 8. **link → generate** — the Mapping page's `Link a file → Generate / make live`
    flow (`generate.apply_edits_to_disk`): stage an `add_code_ref` linking the
-   unlinked `scheduler.py` to `core-api`, apply it, and show `cdmon rpt` no longer
+   unlinked `scheduler.py` to `core-api`, apply it, and show `cdx rpt` no longer
    lists `scheduler.py` as undocumented — the coverage gap is closed live.
 
 The script exits 0 on success.
 
-## Standalone dashboard — `cdmon serve`
+## Standalone dashboard — `cdx serve`
 
-`cdmon serve` (run from this `demo/` directory) launches the SAME FastAPI +
+`cdx serve` (run from this `demo/` directory) launches the SAME FastAPI +
 React dashboard the central server uses, scoped to ONLY this repo, with no
 registration and no network. It auto-registers `demo-taskflow` with its
 `local_path = <repo>/demo`, pre-syncs the **local** view (the working tree), and
@@ -221,7 +221,7 @@ opens the Documents relationship view + a token-less **Sync** button:
 ```bash
 cd demo
 source ../.venv/bin/activate
-python -m code_doc_monitor.cli serve            # http://127.0.0.1:8000
+python -m custodex.cli serve            # http://127.0.0.1:8000
 ```
 
 The "Sync (local)" button works against the working tree immediately. "Sync

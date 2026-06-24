@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 6314d57e91ccc826
+  fingerprint: a2647abaa533011d
   fingerprint_tiers:
-    composite: 6314d57e91ccc826
-    docstring: 5842344ccc02cfc1
-    signature: 165c0c5b590ec882
+    composite: a2647abaa533011d
+    docstring: cdf0f71c8e2745b0
+    signature: 145b4babf0bb35ec
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -174,7 +174,7 @@ cdm:
     - f95e33eaf5a43c96
     - fa2f6597462ddabd
   region_hashes:
-    symbols: f4bf2c697ecd3081
+    symbols: 3790875808d60f98
   schema_version: 1.0.0
 ---
 # server
@@ -312,7 +312,7 @@ cdm:
 | _DEFAULT_BRANCH | variable | _DEFAULT_BRANCH = 'main' |
 | _EDIT_CONFIG | variable | _EDIT_CONFIG = ConfigDict(extra='forbid', frozen=True) |
 | _IGNORED_FILES_CAP | variable | _IGNORED_FILES_CAP = 200 |
-| _LOG | variable | _LOG = logging.getLogger('code_doc_monitor.server') |
+| _LOG | variable | _LOG = logging.getLogger('custodex.server') |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |
 | _RateLimitMiddleware | class | class _RateLimitMiddleware(BaseHTTPMiddleware) |
 | _RateLimitMiddleware.__init__ | method | def __init__(self, app: Any, *, limit: int, now_epoch: Callable[[], int]) -> None |

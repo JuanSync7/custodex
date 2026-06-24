@@ -39,22 +39,22 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor import cli
-from code_doc_monitor.backends import BackendResult, ClaudeCodeBackend, FixRequest
-from code_doc_monitor.blocks import expected_region
-from code_doc_monitor.config import (
+from custodex import cli
+from custodex.backends import BackendResult, ClaudeCodeBackend, FixRequest
+from custodex.blocks import expected_region
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.drift import DriftKind
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import regenerate_regions, render_corrected
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.reviewlog import read_all
-from code_doc_monitor.schema import ProposedFix, Verdict
-from code_doc_monitor.sinks import FileSink
+from custodex.drift import DriftKind
+from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions, render_corrected
+from custodex.monitor import Monitor
+from custodex.reviewlog import read_all
+from custodex.schema import ProposedFix, Verdict
+from custodex.sinks import FileSink
 
 _NOW = "2026-06-01T00:00:00Z"
 
@@ -295,8 +295,8 @@ def test_human_region_reported_but_never_healed(tmp_path: Path) -> None:
     human region BYTE-IDENTICAL while still refreshing the fingerprint; a second
     `--apply` is idempotent (no churn).
     """
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.manifest import parse_doc, regions, set_region
+    from custodex.config import RegionMode
+    from custodex.manifest import parse_doc, regions, set_region
 
     root = tmp_path
     (root / "shared.py").write_text(_SHARED_V1, encoding="utf-8")
@@ -375,8 +375,8 @@ def test_llm_seeded_fill_then_lock_three_phase(tmp_path: Path) -> None:
         (like a human region), while an UNLOCKED llm-seeded region still
         regenerates on a code move.
     """
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.manifest import (
+    from custodex.config import RegionMode
+    from custodex.manifest import (
         parse_doc,
         region_body_hash,
         regions,
@@ -416,8 +416,8 @@ def test_llm_seeded_fill_then_lock_three_phase(tmp_path: Path) -> None:
     human_body = regions(parse_doc(md_path))["symbols"]
     # Re-baseline the fingerprint (preserve the locked body) so only a code move
     # drives further drift.
-    from code_doc_monitor.extract import build_document_surface
-    from code_doc_monitor.heal import regenerate_regions
+    from custodex.extract import build_document_surface
+    from custodex.heal import regenerate_regions
 
     modes = {"symbols": RegionMode.LLM_SEEDED}
     regenerate_regions(
@@ -454,8 +454,8 @@ def test_llm_seeded_fill_then_lock_three_phase(tmp_path: Path) -> None:
 def test_llm_seeded_unlocked_regenerates_on_code_move(tmp_path: Path) -> None:
     """An UNLOCKED llm-seeded region still regenerates on a code move (it is
     engine-owned until a human edits it) — the foil to the lock test."""
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.manifest import parse_doc, regions
+    from custodex.config import RegionMode
+    from custodex.manifest import parse_doc, regions
 
     root = tmp_path
     (root / "shared.py").write_text(_SHARED_V1, encoding="utf-8")
@@ -513,7 +513,7 @@ def _four_region_setup(tmp_path: Path):
     region. Every region is renderable via a `symbols`-source template so the
     engine has a renderer for each (the interim `llm` rule needs a renderer to
     behave like `generated`)."""
-    from code_doc_monitor.config import (
+    from custodex.config import (
         RegionColumn,
         RegionMode,
         RegionTemplate,
@@ -564,8 +564,8 @@ def test_mixed_authorship_four_regions_e2e(tmp_path: Path) -> None:
         NO-renderer `llm` region is backend-authored prose — see
         `test_pure_llm_no_renderer_authored_e2e`).
     """
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.manifest import (
+    from custodex.config import RegionMode
+    from custodex.manifest import (
         parse_doc,
         regions,
         set_region,
@@ -677,8 +677,8 @@ def test_pure_llm_no_renderer_authored_e2e(tmp_path: Path) -> None:
       4. with NO authoring path (a purely mechanical `regenerate_regions` heal,
          no backend), the region still SURFACES (loud, never silently stale, K8).
     """
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.manifest import (
+    from custodex.config import RegionMode
+    from custodex.manifest import (
         parse_doc,
         regions,
         render_doc,
@@ -771,10 +771,10 @@ def test_pure_llm_no_renderer_authored_e2e(tmp_path: Path) -> None:
 
 def test_mixed_authorship_lint_modes_surface(tmp_path: Path) -> None:
     """B-05 (e2e): `lint`'s mode surface reports each region's mode + state."""
-    from code_doc_monitor.blocks import known_region_ids
-    from code_doc_monitor.config import RegionMode
-    from code_doc_monitor.layout import config_region_states
-    from code_doc_monitor.manifest import set_region
+    from custodex.blocks import known_region_ids
+    from custodex.config import RegionMode
+    from custodex.layout import config_region_states
+    from custodex.manifest import set_region
 
     root, md_path, spec, cfg, modes, templates = _four_region_setup(tmp_path)
     modes_engine = {k: v for k, v in modes.items() if k != "human"}
@@ -873,13 +873,13 @@ def test_cli_bad_config_is_clean_error(
 
 def test_layout_standard_end_to_end_with_html_twin(tmp_path: Path) -> None:
     """Scaffold -> lint clean -> html pairing (missing/derived/stale) -> clean."""
-    from code_doc_monitor.layout import (
+    from custodex.layout import (
         embedded_md_hash,
         lint_config,
         md_source_hash,
         scaffold_doc,
     )
-    from code_doc_monitor.manifest import parse_doc
+    from custodex.manifest import parse_doc
 
     (tmp_path / "mod.py").write_text(
         '"""m."""\n\n\ndef api(x: int) -> int:\n    return x\n', encoding="utf-8"
@@ -1010,7 +1010,7 @@ def test_body_tier_on_eng_guide_body_change_drifts_and_heals_e2e(
 
 def test_which_tier_moved_reported_and_stamped_e2e(tmp_path: Path) -> None:
     """P2 e2e: heal stamps per-tier digests; a body change reports tiers=('body',)."""
-    from code_doc_monitor.manifest import parse_doc, stored_fingerprint_tiers
+    from custodex.manifest import parse_doc, stored_fingerprint_tiers
 
     root, cfg = _make_repo_body_tier(tmp_path)
     # The baseline heal (regenerate_regions, include_body) stamped the tiered
@@ -1033,8 +1033,8 @@ def test_which_tier_moved_reported_and_stamped_e2e(tmp_path: Path) -> None:
 def test_anchors_stamped_and_classify_change_e2e(tmp_path: Path) -> None:
     """P4 e2e: heal stamps region anchors; drift tells a body change (anchors
     stable) from a removed public symbol (anchor removed)."""
-    from code_doc_monitor.extract import anchor_id
-    from code_doc_monitor.manifest import parse_doc, stored_region_anchors
+    from custodex.extract import anchor_id
+    from custodex.manifest import parse_doc, stored_region_anchors
 
     root, cfg = _make_repo_body_tier(tmp_path)
     # The baseline heal stamped the symbol-table region's anchor set.

@@ -1,4 +1,4 @@
-"""Alembic migration environment for code-doc-monitor (E-04 — Postgres-first).
+"""Alembic migration environment for custodex (E-04 — Postgres-first).
 
 Reads the database URL from ``$CDMON_DATABASE_URL`` (default a local sqlite file for
 dev) unless one is already set on the Alembic ``Config`` (the up/down test sets it
@@ -14,7 +14,7 @@ import os
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from code_doc_monitor.server.db import Base
+from custodex.server.db import Base
 
 config = context.config
 

@@ -1,6 +1,6 @@
 # Vocabulary: engine-domain
 
-Use the code-doc-monitor engine's own vocabulary so documents read consistently
+Use the custodex engine's own vocabulary so documents read consistently
 with the system they describe. These are terms of art; use them precisely and do
 not coin synonyms for them.
 

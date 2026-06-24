@@ -17,7 +17,7 @@ Design notes:
 
 * **Real git, no network (K4).** Everything is local ``git`` over the filesystem;
   :func:`file_url` yields the ``file://`` origin the server clones. The real
-  clone leaf (``code_doc_monitor.gitfetch._GitCloner``) is exercised end to end.
+  clone leaf (``custodex.gitfetch._GitCloner``) is exercised end to end.
 * **Deterministic (K10).** Commits are stamped with a FIXED author/committer
   date (:data:`_FIXED_DATE`) via ``GIT_*_DATE`` env, and identity is pinned, so a
   repo built from the same tree + history is byte-stable run to run — no wall

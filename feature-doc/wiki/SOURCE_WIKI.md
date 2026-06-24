@@ -1,6 +1,6 @@
-# code-doc-monitor — source wiki
+# custodex — source wiki
 
-Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdmon wiki` (R-08) to regenerate.
+Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
 **45 public modules**, 0 without a catalogued feature.
 

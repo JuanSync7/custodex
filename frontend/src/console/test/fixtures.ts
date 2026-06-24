@@ -1,5 +1,5 @@
 // Realistic fixtures mirroring the server's RegisteredRepo / RepoStatus shapes
-// (code_doc_monitor/server/store.py + app.py). Used by the component tests.
+// (custodex/server/store.py + app.py). Used by the component tests.
 import type {
   ApplyFixResponse,
   ConfigDocumentTree,
@@ -338,7 +338,7 @@ export const readmeRecord: ReviewRecord = {
   doc_path: "README.md",
   audience: "user-guide",
   drift_kind: "signature_changed",
-  drift_detail: "the CLI gained a `cdmon trace` command",
+  drift_detail: "the CLI gained a `cdx trace` command",
   cause: "the README's command list is stale",
   verdict: "FIX",
   fix: { rationale: "regenerate the command list", new_doc_text: "…" },

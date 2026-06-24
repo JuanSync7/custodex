@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.testwiki (EPIC R, R-06 Part A).
+"""Tests for custodex.testwiki (EPIC R, R-06 Part A).
 
 The test-wiki extractor: a pure, deterministic engine that AST-parses the test
 tree (NEVER importing it — K1), pulling each ``test_*`` function's docstring
@@ -18,8 +18,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.errors import CatalogError
-from code_doc_monitor.testwiki import (
+from custodex.errors import CatalogError
+from custodex.testwiki import (
     TestBoundary,
     TestCase,
     TestModule,

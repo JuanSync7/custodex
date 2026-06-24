@@ -35,11 +35,11 @@ slug by substring (robust to the loader's id casing).
 **Retiring the server `GET /wiki` JSON endpoint + `WIKI_SECTIONS`/`_wiki_dir`/
 `_load_wiki_sections` + `build.render_markdown`'s wiki use + the catalog
 FEAT-SERVER-019 (and its demo/test) is a FOLLOW-UP** — it cascades into the
-golden catalog + `cdmon trace`/`wiki` dogfood, which warrants its own slice on a
+golden catalog + `cdx trace`/`wiki` dogfood, which warrants its own slice on a
 non-contended host. The endpoint stays as a now-unused API; the FRONTEND is fully
 native-Astro (the user-visible "so many HTML" is resolved).
 
 ## Constraints
 K0 (no engine dep). Deterministic static render (K10). The wikis remain the
-single source — `cdmon wiki` regenerates `feature-doc/*.md`, the Astro build
+single source — `cdx wiki` regenerates `feature-doc/*.md`, the Astro build
 renders them.

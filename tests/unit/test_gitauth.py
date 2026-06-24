@@ -1,6 +1,6 @@
 """GIT-05 — short-lived provider-token minting (PHASE 2; offline, K4/K8/K10).
 
-Exercises :mod:`code_doc_monitor.gitauth` with NO network and NO real provider: a
+Exercises :mod:`custodex.gitauth` with NO network and NO real provider: a
 GENERATED test RSA key signs the GitHub App JWT (verified against its own public
 key), and an INJECTED fake exchange leaf returns the minted token. Every malformed
 input is a loud :class:`TransportError`. The ``cryptography`` import stays lazy and
@@ -24,8 +24,8 @@ pytest.importorskip("cryptography", reason="the [server] extra is not installed"
 from cryptography.hazmat.primitives import hashes, serialization  # noqa: E402
 from cryptography.hazmat.primitives.asymmetric import padding, rsa  # noqa: E402
 
-from code_doc_monitor.errors import TransportError  # noqa: E402
-from code_doc_monitor.gitauth import (  # noqa: E402
+from custodex.errors import TransportError  # noqa: E402
+from custodex.gitauth import (  # noqa: E402
     github_app_jwt,
     mint_gitlab_oauth_token,
     mint_provider_token,
@@ -221,17 +221,15 @@ def test_mint_provider_token_missing_field_is_loud(rsa_pem: str) -> None:
 
 def test_core_engine_does_not_import_gitauth() -> None:
     code = (
-        "import sys, code_doc_monitor.configsync, code_doc_monitor.monitor, "
-        "code_doc_monitor.pr;"
-        "assert 'code_doc_monitor.gitauth' not in sys.modules"
+        "import sys, custodex.configsync, custodex.monitor, "
+        "custodex.pr;"
+        "assert 'custodex.gitauth' not in sys.modules"
     )
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr
 
 
 def test_importing_gitauth_is_lazy_no_cryptography() -> None:
-    code = (
-        "import sys, code_doc_monitor.gitauth;assert 'cryptography' not in sys.modules"
-    )
+    code = "import sys, custodex.gitauth;assert 'cryptography' not in sys.modules"
     proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert proc.returncode == 0, proc.stderr

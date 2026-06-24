@@ -3,7 +3,7 @@
 # file stem (K8).
 cdmon-config-version: "2.0.0"
 unit: tests
-title: "code-doc-monitor test suite (smoke boundary)"
+title: "custodex test suite (smoke boundary)"
 owner: cdmon-team
 created: "2026-06-13"
 updated: "2026-06-13"
@@ -11,10 +11,10 @@ updated: "2026-06-13"
 # The test→test-doc MIRROR (FEAT-CONFIGV2-017). Tests are just `.py` files, so the
 # SAME machinery that syncs source → docs syncs tests → test-docs: a unit whose
 # `code_refs` point at `tests/**` and whose documents live under a top-level
-# `test-docs/` directory. cdmon dogfoods this on its own SMOKE boundary — a small,
+# `test-docs/` directory. cdx dogfoods this on its own SMOKE boundary — a small,
 # stable slice — so the maintenance tax (every test edit drifts its test-doc) and
 # the coverage impact stay bounded. Reheal exactly like any doc:
-# `cdmon monitor --apply`.
+# `cdx monitor --apply`.
 
 # This unit's coverage scope: the smoke boundary's `.py` files.
 dir-covered:

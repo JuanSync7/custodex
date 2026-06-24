@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.heal (CDM-03).
+"""Tests for custodex.heal (CDM-03).
 
 regenerate_regions closes REGION + HASH drift, is idempotent (K7), and leaves
 detect() clean afterwards. apply_fix handles both the region-body and the
@@ -13,18 +13,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from code_doc_monitor.blocks import symbol_table
-from code_doc_monitor.config import (
+from custodex.blocks import symbol_table
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
     RegionMode,
 )
-from code_doc_monitor.drift import detect
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import apply_fix, regenerate_regions, render_corrected
-from code_doc_monitor.manifest import (
+from custodex.drift import detect
+from custodex.extract import build_document_surface
+from custodex.heal import apply_fix, regenerate_regions, render_corrected
+from custodex.manifest import (
     parse_doc,
     parse_text,
     region_body_hash,

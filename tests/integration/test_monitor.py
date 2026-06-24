@@ -12,20 +12,20 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.backends import MockBackend
-from code_doc_monitor.blocks import symbol_table
-from code_doc_monitor.config import (
+from custodex.backends import MockBackend
+from custodex.blocks import symbol_table
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.drift import DriftKind
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.reviewlog import read_all
-from code_doc_monitor.schema import Verdict
-from code_doc_monitor.sinks import FileSink, NullSink
+from custodex.drift import DriftKind
+from custodex.extract import build_document_surface
+from custodex.monitor import Monitor
+from custodex.reviewlog import read_all
+from custodex.schema import Verdict
+from custodex.sinks import FileSink, NullSink
 
 FIXED_NOW = "2026-06-01T00:00:00+00:00"
 
@@ -321,12 +321,12 @@ class _RecordingBackend:
 
 def _seed_resolved_history(cfg_dir: Path, *, doc_id: str, surface_hash: str) -> None:
     """Append a RESOLVED past record (same doc + surface) so retrieval finds it."""
-    from code_doc_monitor.reviewlog import (
+    from custodex.reviewlog import (
         DEFAULT_RESOLUTIONS_PATH,
         append,
         append_resolution,
     )
-    from code_doc_monitor.schema import (
+    from custodex.schema import (
         ProposedFix,
         Resolution,
         ResolutionRecord,
@@ -434,7 +434,7 @@ class _SpyBackend:
 
 
 def test_matched_rule_resolves_with_zero_backend_calls(tmp_path: Path) -> None:
-    from code_doc_monitor.promotion import PromotionRule
+    from custodex.promotion import PromotionRule
 
     config, cfg_dir, _, _ = _make_fixture(tmp_path)
     log_path = cfg_dir / ".cdmon" / "review-log.jsonl"
@@ -466,7 +466,7 @@ def test_matched_rule_resolves_with_zero_backend_calls(tmp_path: Path) -> None:
 
 
 def test_nonmatching_drift_still_hits_backend(tmp_path: Path) -> None:
-    from code_doc_monitor.promotion import PromotionRule
+    from custodex.promotion import PromotionRule
 
     config, cfg_dir, _, _ = _make_fixture(tmp_path)
     spy = _SpyBackend()
@@ -507,7 +507,7 @@ def test_record_carries_drifted_tiers_for_body_change(tmp_path: Path) -> None:
     )
     config = MonitorConfig(root=".", documents=(spec,), fingerprint_body_tier=True)
     # Scaffold a fully-synced doc (composite + per-tier digests stamped, flag ON).
-    from code_doc_monitor.layout import scaffold_doc
+    from custodex.layout import scaffold_doc
 
     surface = build_document_surface(spec, tmp_path)
     (tmp_path / "guide.md").write_text(

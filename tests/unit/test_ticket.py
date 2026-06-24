@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.ticket (T-01).
+"""Tests for custodex.ticket (T-01).
 
 A :class:`DriftTicket` is the structured, human-validatable artifact built FROM
 an existing backend result — pure and deterministic (K1/K10): every field is
@@ -14,11 +14,11 @@ from __future__ import annotations
 import pydantic
 import pytest
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.extract import DocumentSurface, Symbol
-from code_doc_monitor.schema import ProposedFix, Resolution, ResolutionRecord, Verdict
-from code_doc_monitor.ticket import (
+from custodex.config import Audience
+from custodex.drift import Drift, DriftKind
+from custodex.extract import DocumentSurface, Symbol
+from custodex.schema import ProposedFix, Resolution, ResolutionRecord, Verdict
+from custodex.ticket import (
     AcceptanceCheck,
     DriftTicket,
     TicketSeverity,
@@ -299,7 +299,7 @@ def test_acceptance_criteria_fix() -> None:
     texts = [c.text for c in crit]
     assert any("current code surface" in t for t in texts)
     assert any("human-owned region" in t for t in texts)
-    assert any("cdmon lint" in t for t in texts)
+    assert any("cdx lint" in t for t in texts)
     assert crit[0].auto_satisfied is True
     assert crit[-1].auto_satisfied is False
 

@@ -1,11 +1,11 @@
-# Slice OWN-03 — `cdmon ownership` CLI (read-only)
+# Slice OWN-03 — `cdx ownership` CLI (read-only)
 
 The offline, demonstrable surface: list per-doc ownership and flag orphans without
 a server.
 
 ## Goal (validable)
 ```
-cdmon ownership [--config DIR] [--roster roster.yaml] [--json] [--fail-on-orphan]
+cdx ownership [--config DIR] [--roster roster.yaml] [--json] [--fail-on-orphan]
 ```
 1. With no `--roster`: prints a per-doc owner table (doc_id, audience, accountable,
    owner/team/dri), exit 0.
@@ -34,7 +34,7 @@ Pure + offline (K1/K4) — no backend, no network.
 ## Dogfood
 `cli.py` is tracked → reheal `docs/api/*` (the cli api doc HASH/REGION). Add
 **FEAT-OWNERSHIP-004** (the CLI) to the catalog + DEMOS case + tagged test;
-`cdmon wiki`; `cdmon trace --fail-on-gap` exit 0.
+`cdx wiki`; `cdx trace --fail-on-gap` exit 0.
 
 ## Constraints
 K1 (read-only), K4 (offline), K8 (loud on bad config/roster), K9, K10 (stable JSON).

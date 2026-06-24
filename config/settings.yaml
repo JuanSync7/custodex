@@ -1,19 +1,19 @@
-# code-doc-monitor — operator runtime settings (EPIC SVR).
+# custodex — operator runtime settings (EPIC SVR).
 #
-# These are the deployment knobs for the central server (`cdmon-server`) and the
-# standalone dashboard (`cdmon serve`). Every value below is the BUILT-IN DEFAULT,
+# These are the deployment knobs for the central server (`cdx-server`) and the
+# standalone dashboard (`cdx serve`). Every value below is the BUILT-IN DEFAULT,
 # so deleting this file changes nothing (back-compat). Edit a value, or override any
 # of them at runtime with the matching environment variable (env WINS over this file;
 # a CLI --host/--port wins over env).
 #
 # SECRETS ARE NOT HERE. The admin token, database URL and credential-sealing key stay
 # in the environment ($CDMON_ADMIN_TOKEN / $CDMON_DATABASE_URL / $CDMON_SECRET_KEY);
-# the console + `cdmon settings` only report whether each is configured, never its value.
+# the console + `cdx settings` only report whether each is configured, never its value.
 
 version: "1.0.0"
 
 server:
-  # Bind address + port for the central server (`cdmon-server` / main()).
+  # Bind address + port for the central server (`cdx-server` / main()).
   # env: CDMON_SERVER_HOST / CDMON_SERVER_PORT
   host: "0.0.0.0"
   port: 33333

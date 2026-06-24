@@ -1,7 +1,7 @@
-"""A tiny stand-in for *some other team's* library — the cdmon adopter example.
+"""A tiny stand-in for *some other team's* library — the cdx adopter example.
 
-This module is NOT part of the code-doc-monitor engine; it is a self-contained
-"external repo" that ADOPTS cdmon (its own ``cdmon.yaml`` maps these public
+This module is NOT part of the custodex engine; it is a self-contained
+"external repo" that ADOPTS cdx (its own ``cdmon.yaml`` maps these public
 functions onto ``docs/api.md``'s managed ``symbols`` region). The e2e test
 (``tests/test_example_external.py``) heals this doc and reports the records to an
 in-process central server, proving the whole adopter loop offline (K4).

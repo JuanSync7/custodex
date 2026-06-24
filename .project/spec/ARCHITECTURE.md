@@ -1,4 +1,4 @@
-# code-doc-monitor — architecture & module contracts
+# custodex — architecture & module contracts
 
 Fixed module boundaries and public signatures. Slices implement these contracts
 exactly so they compose without integration drift. Pipeline:
@@ -108,18 +108,18 @@ pydantic aliases with `populate_by_name=True` so YAML keys are hyphenated while
 attrs stay snake_case (K0). All failures raise typed `ConfigError` (K8); the
 merge is pure and deterministic (K10: index order, then in-file order).
 
-**Z-01b/Z-02 — cdmon dogfoods this layout on ITSELF (it is now the canonical
+**Z-01b/Z-02 — cdx dogfoods this layout on ITSELF (it is now the canonical
 self-config).** The repo carries `config/cdmon/` (`index.yaml` + nested units
-`core`/`agent`/`server` = `code_doc_monitor`/`code_doc_monitor/agent`/
-`code_doc_monitor/server`, plus `ignore.yaml`/`doc-style.yaml`/`coverage.rpt`)
+`core`/`agent`/`server` = `custodex`/`custodex/agent`/
+`custodex/server`, plus `ignore.yaml`/`doc-style.yaml`/`coverage.rpt`)
 covering its 12 documents, `api-index` region template, and the three
 `__init__.py` waivers. Z-02 REMOVED the now-redundant root `cdmon.yaml`: the dir
-layout is cdmon's only self-config; `cdmon check`/`coverage` auto-detect it from
+layout is cdmon's only self-config; `cdx check`/`coverage` auto-detect it from
 the repo root. Enforced by `tests/test_dogfood.py`. Self-coverage is 100% of
 scanned engine public symbols: `report.py`→`coverage-system`, `configsync.py`→
 `central-client`, and `server/standalone.py`→`server` close the last gaps. The
 single-file `load_config` path remains the documented BACK-COMPAT capability
-(`cdmon init`, `examples/`), kept and tested against a SEPARATE fixture (NOT
+(`cdx init`, `examples/`), kept and tested against a SEPARATE fixture (NOT
 cdmon's own config).
 ```python
 CDMON_CONFIG_VERSION = "2.0.0"   # the only accepted cdmon-config-version
@@ -159,7 +159,7 @@ def load_index_file(path: Path) -> IndexFile
 def load_bundle(config_dir: Path) -> ConfigBundle   # reads index, then units in order; merges
 def load_config_dir(config_dir: Path) -> MonitorConfig   # == load_bundle(config_dir).config
 
-# N-02: index<->disk reverse validation + regeneration (`cdmon index`).
+# N-02: index<->disk reverse validation + regeneration (`cdx index`).
 RESERVED_UNIT_STEMS = frozenset({"index", "ignore", "doc-style"})  # not coverage units
 def regenerate_index(config_dir: Path) -> str   # rescan units (sorted), rebuild units:, refresh updated (clock seam)
 def write_index(config_dir: Path, text: str) -> None   # loud writer (ConfigError on OSError, K8)
@@ -177,7 +177,7 @@ on disk; a missing `index.yaml`. The CLI auto-detects via
 `--config` file is absent) a `config/cdmon/index.yaml` under cwd uses
 `load_config_dir`; otherwise the single-file `load_config` path is unchanged.
 
-**N-02 — index↔disk reverse validation + `cdmon index`.** `load_bundle` now also
+**N-02 — index↔disk reverse validation + `cdx index`.** `load_bundle` now also
 enforces the REVERSE invariant: every on-disk `config/cdmon/*.yaml` (minus the
 reserved stems `index`/`ignore`/`doc-style`, `RESERVED_UNIT_STEMS`) MUST appear in
 `index.yaml`'s `units:`; an on-disk-not-in-index unit is a loud `ConfigError`
@@ -187,7 +187,7 @@ rescans the on-disk units (alphabetical, reserved excluded), rebuilds the body
 clock seam (mirrors `monitor._default_now`) — every other global and frontmatter
 field is preserved byte-for-byte by textual surgery (no parse→re-serialize), so it
 is idempotent (K7) and deterministic (K10). `write_index(config_dir, text)` is the
-loud writer. The `cdmon index [--config-dir config/cdmon] [--check]` CLI rewrites
+loud writer. The `cdx index [--config-dir config/cdmon] [--check]` CLI rewrites
 the index by default (no-op when already synced) and `--check` is read-only (K1):
 exit 1 + unified diff on drift, 0 when synced — a CI guard.
 
@@ -232,7 +232,7 @@ child unit is scoped by the CHILD's `source-files-format`, not the parent's");
 `load_bundle` resolves `repo_root = resolve_repo_root(config_dir, index.root) =
 normpath(config_dir / index.root)` — the ONE repo-root formula shared by
 `Monitor`, `drift.detect`, `effective_coverage`, the doc-style `templates_root`,
-and `cdmon rpt` (N-06: `root` is the repo root relative to the dir the config
+and `cdx rpt` (N-06: `root` is the repo root relative to the dir the config
 lives in — `config/cdmon/`, default `../..`; the repo root for a single file,
 default `.`). It reads the ignore pointer (`index.ignore`, default `ignore.yaml`) from
 `config_dir`, and rebuilds the merged config with the derived coverage; the
@@ -247,7 +247,7 @@ independent writing-template categories live as real markdown guidance under
 each). A `config/cdmon/doc-style.yaml` maps each document id to ONE template per
 category (with `defaults`). The agent, when AUTHORING a no-renderer `llm`
 region's prose, composes the four selected files into its prompt. The models +
-loader live in a NEW module `code_doc_monitor/docstyle.py` (config.py kept lean;
+loader live in a NEW module `custodex/docstyle.py` (config.py kept lean;
 no cycle — docstyle imports config's leaf helpers, config does a LAZY local
 import in `load_bundle`):
 ```python
@@ -273,7 +273,7 @@ the composed prompt is BYTE-IDENTICAL to today (K6) and the offline `MockBackend
 (which authors prose in code) is untouched (K4/K10). `Monitor(..., doc_style=…)`
 threads it: `_style_guidance_for(drift, region_mode)` returns the composed
 guidance ONLY for a no-renderer `llm` REGION drift (a REGION whose `region_id`
-is mode `llm` and has NO `region_templates` renderer), else None. The `cdmon
+is mode `llm` and has NO `region_templates` renderer), else None. The `cdx
 monitor` CLI lifts `doc_style` from the bundle (dir layout only; single-file
 configs have no doc-style seam).
 
@@ -294,7 +294,7 @@ def scaffold_config_dir(config_dir, *, repo, now) -> None  # write index.yaml + 
 `scaffold_config_dir` substitutes `repo`/`now` and writes the four files (the
 referenced writing templates already live in `templates/writing/`, not rewritten);
 the result PASSES `load_bundle` for a repo shipping those templates (asserted).
-OS errors wrap into a typed `ConfigError` (K8). `cdmon init --v2` is the loud
+OS errors wrap into a typed `ConfigError` (K8). `cdx init --v2` is the loud
 caller (no-clobber without `--force`). The DOC_STYLE_TEMPLATE names writing
 templates that exist (api-reference / precise / reference-dense / engine-domain).
 
@@ -349,7 +349,7 @@ format mismatch vs. no-dir-match — Z-01a deepest-wins). Percentages are rounde
 render) so the model carries exactly the 2-dp figure the file shows and the
 round-trip holds: `parse_rpt(render_rpt(r)) == r`.
 `render_rpt` emits a `---` frontmatter block (`cdmon-report-version`/`kind`/`repo`/
-`ref`/`generated-by: cdmon rpt`) then the YAML body in a FIXED key order, every
+`ref`/`generated-by: cdx rpt`) then the YAML body in a FIXED key order, every
 list sorted, percentages at 2 dp (`n/a` for None). NO wall-clock is written
 (K7) — provenance is `ref` (a branch/commit; a later sync slice fills it), so a
 re-run with no code/config change is byte-identical. Free-text reasons go through
@@ -357,7 +357,7 @@ a PyYAML flow-scalar helper so colons/quotes/hashes are escaped (lossless
 round-trip). `parse_rpt` is the strict inverse (loud `ConfigError` on a missing/
 unterminated fence, wrong report-version, or a non-mapping/structurally-invalid
 body). `write_rpt` is a plain loud writer to `config_dir/coverage.rpt`. The
-`cdmon rpt [--config-dir config/cdmon] [--write] [--ref REF]` CLI prints the
+`cdx rpt [--config-dir config/cdmon] [--write] [--ref REF]` CLI prints the
 rendered report by default (read-only, K1) and only writes the `.rpt` under
 `--write` (idempotent, K7). DB/sync filling `ref` from git is epic Y;
 doc-style/templates are N-05 (see the `config.py` N-05 section above).
@@ -851,7 +851,7 @@ def make_sink(cfg: CentralConfig) -> Sink
 
 ## `registry.py`  (repo registration client — offline default, E-02)
 ```python
-# A repo announces itself to the central server (an explicit `cdmon register`)
+# A repo announces itself to the central server (an explicit `cdx register`)
 # BEFORE/while reporting. CLIENT-SIDE only (the server /repos endpoint is E-03,
 # which consumes RegistrationPayload directly — ONE shared schema, no DTOs, K6).
 # Mirrors sinks.py / pr.py: an INJECTED transport so tests never touch the
@@ -897,7 +897,7 @@ def register_repo(identity: RepoIdentity, *, url: str, auth_env: str | None = No
 # schemas — NO hand-written request DTOs (K6). The routes import registry/sinks
 # models DIRECTLY and let FastAPI/pydantic validate them (a malformed body -> 422).
 # Behind the `[server]` extra (fastapi, uvicorn[standard], httpx for TestClient);
-# importing `code_doc_monitor` core pulls in NOTHING from here — `server/__init__.py`
+# importing `custodex` core pulls in NOTHING from here — `server/__init__.py`
 # does NOT import fastapi at import time (lazy, mirrors the `agent` extra, K0). The
 # store is a Protocol seam: E-03 ships an InMemoryStore; E-04 swaps in a SQLAlchemy/
 # Postgres store behind the SAME Store without touching app.py/the routes.
@@ -1157,7 +1157,7 @@ class SqlStore:                     # implements `Store` + resolutions/coverage 
     def add_sync_run(run) -> None; def sync_runs_for(repo_id, sync_kind=None) -> list[SyncRun]
     def latest_sync_run(repo_id, sync_kind=None) -> SyncRun | None  # ORDER BY id DESC, first
 
-# `import code_doc_monitor` core still imports NO sqlalchemy (lazy [server] boundary
+# `import custodex` core still imports NO sqlalchemy (lazy [server] boundary
 # holds — db.py is imported only from the server subpackage / tests). create_app(
 # SqlStore(sqlite_engine)) re-runs the E-03 server tests unchanged (Protocol swap is
 # transparent).
@@ -1315,14 +1315,14 @@ its advisory PERSISTS across a fingerprint heal until the body actually changes
 (fixes B-02's known limitation). Default (no region_hashes, no modes) == B-02
 byte-for-byte (additive, K9).
 
-## `cli.py`  (`cdmon`)
+## `cli.py`  (`cdx`)
 `init | surface | check | monitor | report | coverage | schema` per SPEC, plus the
 CONFIG-V2 surface `index | rpt | sync` (sync = Y-03, see configsync.py above). `check`
 exits 1 on drift; `monitor` exits 0 unless drift `remaining`. Uses
 `make_backend`/`make_sink` from config; `--apply/--no-apply` overrides
 `apply_default`.
 
-**A-08 — `cdmon coverage --write [PATH]` (opt-in mutation; Decision 2: a dedicated
+**A-08 — `cdx coverage --write [PATH]` (opt-in mutation; Decision 2: a dedicated
 regenerable manifest, NOT injected into `cdmon.yaml`; K1/K7/K10).** `--write` takes
 an optional PATH (default `.cdmon/coverage.json`, gitignored) and writes a
 deterministic manifest = the A-05 `_coverage_payload(report)` PLUS a top-level
@@ -1334,7 +1334,7 @@ writes (creating parent dirs) and prints the path. The default `coverage`
 invocation stays read-only (K1) — `--write` is the only mutating mode. `--write`
 composes with `--json`/`--fail-under` (stdout/exit unaffected by the write).
 
-**B-05 — `cdmon lint --modes` (per-region authority STATE surface, NOT a new gate).**
+**B-05 — `cdx lint --modes` (per-region authority STATE surface, NOT a new gate).**
 New pure helpers in `layout.py`:
 ```python
 class RegionState(BaseModel):           # frozen, extra="forbid"
@@ -1355,7 +1355,7 @@ def config_region_states(config, config_dir) -> list[RegionState]
     # file-reading driver: parse each existing doc and collect region_states across all
     # documents (skips missing/malformed docs, like lint_config). root=config_dir/config.root.
 ```
-`cdmon lint --modes` prints one informational line per region (`doc::region — mode
+`cdx lint --modes` prints one informational line per region (`doc::region — mode
 [renderer|no-renderer] [locked] [advisory]`) and **keeps lint's existing pass/fail
 semantics** (structural issues still drive exit code; `--modes` adds an info view, it
 is not a gate). K0/K2/K10.
@@ -1388,9 +1388,9 @@ authors the new prose, and a second `monitor --apply` is a clean no-op (K7). Doc
 by `[B-06]` in `tests/regression/`. The renderer-backed interim case stays asserted by
 `test_system.test_mixed_authorship_four_regions_e2e`.
 
-**D-01/D-02 — `cdmon resolve` (capture the human outcome as a separate event).**
+**D-01/D-02 — `cdx resolve` (capture the human outcome as a separate event).**
 ```
-cdmon resolve <record_id> --resolution {accepted|overridden|rejected|invalidated}
+cdx resolve <record_id> --resolution {accepted|overridden|rejected|invalidated}
     [--by NAME] [--text TEXT] [--note NOTE] [--config PATH] [--log PATH]
 ```
 Validates `<record_id>` EXISTS in the review log (`reviewlog.read_all` over
@@ -1403,7 +1403,7 @@ clock pattern monitor uses, K10), and prints `resolved <record_id> as <resolutio
 review log is NEVER mutated — the outcome is a new append-only event linked by FK
 (K5). `report` is additively extended to print `resolved`/`unresolved` counts.
 
-**G-01 — `cdmon init --central URL` (HTTP-reporting bootstrap; ADDITIVE, K0/K8).**
+**G-01 — `cdx init --central URL` (HTTP-reporting bootstrap; ADDITIVE, K0/K8).**
 `init` grows four optional flags: `--central URL`, `--repo-id ID`, `--token-env VAR`
 (default `CDMON_CENTRAL_TOKEN`), `--repo-url URL`. WITHOUT `--central` the command is
 byte-identical to today (writes `config.CONFIG_TEMPLATE` via `write_template` — existing
@@ -1427,12 +1427,12 @@ def central_config_template(*, url: str, repo_id: str,
 usable name). The command refuses to clobber unless `--force` (unchanged). Offline: writes
 ONE file, no network (K1/K4).
 
-**W-02 — `cdmon init --v2` (scaffold the `config/cdmon/` dir layout; ADDITIVE, K7/K8).**
+**W-02 — `cdx init --v2` (scaffold the `config/cdmon/` dir layout; ADDITIVE, K7/K8).**
 `init` grows `--v2`, `--config-dir` (default `config/cdmon`), and `--repo` (defaults to
 the cwd name). WITHOUT `--v2` the single-file behavior is byte-identical (above). WITH
 `--v2` it calls `templates_v2.scaffold_config_dir(config_dir, repo=…, now=cli._now())` —
 writing the four canonical files from the templates — and refuses to clobber an EXISTING
-directory unless `--force` (loud K8). The scaffolded dir passes `load_bundle`/`cdmon check`
+directory unless `--force` (loud K8). The scaffolded dir passes `load_bundle`/`cdx check`
 (verified). Clock via the `cli._now()` seam (deterministic in tests, K10).
 
 ## `doctor.py`  (G-02 — offline preflight; pure-ish, read-only — K1/K4/K10)
@@ -1528,8 +1528,8 @@ def run_sync(local_path, repo_id, *, mode, default_branch="main", now,
 # unknown mode / git failure (K8). Offline: real local git only, no network.
 ```
 
-**Y-03 — `cdmon sync` (the client-facing trigger; local + remote).**
-`cli.py` adds `cdmon sync [--mode git|local] [--remote URL --repo-id ID]
+**Y-03 — `cdx sync` (the client-facing trigger; local + remote).**
+`cli.py` adds `cdx sync [--mode git|local] [--remote URL --repo-id ID]
 [--token-env VAR] [--default-branch main] [--json]`:
 
 * **LOCAL** (no `--remote`): runs `configsync.run_sync(Path.cwd(), repo_id, mode=...,
@@ -1542,7 +1542,7 @@ def run_sync(local_path, repo_id, *, mode, default_branch="main", now,
   a loud `error:` line + Exit(1) on any `CodeDocMonitorError` (K8, no traceback).
 * **REMOTE** (`--remote URL --repo-id ID`): POSTs `{mode}` to `<URL>/repos/{ID}/sync`
   via `registry.sync_repo_remote` → `HttpSyncTransport`, which REUSES the exact same
-  stdlib HTTP+auth seam as `cdmon register` (`registry._UrllibRegisterHttp.request(
+  stdlib HTTP+auth seam as `cdx register` (`registry._UrllibRegisterHttp.request(
   method, url, *, body, token)` lazily built when no leaf is injected, K0; bearer read
   from `--token-env` at call time, default `DEFAULT_CENTRAL_TOKEN_ENV`). The server's
   `SyncRun` JSON is printed via the SAME `_sync_run_lines` renderer (or `--json`).
@@ -1580,11 +1580,11 @@ review-log/sink records (it always does — K5); the dry-run restore is about th
 Idempotent (K7): a clean repo (or a second `sync_pr` after an apply) heals nothing,
 so AFTER == BEFORE for every doc → empty `patch`, empty `changed_paths`, summary
 `"clean"`. Offline by default (mock backend, K4). `cli.py` adds
-`cdmon sync-pr [--config] [--out FILE] [--dry-run]`: default applies + prints the
+`cdx sync-pr [--config] [--out FILE] [--dry-run]`: default applies + prints the
 patch (or writes it to `--out`) + prints the summary to stderr, exit 0; `--dry-run`
 computes the same patch with NO mutation; malformed config → clean `error:` + Exit(1)
 (K8). NOT dogfood-tracked (it imports nothing dogfood docs grade). `.gitlab-ci.yml`
-gains a fast offline `docs:gate` job (`cdmon check` + `cdmon lint`) that fails the
+gains a fast offline `docs:gate` job (`cdx check` + `cdx lint`) that fails the
 pipeline on drift — orthogonal to `tests:offline`. C-03 (bot-PR opener) consumes
 `SyncResult.patch` + `changed_paths` over an INJECTED GitLab transport.
 
@@ -1628,7 +1628,7 @@ drive `open_docs_pr` with a FAKE `PRTransport` that records and asserts the exac
 (branch/title/description/files/labels); the build-default + missing-env branches are
 covered by stubbing the leaf and by asserting the loud `from_env` error — so 100% holds
 with ZERO network. `cli.py` adds
-`cdmon open-docs-pr [--config] [--dry-run] [--target BRANCH] [--ref REF]`: runs
+`cdx open-docs-pr [--config] [--dry-run] [--target BRANCH] [--ref REF]`: runs
 `sync_pr` (with `dry_run=True` under `--dry-run` so NOTHING is written) then `open_docs_pr`;
 an empty sync prints "clean — nothing to open" (no transport, no MR); `--dry-run` prints
 the plan as JSON without building/calling a transport; otherwise it builds the default
@@ -1658,7 +1658,7 @@ outside the managed-doc set, `False` (SKIP) when EVERY changed file is a managed
 (a bot doc-only commit) or the set is empty. It is provider-agnostic — it only needs
 the changed-file list, however CI obtains it.
 
-`cli.py` adds `cdmon should-sync [--config] [FILES...]` (also reads newline-separated
+`cli.py` adds `cdx should-sync [--config] [FILES...]` (also reads newline-separated
 paths from stdin when no FILES are given): exits `0` when `should_sync` is `True`
 (proceed), `1` when `False` (skip). Malformed config → clean `error:` line + Exit(1)
 (K8). `.gitlab-ci.yml`'s heal path uses it (a commented guard) so a doc-only commit
@@ -1672,7 +1672,7 @@ field to `ReviewRecord`, AFTER the existing fields, default `None`:
 ```
 
 Old JSONL lines without `source_sha` still `model_validate_json` (default None);
-existing records stay byte-valid; `cdmon schema` re-emits it. `monitor.py` threads it:
+existing records stay byte-valid; `cdx schema` re-emits it. `monitor.py` threads it:
 
 ```python
 Monitor(config, config_dir, *, ..., source_sha: str | None = None)  # __init__ stores it
@@ -1694,7 +1694,7 @@ after the field/signature land.
 
 A standalone SPA that READS the central server (EPIC-E) and visualises repos,
 drift records, and coverage. It is **not** a Python module: it lives in `dashboard/`,
-has its own Node toolchain + test gate (Vitest), and is NOT tracked by `cdmon`
+has its own Node toolchain + test gate (Vitest), and is NOT tracked by `cdx`
 (no `**/*.py`). The Python gate is untouched by EPIC-F.
 
 ### Toolchain + scripts
@@ -1745,7 +1745,7 @@ interface RepoStatus {
   last_detected_at?: string | null; coverage_ratio?: number | null;
 }
 ```
-F-02+ can generate `ReviewRecord`/`ResolutionRecord` TS from `cdmon schema` (JSON Schema)
+F-02+ can generate `ReviewRecord`/`ResolutionRecord` TS from `cdx schema` (JSON Schema)
 rather than hand-writing them; F-01 hand-writes only the two small shapes it consumes.
 
 ### Pages / structure
@@ -1796,8 +1796,8 @@ still sent but an empty drift_kind is not).
 
 **Types (`src/types.ts`).** `RecordVerdict` (`FIX|INVALIDATE|ESCALATE`), `Audience`,
 `ProposedFix`, `ReviewRecord` are **generated** from the real Python schema —
-`.venv/bin/cdmon schema --out dashboard/src/schema.review.json` (schema.py::ReviewRecord,
-the K6 source of truth); the interfaces mirror that JSON's `properties`. `cdmon schema`
+`.venv/bin/cdx schema --out dashboard/src/schema.review.json` (schema.py::ReviewRecord,
+the K6 source of truth); the interfaces mirror that JSON's `properties`. `cdx schema`
 emits ONLY the review record, so `Resolution`/`ResolutionRecord` are hand-written from
 schema.py::ResolutionRecord, and `CoverageSnapshot` from the server's OPAQUE snapshot dict
 (`store.coverage_for → list[dict]`; only `ratio` is contractual, app.py reads it — the
@@ -1891,12 +1891,12 @@ def _compute_telemetry(store, repo_id) -> RepoTelemetry
 - **`promotion_candidates`** reuses `detect_promotions(records, resolutions)` server-side
   (the SAME pure detector the CLI uses) — surfacing shapes ripe to auto-promote.
 
-## H-04 — `issues.py` + `cdmon surface-gaps` (coverage gaps → tracker issue — K0/K4/K8/K10)
+## H-04 — `issues.py` + `cdx surface-gaps` (coverage gaps → tracker issue — K0/K4/K8/K10)
 A NEW engine module mirroring `pr.py`'s INJECTED-transport / inject-the-leaf pattern:
 the deterministic issue payload is pure; the real provider POST is the only
 `# pragma: no cover` leaf; tests drive a fake transport (no network, K4).
 ```python
-# code_doc_monitor/issues.py  (new)
+# custodex/issues.py  (new)
 class IssuePlan(BaseModel):              # frozen, extra="forbid"
     title: str                          # "docs: N undocumented public symbol(s)"
     body: str                           # deterministic: gaps grouped by suggested owner
@@ -1938,7 +1938,7 @@ Both `_Urllib*IssueHttp` leaves are stdlib-only urllib (no `requests`, K0); thei
 `urlopen` is the ONLY `# pragma: no cover` line. Lazy build (no http injected) + missing
 -env are covered (real POST stubbed), mirroring `pr.py`.
 
-**`cdmon surface-gaps [--config] [--dry-run] [--provider gitlab|github]`.** Runs
+**`cdx surface-gaps [--config] [--dry-run] [--provider gitlab|github]`.** Runs
 discover→`resolve_coverage`→`suggest_owners`, builds the plan. No gaps → prints
 "no coverage gaps" and exits 0 (no transport built). `--dry-run` prints the plan JSON
 WITHOUT building/calling a transport (a `_NullTransport` like `open-docs-pr`). Else the
@@ -1947,7 +1947,7 @@ prints the created issue's `web_url`. Offline + deterministic in `--dry-run` (K4
 
 **Dogfood (cdmon.yaml):** `issues.py` is a NEW engine module → ADD it to the `pr-loop`
 DocumentSpec's `code_refs` (alongside `syncpr.py`/`pr.py`, the natural home for the
-PR/issue transports) so `cdmon coverage --fail-under 95` self-gate stays green.
+PR/issue transports) so `cdx coverage --fail-under 95` self-gate stays green.
 
 # EPIC EDITOR — the interactive config editor (E-01..E-13)
 
@@ -2063,7 +2063,7 @@ def apply_edits_to_disk(local_path: Path, edits: list[ConfigEdit], *, now, backe
     #    file then regenerate_regions to bring managed regions in sync — preserving HUMAN
     #    regions (mirrors the monitor/new-doc preserve/modes derivation, B-02/B-03). NO LLM.
 def apply_record_fix(local_path: Path, record: ReviewRecord, *, now) -> ApplyFixResult
-    # the SCOPED counterpart of `cdmon monitor --apply` for ONE recorded drift: loud K8 if
+    # the SCOPED counterpart of `cdx monitor --apply` for ONE recorded drift: loud K8 if
     # the record carries no applicable fix (fix is None / verdict != FIX); resolve the doc
     # path under the repo root; derive preserve/modes from the DocumentSpec; call heal.apply_fix;
     # return a unified `diff` of before→after (empty + applied=False when unchanged, K7).
@@ -2134,7 +2134,7 @@ dogfood config (cdmon's own) all exercise `context_refs`.
 
 ## `featurecatalog.py`  (EPIC R — the golden feature catalog loader; pure, stdlib+pydantic+pyyaml only — K0/K1/K10)
 
-The machine-readable golden reference of every cdmon *feature*. The catalog
+The machine-readable golden reference of every cdx *feature*. The catalog
 lives in `feature-doc/catalog/*.yaml` (one file per subsystem, mirroring the
 `config/cdmon/` multi-file pattern); `feature-doc/FEATURES.md` is RENDERED from
 it (never hand-edited — the yaml is the single source of truth). Pure and
@@ -2149,7 +2149,7 @@ class Feature(pydantic.BaseModel):           # frozen=True, extra="forbid"
     title: str                               # one-line human name
     summary: str                             # 1-3 sentence description (the golden prose)
     subsystem: str                           # logical grouping, lowercase (e.g. "extract")
-    modules: tuple[str, ...]                  # real code_doc_monitor modules implementing it (non-empty)
+    modules: tuple[str, ...]                  # real custodex modules implementing it (non-empty)
     constraints: tuple[str, ...] = ()         # K-refs upheld (e.g. ("K0", "K3"))
     status: Literal["implemented", "planned", "deprecated"] = "implemented"
     demos: tuple[str, ...] = ()               # demo case ids (filled/checked in R3)
@@ -2169,13 +2169,13 @@ def load_catalog(catalog_dir: Path, *, known_modules: Collection[str] | None = N
 def render_features_md(catalog: FeatureCatalog) -> str: ...
 #   the human golden ref — grouped by subsystem, sorted, with a per-feature
 #   demo/test traceability column. Pure string build (K10); cdmon-managed-region
-#   compatible so `cdmon wiki` can re-stamp it idempotently (R7).
+#   compatible so `cdx wiki` can re-stamp it idempotently (R7).
 ```
 
 `errors.py` gains `CatalogError(CdmError)` (loud, K8). `known_modules` is sourced
 from `inventory`-style discovery so a typo'd module ref fails loud at load. No new
 dependency (pydantic+pyyaml already core, K0). This module is the foundation R3
-(demos), R5 (test wiki), R6 (source wiki), and R7 (`cdmon wiki`) all read from.
+(demos), R5 (test wiki), R6 (source wiki), and R7 (`cdx wiki`) all read from.
 
 ## `traceability.py`  (EPIC R, R-03 — feature ⇄ demo/test/source coverage matrix; pure, stdlib+pydantic — K0/K1/K10)
 
@@ -2223,7 +2223,7 @@ def render_matrix_md(matrix: TraceMatrix) -> str: ...
 #   the traceability wiki: per-feature demo/test columns + a gaps section. Pure (K10).
 ```
 
-`cli.py` gains `cdmon trace` (`--json`, `--fail-on-gap`): loads `feature-doc/catalog`,
+`cli.py` gains `cdx trace` (`--json`, `--fail-on-gap`): loads `feature-doc/catalog`,
 scans `tests/` + `demo/`, prints the matrix summary; `--fail-on-gap` exits nonzero
 if any feature lacks a test or demo, or any unknown ref exists (K8). The catalog's
 `Feature.demos`/`tests` slots are an OPTIONAL secondary source (filled by R3/R5);
@@ -2270,12 +2270,12 @@ The annotation CONVENTION (R-06): each `tests/.../test_*.py` carries a module-le
 `Features: FEAT-…` tag in its module docstring listing the catalog features that
 file exercises (file-level coverage — this is what makes the traceability TEST side
 complete, `features_without_test == []`). Per-test `Feature:` tags refine where
-valuable. The boundary comes from the R-05 directory, not a tag. `cdmon wiki` (R-08)
+valuable. The boundary comes from the R-05 directory, not a tag. `cdx wiki` (R-08)
 renders `render_test_wiki_md` to disk. No new dependency (K0).
 
 ## `srcindex.py`  (EPIC R, R-07 — the source index + source wiki; reuses inventory/coverage — K0/K1/K10)
 
-Indexes every public symbol of `code_doc_monitor` and ties each module to the
+Indexes every public symbol of `custodex` and ties each module to the
 catalog features it implements (the inverse of `Feature.modules`), so the source
 wiki and the traceability SOURCE view are complete and provably cover the whole
 public surface. Reuses `inventory.discover_files`/`discover_symbols` (no AST
@@ -2302,14 +2302,14 @@ def render_source_wiki_md(index: SourceIndex) -> str: ...
 #   summary (modules with no feature). Pure (K10).
 ```
 
-`cdmon wiki` (R-08) renders this to `feature-doc/wiki/SOURCE_WIKI.md`. The
+`cdx wiki` (R-08) renders this to `feature-doc/wiki/SOURCE_WIKI.md`. The
 `modules_without_feature` accessor is the deferred R-02 "no orphan public
 capability" check, now realizable: a public module with zero catalog features is a
 golden-reference gap, reported (and optionally gated). No new dependency (K0).
 
-## `cdmon wiki` + `cdmon trace` gate  (EPIC R, R-08 — regenerate all wikis from the single sources; CI freshness + traceability gate)
+## `cdx wiki` + `cdx trace` gate  (EPIC R, R-08 — regenerate all wikis from the single sources; CI freshness + traceability gate)
 
-`cli.py` gains `cdmon wiki` — the single regeneration entry point that renders ALL
+`cli.py` gains `cdx wiki` — the single regeneration entry point that renders ALL
 of EPIC R's derived artifacts from their sources (the catalog yaml + the tests'
 docstrings + the source AST), to a canonical set of paths:
 
@@ -2320,17 +2320,17 @@ feature-doc/wiki/SOURCE_WIKI.md  ← srcindex.render_source_wiki_md(build_source
 feature-doc/wiki/TRACEABILITY.md ← traceability.render_matrix_md(build_matrix)
 ```
 
-- `cdmon wiki` writes all four (idempotent — a second run is a no-op, K7;
+- `cdx wiki` writes all four (idempotent — a second run is a no-op, K7;
   deterministic content, K10) and echoes each path + whether it changed.
-- `cdmon wiki --check` renders in memory and compares to disk; exits 0 when all
+- `cdx wiki --check` renders in memory and compares to disk; exits 0 when all
   fresh, nonzero listing every stale file when not (K8) — the CI freshness gate.
   No write on `--check`.
 - A shared `WIKI_TARGETS` mapping (path → render thunk) is the single source of the
   output set so `wiki` and `wiki --check` can never diverge.
 
-The `cdmon trace --fail-on-gap` command (R-03), now that the matrix is complete,
+The `cdx trace --fail-on-gap` command (R-03), now that the matrix is complete,
 becomes a CI gate: a new demo/feature without a test (or vice-versa) fails CI. Both
-`cdmon wiki --check` and `cdmon trace --fail-on-gap` are added to `.gitlab-ci.yml`
+`cdx wiki --check` and `cdx trace --fail-on-gap` are added to `.gitlab-ci.yml`
 (offline, no network — K4). No new dependency (K0). This closes EPIC R: the golden
 reference, its demo/test 1:1 mappings, and the source/test wikis all regenerate
 from one source each and are gated against drift — cdmon's own discipline applied
@@ -2358,7 +2358,7 @@ WIKI_SECTIONS = (   # (id, title, repo-relative path under feature-doc/) — det
 @app.get("/wiki")
 def wiki() -> dict:
     """Public: the EPIC-R wikis rendered to HTML. {"sections":[{"id","title","html"}...]}.
-    Missing dir/file → that section omitted (graceful empty for a non-cdmon repo). K10 pure."""
+    Missing dir/file → that section omitted (graceful empty for a non-cdx repo). K10 pure."""
 ```
 
 Frontend (`dashboard/`):
@@ -2377,7 +2377,7 @@ Frontend (`dashboard/`):
 
 `featurecatalog`: add **FEAT-SERVER-019** "Feature-wiki endpoint" (subsystem server,
 modules [server]) so the golden reference stays correct; tag it on the server test +
-a demo case so `cdmon trace` stays complete. After the endpoint lands, `cdmon wiki`
+a demo case so `cdx trace` stays complete. After the endpoint lands, `cdx wiki`
 is re-run (FEATURES/SOURCE/TEST wikis pick up the new feature) and the server api doc
 is rehealed. No new dependency anywhere (K0); the dashboard adds no npm package.
 
@@ -2430,7 +2430,7 @@ base stays `""` (same-origin root) — Astro exposes it as `import.meta.env.PUBL
 **Dogfood (catalog stays correct):** `GET /wiki` is retired, so **FEAT-SERVER-019**
 is removed/superseded and new **FEAT-FRONTEND-0NN** features (Astro app shell, native
 wiki pages, console islands, single-origin serving) are added to the catalog with
-their demo + test tags; `cdmon wiki` is re-run and `cdmon trace --fail-on-gap` stays
+their demo + test tags; `cdx wiki` is re-run and `cdx trace --fail-on-gap` stays
 green. `frontend/` is a frontend artifact (like `dashboard/` was) — outside the Python
 coverage surface; `frontend/{node_modules,dist}` are gitignored.
 
@@ -2574,7 +2574,7 @@ partition, NOT a new module or signature.
 `dir-covered` names a test directory and whose `DocumentSpec`s point `code_refs` at
 test files, with the documents living under a top-level **`test-docs/`** directory
 and carrying a managed `symbols` region. The region then lists the test file's
-`test_*` functions; editing a test drifts the test-doc; `cdmon monitor --apply`
+`test_*` functions; editing a test drifts the test-doc; `cdx monitor --apply`
 heals it (K7). The test file is the source of truth, the test-doc is graded against
 it (K2). 1:1: one test-doc per test file. Scoped to keep coverage bounded — the
 dogfood covers only `tests/smoke`; the demo covers all of `demo/tests/`.
@@ -2599,7 +2599,7 @@ existing document endpoints, distinguished purely by path.
 test (`test_testdoc_mirror.py`). **TDOC-02** demo 1:1 (`demo/tests` → 4 test-docs)
 + the count-pin ripple. **TDOC-03** `FEAT-CONFIGV2-017` + DEMO-058 + trace 199/199
 + wikis. **TDOC-04** the frontend Test docs section. Each: TDD red-first, full gate
-green (ruff+mypy+pytest ≥90% branch + dogfood/demo `cdmon` gates + `astro check`),
+green (ruff+mypy+pytest ≥90% branch + dogfood/demo `cdx` gates + `astro check`),
 STATUS row + LESSON.
 
 ## EPIC OWN — ownership & accountability (`ownership.py` + roster mirror + reassignment — K0/K1/K2/K4/K5/K6/K10)
@@ -2627,7 +2627,7 @@ its *durable* owner = `team or owner`; doc-level falls back to the unit `owner`
 when all three are unset. Serialized by `_document_to_yaml` after `nav_label`,
 before `region_keys` (defaults dropped — idempotent round-trip, K7). Code-ref-level
 ownership is intentionally deferred: a code_ref's accountable human is its
-document's owner (cdmon already maps code → doc, so code → doc → human is closed
+document's owner (cdx already maps code → doc, so code → doc → human is closed
 without new per-ref fields).
 
 **`ownership.py` (NEW core module — pure, stdlib + pydantic only, K0/K1/K10).** No
@@ -2678,9 +2678,9 @@ is DEFERRED — it needs a per-doc `last_reviewed` the schema does not yet carry
 `detect_orphans` is the clock-free half, a future `detect_stale(owners,
 last_reviewed, *, now, sla_days)` is the injected-clock half.
 
-**CLI — `cdmon ownership` (read-only, K1).**
+**CLI — `cdx ownership` (read-only, K1).**
 ```
-cdmon ownership [--config DIR] [--roster roster.yaml] [--json] [--fail-on-orphan]
+cdx ownership [--config DIR] [--roster roster.yaml] [--json] [--fail-on-orphan]
 ```
 Loads the config bundle, optionally an OFFLINE roster YAML (`identities: [...]`),
 resolves ownership, runs `detect_orphans`, prints a per-doc owner table + findings;
@@ -2743,14 +2743,14 @@ committed config; e2e asserts ownership renders and a departure produces an orph
 
 **Feature catalog — new `ownership` subsystem.** `feature-doc/catalog/ownership.yaml`
 (20th subsystem), FEAT-OWNERSHIP-001…, each traced 1:1 to a `demo/DEMOS.md` case
-and a tagged test (`cdmon trace --fail-on-gap` / `cdmon wiki --check` stay green).
+and a tagged test (`cdx trace --fail-on-gap` / `cdx wiki --check` stay green).
 
 **Slices:** **OWN-00** pin + plan (this) · **OWN-01** config fields + `resolve_ownership`
-· **OWN-02** `detect_orphans` · **OWN-03** `cdmon ownership` CLI · **OWN-04** server
+· **OWN-02** `detect_orphans` · **OWN-03** `cdx ownership` CLI · **OWN-04** server
 roster + mirror + migration 0006 + admin token + routes (store parity, `pg` twin) ·
 **OWN-05** `ReassignOwnerEdit` reassignment · **OWN-06** demo seeding + Ownership page
 + e2e. Each: TDD red-first, full gate green (ruff+mypy+pytest ≥90% branch + dogfood
-reheal + `cdmon trace`/`wiki --check` + `astro check`), STATUS row + LESSON.
+reheal + `cdx trace`/`wiki --check` + `astro check`), STATUS row + LESSON.
 
 ## EPIC SVR — central-server hardening + operator settings
 
@@ -2759,7 +2759,7 @@ hardening middleware from it, and expose it read-only in the CLI + console. Secr
 stay in the environment; the file holds only non-secret knobs (their PRESENCE is the
 only thing ever surfaced). Every default reproduces today's behavior (back-compat, K6).
 
-**Core model — `code_doc_monitor/settings.py` (pydantic + pyyaml only ⇒ CORE, K0).**
+**Core model — `custodex/settings.py` (pydantic + pyyaml only ⇒ CORE, K0).**
 ```python
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 DEFAULT_SETTINGS_PATH = Path("config/settings.yaml")
@@ -2798,10 +2798,10 @@ if `rate_limit.requests_per_minute`; clock-injected, K10; per-worker caveat docu
 feeds `_check_remote_allowed`; `clone_timeout_seconds` threads to `gitfetch` `subprocess.run(timeout=)`.
 New OPEN read `GET /settings` → `{settings: <Settings dump>, secrets: <presence>}` (defined BEFORE
 the SPA catch-all mount). The CENTRAL server `main()` reads host/port/log_level from settings;
-`cdmon serve` keeps its own localhost dev defaults (127.0.0.1:0, `--host/--port` override). App
+`cdx serve` keeps its own localhost dev defaults (127.0.0.1:0, `--host/--port` override). App
 version de-duped via `importlib.metadata`.
 
-**CLI — `cdmon settings [--settings PATH] [--json]`** (read-only, K1/K4): prints the effective
+**CLI — `cdx settings [--settings PATH] [--json]`** (read-only, K1/K4): prints the effective
 resolved settings + secret presence; loud ConfigError → exit 1. Mirrors `schema`/`ownership`.
 
 **Frontend — global Settings page** (mirrors `/config`, NOT per-repo): `pages/Settings.tsx`,
@@ -2809,12 +2809,12 @@ resolved settings + secret presence; loud ConfigError → exit 1. Mirrors `schem
 "Settings" entry in `AppShell` Console nav, `/settings` route in `App.tsx`. `astro check`/vitest.
 
 **Deploy — `Dockerfile` (node build stage → frontend/dist; python slim + `[server]` extra; CMD
-`cdmon-server`), `.dockerignore`, `docker-compose.yml` (server + postgres, `CDMON_DATABASE_URL`),
+`cdx-server`), `.dockerignore`, `docker-compose.yml` (server + postgres, `CDMON_DATABASE_URL`),
 `DEPLOY.md` runbook** (TLS/reverse-proxy, the settings knobs, the rate-limit per-worker caveat).
 
 **Slices:** **SVR-00** pin (this) · **SVR-01** `settings.py` + `config/settings.yaml` + loader/env ·
 **SVR-02** middleware + host/port/log_level + git timeout/allowlist wiring · **SVR-03** `GET /settings`
-+ `cdmon settings` · **SVR-04** console Settings page · **SVR-05** Docker/compose/DEPLOY · **SVR-06**
++ `cdx settings` · **SVR-04** console Settings page · **SVR-05** Docker/compose/DEPLOY · **SVR-06**
 demo + final gate. New `settings` catalog subsystem grown in lockstep; each slice TDD + full gate green.
 
 ## EPIC SLA — time-based staleness / review SLA
@@ -2829,7 +2829,7 @@ was last reviewed). `MonitorConfig.staleness: StalenessConfig` —
 `default_days: int = 90` + `audience_days: dict[Audience,int] = {}` (a user-guide may get
 a longer SLA than an eng-guide, K3).
 
-**Core — `code_doc_monitor/staleness.py` (pure, clock-free except the injected `now`).**
+**Core — `custodex/staleness.py` (pure, clock-free except the injected `now`).**
 ```python
 class StalenessStatus(str, Enum): FRESH / STALE / NEVER_REVIEWED
 class ReviewedDoc(BaseModel):  # frozen
@@ -2843,7 +2843,7 @@ def reviewed_docs_from_config(config) -> tuple[ReviewedDoc, ...]
 ```
 `reviewed is None` ⇒ NEVER_REVIEWED; `age = now - reviewed` (days) > sla ⇒ STALE; else FRESH.
 
-**CLI — `cdmon staleness [--config][--now ISO][--json][--fail-on-stale]`** (read-only,
+**CLI — `cdx staleness [--config][--now ISO][--json][--fail-on-stale]`** (read-only,
 K1/K4): resolves reviewed-docs from config, runs `detect_stale` against `now` (default the
 wall clock, injectable), prints a table; `--fail-on-stale` exits 1 on any STALE/NEVER_REVIEWED.
 
@@ -2854,5 +2854,5 @@ stale on the NEXT read with no re-sync. `ConfigDocument` gains additive `reviewe
 SLA column) — accountability + freshness in one view. New `staleness` catalog subsystem.
 
 **Slices:** **SLA-00** pin (this) · **SLA-01** `staleness.py` pure core · **SLA-02** config
-`reviewed`/`StalenessConfig` + `cdmon staleness` · **SLA-03** `ConfigDocument.reviewed` +
+`reviewed`/`StalenessConfig` + `cdx staleness` · **SLA-03** `ConfigDocument.reviewed` +
 `/staleness` route · **SLA-04** frontend column · **SLA-05** demo + final gate. Each TDD, full gate.

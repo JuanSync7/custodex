@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import code_doc_monitor
+import custodex
 
 
 def test_version_is_exposed() -> None:
-    assert code_doc_monitor.__version__ == "0.1.0"
+    assert custodex.__version__ == "0.1.0"

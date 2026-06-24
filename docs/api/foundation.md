@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 061f0bdb7def27b9
+  fingerprint: 7fa1aa291e0fb628
   fingerprint_tiers:
-    composite: 061f0bdb7def27b9
-    docstring: b85549ece57af112
+    composite: 7fa1aa291e0fb628
+    docstring: 498a9e4bb336fc50
     signature: 9db9fe40bba9a50a
   region_anchors:
     symbols:
@@ -133,9 +133,9 @@ cdm:
     symbols: 1f239a6a6315c45a
   schema_version: 1.0.0
 ---
-# code-doc-monitor — foundation (engineering reference)
+# custodex — foundation (engineering reference)
 
-> Auto-maintained by code-doc-monitor itself (dogfood). The prose is human;
+> Auto-maintained by custodex itself (dogfood). The prose is human;
 > the symbol table below is generated from the code and kept in sync.
 
 <!-- CDM:BEGIN symbols -->

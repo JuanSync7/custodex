@@ -21,16 +21,16 @@ pytest.importorskip(
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.ownership import Identity  # noqa: E402
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.ownership import Identity  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.store import ConfigDocument, Store  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.server.store import ConfigDocument, Store  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _REPO = "acme/widget"
 _NOW = "2026-06-19T00:00:00Z"
@@ -163,12 +163,12 @@ def test_unset_admin_token_warns_only_for_persistent_store(
 
     _MSG = "CDMON_ADMIN_TOKEN is not set"
     sql = _make_store("sql")
-    with caplog.at_level(logging.WARNING, logger="code_doc_monitor.server"):
+    with caplog.at_level(logging.WARNING, logger="custodex.server"):
         create_app(sql)  # persistent store + no admin token → LOUD
     assert any(_MSG in r.message for r in caplog.records)
 
     caplog.clear()
-    with caplog.at_level(logging.WARNING, logger="code_doc_monitor.server"):
+    with caplog.at_level(logging.WARNING, logger="custodex.server"):
         create_app(InMemoryStore())  # ephemeral store → quiet
         create_app(sql, admin_token="set")  # token configured → quiet
     assert not any(_MSG in r.message for r in caplog.records)

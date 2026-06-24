@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 3d49af736a34cc60
+  fingerprint: 4ddefa45e9cab82f
   fingerprint_tiers:
-    composite: 3d49af736a34cc60
-    docstring: a4a226b72f3220c6
-    signature: e4af42cf882cb105
+    composite: 4ddefa45e9cab82f
+    docstring: 3b48178bd8d78505
+    signature: 63743d74a94dbe2d
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -72,12 +72,12 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 2f88cef59a87808e
+    symbols: 508cd47942204f91
   schema_version: 1.0.0
 ---
 # ops
 
-> The operator surface: the `cdmon` CLI command functions that drive every
+> The operator surface: the `cdx` CLI command functions that drive every
 > subcommand (`cli`) and the `doctor` preflight that self-checks a config +
 > environment before a run (`doctor`).
 
@@ -139,7 +139,7 @@ cdm:
 | schema | function | def schema(out: Path \| None = typer.Option(None, '--out', help='Write the schema to this file instead of stdout.')) -> None |
 | serve | function | def serve(host: str = typer.Option('127.0.0.1', '--host', help='Host/interface to bind the standalone server to.'), port: int = typer.Option(0, '--port', help='Port to bind (0 = let the OS pick a free port).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Repo id for the standalone view. Defaults to the bundle's index `repo` field (else the current directory name)."), no_open: bool = typer.Option(False, '--no-open', help='Do not open a browser tab (accepted for parity; never auto-opens).')) -> None |
 | settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
-| should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdmon should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
+| should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdx should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
 | staleness | function | def staleness(config: Path = _CONFIG_OPTION, now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade freshness against (default: the current time).'), as_json: bool = typer.Option(False, '--json', help='Emit {findings} as JSON (includes fresh docs).'), fail_on_stale: bool = typer.Option(False, '--fail-on-stale', help='Exit 1 if any document is stale or never reviewed (a review gate).')) -> None |
 | surface | function | def surface(config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help="Dump each document's surface as a JSON list.")) -> None |
 | surface_gaps | function | def surface_gaps(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the issue plan WITHOUT opening an issue (never builds a transport, so no provider env is required).'), provider: str = typer.Option('gitlab', '--provider', help='Issue tracker to open the coverage-gap issue on (gitlab \| github).')) -> None |

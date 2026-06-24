@@ -1,4 +1,4 @@
-# code-doc-monitor — EPIC-2 execution process (binding)
+# custodex — EPIC-2 execution process (binding)
 
 How every vertical slice is built. The **main agent is the orchestrator**; each
 **vertical slice is executed by one subagent** with a lean, isolated context.
@@ -21,18 +21,18 @@ A slice is DONE only when ALL hold:
    ```bash
    .venv/bin/ruff format --check .
    .venv/bin/ruff check .
-   .venv/bin/mypy code_doc_monitor
-   .venv/bin/pytest -q --cov=code_doc_monitor --cov-branch
+   .venv/bin/mypy custodex
+   .venv/bin/pytest -q --cov=custodex --cov-branch
    ```
    ruff + mypy clean; suite green; coverage ≥ 90% (the `fail_under` gate).
 5. **Constraints upheld.** All of K0–K10 (CONSTRAINTS.md). If a slice needs a new
    binding rule, it appends it as **K11+** to CONSTRAINTS.md in the same slice and
    cites it.
 6. **Dogfood re-healed.** Any change to a tracked module drifts `docs/api/*`;
-   run `cdmon monitor --apply --config config/cdmon` (cdmon's canonical
+   run `cdx monitor --apply --config config/cdmon` (cdmon's canonical
    self-config is the CONFIG-V2 dir layout since Z-02 removed the redundant root
-   `cdmon.yaml`; `--config` may be omitted — it auto-detects) so `cdmon check`
-   and `cdmon lint` exit 0 before claiming done. (See the dogfood-reheal memory.)
+   `cdmon.yaml`; `--config` may be omitted — it auto-detects) so `cdx check`
+   and `cdx lint` exit 0 before claiming done. (See the dogfood-reheal memory.)
 7. **Records updated.** The subagent appends:
    - a STATUS.md row (slice, status, evidence, notes);
    - a LESSON_LEARNT.md entry **whenever** something was non-obvious, a limitation
@@ -93,7 +93,7 @@ documented, never incidental.
    specific source/test files named in your spec.
 2. Run the gate once to confirm a green baseline before you start.
 3. TDD the slice in the Ralph loop above.
-4. Re-heal the dogfood; confirm `cdmon check` + `cdmon lint` exit 0.
+4. Re-heal the dogfood; confirm `cdx check` + `cdx lint` exit 0.
 5. Run the full gate; paste the evidence.
 6. Append STATUS row + LESSON entries (+ a problems note if warranted).
 7. Report back: what changed, the gate evidence, and anything the next slice

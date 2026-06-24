@@ -3,31 +3,31 @@
 # stem ("server"), or load_unit_file raises a loud ConfigError (K8).
 cdmon-config-version: "2.0.0"
 unit: server
-title: "code-doc-monitor central server"
+title: "custodex central server"
 owner: cdmon-team
 created: "2026-06-07"
 updated: "2026-06-07"
 ---
 # Body: the coverage scope this unit owns + the document it carries.
 
-# Nested under the core unit's code_doc_monitor: every .py under
-# code_doc_monitor/server is attributed HERE (deepest-wins, Z-01a).
+# Nested under the core unit's custodex: every .py under
+# custodex/server is attributed HERE (deepest-wins, Z-01a).
 dir-covered:
-  - code_doc_monitor/server
+  - custodex/server
 
 source-files-format:
   - ".py"
 
 documents:
   # The central server (EPIC G): FastAPI app + store + SQLAlchemy db layer, plus
-  # the per-repo standalone app (`cdmon serve`, L-01).
+  # the per-repo standalone app (`cdx serve`, L-01).
   - id: server
     path: docs/api/server.md
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/server/app.py
-      - path: code_doc_monitor/server/store.py
-      - path: code_doc_monitor/server/db.py
-      - path: code_doc_monitor/server/edits.py
-      - path: code_doc_monitor/server/standalone.py
+      - path: custodex/server/app.py
+      - path: custodex/server/store.py
+      - path: custodex/server/db.py
+      - path: custodex/server/edits.py
+      - path: custodex/server/standalone.py

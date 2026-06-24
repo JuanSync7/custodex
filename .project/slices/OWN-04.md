@@ -42,7 +42,7 @@ Store-parity (InMemoryStore + SqlStore), offline SQLite + `pg` twin.
 `server/*`, `configsync.py`, `store.py`, `db.py` tracked → reheal `docs/api/*`.
 Add **FEAT-OWNERSHIP-005** (roster mirror tables/migration), **-006** (admin-token
 roster routes), **-007** (computed `/ownership` view + cascade) to the catalog +
-DEMOS cases + tagged tests; `cdmon wiki`; `cdmon trace --fail-on-gap` exit 0.
+DEMOS cases + tagged tests; `cdx wiki`; `cdx trace --fail-on-gap` exit 0.
 
 ## Constraints
 K0 (`[server]` extra, lazy), K4 (offline SQLite default; `pg` opt-in), K5 (orphan

@@ -3,7 +3,7 @@ cdmon-report-version: 1.0.0
 kind: coverage
 repo: demo-taskflow
 ref: null
-generated-by: cdmon rpt
+generated-by: cdx rpt
 ---
 summary:
   scanned_files: 12

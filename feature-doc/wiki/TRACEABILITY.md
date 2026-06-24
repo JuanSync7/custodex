@@ -1,6 +1,6 @@
-# code-doc-monitor — feature traceability
+# custodex — feature traceability
 
-Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdmon trace` (R-07 `cdmon wiki`) to regenerate.
+Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
 **222 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 

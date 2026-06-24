@@ -34,11 +34,11 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import load_config
-from code_doc_monitor.extract import build_document_surface
-from code_doc_monitor.heal import regenerate_regions
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.schema import Verdict
+from custodex.config import load_config
+from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions
+from custodex.monitor import Monitor
+from custodex.schema import Verdict
 
 pytestmark = pytest.mark.live_llm
 
@@ -62,7 +62,7 @@ def mul(a: int, b: int) -> int:
 _DOC_STUB = """\
 # tiny module — engineering reference
 
-> Auto-maintained by code-doc-monitor. The prose is human; the table below is
+> Auto-maintained by custodex. The prose is human; the table below is
 > generated from the code and kept in sync.
 
 <!-- CDM:BEGIN symbols -->

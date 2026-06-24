@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.backends (CDM-05).
+"""Tests for custodex.backends (CDM-05).
 
 Backends are pluggable and offline by default (K4): the default is the
 deterministic ``MockBackend`` (no network, no LLM). The ``claude-code`` and
@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from code_doc_monitor.backends import (
+from custodex.backends import (
     ApiBackend,
     Backend,
     BackendResult,
@@ -28,12 +28,12 @@ from code_doc_monitor.backends import (
     make_backend,
     parse_backend_json,
 )
-from code_doc_monitor.blocks import expected_region
-from code_doc_monitor.config import Audience, BackendConfig, RegionMode
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.errors import BackendError
-from code_doc_monitor.extract import DocumentSurface, Symbol
-from code_doc_monitor.schema import ProposedFix, Verdict
+from custodex.blocks import expected_region
+from custodex.config import Audience, BackendConfig, RegionMode
+from custodex.drift import Drift, DriftKind
+from custodex.errors import BackendError
+from custodex.extract import DocumentSurface, Symbol
+from custodex.schema import ProposedFix, Verdict
 
 
 # ---------------------------------------------------------------------------
@@ -437,7 +437,7 @@ def test_claude_code_default_runner_built_lazily(
 ) -> None:
     # When no runner is injected, propose() builds a stdlib subprocess runner.
     # We stub subprocess.run so the lazy-build branch runs with NO real process.
-    import code_doc_monitor.backends as backends_mod
+    import custodex.backends as backends_mod
 
     class FakeCompleted:
         def __init__(self) -> None:
@@ -462,7 +462,7 @@ def test_claude_code_default_runner_built_lazily(
 def test_claude_code_default_runner_nonzero_exit_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import code_doc_monitor.backends as backends_mod
+    import custodex.backends as backends_mod
 
     class FakeCompleted:
         def __init__(self) -> None:
@@ -542,7 +542,7 @@ def test_api_backend_default_client_built_when_key_present(
 ) -> None:
     # With the key present the default client is built; stub its leaf call so no
     # network runs (K4) yet the lazy-build branch is covered.
-    import code_doc_monitor.backends as backends_mod
+    import custodex.backends as backends_mod
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     posted: list[str] = []
@@ -586,8 +586,8 @@ def test_make_backend_api_uses_default_model_when_unset() -> None:
 # D-04 — FixRequest.exemplars is additive; MockBackend + build_prompt ignore it
 # ---------------------------------------------------------------------------
 def _exemplar(record_id: str = "ex1", *, resolved_text: str | None = None):
-    from code_doc_monitor.schema import Resolution, ResolutionRecord, ReviewRecord
-    from code_doc_monitor.similar import Exemplar
+    from custodex.schema import Resolution, ResolutionRecord, ReviewRecord
+    from custodex.similar import Exemplar
 
     rec = ReviewRecord(
         record_id=record_id,
@@ -731,7 +731,7 @@ def test_fix_request_region_mode_defaults_generated() -> None:
 # ---------------------------------------------------------------------------
 def _req_with_context(refs, *, repo_root=None) -> FixRequest:
     """A FixRequest carrying ``context_refs`` (and an optional repo_root)."""
-    from code_doc_monitor.config import ContextRef
+    from custodex.config import ContextRef
 
     base = _req()
     return base.model_copy(

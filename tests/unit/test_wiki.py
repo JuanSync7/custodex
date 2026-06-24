@@ -1,4 +1,4 @@
-"""Unit tests for the ``cdmon wiki`` regeneration engine (EPIC R, R-08).
+"""Unit tests for the ``cdx wiki`` regeneration engine (EPIC R, R-08).
 
 Features: FEAT-REFERENCE-007
 """
@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.traceability import build_matrix
-from code_doc_monitor.wiki import WIKI_TARGETS, regenerate
+from custodex.traceability import build_matrix
+from custodex.wiki import WIKI_TARGETS, regenerate
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -45,7 +45,7 @@ def test_committed_wikis_are_fresh() -> None:
     """``regenerate(write=False)`` over the real repo reports nothing stale.
 
     The committed artifacts on disk must match a fresh render (R-08 ran
-    ``cdmon wiki`` to regenerate them).
+    ``cdx wiki`` to regenerate them).
 
     Features: FEAT-REFERENCE-007
     """
@@ -133,7 +133,7 @@ def test_new_reference_feature_keeps_the_matrix_complete() -> None:
 
     Features: FEAT-REFERENCE-007
     """
-    from code_doc_monitor.featurecatalog import load_catalog
+    from custodex.featurecatalog import load_catalog
 
     catalog = load_catalog(REPO_ROOT / "feature-doc" / "catalog")
     matrix = build_matrix(
@@ -149,14 +149,14 @@ def _seed_repo(root: Path) -> None:
     """Seed ``root`` with the source dirs the renders read (catalog/tests/demo/pkg).
 
     The renders read ``feature-doc/catalog``, ``tests``, ``demo``, and
-    ``code_doc_monitor`` relative to the given repo root; symlinking them lets a
+    ``custodex`` relative to the given repo root; symlinking them lets a
     write-mode regenerate target a throwaway ``feature-doc/wiki`` without touching
     the committed tree.
     """
     (root / "feature-doc").mkdir(parents=True, exist_ok=True)
     (root / "feature-doc" / "catalog").symlink_to(REPO_ROOT / "feature-doc" / "catalog")
     (root / "feature-doc" / "FEATURES.md").touch()
-    for name in ("tests", "demo", "code_doc_monitor"):
+    for name in ("tests", "demo", "custodex"):
         (root / name).symlink_to(REPO_ROOT / name)
 
 

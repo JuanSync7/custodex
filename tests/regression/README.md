@@ -52,7 +52,7 @@ unlisted-engine-module-is-a-gap case).
 |------|--------|-----------|
 | `test_self_coverage_meets_committed_threshold` | **[H-02]** | engine public-symbol self-coverage stays ≥ the committed 95% floor |
 | `test_every_coverage_waiver_carries_a_reason` | **[H-02/A-04]** | every coverage waiver justifies itself (losslessness explicit) |
-| `test_unlisted_engine_module_is_detected_as_a_gap` | **[H-01/H-04]** | an UNLISTED `code_doc_monitor/**` module's public symbol is detected as a gap and DROPS self-coverage |
+| `test_unlisted_engine_module_is_detected_as_a_gap` | **[H-01/H-04]** | an UNLISTED `custodex/**` module's public symbol is detected as a gap and DROPS self-coverage |
 | `test_dogfood_docs_are_in_sync` | **[CDM-07]** | the checked-in docs match the checked-in code (in-sync re-assertion) |
 | `test_dogfood_docs_conform_to_layout_standard` | **[CDM-08]** | the checked-in docs satisfy the machine-checked Layout Standard |
 | `test_dogfood_self_heals_on_a_copy` | **[CDM-07]** | the full self-heal LOOP works on the real project (on a temp copy) |

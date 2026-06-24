@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.similar (D-03 — pure, deterministic — K0/K10).
+"""Tests for custodex.similar (D-03 — pure, deterministic — K0/K10).
 
 `rank_similar` retrieves the N most-similar PAST RESOLVED records to a target
 drift, with a deterministic feature-match score and a total-order tie-break. No
@@ -11,15 +11,15 @@ from __future__ import annotations
 
 from pydantic import ValidationError
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.schema import (
+from custodex.config import Audience
+from custodex.schema import (
     ProposedFix,
     Resolution,
     ResolutionRecord,
     ReviewRecord,
     Verdict,
 )
-from code_doc_monitor.similar import Exemplar, rank_similar
+from custodex.similar import Exemplar, rank_similar
 
 
 def _record(

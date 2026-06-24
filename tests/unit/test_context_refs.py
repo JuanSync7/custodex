@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     ContextRef,
     DocumentSpec,
@@ -23,7 +23,7 @@ from code_doc_monitor.config import (
     load_bundle,
     load_unit_file,
 )
-from code_doc_monitor.errors import ConfigError
+from custodex.errors import ConfigError
 
 _FM = (
     "---\n"
@@ -46,23 +46,23 @@ def _write_unit(tmp_path: Path, body: str, stem: str = "core") -> Path:
 def test_context_refs_loads_into_document_spec(tmp_path: Path) -> None:
     """A ``documents[].context_refs`` list parses into ``DocumentSpec.context_refs``."""
     body = (
-        "dir-covered:\n  - code_doc_monitor\n"
+        "dir-covered:\n  - custodex\n"
         "source-files-format:\n  - .py\n"
         "documents:\n"
         "  - id: foundation\n"
         "    path: docs/foundation.md\n"
         "    audience: eng-guide\n"
-        "    code_refs:\n      - path: code_doc_monitor/config.py\n"
+        "    code_refs:\n      - path: custodex/config.py\n"
         "    context_refs:\n"
         "      - path: docs/api/index.md\n"
         '        note: "the landing page"\n'
-        "      - path: code_doc_monitor/errors.py\n"
+        "      - path: custodex/errors.py\n"
     )
     unit = load_unit_file(_write_unit(tmp_path, body))
     doc = unit.documents[0]
     assert doc.context_refs == (
         ContextRef(path="docs/api/index.md", note="the landing page"),
-        ContextRef(path="code_doc_monitor/errors.py", note=None),
+        ContextRef(path="custodex/errors.py", note=None),
     )
 
 
@@ -82,7 +82,7 @@ def test_default_context_refs_is_empty() -> None:
 def test_duplicate_context_refs_path_is_loud(tmp_path: Path) -> None:
     """Two ``context_refs`` with the same path in one document → ConfigError (K8)."""
     body = (
-        "dir-covered:\n  - code_doc_monitor\n"
+        "dir-covered:\n  - custodex\n"
         "source-files-format:\n  - .py\n"
         "documents:\n"
         "  - id: foundation\n"
@@ -107,15 +107,15 @@ def _bundle_dir(tmp_path: Path, unit_body: str) -> Path:
         "---\n"
         'cdmon-config-version: "2.0.0"\n'
         'repo: "demo"\n'
-        "generated-by: cdmon\n"
+        "generated-by: cdx\n"
         'updated: "2026-06-07"\n'
         "---\n"
         'root: "../.."\n'
         "units:\n  - file: core.yaml\n",
         encoding="utf-8",
     )
-    # Make code_doc_monitor a real dir under repo root so coverage globs resolve.
-    (tmp_path / "code_doc_monitor").mkdir()
+    # Make custodex a real dir under repo root so coverage globs resolve.
+    (tmp_path / "custodex").mkdir()
     return cfg
 
 
@@ -126,18 +126,18 @@ def test_context_refs_do_not_affect_coverage(tmp_path: Path) -> None:
     the derived coverage include/exclude/waive must be byte-identical.
     """
     without = (
-        "dir-covered:\n  - code_doc_monitor\n"
+        "dir-covered:\n  - custodex\n"
         "source-files-format:\n  - .py\n"
         "documents:\n"
         "  - id: foundation\n"
         "    path: docs/foundation.md\n"
         "    audience: eng-guide\n"
-        "    code_refs:\n      - path: code_doc_monitor/config.py\n"
+        "    code_refs:\n      - path: custodex/config.py\n"
     )
     with_refs = without + (
         "    context_refs:\n"
         "      - path: docs/api/index.md\n"
-        "      - path: code_doc_monitor/errors.py\n"
+        "      - path: custodex/errors.py\n"
     )
 
     cfg_a = _bundle_dir(tmp_path / "a", without)

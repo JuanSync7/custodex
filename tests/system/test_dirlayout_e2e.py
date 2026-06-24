@@ -2,10 +2,10 @@
 
 This is the test whose ABSENCE hid the N-06 repo-root divergence: the per-slice
 N-01..N-05 tests exercised the loader/merge/coverage-derivation but never drove
-``detect()`` / ``cdmon check`` / ``cdmon monitor --apply`` / ``cdmon coverage``
+``detect()`` / ``cdx check`` / ``cdx monitor --apply`` / ``cdx coverage``
 through the dir-layout resolution path against REAL on-disk source + docs. With
 the old divergent formula (``Monitor.root = config_dir / config.root`` resolving
-``config/cdmon/..`` = ``<repo>/config``) ``cdmon check`` looked for code under
+``config/cdmon/..`` = ``<repo>/config``) ``cdx check`` looked for code under
 ``config/cdmon/../pkg`` and could never find it. This test builds a true on-disk
 dir-layout repo and asserts the whole pipeline resolves code + docs under the
 REAL repo root (``<repo>``), heals idempotently (K7), and reports correct
@@ -27,8 +27,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import (
+from custodex.cli import app
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
@@ -36,8 +36,8 @@ from code_doc_monitor.config import (
     load_config_dir,
     resolve_repo_root,
 )
-from code_doc_monitor.drift import detect
-from code_doc_monitor.monitor import Monitor
+from custodex.drift import detect
+from custodex.monitor import Monitor
 
 runner = CliRunner()
 
@@ -49,7 +49,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: e2e-demo
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -147,7 +147,7 @@ def _build_repo(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _seed_in_sync(cfg_dir: Path) -> None:
-    """Heal the docs to a clean baseline via ``cdmon monitor --apply``."""
+    """Heal the docs to a clean baseline via ``cdx monitor --apply``."""
     result = runner.invoke(app, ["monitor", "--config", str(cfg_dir), "--apply"])
     assert result.exit_code == 0, result.output
 
@@ -186,7 +186,7 @@ def test_monitor_root_under_true_repo_for_dir_layout(tmp_path: Path) -> None:
 
 
 def test_clean_repo_detects_no_drift(tmp_path: Path) -> None:
-    """After seeding, ``detect()`` and ``cdmon check`` agree: zero drift."""
+    """After seeding, ``detect()`` and ``cdx check`` agree: zero drift."""
     repo, cfg = _build_repo(tmp_path)
     _seed_in_sync(cfg)
 
@@ -213,7 +213,7 @@ def test_code_edit_drifts_then_heals_idempotently(tmp_path: Path) -> None:
     assert not report.ok, "a code edit under the repo root must drift"
     assert {d.doc_id for d in report.drifts} == {"api-guide"}
 
-    # cdmon check sees the drift (exit 1).
+    # cdx check sees the drift (exit 1).
     check1 = runner.invoke(app, ["check", "--config", str(cfg)])
     assert check1.exit_code == 1, check1.output
 
@@ -239,7 +239,7 @@ def test_code_edit_drifts_then_heals_idempotently(tmp_path: Path) -> None:
 
 
 def test_coverage_resolves_code_under_true_repo_root(tmp_path: Path) -> None:
-    """``cdmon coverage`` scans pkg/ under the repo root and reports correct %.
+    """``cdx coverage`` scans pkg/ under the repo root and reports correct %.
 
     With the old divergent formula coverage scanned the wrong directory; here
     ``pkg/calc.py`` is documented (api-guide), ``pkg/_gen.py`` is waived, so file

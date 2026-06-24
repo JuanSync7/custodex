@@ -1,6 +1,6 @@
-"""Generate a genbuild cdmon.yaml + migrate its docs into cdmon format.
+"""Generate a genbuild cdmon.yaml + migrate its docs into cdx format.
 
-Run with the code-doc-monitor venv python. Discovers genbuild plugins by the
+Run with the custodex venv python. Discovers genbuild plugins by the
 SAME signature rule docsync used (functions whose positional args are
 [all_fileset, tool, view_name]), reads the companion-tool registry, and emits:
 
@@ -22,11 +22,11 @@ import yaml
 GB = Path("/home/Juan.Kok/my_rnd/genbuild_test/local_genbuild")
 SRC = GB / "docs" / "userguide" / "src"
 DST = GB / "docs" / "userguide" / "cdmon-src"
-DST_REL = "docs/userguide/cdmon-src"  # relative to GB (the cdmon root)
+DST_REL = "docs/userguide/cdmon-src"  # relative to GB (the cdx root)
 
-# code-doc-monitor's extractor (installed in this venv)
+# custodex's extractor (installed in this venv)
 sys.path.insert(0, "/home/Juan.Kok/my_rnd/code-doc-monitor")
-from code_doc_monitor.extract import extract_file  # noqa: E402
+from custodex.extract import extract_file  # noqa: E402
 
 PLUGIN_SIG = ("all_fileset", "tool", "view_name")
 
@@ -182,7 +182,7 @@ def build_config(plugins: list[dict]) -> dict:
         )
 
     # index (static landing page: no managed regions, no code refs).
-    # index=True makes `cdmon lint` assert it links every other doc, so a
+    # index=True makes `cdx lint` assert it links every other doc, so a
     # plugin/tool added to the config without a landing-page link is caught.
     # The index renders as a headingless link at the top of the sidebar (no
     # nav_section), labelled as the guide home.
@@ -207,7 +207,7 @@ def build_config(plugins: list[dict]) -> dict:
 
 
 def migrate_doc(src_path: Path, dst_path: Path, audience: str) -> None:
-    """Copy a docsync doc to cdmon format: cdm front matter + CDM markers."""
+    """Copy a docsync doc to cdx format: cdm front matter + CDM markers."""
     raw = src_path.read_text(encoding="utf-8")
     # strip docsync front matter (--- ... ---) entirely; keep the body
     body = raw
@@ -273,7 +273,7 @@ def migrate_index(plugins: list[dict]) -> None:
         "`genbuild --tool`.\n\n"
         "> Every page exists in two forms: a human-friendly **.html** build and "
         "the\n> **.md** source (ideal for an LLM). Both are generated from — and "
-        "kept in sync\n> with — the genbuild source code by `code-doc-monitor`, "
+        "kept in sync\n> with — the genbuild source code by `custodex`, "
         "so the human and LLM\n> versions can never disagree, and a plugin or "
         "flag change that outdates the docs\n> is caught immediately.\n\n"
     )

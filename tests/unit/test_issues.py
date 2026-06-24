@@ -19,16 +19,16 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor import inventory
-from code_doc_monitor.config import (
+from custodex import inventory
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.coverage import resolve_coverage, suggest_owners
-from code_doc_monitor.errors import TransportError
-from code_doc_monitor.issues import (
+from custodex.coverage import resolve_coverage, suggest_owners
+from custodex.errors import TransportError
+from custodex.issues import (
     GitHubIssueTransport,
     GitLabIssueTransport,
     IssuePlan,
@@ -218,7 +218,7 @@ def test_gitlab_submit_posts_issue_via_injected_http(tmp_path: Path) -> None:
 def test_gitlab_builds_default_http_leaf_without_network(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import code_doc_monitor.issues as issues_mod
+    import custodex.issues as issues_mod
 
     posted: list[str] = []
 
@@ -304,7 +304,7 @@ def test_github_submit_posts_issue_via_injected_http(tmp_path: Path) -> None:
 def test_github_builds_default_http_leaf_without_network(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import code_doc_monitor.issues as issues_mod
+    import custodex.issues as issues_mod
 
     posted: list[str] = []
 

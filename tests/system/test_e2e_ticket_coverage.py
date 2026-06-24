@@ -7,7 +7,7 @@ WHOLE vertical the way a real client would:
    ``test_system.py``) is healed to a clean baseline, the public signature is
    moved, and ``Monitor.run`` produces ``ReviewRecord``\\s each carrying a
    non-None structured ``ticket`` (T-01).
-2. A :class:`~code_doc_monitor.coverage.CoverageReport` is resolved over the same
+2. A :class:`~custodex.coverage.CoverageReport` is resolved over the same
    fixture (one documented file + one undocumented file) and projected to the
    wire ``coverage_snapshot`` dict with its per-file ``files`` list (T-02).
 3. The FastAPI app (``create_app(InMemoryStore())``) is exercised through
@@ -41,22 +41,22 @@ from tests._repo import REPO_ROOT
 fastapi = pytest.importorskip("fastapi")  # the [server] extra (K0)
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.config import (  # noqa: E402
+from custodex.config import (  # noqa: E402
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.coverage import (  # noqa: E402
+from custodex.coverage import (  # noqa: E402
     coverage_snapshot,
     resolve_coverage,
 )
-from code_doc_monitor.extract import build_document_surface  # noqa: E402
-from code_doc_monitor.heal import regenerate_regions  # noqa: E402
-from code_doc_monitor.inventory import discover_files, discover_symbols  # noqa: E402
-from code_doc_monitor.monitor import Monitor  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
+from custodex.extract import build_document_surface  # noqa: E402
+from custodex.heal import regenerate_regions  # noqa: E402
+from custodex.inventory import discover_files, discover_symbols  # noqa: E402
+from custodex.monitor import Monitor  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
 
 _NOW = "2026-06-01T00:00:00Z"
 _REPO_ID = "acme-demo"
@@ -228,7 +228,7 @@ def test_seed_demo_builds_a_populated_store() -> None:
     store = seed.build_seeded_store()
 
     repos = store.list_repos()
-    # The demo seeds the two REAL repos (the dogfood `code-doc-monitor` + the
+    # The demo seeds the two REAL repos (the dogfood `custodex` + the
     # `demo-taskflow` adopter); the synthetic `acme-*` placeholders were removed.
     assert len(repos) >= 2, "the real demo repos are registered"
 

@@ -1,15 +1,15 @@
 ---
 # Frontmatter (REQUIRED): repo identity + provenance.
 cdmon-config-version: "2.0.0"
-repo: "code-doc-monitor"
-generated-by: cdmon
+repo: "custodex"
+generated-by: cdx
 updated: "2026-06-13T03:21:56.707870+00:00"
 ---
-# code-doc-monitor's own configuration (dir layout) — it monitors ITS OWN source
+# custodex's own configuration (dir layout) — it monitors ITS OWN source
 # against its own engineering docs (dogfooding the CONFIG-V2 multi-file layout).
 # `schema.py` is a SHARED file: the `foundation` doc references just its public
 # verdict/fix types (sub-file `symbols` selection), while the `remediation` doc
-# references the whole module. Run `cdmon check` to see drift, `cdmon monitor
+# references the whole module. Run `cdx check` to see drift, `cdx monitor
 # --apply` to auto-close it. Mirrors the root `cdmon.yaml` exactly.
 
 # Repo root RELATIVE TO this config directory. config/cdmon/ sits two levels
@@ -50,36 +50,36 @@ region_templates:
 # and the % reflects real intent.
 coverage:
   waive:
-    - path: "code_doc_monitor/__init__.py"
+    - path: "custodex/__init__.py"
       reason: "re-export aggregator; symbols documented in their home modules"
-    - path: "code_doc_monitor/agent/__init__.py"
+    - path: "custodex/agent/__init__.py"
       reason: "re-export aggregator; symbols documented in agent-workflow doc"
-    - path: "code_doc_monitor/server/__init__.py"
+    - path: "custodex/server/__init__.py"
       reason: "re-export aggregator; symbols documented in server doc"
-    - path: "code_doc_monitor/featurecatalog.py"
-      reason: "EPIC R golden catalog; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
-    - path: "code_doc_monitor/traceability.py"
-      reason: "EPIC R traceability; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
-    - path: "code_doc_monitor/testwiki.py"
-      reason: "EPIC R test wiki; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
-    - path: "code_doc_monitor/srcindex.py"
-      reason: "EPIC R source index; documented in feature-doc/, api doc owned by R-07 cdmon wiki"
-    - path: "code_doc_monitor/wiki.py"
-      reason: "EPIC R wiki regeneration; documented in feature-doc/, api doc owned by R-08 cdmon wiki"
-    - path: "code_doc_monitor/ownership.py"
-      reason: "EPIC OWN ownership/accountability core; documented in feature-doc/catalog/ownership.yaml (api doc owned by cdmon wiki)"
-    - path: "code_doc_monitor/settings.py"
-      reason: "EPIC SVR operator runtime settings core; documented in feature-doc/catalog/settings.yaml (api doc owned by cdmon wiki)"
-    - path: "code_doc_monitor/staleness.py"
-      reason: "EPIC SLA staleness/review-SLA core; documented in feature-doc/catalog/staleness.yaml (api doc owned by cdmon wiki)"
+    - path: "custodex/featurecatalog.py"
+      reason: "EPIC R golden catalog; documented in feature-doc/, api doc owned by R-07 cdx wiki"
+    - path: "custodex/traceability.py"
+      reason: "EPIC R traceability; documented in feature-doc/, api doc owned by R-07 cdx wiki"
+    - path: "custodex/testwiki.py"
+      reason: "EPIC R test wiki; documented in feature-doc/, api doc owned by R-07 cdx wiki"
+    - path: "custodex/srcindex.py"
+      reason: "EPIC R source index; documented in feature-doc/, api doc owned by R-07 cdx wiki"
+    - path: "custodex/wiki.py"
+      reason: "EPIC R wiki regeneration; documented in feature-doc/, api doc owned by R-08 cdx wiki"
+    - path: "custodex/ownership.py"
+      reason: "EPIC OWN ownership/accountability core; documented in feature-doc/catalog/ownership.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/settings.py"
+      reason: "EPIC SVR operator runtime settings core; documented in feature-doc/catalog/settings.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/staleness.py"
+      reason: "EPIC SLA staleness/review-SLA core; documented in feature-doc/catalog/staleness.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
-# *.yaml unit on disk MUST be listed (run `cdmon index` to regenerate). The three
-# code_doc_monitor units use Z-01a deepest-wins attribution: a file under
-# code_doc_monitor/agent belongs to the `agent` unit, one under
-# code_doc_monitor/server to `server`, and the rest to `core`. The `tests` unit
+# *.yaml unit on disk MUST be listed (run `cdx index` to regenerate). The three
+# custodex units use Z-01a deepest-wins attribution: a file under
+# custodex/agent belongs to the `agent` unit, one under
+# custodex/server to `server`, and the rest to `core`. The `tests` unit
 # covers tests/smoke (the test→test-doc mirror, FEAT-CONFIGV2-017).
 units:
   - file: agent.yaml

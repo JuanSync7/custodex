@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.promotion (D-05/D-06 — pure detector + rule app).
+"""Tests for custodex.promotion (D-05/D-06 — pure detector + rule app).
 
 `detect_promotions` mines the review log joined to the resolutions log for a
 GENERALIZABLE shape `(doc_id, drift_kind, audience)` whose RESOLVED records >= K
@@ -15,16 +15,16 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.drift import Drift, DriftKind
-from code_doc_monitor.promotion import (
+from custodex.config import Audience
+from custodex.drift import Drift, DriftKind
+from custodex.promotion import (
     PromotionCandidate,
     PromotionRule,
     detect_promotions,
     rule_for,
     rule_from_candidate,
 )
-from code_doc_monitor.schema import (
+from custodex.schema import (
     Resolution,
     ResolutionRecord,
     ReviewRecord,

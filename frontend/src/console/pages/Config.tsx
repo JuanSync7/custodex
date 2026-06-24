@@ -63,7 +63,7 @@ export function Config({ api = apiClient }: ConfigProps) {
     <section>
       {head}
       <p className="config-intro">
-        A repo describes itself to <code>cdmon</code> under{" "}
+        A repo describes itself to <code>cdx</code> under{" "}
         <code>config/cdmon/</code>: an <code>index.yaml</code> lists the documents
         and the code they own, one <code>*.yaml</code> per unit groups related
         code surfaces, <code>ignore.yaml</code> excludes paths from coverage, and{" "}

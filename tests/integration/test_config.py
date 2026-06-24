@@ -14,8 +14,8 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from code_doc_monitor import inventory
-from code_doc_monitor.config import (
+from custodex import inventory
+from custodex.config import (
     CONFIG_TEMPLATE,
     Audience,
     BackendConfig,
@@ -28,7 +28,7 @@ from code_doc_monitor.config import (
     load_config,
     write_template,
 )
-from code_doc_monitor.errors import CodeDocMonitorError, ConfigError
+from custodex.errors import CodeDocMonitorError, ConfigError
 
 # A minimal but complete config dict used across loader tests.
 VALID_CONFIG: dict = {

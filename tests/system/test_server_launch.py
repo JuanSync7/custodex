@@ -1,10 +1,10 @@
 """Production store selection + persistence — ``store_from_env`` (E-04 launch wiring).
 
-The central server's production launch (``cdmon-server`` -> ``server.app:main``) must
+The central server's production launch (``cdx-server`` -> ``server.app:main``) must
 PERSIST: a restart cannot lose ingested records. ``store_from_env`` is the seam that
 makes that real — it reads ``$CDMON_DATABASE_URL`` and, when set, MIGRATES the schema
 to head (Alembic, the prod path) and returns a persistent
-:class:`~code_doc_monitor.server.db.SqlStore`; when unset it falls back to a transient
+:class:`~custodex.server.db.SqlStore`; when unset it falls back to a transient
 :class:`InMemoryStore` with a LOUD warning (K8) so an operator is never silently
 surprised by vanished data.
 
@@ -37,15 +37,15 @@ pytest.importorskip("alembic", reason="the [server] extra (alembic) is not insta
 
 from sqlalchemy import create_engine, inspect  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.schema import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.schema import (  # noqa: E402
     ProposedFix,
     ReviewRecord,
     Verdict,
 )
-from code_doc_monitor.server import InMemoryStore, store_from_env  # noqa: E402
-from code_doc_monitor.server.db import SqlStore  # noqa: E402
-from code_doc_monitor.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
+from custodex.server import InMemoryStore, store_from_env  # noqa: E402
+from custodex.server.db import SqlStore  # noqa: E402
+from custodex.sinks import IngestEnvelope, RepoIdentity  # noqa: E402
 
 _ENV = "CDMON_DATABASE_URL"
 
@@ -90,7 +90,7 @@ def test_store_from_env_unset_is_in_memory_and_warns(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     monkeypatch.delenv(_ENV, raising=False)
-    with caplog.at_level(logging.WARNING, logger="code_doc_monitor.server"):
+    with caplog.at_level(logging.WARNING, logger="custodex.server"):
         store = store_from_env()
     assert isinstance(store, InMemoryStore)
     # the operator is told, loudly, that data is ephemeral.
@@ -156,7 +156,7 @@ def test_ingested_data_survives_a_restart_through_http(
 ) -> None:
     from fastapi.testclient import TestClient
 
-    from code_doc_monitor.server import create_app
+    from custodex.server import create_app
 
     url = f"sqlite:///{tmp_path / 'cdmon.db'}"
     monkeypatch.setenv(_ENV, url)

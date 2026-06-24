@@ -199,7 +199,7 @@ features:
       refreshes its fingerprint. To keep an eng-only api-index from being forced
       to list such a user-guide README, the INDEX_INCOMPLETE lint honors the index
       region's audience kind, so an index need only link the documents it renders.
-      cdmon dogfoods this on its own README.md.
+      cdx dogfoods this on its own README.md.
     subsystem: configv2
     modules: [config, drift, layout]
     constraints: [K0, K2, K3, K5, K10]
@@ -217,7 +217,7 @@ features:
       against it, never the reverse (K2); editing or renaming a test drifts its
       test-doc and records a ReviewRecord for a human (K5), and monitor --apply
       heals it idempotently (K7). The demo maps all four of its test files to
-      test-docs 1:1, and cdmon dogfoods the pattern on its own tests/smoke
+      test-docs 1:1, and cdx dogfoods the pattern on its own tests/smoke
       boundary; the console surfaces test-docs in a dedicated Test docs section on
       the Documents, Drift, and Mapping pages.
     subsystem: configv2

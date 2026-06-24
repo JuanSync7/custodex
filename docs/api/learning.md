@@ -1,7 +1,31 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 532590dbc66e0562
+  fingerprint: 93ad666b19d8ff9b
+  fingerprint_tiers:
+    composite: 93ad666b19d8ff9b
+    docstring: c11480ba5c086afc
+    signature: 5ddbb2bcc208cac9
+  region_anchors:
+    symbols:
+    - 02b23ad449ed3a49
+    - 051af376199dec21
+    - 051af376199dec21
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 4480c844dbf4cd6b
+    - 4a44f6b94fcbe363
+    - 551e873b177b069b
+    - a0aac6e3dbd9712e
+    - a120067e57c16791
+    - bc8ebaa383846735
+    - c6bcf0d16bc94e16
+    - cac98654213bca94
+    - ea19528ca582fa92
+    - ec56a3351cb8de96
+    - f779aad38facd2db
+  region_hashes:
+    symbols: 8a0fa893750738cb
   schema_version: 1.0.0
 ---
 # learning

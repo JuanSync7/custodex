@@ -1,4 +1,4 @@
-"""CDM-01 — tests for `cdmon init`.
+"""CDM-01 — tests for `cdx init`.
 
 Features: FEAT-CLI-001, FEAT-CONFIG-008, FEAT-CONFIG-009, FEAT-CONFIG-010
 Features: FEAT-RECORD-012, FEAT-RECORD-013
@@ -10,9 +10,9 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import CONFIG_TEMPLATE, Audience, load_config
-from code_doc_monitor.sinks import HttpSink, make_sink
+from custodex.cli import app
+from custodex.config import CONFIG_TEMPLATE, Audience, load_config
+from custodex.sinks import HttpSink, make_sink
 
 runner = CliRunner()
 
@@ -62,7 +62,7 @@ def test_init_default_path(tmp_path: Path, monkeypatch) -> None:
 
 
 # --------------------------------------------------------------------------
-# G-01 — `cdmon init --central`
+# G-01 — `cdx init --central`
 # --------------------------------------------------------------------------
 def test_init_without_central_is_byte_identical_template(tmp_path: Path) -> None:
     target = tmp_path / "cdmon.yaml"

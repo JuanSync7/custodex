@@ -1,15 +1,15 @@
 # demo-taskflow — demo ⇄ feature traceability catalog
 
-This is the **demo→feature traceability catalog** for code-doc-monitor. Each
+This is the **demo→feature traceability catalog** for custodex. Each
 `DEMO-NNN` case below is an **observable scenario** — something you can actually
 watch happen, by running a step of `demo/walkthrough.py`, an exact
-`cdmon <cmd> --config demo/config/cdmon` invocation, inspecting a checked-in
+`cdx <cmd> --config demo/config/cdmon` invocation, inspecting a checked-in
 config/doc artifact, or following the documented reproducible steps for an
-opt-in path (a `cdmon serve` + a POST, `scripts/seed_demo.py`, or a live-backend
+opt-in path (a `cdx serve` + a POST, `scripts/seed_demo.py`, or a live-backend
 recipe).
 
 Each case ends with a `Features: <id>[, <id>...]` tag line. Those lines are the
-single source of truth `cdmon trace` scans (`traceability.scan_refs(demo, DEMO)`)
+single source of truth `cdx trace` scans (`traceability.scan_refs(demo, DEMO)`)
 to prove **every catalogued feature is demonstrated by at least one case** (the
 exact count is the header of `feature-doc/FEATURES.md`). The marker `Features:` is
 what makes a `FEAT-id` a reference — a bare mention elsewhere in prose is ignored.
@@ -26,7 +26,7 @@ backend) and the checked-in `demo/config/cdmon` + `demo/docs` tree. Verify the
 mapping with:
 
 ```bash
-cdmon trace --catalog feature-doc/catalog --tests-root tests --demo-root demo
+cdx trace --catalog feature-doc/catalog --tests-root tests --demo-root demo
 ```
 
 Cases are grouped by user journey:
@@ -41,7 +41,7 @@ Cases are grouped by user journey:
 - H. Backends + agent (offline + opt-in)
 - I. Record / log / sinks
 - J. Extractor seam + shell
-- K. Reference & traceability (cdmon documents itself)
+- K. Reference & traceability (cdx documents itself)
 - L. Properties (determinism / authority / fingerprint-tier / anchor invariants)
 - M. Server-side git sync (clone-on-demand + provider credentials, EPIC GIT)
 
@@ -51,12 +51,12 @@ Cases are grouped by user journey:
 
 ### DEMO-001 — Detect drift after a real source edit
 **What it shows.** Editing a tracked source file (a new public `Engine` method)
-moves the eng-guide code surface; `cdmon check` grades every document against its
+moves the eng-guide code surface; `cdx check` grades every document against its
 freshly-built surface, reports the drift as data (a `DriftReport` summary line),
 and exits 1 — without writing anything or calling a backend.
 **How to observe.** `demo/walkthrough.py` step `[1/6]` induces the drift, step
-`[2/6]` runs `cdmon check`; or directly:
-`cdmon check --config demo/config/cdmon` after appending a public method to
+`[2/6]` runs `cdx check`; or directly:
+`cdx check --config demo/config/cdmon` after appending a public method to
 `demo/src/taskflow/core/engine.py`.
 Features: FEAT-CLI-005, FEAT-MONITOR-002, FEAT-DRIFT-001, FEAT-DRIFT-002, FEAT-DRIFT-003, FEAT-DRIFT-010, FEAT-EXTRACT-001, FEAT-EXTRACT-002, FEAT-MANIFEST-001, FEAT-MANIFEST-002, FEAT-MANIFEST-004
 
@@ -67,18 +67,18 @@ classifies the change via the documented symbol anchors — an added public meth
 shows up as an anchor *added* (a structural change), not a pure internal re-bind.
 **How to observe.** Inspect `demo/docs/api/core-api.md` front matter
 (`cdm.fingerprint_tiers`, `cdm.region_anchors`) then run
-`cdmon check --config demo/config/cdmon` after the DEMO-001 edit; the drift detail
+`cdx check --config demo/config/cdmon` after the DEMO-001 edit; the drift detail
 reports the moved tier and the anchor delta.
 Features: FEAT-DRIFT-005, FEAT-DRIFT-006, FEAT-EXTRACT-004, FEAT-EXTRACT-005, FEAT-MANIFEST-005, FEAT-MANIFEST-008
 
 ### DEMO-003 — Heal the drift with the offline mock backend
-**What it shows.** `cdmon monitor --apply` runs the full orchestration loop
+**What it shows.** `cdx monitor --apply` runs the full orchestration loop
 (detect → backend verdict → record → apply FIX → recheck) and regenerates the
 managed `symbols` region from the live code surface using the deterministic mock
-backend — no network, no API key. Re-running `cdmon check` is clean (exit 0): the
+backend — no network, no API key. Re-running `cdx check` is clean (exit 0): the
 recheck-after-apply remaining set is empty, proving convergence.
 **How to observe.** `demo/walkthrough.py` steps `[3/6]` (heal) and `[4/6]`
-(re-check clean); or `cdmon monitor --apply --config demo/config/cdmon`.
+(re-check clean); or `cdx monitor --apply --config demo/config/cdmon`.
 Features: FEAT-CLI-007, FEAT-MONITOR-001, FEAT-MONITOR-003, FEAT-MONITOR-006, FEAT-HEAL-001, FEAT-HEAL-002, FEAT-BACKENDS-001, FEAT-BACKENDS-002, FEAT-BACKENDS-003, FEAT-MANIFEST-003, FEAT-MANIFEST-009
 
 ### DEMO-004 — Heal stamps fingerprint, per-tier digests, region hash and anchors
@@ -87,18 +87,18 @@ truth: the composite `cdm.fingerprint`, the per-tier `cdm.fingerprint_tiers`, th
 per-region `cdm.region_hashes`, and the symbol-table `cdm.region_anchors` — all
 from one fingerprint computation, so heal never stamps a fingerprint `check`
 won't match.
-**How to observe.** After `cdmon monitor --apply --config demo/config/cdmon`,
+**How to observe.** After `cdx monitor --apply --config demo/config/cdmon`,
 read the regenerated `demo/docs/api/core-api.md` front matter; the four `cdm.*`
-blocks are present and a subsequent `cdmon check` is clean.
+blocks are present and a subsequent `cdx check` is clean.
 Features: FEAT-HEAL-006, FEAT-HEAL-007, FEAT-MANIFEST-006, FEAT-MANIFEST-007
 
 ### DEMO-005 — Every verdict is recorded and the review log summarised
 **What it shows.** The heal run records a `ReviewRecord` (a `FIX` verdict with a
 provenance snapshot and a deterministic record id) into the append-only review
-log and emits it to the configured sink; `cdmon report` then summarises the log
+log and emits it to the configured sink; `cdx report` then summarises the log
 by verdict/audience/doc-id.
-**How to observe.** `demo/walkthrough.py` step `[5/6]` (`cdmon report` shows the
-recorded `FIX`); or `cdmon report --config demo/config/cdmon`.
+**How to observe.** `demo/walkthrough.py` step `[5/6]` (`cdx report` shows the
+recorded `FIX`); or `cdx report --config demo/config/cdmon`.
 Features: FEAT-CLI-015, FEAT-MONITOR-004, FEAT-MONITOR-005, FEAT-RECORD-007, FEAT-RECORD-008
 
 ---
@@ -124,10 +124,10 @@ Features: FEAT-SERVER-013, FEAT-RECORD-004, FEAT-HEAL-008, FEAT-HEAL-009, FEAT-M
 **What it shows.** `scheduler.py` is deliberately UNLINKED (the live Mapping-page
 coverage gap). Staging an `add_code_ref` edit linking it to `core-api` and
 applying it with the generate-to-disk engine writes the unit yaml + index and
-heals the doc mechanically (no LLM) over a SCOPED write surface; `cdmon rpt` then
+heals the doc mechanically (no LLM) over a SCOPED write surface; `cdx rpt` then
 no longer lists `scheduler.py` as undocumented — the gap closes live.
 **How to observe.** `demo/walkthrough.py` step `[8/8]` — drives
-`generate.apply_edits_to_disk`; before/after `cdmon rpt --config-dir
+`generate.apply_edits_to_disk`; before/after `cdx rpt --config-dir
 demo/config/cdmon` shows `scheduler.py` leaving the undocumented list.
 Features: FEAT-CONFIGV2-013, FEAT-CONFIGV2-014, FEAT-CONFIGV2-009, FEAT-CONFIGV2-011
 
@@ -148,56 +148,56 @@ Features: FEAT-CONFIG-003, FEAT-BACKENDS-008, FEAT-SERVER-010
 ## D. Coverage + gap → issue / ticket
 
 ### DEMO-009 — Doc coverage report: three baskets and percentages
-**What it shows.** `cdmon coverage` discovers the repo's code files (glob-scoped),
+**What it shows.** `cdx coverage` discovers the repo's code files (glob-scoped),
 attaches each file's symbol inventory, resolves file- and symbol-level ownership
 against the documents' `code_refs`, and reports documented / undocumented / waived
 baskets with file and public-symbol percentages — the two `__init__.py` are waived
 out of the denominator, `scheduler.py` is the one real gap.
-**How to observe.** `cdmon coverage --config demo/config/cdmon` (or `--json`);
+**How to observe.** `cdx coverage --config demo/config/cdmon` (or `--json`);
 `scheduler.py` appears undocumented and the percentages reflect the waivers.
 Features: FEAT-CLI-017, FEAT-COVERAGE-001, FEAT-COVERAGE-003, FEAT-COVERAGE-005, FEAT-COVERAGE-006, FEAT-COVERAGE-007, FEAT-COVERAGE-008, FEAT-COVERAGE-010, FEAT-CONFIG-007
 
 ### DEMO-010 — Glob scoping + a non-source file under a dir-covered directory
 **What it shows.** `core/notes.log` is a deliberate non-source file under a
 `dir-covered` directory: because `source-files-format` is `['.py']` and `*.log`
-is ignored, cdmon never counts it. This exercises the in-house recursive `**`
+is ignored, cdx never counts it. This exercises the in-house recursive `**`
 glob translation and lossless language tagging, and proves a missing/invalid root
 fails loud.
 **How to observe.** Inspect `demo/src/taskflow/core/notes.log` (present but never
 in the coverage universe) and `demo/config/cdmon/ignore.yaml`; run
-`cdmon coverage --config demo/config/cdmon` — `notes.log` is absent from every
+`cdx coverage --config demo/config/cdmon` — `notes.log` is absent from every
 basket.
 Features: FEAT-COVERAGE-002, FEAT-COVERAGE-004
 
 ### DEMO-011 — coverage.rpt: the dir-layout report with suggested units
-**What it shows.** `cdmon rpt` builds the per-unit `coverage.rpt` over the SAME
-coverage facts as `cdmon coverage`, reusing the effective coverage derived from
+**What it shows.** `cdx rpt` builds the per-unit `coverage.rpt` over the SAME
+coverage facts as `cdx coverage`, reusing the effective coverage derived from
 the dir layout. The committed report shows overall 88.9%, `core` 66.67%, `io` 100%,
 `tests` 100%, and lists `scheduler.py` under `undocumented:` with a `suggested_unit`
 of `core`.
 `--write` is byte-stable / idempotent and round-trips through parse.
 **How to observe.** Read the committed `demo/config/cdmon/coverage.rpt`; re-run
-`cdmon rpt --write --config-dir demo/config/cdmon` (byte-identical); test
+`cdx rpt --write --config-dir demo/config/cdmon` (byte-identical); test
 `tests/test_demo_e2e.py::test_demo_rpt_matches_committed_coverage_report`.
 Features: FEAT-CLI-003, FEAT-QUALITY-005, FEAT-QUALITY-006, FEAT-QUALITY-007, FEAT-CONFIGV2-006
 
 ### DEMO-012 — Surface-gaps → a coverage-gap tracker issue (dry-run)
-**What it shows.** `cdmon surface-gaps` turns the `scheduler.py` coverage gap into
+**What it shows.** `cdx surface-gaps` turns the `scheduler.py` coverage gap into
 a tracker issue: it discovers → resolves coverage → suggests an owner for the
 undocumented public symbol → builds an `IssuePlan` grouping gaps under their
 suggested owner. `--dry-run` prints the plan as JSON with no network; the gitlab /
 github transports POST it when a provider + CI env is configured.
-**How to observe.** `cdmon surface-gaps --dry-run --config demo/config/cdmon`
+**How to observe.** `cdx surface-gaps --dry-run --config demo/config/cdmon`
 prints the plan JSON naming `scheduler.py`. (Live: set the provider's CI env vars
 and drop `--dry-run` to open the issue.)
 Features: FEAT-CLI-018, FEAT-COVERAGE-009, FEAT-PR-007, FEAT-PR-008
 
 ### DEMO-013 — Surface dump for debugging
-**What it shows.** `cdmon surface` prints each document's id / audience /
+**What it shows.** `cdx surface` prints each document's id / audience /
 symbol-count and surface hash via `build_document_surface`; `--json` dumps every
-symbol of each surface — the debugging view of what cdmon thinks each doc
+symbol of each surface — the debugging view of what cdx thinks each doc
 documents.
-**How to observe.** `cdmon surface --config demo/config/cdmon` (and `--json`)
+**How to observe.** `cdx surface --config demo/config/cdmon` (and `--json`)
 shows `core-api`, `getting-started`, `io-api` with their hashes and symbols.
 Features: FEAT-CLI-004, FEAT-CONFIG-004
 
@@ -217,48 +217,48 @@ Features: FEAT-PR-009, FEAT-PR-010, FEAT-PR-011
 
 ## E. Doctor / adopt
 
-### DEMO-015 — Offline adoption preflight (cdmon doctor)
-**What it shows.** `cdmon doctor` is the offline, read-only adoption preflight: it
+### DEMO-015 — Offline adoption preflight (cdx doctor)
+**What it shows.** `cdx doctor` is the offline, read-only adoption preflight: it
 loads the config then runs ordered checks over config / documents / backend
 prereq / central wiring / extras, printing one `STATUS  name — detail` line each.
 The demo passes (`PASS  config`, ...). Its grading is WARN-vs-FAIL: a merely
 absent prereq is a WARN (config still valid); only a structurally broken config
 FAILs the gate.
-**How to observe.** `demo/walkthrough.py` step `[6/6]` runs `cdmon doctor`; or
-`cdmon doctor --config demo/config/cdmon` (exit 0, all PASS/WARN).
+**How to observe.** `demo/walkthrough.py` step `[6/6]` runs `cdx doctor`; or
+`cdx doctor --config demo/config/cdmon` (exit 0, all PASS/WARN).
 Features: FEAT-CLI-014, FEAT-QUALITY-008, FEAT-QUALITY-009
 
 ### DEMO-016 — Scaffold a conformant doc + layout lint + modes
-**What it shows.** `cdmon new-doc` scaffolds a fully-conformant, in-sync Markdown
+**What it shows.** `cdx new-doc` scaffolds a fully-conformant, in-sync Markdown
 document for a configured doc id from its surface (refusing to clobber without
-`--force`); `cdmon lint` validates every doc against the Layout Standard, `--fix`
+`--force`); `cdx lint` validates every doc against the Layout Standard, `--fix`
 stamps missing static front matter, and `--modes` prints each managed region's
 authority mode / lock / advisory state.
-**How to observe.** `cdmon lint --config demo/config/cdmon` (exit 0),
-`cdmon lint --modes --config demo/config/cdmon` (prints each region's mode), and
-`cdmon new-doc <id> --config demo/config/cdmon` scaffolds a conformant file.
+**How to observe.** `cdx lint --config demo/config/cdmon` (exit 0),
+`cdx lint --modes --config demo/config/cdmon` (prints each region's mode), and
+`cdx new-doc <id> --config demo/config/cdmon` scaffolds a conformant file.
 Features: FEAT-CLI-020, FEAT-CLI-021, FEAT-LAYOUT-001, FEAT-LAYOUT-002, FEAT-LAYOUT-003, FEAT-LAYOUT-004, FEAT-LAYOUT-007
 
 ### DEMO-017 — Build the HTML twins + index landing-page coverage
-**What it shows.** `cdmon build` renders every `html: true` document to its `.html`
+**What it shows.** `cdx build` renders every `html: true` document to its `.html`
 twin via the dependency-free Markdown renderer, wrapping each in a styled page with
 a sidebar nav and embedding the body's source hash so the twin is recognised as
 derived; the index landing-page rule checks every `index: true` doc links every
 other doc; the twin-pairing check flags a missing / non-derived / stale twin.
-**How to observe.** `cdmon build --config demo/config/cdmon` writes the `.html`
-twins for the demo's html docs; `cdmon lint --config demo/config/cdmon` runs the
+**How to observe.** `cdx build --config demo/config/cdmon` writes the `.html`
+twins for the demo's html docs; `cdx lint --config demo/config/cdmon` runs the
 twin-pairing + index-coverage checks.
 Features: FEAT-CLI-006, FEAT-LAYOUT-005, FEAT-LAYOUT-006, FEAT-LAYOUT-008, FEAT-LAYOUT-009
 
 ### DEMO-018 — Scaffold a v2 config dir + init template (adopt-from-scratch)
-**What it shows.** `cdmon init --v2` scaffolds the multi-file `config/cdmon/`
+**What it shows.** `cdx init --v2` scaffolds the multi-file `config/cdmon/`
 directory layout from the four canonical templates (refusing to clobber without
-`--force`); the classic `cdmon init` writes the documented single-file starter
+`--force`); the classic `cdx init` writes the documented single-file starter
 template (with `--central URL` wiring the HTTP-reporting block). The demo's own
 `config/cdmon` is exactly such a scaffold, filled in.
-**How to observe.** `cdmon init --v2 --config-dir /tmp/new/config/cdmon --repo
+**How to observe.** `cdx init --v2 --config-dir /tmp/new/config/cdmon --repo
 demo` produces a `load_bundle`-valid dir mirroring `demo/config/cdmon`'s shape;
-`cdmon init --central https://central.example /tmp/single.yaml` writes the wired
+`cdx init --central https://central.example /tmp/single.yaml` writes the wired
 single-file template.
 Features: FEAT-CLI-001, FEAT-CONFIG-010, FEAT-CONFIGV2-011, FEAT-CONFIG-009
 
@@ -289,16 +289,16 @@ translation feeds the coverage exclude set so `coverage.rpt` and `notes.log` are
 never counted.
 **How to observe.** Inspect `demo/config/cdmon/ignore.yaml` and `demo/.gitignore`;
 `bundle.unit_for_path("src/taskflow/io/storage.py")` → `io`, `core/...` → `core`;
-`cdmon coverage --config demo/config/cdmon` excludes the ignored files.
+`cdx coverage --config demo/config/cdmon` excludes the ignored files.
 Features: FEAT-CONFIGV2-005, FEAT-CONFIGV2-007
 
-### DEMO-021 — Regenerate the index from on-disk units (cdmon index)
-**What it shows.** `cdmon index` rebuilds `index.yaml`'s `units:` block from the
+### DEMO-021 — Regenerate the index from on-disk units (cdx index)
+**What it shows.** `cdx index` rebuilds `index.yaml`'s `units:` block from the
 on-disk unit files (sorted, reserved stems excluded), preserving every other field
 byte-for-byte and the frontmatter `updated:` line. `--check` is a read-only CI
 gate that exits 1 on a real units-list change (ignoring the wall-clock stamp).
-**How to observe.** `cdmon index --check --config demo/config/cdmon` (exit 0 — the
-committed index matches its units); `cdmon index --config demo/config/cdmon`
+**How to observe.** `cdx index --check --config demo/config/cdmon` (exit 0 — the
+committed index matches its units); `cdx index --config demo/config/cdmon`
 rewrites only the `units:` block.
 Features: FEAT-CLI-002, FEAT-CONFIGV2-009
 
@@ -335,16 +335,16 @@ table a `getting-started`-style index doc carries.
 **How to observe.** Reproducible recipe: `render_index(bundle.config, ...)` over
 the demo bundle produces the ordered table; an `index: true` doc whose `symbols`
 region uses `source: index` regenerates to that table under
-`cdmon monitor --apply`.
+`cdx monitor --apply`.
 Features: FEAT-CONFIGV2-015
 
-### DEMO-025 — Config sync (local) over the working tree (cdmon sync)
-**What it shows.** `cdmon sync --mode local` runs a read-only config sync against
+### DEMO-025 — Config sync (local) over the working tree (cdx sync)
+**What it shows.** `cdx sync --mode local` runs a read-only config sync against
 the working tree: it loads the bundle, computes drift and coverage, projects the
 document / code-ref rows and a `SyncRun` summary, mutating nothing; `--json` emits
 the run. (Git mode materialises the default branch in a throwaway worktree torn
 down in a finally — see DEMO-031.)
-**How to observe.** `cdmon sync --mode local --json --config demo/config/cdmon`
+**How to observe.** `cdx sync --mode local --json --config demo/config/cdmon`
 prints the `SyncRun` (8 documents, 11 code refs, fully synced); the working tree is
 untouched.
 Features: FEAT-CLI-012, FEAT-CONFIGV2-012, FEAT-SERVER-018
@@ -353,8 +353,8 @@ Features: FEAT-CLI-012, FEAT-CONFIGV2-012, FEAT-SERVER-018
 
 ## G. Central server + register + dashboard
 
-### DEMO-026 — Standalone per-repo dashboard (cdmon serve)
-**What it shows.** `cdmon serve`, run from `demo/`, launches the SAME FastAPI +
+### DEMO-026 — Standalone per-repo dashboard (cdx serve)
+**What it shows.** `cdx serve`, run from `demo/`, launches the SAME FastAPI +
 React dashboard the central server uses, scoped to ONLY this repo, with no
 registration and no network: it builds an in-memory store holding just
 `demo-taskflow` (auto-registered OPEN, token-less), pre-syncs the local view, and
@@ -364,21 +364,21 @@ exposes the public, no-auth `GET /wiki`, which serves the committed EPIC-R wikis
 (Feature Reference / Traceability / Test / Source) rendered to HTML by the
 engine's own `render_markdown` (no new dep), so the console's Wiki page reads them
 from the running server.
-**How to observe.** From `demo/`: `cdmon serve` → open `http://127.0.0.1:8000`
+**How to observe.** From `demo/`: `cdx serve` → open `http://127.0.0.1:8000`
 (the Documents view + token-less Sync button); `GET /wiki` returns
 `{"sections":[{"id","title","html"}...]}` for the console Wiki page; the README
 "Standalone dashboard" section documents it. Test:
 `tests/test_demo_e2e.py::test_standalone_demo_app_one_repo_and_documents`.
 Features: FEAT-CLI-013, FEAT-SERVER-001, FEAT-SERVER-014, FEAT-SERVER-015, FEAT-SERVER-019
 
-### DEMO-027 — Register the repo with a central server (cdmon register)
-**What it shows.** `cdmon register` announces the repo to a central server by
+### DEMO-027 — Register the repo with a central server (cdx register)
+**What it shows.** `cdx register` announces the repo to a central server by
 POSTing a `RegistrationPayload` (a `RepoIdentity` built from the config) to
 `<url>/repos`; `--dry-run` prints the exact payload it would send with no network
 call. The server's `POST /repos` validates the same shared schema and persists it.
-**How to observe.** `cdmon register --dry-run --config <a config with a central:
+**How to observe.** `cdx register --dry-run --config <a config with a central:
 block>` prints the `RegistrationPayload`. (Live: point `central.url` at a running
-`cdmon` server, set the auth env token, and drop `--dry-run`.)
+`cdx` server, set the auth env token, and drop `--dry-run`.)
 Features: FEAT-CLI-011, FEAT-SERVER-002, FEAT-SERVER-017, FEAT-RECORD-010
 
 ### DEMO-028 — Seed the central demo dashboard (scripts/seed_demo.py)
@@ -401,7 +401,7 @@ Features: FEAT-SERVER-005, FEAT-SERVER-008, FEAT-COVERAGE-010
 for an unknown repo is a loud 404). Writes are guarded by a per-repo bearer token
 whose sha256 is the only thing stored — a missing header on a protected repo is
 401, a wrong token 403, a token-less repo stays open, reads are always open.
-**How to observe.** Reproducible recipe: `cdmon serve` from `demo/`, then
+**How to observe.** Reproducible recipe: `cdx serve` from `demo/`, then
 `POST /repos/demo-taskflow/sync {"mode":"local"}` succeeds token-less (the demo is
 registered OPEN). For auth: register a repo WITH a token, then POST `/ingest` an
 `IngestEnvelope` with no / wrong / correct `Authorization: Bearer` header to
@@ -415,7 +415,7 @@ pending `StoredConfigEdit`; `GET /config/edits` lists them; `POST /config/genera
 makes selected edits live by applying them to disk (offline, no-LLM), re-syncing,
 and returning the applied ids + fresh `SyncRun` + recomputed undocumented files —
 the server twin of the walkthrough's link→generate.
-**How to observe.** Reproducible recipe: `cdmon serve` from `demo/`, then
+**How to observe.** Reproducible recipe: `cdx serve` from `demo/`, then
 `POST /repos/demo-taskflow/config/edits` an `add_code_ref` for `scheduler.py`,
 `GET .../config/edits` to see it pending, `POST .../config/generate` to apply it;
 the editable tree's `undocumented_files` no longer lists `scheduler.py`. Tests:
@@ -444,7 +444,7 @@ Postgres, JSON on SQLite via the same migration scripts); when unset it returns 
 transient `InMemoryStore` and logs a LOUD warning that ingested data is lost on
 restart. The full HTTP suite runs every route over BOTH stores.
 **How to observe.** Reproducible recipe: `export
-CDMON_DATABASE_URL=sqlite:////tmp/cdmon.db` then `cdmon serve` (or launch the
+CDMON_DATABASE_URL=sqlite:////tmp/cdmon.db` then `cdx serve` (or launch the
 central server) — it migrates and persists across restarts; unset it to see the
 loud in-memory warning. The `pg`-marked CI twin runs the same suite on Postgres;
 `tests/test_server*` assert store-parity for every route.
@@ -461,7 +461,7 @@ INVALIDATEs a user-guide docstring/comment/private HASH drift, FIXes a surface
 HASH drift via a whole-doc correction, and ESCALATEs anything else — all
 deterministic, offline, ignoring the additive authoring inputs to stay
 reproducible.
-**How to observe.** Every `cdmon monitor`/`check` in this catalog uses it (see
+**How to observe.** Every `cdx monitor`/`check` in this catalog uses it (see
 `backend: { kind: mock }` in `demo/config/cdmon/index.yaml`); the walkthrough's
 `[3/6]` heal exercises the FIX path with zero network.
 Features: FEAT-BACKENDS-003, FEAT-CONFIG-008
@@ -473,8 +473,8 @@ Claude Code CLI: `ClaudeCodeBackend` builds the shared prompt, assembles argv
 `ProcessRunner` (a stdlib subprocess runner built lazily) — any failure/timeout is
 a loud `BackendError`. The factory keeps it behind the same `propose` contract.
 **How to observe.** Reproducible recipe: set `backend: { kind: claude-code }` in a
-config and ensure the `claude` CLI is on `$PATH`, then `cdmon monitor --apply`
-drives it; `cdmon doctor` WARNs if `claude` is absent. (Tests inject a fake
+config and ensure the `claude` CLI is on `$PATH`, then `cdx monitor --apply`
+drives it; `cdx doctor` WARNs if `claude` is absent. (Tests inject a fake
 `ProcessRunner` so no `claude` is spawned.)
 Features: FEAT-BACKENDS-004, FEAT-BACKENDS-007
 
@@ -485,7 +485,7 @@ API through an injected `ApiClient` (a stdlib `urllib` client built lazily — n
 `BackendError`; any client failure is wrapped. Behind the same `propose` contract,
 the orchestrator is unchanged.
 **How to observe.** Reproducible recipe: set `backend: { kind: api, api_key_env:
-ANTHROPIC_API_KEY }`, export the key, then `cdmon monitor --apply`; `cdmon doctor`
+ANTHROPIC_API_KEY }`, export the key, then `cdx monitor --apply`; `cdx doctor`
 WARNs on an unset key. (Tests inject a fake `ApiClient` so no network is hit.)
 Features: FEAT-BACKENDS-005
 
@@ -498,8 +498,8 @@ fails loudly; the only non-determinism is the injected `Driver`, which
 `resolve_driver` builds from config (Claude Code CLI / Anthropic API / a local
 OpenAI-compatible endpoint).
 **How to observe.** Reproducible recipe: `pip install
-code-doc-monitor[agent]`, set `backend: { kind: agent }` + an `agent:` block, then
-`cdmon monitor --apply`. `cdmon doctor` WARNs if the `langgraph` extra is missing.
+custodex[agent]`, set `backend: { kind: agent }` + an `agent:` block, then
+`cdx monitor --apply`. `cdx doctor` WARNs if the `langgraph` extra is missing.
 (Tests drive the graph offline with a fake driver.)
 Features: FEAT-AGENT-001, FEAT-AGENT-002, FEAT-AGENT-003, FEAT-AGENT-008, FEAT-BACKENDS-002
 
@@ -512,7 +512,7 @@ enabled, EXEMPLARS only when the request carries exemplars); `render_context`
 appends the per-drift block (audience, doc, drift, current text, symbol table)
 with exemplars/style LAST so an exemplar-/style-free request is byte-identical.
 **How to observe.** Read the packaged artifacts under
-`code_doc_monitor/agent/prompts/` (incl. `EXEMPLARS.md`); the agent recipe
+`custodex/agent/prompts/` (incl. `EXEMPLARS.md`); the agent recipe
 (DEMO-036) composes them. Reproducible: build a `FixRequest` for the demo's
 `core-api` drift, call `select_artifacts`/`render_context` — TOOL is selected,
 PERSONA/EXEMPLARS are not (no exemplars), output is stable.
@@ -533,13 +533,13 @@ top-N `Exemplar`s in a stable score/recency/id order; run the monitor with
 Features: FEAT-AGENT-007, FEAT-MONITOR-008, FEAT-LEARN-001, FEAT-LEARN-002, FEAT-LEARN-003
 
 ### DEMO-039 — Promotion: recurring resolved drifts → a deterministic rule
-**What it shows.** `cdmon promotions` lists read-only promotion CANDIDATES: each
+**What it shows.** `cdx promotions` lists read-only promotion CANDIDATES: each
 `(doc_id, drift_kind, audience)` shape whose resolved records (≥ min-count)
 unanimously share one DECISION resolution (only the content-free `invalidated` /
 `rejected` auto-promote; `overridden`/`accepted` are excluded). A candidate maps to
 a frozen `PromotionRule`, and at run time `rule_for` resolves a matching drift with
 ZERO backend calls.
-**How to observe.** `cdmon promotions --config demo/config/cdmon --json` (over a
+**How to observe.** `cdx promotions --config demo/config/cdmon --json` (over a
 review log seeded with repeated resolved invalidations). Reproducible:
 `detect_promotions(records, resolutions)` → a `PromotionCandidate`;
 `rule_from_candidate(...)` → a rule; `monitor.run(rules=(rule,))` resolves the
@@ -550,29 +550,29 @@ Features: FEAT-CLI-016, FEAT-MONITOR-007, FEAT-LEARN-004, FEAT-LEARN-005, FEAT-L
 
 ## I. Record / log / sinks
 
-### DEMO-040 — The public review record + schema export (cdmon schema)
-**What it shows.** `cdmon schema` emits the public review-record JSON Schema — the
+### DEMO-040 — The public review record + schema export (cdx schema)
+**What it shows.** `cdx schema` emits the public review-record JSON Schema — the
 one contract the central system consumes — straight from the pydantic model
 (never hand-written). The `ReviewRecord` is a frozen/extra-forbid versioned payload
 carrying the drift, cause, verdict, proposed fix and an audience/config/hash
 snapshot; it grows only by appending optional fields, so an old `1.0.0` line still
 parses. Its record id is a deterministic sha256 prefix of the drift identity.
-**How to observe.** `cdmon schema` (or `--out file`) prints the schema; the heal
+**How to observe.** `cdx schema` (or `--out file`) prints the schema; the heal
 run (DEMO-005) writes a `ReviewRecord` whose `schema_version` and deterministic id
 are visible in the review log JSONL.
 Features: FEAT-CLI-022, FEAT-RECORD-001, FEAT-RECORD-002, FEAT-RECORD-003, FEAT-RECORD-005
 
-### DEMO-041 — Record a human resolution outcome (cdmon resolve)
-**What it shows.** `cdmon resolve RECORD_ID --resolution {accepted|overridden|
+### DEMO-041 — Record a human resolution outcome (cdx resolve)
+**What it shows.** `cdx resolve RECORD_ID --resolution {accepted|overridden|
 rejected|invalidated}` records the human OUTCOME of a handled drift as a SEPARATE
 append-only `ResolutionRecord` linked by record_id, validating the id exists (loud)
-and leaving the immutable review record untouched. `cdmon report` then joins
+and leaving the immutable review record untouched. `cdx report` then joins
 resolved-vs-unresolved last-write-wins, and `--verdict V` lists the individual
 records of a verdict (e.g. the ESCALATEs a human must act on).
-**How to observe.** After DEMO-005, grab the `FIX` record id from `cdmon report
---json` and run `cdmon resolve <id> --resolution accepted --config
-demo/config/cdmon`; re-run `cdmon report` to see the resolved/unresolved split, and
-`cdmon report --verdict ESCALATE` to list escalations.
+**How to observe.** After DEMO-005, grab the `FIX` record id from `cdx report
+--json` and run `cdx resolve <id> --resolution accepted --config
+demo/config/cdmon`; re-run `cdx report` to see the resolved/unresolved split, and
+`cdx report --verdict ESCALATE` to list escalations.
 Features: FEAT-CLI-019, FEAT-RECORD-006, FEAT-RECORD-009
 
 ### DEMO-042 — Offline sinks vs the resilient HTTP sink with outbox
@@ -600,7 +600,7 @@ Features: FEAT-RECORD-011, FEAT-RECORD-012, FEAT-RECORD-013
 `get_extractor`, loud on an unknown language) sits under `build_document_surface`;
 the Python AST extractor is the default registration that parses the demo's
 `taskflow` modules.
-**How to observe.** Every `cdmon surface`/`check` over the demo's `.py` files goes
+**How to observe.** Every `cdx surface`/`check` over the demo's `.py` files goes
 through `get_extractor("python")`. Reproducible: `register_extractor(stub,
 suffixes=(".x",))` then a `lang: auto` ref to a `.x` file resolves the stub with
 no engine edit; `get_extractor("nope")` raises loudly.
@@ -615,29 +615,29 @@ leading-comment docstring in; a user-guide drops `_`-prefixed helpers and exclud
 docstrings.
 **How to observe.** Reproducible recipe: add a small `.sh` file with a
 `deploy() { ... }` function, point a `lang: shell` (or `lang: auto`) `code_ref` at
-it, and `cdmon surface` lists the `deploy` function — with ZERO engine edit. (18
+it, and `cdx surface` lists the `deploy` function — with ZERO engine edit. (18
 shell tests in `tests/test_extract.py`.)
 Features: FEAT-EXTRACT-006
 
 ---
 
-## K. Reference & traceability (cdmon documents itself)
+## K. Reference & traceability (cdx documents itself)
 
-### DEMO-045 — This catalog proves the demo↔feature mapping (cdmon trace)
-**What it shows.** cdmon documents its own documentation system. The golden
+### DEMO-045 — This catalog proves the demo↔feature mapping (cdx trace)
+**What it shows.** cdx documents its own documentation system. The golden
 feature catalog (`feature-doc/catalog/*.yaml`) is a typed, loadable
 `FeatureCatalog` (loud on a duplicate id / bad pattern / non-existent module), and
-`render_features_md` renders the human `feature-doc/FEATURES.md`. `cdmon trace`
+`render_features_md` renders the human `feature-doc/FEATURES.md`. `cdx trace`
 crosses that catalog against the inline `Features:` tags in THIS file (and in
 `tests/`) and reports demo coverage — for R-04 the demo side is COMPLETE (every
 feature has ≥1 demo case), with zero unknown refs.
-**How to observe.** `cdmon trace --catalog feature-doc/catalog --tests-root tests
+**How to observe.** `cdx trace --catalog feature-doc/catalog --tests-root tests
 --demo-root demo` (the demo column is fully covered; `--json` emits the matrix);
 test `tests/test_demo_traceability.py` asserts
 `build_matrix(...).features_without_demo() == ()`.
 Features: FEAT-REFERENCE-001, FEAT-REFERENCE-002
 
-### DEMO-052 — Traceability matrix + test wiki (cdmon documents its own coverage)
+### DEMO-052 — Traceability matrix + test wiki (cdx documents its own coverage)
 **What it shows.** `traceability.build_matrix` crosses the catalog against the
 inline `Features:` tags scanned (as text — never imported) from `tests/` and
 `demo/`, and `TraceMatrix.is_complete()` is the 1:1 guarantee that EVERY feature
@@ -650,9 +650,9 @@ tests_root=tests, demo_root=demo).is_complete()` is `True`; `render_matrix_md` a
 `render_test_wiki_md` are byte-stable (same input → identical Markdown).
 Features: FEAT-REFERENCE-003, FEAT-REFERENCE-004
 
-### DEMO-053 — Source index: no orphan public capability (cdmon proves it covers itself)
+### DEMO-053 — Source index: no orphan public capability (cdx proves it covers itself)
 **What it shows.** `srcindex.build_source_index` inventories the whole
-`code_doc_monitor` package (reusing `inventory.discover_files`/`discover_symbols`
+`custodex` package (reusing `inventory.discover_files`/`discover_symbols`
 — no AST re-impl), folds every file into its top-level module, attaches each
 module's public symbols, and joins each module to the catalog features that name
 it. `SourceIndex.modules_without_feature()` is the "no orphan public capability"
@@ -661,25 +661,25 @@ check (a public module with zero catalog features) and
 module — both are EMPTY over the real tree, proving the golden reference covers
 the entire public surface. `render_source_wiki_md` emits the byte-stable SOURCE
 wiki (per-module path, symbols, implementing features + a coverage summary).
-**How to observe.** Reproducible recipe: build the index over `code_doc_monitor`
+**How to observe.** Reproducible recipe: build the index over `custodex`
 with the real catalog → `features_without_module_match() == ()` AND
 `modules_without_feature() == ()`; `render_source_wiki_md(index)` is byte-stable.
 Features: FEAT-REFERENCE-005, FEAT-REFERENCE-006
 
-### DEMO-054 — One command regenerates every wiki + the freshness gate (cdmon wiki)
-**What it shows.** `cdmon wiki` regenerates ALL of EPIC R's derived artifacts from
+### DEMO-054 — One command regenerates every wiki + the freshness gate (cdx wiki)
+**What it shows.** `cdx wiki` regenerates ALL of EPIC R's derived artifacts from
 their single sources in ONE command — `feature-doc/FEATURES.md` (from the catalog
 yaml) plus `feature-doc/wiki/TEST_WIKI.md`, `SOURCE_WIKI.md`, and `TRACEABILITY.md`
 (from the tests' docstrings and the source AST) — via a shared `WIKI_TARGETS`
-mapping, so write-mode and `--check` can never diverge. A second `cdmon wiki` is a
-no-op (every target reported `unchanged` — idempotent K7). `cdmon wiki --check` is
+mapping, so write-mode and `--check` can never diverge. A second `cdx wiki` is a
+no-op (every target reported `unchanged` — idempotent K7). `cdx wiki --check` is
 the read-only CI freshness gate: it lists every stale file and exits nonzero
-WITHOUT writing (K8). Paired with `cdmon trace --fail-on-gap` (which exits 0 only
+WITHOUT writing (K8). Paired with `cdx trace --fail-on-gap` (which exits 0 only
 when every feature has a demo AND a test), CI fails the moment the reference drifts
 from the code, demos, or tests.
-**How to observe.** `cdmon wiki` regenerates the four artifacts; a second
-`cdmon wiki` prints `unchanged` for all four; `cdmon wiki --check` exits 0 on the
-fresh tree and nonzero after a wiki is touched; `cdmon trace --fail-on-gap` exits 0
+**How to observe.** `cdx wiki` regenerates the four artifacts; a second
+`cdx wiki` prints `unchanged` for all four; `cdx wiki --check` exits 0 on the
+fresh tree and nonzero after a wiki is touched; `cdx trace --fail-on-gap` exits 0
 on the real tree.
 Features: FEAT-REFERENCE-007
 
@@ -693,10 +693,10 @@ Features: FEAT-REFERENCE-007
 user-guide surface hash (the extraction filter excludes those) so it produces no
 HASH drift for the user-guide, while the same change does drift an eng-guide. The
 audience drives what counts as a documented surface and what counts as drift.
-**How to observe.** Edit only a docstring in a `core` symbol and run `cdmon check
+**How to observe.** Edit only a docstring in a `core` symbol and run `cdx check
 --config demo/config/cdmon`: `core-api` (eng-guide) drifts, `getting-started`
 (user-guide) does not. The two API hashes vs the user-guide hash differ in
-`cdmon surface`.
+`cdx surface`.
 Features: FEAT-DRIFT-004, FEAT-EXTRACT-001
 
 ### DEMO-047 — Authority modes: human/llm/llm-seeded regions never clobbered
@@ -711,8 +711,8 @@ whole-doc fingerprint diverges; a human region carries a persistent review
 advisory across a fingerprint heal until acknowledged.
 **How to observe.** Reproducible recipe: add a `region_modes` entry marking a
 region `human` (or `llm-seeded`) on a demo doc, edit that region by hand, then
-`cdmon monitor --apply` — the human/locked region is preserved while the
-`generated` region heals; `cdmon lint --modes` prints each region's mode/lock/
+`cdx monitor --apply` — the human/locked region is preserved while the
+`generated` region heals; `cdx lint --modes` prints each region's mode/lock/
 advisory state.
 Features: FEAT-CONFIG-005, FEAT-CONFIG-006, FEAT-DRIFT-007, FEAT-DRIFT-008, FEAT-DRIFT-009, FEAT-HEAL-003, FEAT-HEAL-004, FEAT-HEAL-005
 
@@ -723,8 +723,8 @@ into non-user-guide surface hashes, so an eng-guide can detect an implementation
 change that leaves the signature untouched. With the flag OFF a body-only edit is
 byte-invisible to the hash; ON it moves the eng-guide surface.
 **How to observe.** Reproducible recipe: with `fingerprint_body_tier: false`
-(the demo default), change only the BODY of a `core` method and `cdmon check` is
-clean; set it `true`, re-stamp via `cdmon monitor --apply`, then the same body-only
+(the demo default), change only the BODY of a `core` method and `cdx check` is
+clean; set it `true`, re-stamp via `cdx monitor --apply`, then the same body-only
 edit drifts `core-api`.
 Features: FEAT-CONFIG-011, FEAT-EXTRACT-004
 
@@ -737,7 +737,7 @@ changed by a rename — so drift tells a structural add/remove/rename from a pur
 internal change.
 **How to observe.** Reproducible recipe: `build_document_surface` over `core-api`
 twice → identical `surface_hash`; move a documented symbol's definition (no
-rename) → its `anchor_id` is unchanged and `cdmon check` reports an empty anchor
+rename) → its `anchor_id` is unchanged and `cdx check` reports an empty anchor
 delta (a re-bind), whereas a rename shows it added+removed.
 Features: FEAT-EXTRACT-002, FEAT-EXTRACT-005
 
@@ -754,20 +754,20 @@ a distinct typed subclass of the one base.
 Features: FEAT-CONFIG-012
 
 ### DEMO-051 — Docs heal patch / loop-safety / docs-MR (the PR family)
-**What it shows.** `cdmon sync-pr` heals the docs and emits a unified-diff patch of
+**What it shows.** `cdx sync-pr` heals the docs and emits a unified-diff patch of
 exactly the changed docs (`--dry-run` computes the same patch with byte-for-byte
 tree restore; a clean/second run is an empty patch — idempotent). The plan is a
 frozen `MergeRequestPlan` whose branch is stable per unchanged patch; an injected
 `PRTransport` seam drives the flow (the GitLab transport does the canonical 3-call
-REST flow). `cdmon open-docs-pr` heals then opens the docs MR (`--dry-run` prints
-the plan JSON with no transport built). The `cdmon should-sync` guard
+REST flow). `cdx open-docs-pr` heals then opens the docs MR (`--dry-run` prints
+the plan JSON with no transport built). The `cdx should-sync` guard
 (`should_sync`) is the loop-breaker that stops a bot doc-only commit re-triggering
 another docs heal/MR: every changed path being a managed doc returns "skip", any
 file outside returns "proceed", an empty set skips.
 **How to observe.** After the DEMO-001 drift on the demo copy:
-`cdmon sync-pr --dry-run --config demo/config/cdmon` prints the doc patch and
-restores the tree; `cdmon open-docs-pr --dry-run --config demo/config/cdmon`
-prints the MR plan JSON. `echo "demo/docs/api/core-api.md" | cdmon should-sync
+`cdx sync-pr --dry-run --config demo/config/cdmon` prints the doc patch and
+restores the tree; `cdx open-docs-pr --dry-run --config demo/config/cdmon`
+prints the MR plan JSON. `echo "demo/docs/api/core-api.md" | cdx should-sync
 --config demo/config/cdmon` exits 1 (a doc-only change → skip), while a source path
 exits 0 (proceed). (Live: set GitLab CI env and drop `--dry-run`.)
 Features: FEAT-CLI-008, FEAT-CLI-009, FEAT-CLI-010, FEAT-PR-001, FEAT-PR-002, FEAT-PR-003, FEAT-PR-004, FEAT-PR-005, FEAT-PR-006
@@ -857,18 +857,18 @@ Features: FEAT-GITSYNC-005
 monitored document, not just engineering reference pages. The demo declares its
 OWN `README.md` as a `readme` document in `demo/config/cdmon/core.yaml`
 (`audience: user-guide`) whose `code_refs` name the source it describes
-(`src/taskflow/core/model.py`) and which carries NO managed region, so cdmon
+(`src/taskflow/core/model.py`) and which carries NO managed region, so cdx
 tracks it by the whole-doc fingerprint over that surface and never rewrites its
 prose (K2). Because it is a `user-guide`, a comment/docstring/private change to
 `model.py` is a non-event (K3) — only a real public-surface change drifts the
-README, surfacing a `ReviewRecord` for a human (K5); `cdmon monitor --apply` then
-refreshes only its fingerprint. cdmon dogfoods the very same pattern on its OWN
-`README.md` (tracked against `code_doc_monitor/cli.py`), where an eng-only
+README, surfacing a `ReviewRecord` for a human (K5); `cdx monitor --apply` then
+refreshes only its fingerprint. cdx dogfoods the very same pattern on its OWN
+`README.md` (tracked against `custodex/cli.py`), where an eng-only
 `api-index` is NOT forced to list the user-guide README because the
 `INDEX_INCOMPLETE` lint honors the index region's `kind: eng-guide` audience.
 **How to observe.** Inspect the `readme` document in `demo/config/cdmon/core.yaml`
 and the `cdm:` front matter atop `demo/README.md`, then run
-`cdmon check --config demo/config/cdmon` (the README is reported in sync). It also
+`cdx check --config demo/config/cdmon` (the README is reported in sync). It also
 shows in the console: open the `demo-taskflow` repo and the **README files**
 section appears under both Documents and Mapping. Tests:
 `tests/system/test_demo_e2e.py` (the demo's 8-document / 11-code-ref mapping incl.
@@ -883,14 +883,14 @@ file under `demo/tests/` to **exactly one** test-doc under `demo/test-docs/` (1:
 each an `eng-guide` document with a managed `symbols` region listing that file's
 `test_*` functions. It is the SAME machinery as source → docs (no engine change —
 a test file is just a `.py` file, K0): add/rename/remove a test and its test-doc
-drifts for a human to review (K5); `cdmon monitor --apply` heals it (K7). The unit
+drifts for a human to review (K5); `cdx monitor --apply` heals it (K7). The unit
 is fully documented (100%), so the demo's only gap stays the deliberate
 `scheduler.py` SOURCE gap — note the symmetry that `scheduler.py`'s source is
-undocumented yet its tests are documented in `test-docs/test_scheduler.md`. cdmon
+undocumented yet its tests are documented in `test-docs/test_scheduler.md`. cdx
 dogfoods the same pattern on its own `tests/smoke/` boundary.
 **How to observe.** Inspect `demo/config/cdmon/tests.yaml` and the four
-`demo/test-docs/test_*.md` files, then run `cdmon check --config demo/config/cdmon`
-(the test-docs are reported in sync) and `cdmon coverage --config demo/config/cdmon`
+`demo/test-docs/test_*.md` files, then run `cdx check --config demo/config/cdmon`
+(the test-docs are reported in sync) and `cdx coverage --config demo/config/cdmon`
 (the `tests` unit is 100%). It also shows in the console: open `demo-taskflow` and
 the **Test docs** section appears under Documents, Drift, and Mapping. Tests:
 `tests/system/test_demo_e2e.py` (the four `test-*` docs in the 8-document mapping)
@@ -936,16 +936,16 @@ needs assigning. Mark `demo-team` inactive too and it escalates to
 **How to observe.** `detect_orphans(resolve_ownership(load_bundle('demo/config/cdmon').config), RosterSnapshot(identities=(Identity(name='dana', active=False), Identity(name='demo-team', active=True))))` flags `core-api` as `ORPHAN_DRI_VACANT`; the branch table is pinned by `tests/unit/test_ownership.py`.
 Features: FEAT-OWNERSHIP-003
 
-### DEMO-062 — `cdmon ownership` lists owners + flags departed-owner orphans
-**What it shows.** `cdmon ownership --config demo/config/cdmon` prints all 8 demo
+### DEMO-062 — `cdx ownership` lists owners + flags departed-owner orphans
+**What it shows.** `cdx ownership --config demo/config/cdmon` prints all 8 demo
 documents with their accountable owner — `core-api` is accountable=dana (its DRI),
 while the docs that declare no owner of their own inherit the unit owner
 `demo-team` (the per-doc fallback). Pass an offline roster that marks `dana`
-departed and `cdmon ownership --roster roster.yaml --fail-on-orphan` flags
+departed and `cdx ownership --roster roster.yaml --fail-on-orphan` flags
 `core-api` as `orphan_dri_vacant` and exits nonzero — an accountability gate you
 can wire into CI. Read-only, offline (K1/K4), no backend.
-**How to observe.** From the repo root: `cdmon ownership --config demo/config/cdmon`
-prints the per-document table; with a roster YAML `{identities: [{name: dana, active: false}, {name: demo-team, active: true}]}`, `cdmon ownership --config demo/config/cdmon --roster roster.yaml --fail-on-orphan` exits 1 and names `core-api`. Pinned by `tests/system/test_ownership_cli.py`.
+**How to observe.** From the repo root: `cdx ownership --config demo/config/cdmon`
+prints the per-document table; with a roster YAML `{identities: [{name: dana, active: false}, {name: demo-team, active: true}]}`, `cdx ownership --config demo/config/cdmon --roster roster.yaml --fail-on-orphan` exits 1 and names `core-api`. Pinned by `tests/system/test_ownership_cli.py`.
 Features: FEAT-OWNERSHIP-004
 
 ### DEMO-063 — Central roster mirror persists over both stores (+ migration 0006)
@@ -1015,7 +1015,7 @@ while the dogfood repo (owned by the active `cdmon-team`) is clean — visible a
 clickable on first load, not an empty state.
 **How to observe.** With the seeded app, `GET /roster` shows `dana` inactive;
 `GET /repos/demo-taskflow/ownership` returns `orphan_count: 1` with `core-api` →
-`orphan_dri_vacant`; `GET /repos/code-doc-monitor/ownership` returns `orphan_count: 0`.
+`orphan_dri_vacant`; `GET /repos/custodex/ownership` returns `orphan_count: 0`.
 Pinned by `tests/system/test_demo_e2e.py::test_central_ownership_view_shows_departed_dri_orphan`.
 Features: FEAT-OWNERSHIP-009
 
@@ -1040,7 +1040,7 @@ Features: FEAT-SETTINGS-002
 **What it shows.** `CDMON_SERVER_PORT=7007` (and the other `CDMON_*` knobs) override
 the file value (env wins); `secret_presence()` reports whether the admin token / DB
 url / KEK are set — never their values.
-**How to observe.** `cdmon settings` with `CDMON_SERVER_PORT=7007` prints
+**How to observe.** `cdx settings` with `CDMON_SERVER_PORT=7007` prints
 `server.port: 7007`; with `CDMON_ADMIN_TOKEN` set prints `admin_token_configured: set`
 but never the token. Pinned by `tests/unit/test_settings.py` + `tests/system/test_settings_cli.py`.
 Features: FEAT-SETTINGS-003
@@ -1080,10 +1080,10 @@ with `secrets.admin_token_configured` a boolean and no token string anywhere. Pi
 by `tests/integration/test_server_settings.py`.
 Features: FEAT-SETTINGS-007
 
-### DEMO-075 — cdmon settings shows the effective configuration
-**What it shows.** `cdmon settings` prints the resolved host/port + hardening knobs and
+### DEMO-075 — cdx settings shows the effective configuration
+**What it shows.** `cdx settings` prints the resolved host/port + hardening knobs and
 the secret presence (never values); `--json` emits the same; a malformed file exits 1.
-**How to observe.** `cdmon settings --json` emits `{settings, secrets}`; a bad
+**How to observe.** `cdx settings --json` emits `{settings, secrets}`; a bad
 `--settings` file exits 1 with `error:`. Pinned by `tests/system/test_settings_cli.py`.
 Features: FEAT-SETTINGS-008
 
@@ -1110,10 +1110,10 @@ SAME old review date is fresh for one audience and stale for the other.
 days ago is FRESH while an eng-guide is STALE. Pinned by `tests/unit/test_staleness.py`.
 Features: FEAT-STALENESS-003
 
-### DEMO-079 — cdmon staleness CLI
-**What it shows.** `cdmon staleness --now <ISO>` lists the docs needing a review; `--json`
+### DEMO-079 — cdx staleness CLI
+**What it shows.** `cdx staleness --now <ISO>` lists the docs needing a review; `--json`
 shows all; `--fail-on-stale` turns it into a CI review gate (exit 1 on any stale/never).
-**How to observe.** `cdmon staleness --config <cfg> --now 2026-06-22T00:00:00Z` prints the
+**How to observe.** `cdx staleness --config <cfg> --now 2026-06-22T00:00:00Z` prints the
 stale/never docs; `--fail-on-stale` exits 1. Pinned by `tests/system/test_staleness_cli.py`.
 Features: FEAT-STALENESS-004
 

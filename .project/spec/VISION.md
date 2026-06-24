@@ -1,4 +1,4 @@
-# code-doc-monitor — EPIC-2 vision
+# custodex — EPIC-2 vision
 
 `vision_version 1.0.0` — builds on the finished EPIC-CDM (CDM-00..11). This is
 the second program: turn the local drift monitor into a **lossless, self-closing,
@@ -51,7 +51,7 @@ that keeps improving *itself*.
    LLM is removed from that path and the system's cost curve bends *down* as it
    learns.
 
-6. **Central server + DB (EPIC E).** code-doc-monitor reports records to a
+6. **Central server + DB (EPIC E).** custodex reports records to a
    central service (it already has the `HttpSink` seam and a versioned schema).
    The service owns a database of repos, records, outcomes, and coverage
    snapshots — one place to see every code↔doc sync it monitors.
@@ -60,14 +60,14 @@ that keeps improving *itself*.
    status, coverage, and health metrics (MTTR, escalation/override-rate trends).
 
 8. **Self-improvement of the monitor itself (EPIC H).** "Self-improving" here
-   means **code-doc-monitor improves code-doc-monitor** — telemetry shows which
+   means **custodex improves custodex** — telemetry shows which
    prompts/rules underperform; lessons-learnt become regression tests; it
    dogfoods its own growing codebase toward 100% coverage. Surfacing items back
    to a *monitored* repo (e.g. opening a gap issue) is a welcome secondary
    output, not the definition.
 
    Deployability (EPIC G) makes pillars 6–8 real for *other* repos: a single
-   `cdmon init --central <url>` drops the client into any codebase.
+   `cdx init --central <url>` drops the client into any codebase.
 
 ## Non-negotiables carried forward
 

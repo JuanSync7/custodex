@@ -1,6 +1,6 @@
 """add repos.token_hash for per-repo bearer auth (E-06).
 
-ADDITIVE migration mirroring ``code_doc_monitor.server.db.RepoRow.token_hash``: a
+ADDITIVE migration mirroring ``custodex.server.db.RepoRow.token_hash``: a
 nullable ``token_hash`` column on ``repos`` holding the sha256 hash of a repo's
 bearer token (never the plaintext). Nullable so it is back-compatible with pre-E-06
 repo rows / token-less repos (whose writes stay open). ``upgrade`` adds the column;

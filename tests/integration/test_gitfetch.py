@@ -2,9 +2,9 @@
 
 The headline Step-0 goal: the server can sync a repo it does NOT hold locally.
 Here we build a real on-disk git repo (the same dir-layout shape as
-``test_configsync.py``), then drive the REAL :class:`~code_doc_monitor.gitfetch`
+``test_configsync.py``), then drive the REAL :class:`~custodex.gitfetch`
 ``_GitCloner`` over a ``file://`` URL (no network — EDR-safe) into a throwaway
-temp tree, and run :func:`code_doc_monitor.configsync.run_sync` over the clone —
+temp tree, and run :func:`custodex.configsync.run_sync` over the clone —
 proving the cloned tree's documents + coverage surface exactly as if it had been
 on disk all along. The temp clone is gone after the ``with`` block (K1).
 
@@ -22,9 +22,9 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.configsync import run_sync
-from code_doc_monitor.errors import SyncError
-from code_doc_monitor.gitfetch import RemoteSpec, cloned_repo
+from custodex.configsync import run_sync
+from custodex.errors import SyncError
+from custodex.gitfetch import RemoteSpec, cloned_repo
 
 _NOW = "2026-06-10T00:00:00Z"
 
@@ -34,7 +34,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: cloned
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-10"
 ---
 root: "../.."
@@ -109,7 +109,7 @@ def _seed_docs(config_dir: Path) -> None:
     """Heal docs/api.md to a clean baseline via the real monitor pipeline."""
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     result = CliRunner().invoke(
         app, ["monitor", "--config", str(config_dir), "--apply"]

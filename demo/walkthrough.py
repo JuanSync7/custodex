@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""A deterministic, offline guided tour of the cdmon detect -> heal loop.
+"""A deterministic, offline guided tour of the cdx detect -> heal loop.
 
 Run it from the repo root::
 
@@ -7,28 +7,28 @@ Run it from the repo root::
 
 It copies the checked-in ``demo/`` into a throwaway temp directory (it NEVER
 mutates the canonical demo, K1), induces real drift on a tracked source file,
-then drives ``cdmon`` through its core loop on the COPY:
+then drives ``cdx`` through its core loop on the COPY:
 
-    1. drift detected   — ``cdmon check`` reports drift (exit non-zero)
-    2. healed           — ``cdmon monitor --apply`` regenerates the region
-    3. clean            — ``cdmon check`` is clean again (exit 0)
-    4. review log       — ``cdmon report`` shows the recorded verdict/provenance
-    5. coverage gap     — ``cdmon rpt`` shows the undocumented ``scheduler.py``
-    6. doctor pass      — ``cdmon doctor`` preflight passes
+    1. drift detected   — ``cdx check`` reports drift (exit non-zero)
+    2. healed           — ``cdx monitor --apply`` regenerates the region
+    3. clean            — ``cdx check`` is clean again (exit 0)
+    4. review log       — ``cdx report`` shows the recorded verdict/provenance
+    5. coverage gap     — ``cdx rpt`` shows the undocumented ``scheduler.py``
+    6. doctor pass      — ``cdx doctor`` preflight passes
 
 It then demonstrates the two EDITOR (E-12) engine actions the Mapping page wires
 to buttons, still on the COPY and still offline:
 
     7. apply-fix       — the ``Apply fix (LLM)`` button's engine
-                         (:func:`code_doc_monitor.generate.apply_record_fix`):
+                         (:func:`custodex.generate.apply_record_fix`):
                          induce drift, get a FIX record carrying a ``fix``, apply
                          it (print the unified diff), and prove a second call is an
                          idempotent no-op (K7).
     8. link → generate — the ``Link a file → Generate / make live`` flow
-                         (:func:`code_doc_monitor.generate.apply_edits_to_disk`):
+                         (:func:`custodex.generate.apply_edits_to_disk`):
                          stage an ``add_code_ref`` edit linking the deliberately
                          UNLINKED ``scheduler.py`` to ``core-api``, apply it, and
-                         show ``cdmon rpt`` no longer lists ``scheduler.py`` as
+                         show ``cdx rpt`` no longer lists ``scheduler.py`` as
                          undocumented — the coverage gap is closed live.
 
 Everything is offline and deterministic: it uses the demo's built-in ``mock``
@@ -44,12 +44,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from code_doc_monitor.config import load_config_dir
-from code_doc_monitor.generate import apply_edits_to_disk, apply_record_fix
-from code_doc_monitor.monitor import Monitor
-from code_doc_monitor.schema import Verdict
-from code_doc_monitor.server.edits import AddCodeRefEdit, EditCodeRef
-from code_doc_monitor.sinks import NullSink
+from custodex.config import load_config_dir
+from custodex.generate import apply_edits_to_disk, apply_record_fix
+from custodex.monitor import Monitor
+from custodex.schema import Verdict
+from custodex.server.edits import AddCodeRefEdit, EditCodeRef
+from custodex.sinks import NullSink
 
 # The canonical, checked-in demo (this script lives at demo/walkthrough.py).
 _DEMO_DIR = Path(__file__).resolve().parent
@@ -84,16 +84,16 @@ def _header(step: str, title: str) -> None:
 def _cdmon(
     config_dir: Path, *args: str, config_flag: str = "--config"
 ) -> subprocess.CompletedProcess[str]:
-    """Run ``cdmon <args> <config_flag> <config_dir>`` via the in-tree CLI module.
+    """Run ``cdx <args> <config_flag> <config_dir>`` via the in-tree CLI module.
 
-    Uses ``python -m code_doc_monitor.cli`` with the SAME interpreter that runs
+    Uses ``python -m custodex.cli`` with the SAME interpreter that runs
     this script, so it works straight from the activated venv with no network.
     Most commands take ``--config``; ``rpt`` takes ``--config-dir`` instead.
     """
     cmd = [
         sys.executable,
         "-m",
-        "code_doc_monitor.cli",
+        "custodex.cli",
         *args,
         config_flag,
         str(config_dir),
@@ -175,7 +175,7 @@ def _demo_link_generate(copy_dir: Path) -> int:
     the Mapping page). Here we stage the edit the ticket form would submit — an
     ``add_code_ref`` linking ``scheduler.py`` to ``core-api`` — apply it with
     :func:`apply_edits_to_disk` (writes the unit yaml + index, scaffolds/heals the
-    doc), then show ``cdmon rpt`` no longer lists ``scheduler.py`` as undocumented:
+    doc), then show ``cdx rpt`` no longer lists ``scheduler.py`` as undocumented:
     the gap is closed live. Returns an exit code.
     """
     _header("[8/8]", "Link → generate: `apply_edits_to_disk` (close the coverage gap)")
@@ -225,40 +225,40 @@ def run(copy_dir: Path) -> int:
     _induce_drift(copy_dir)
     print("Added Engine.is_complete() to src/taskflow/core/engine.py", flush=True)
 
-    _header("[2/6]", "Detect: `cdmon check` should report drift")
+    _header("[2/6]", "Detect: `cdx check` should report drift")
     check = _cdmon(config_dir, "check")
     if check.returncode == 0:
         print("UNEXPECTED: check found no drift", file=sys.stderr)
         return 1
-    print(f"drift detected (cdmon check exit {check.returncode})", flush=True)
+    print(f"drift detected (cdx check exit {check.returncode})", flush=True)
 
-    _header("[3/6]", "Heal: `cdmon monitor --apply` (mock backend, offline)")
+    _header("[3/6]", "Heal: `cdx monitor --apply` (mock backend, offline)")
     healed = _cdmon(config_dir, "monitor", "--apply")
     if healed.returncode != 0:
         print("UNEXPECTED: heal did not converge", file=sys.stderr)
         return 1
     print("healed: region regenerated from the live code surface", flush=True)
 
-    _header("[4/6]", "Verify: `cdmon check` should be clean again")
+    _header("[4/6]", "Verify: `cdx check` should be clean again")
     reclean = _cdmon(config_dir, "check")
     if reclean.returncode != 0:
         print("UNEXPECTED: drift remains after heal", file=sys.stderr)
         return 1
-    print(f"clean (cdmon check exit {reclean.returncode})", flush=True)
+    print(f"clean (cdx check exit {reclean.returncode})", flush=True)
 
-    _header("[5/6]", "Review log: `cdmon report` shows the recorded verdict")
+    _header("[5/6]", "Review log: `cdx report` shows the recorded verdict")
     report = _cdmon(config_dir, "report")
     if report.returncode != 0:
         print("UNEXPECTED: report failed", file=sys.stderr)
         return 1
 
     _header("[6/6]", "Coverage gap + doctor preflight")
-    print("--- coverage gap: `cdmon rpt` ---", flush=True)
+    print("--- coverage gap: `cdx rpt` ---", flush=True)
     rpt = _cdmon(config_dir, "rpt", config_flag="--config-dir")
     if rpt.returncode != 0 or "scheduler.py" not in rpt.stdout:
         print("UNEXPECTED: scheduler.py gap not reported", file=sys.stderr)
         return 1
-    print("\n--- doctor preflight: `cdmon doctor` ---", flush=True)
+    print("\n--- doctor preflight: `cdx doctor` ---", flush=True)
     doctor = _cdmon(config_dir, "doctor")
     if doctor.returncode != 0:
         print("UNEXPECTED: doctor did not pass", file=sys.stderr)

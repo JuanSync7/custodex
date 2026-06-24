@@ -1,14 +1,153 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d5ac74f15012e861
+  fingerprint: 6dafb6da173d4a99
+  fingerprint_tiers:
+    composite: 6dafb6da173d4a99
+    docstring: 9c4e6ddadc393aa4
+    signature: 72778b04ea833c69
+  region_anchors:
+    symbols:
+    - 000f066b671bb0ba
+    - 00a7ce0cbacbcf4c
+    - 04b3eb1ec27586a1
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0a412344fabd6422
+    - 0b0fe3e2145090f0
+    - 0ba04f40d95602fe
+    - 101c5c19d00d50c7
+    - 10af53c00976b733
+    - 12c0956234545317
+    - 14de115be3e0e2e2
+    - 182cb31b005cd1f6
+    - 190b2af0b34383b7
+    - 1ca29bd3a3b4b625
+    - 1d17d141d76bc3bc
+    - 1ea7d09f8477a491
+    - 1f492dd8d1d03dee
+    - 20d1a793870421e1
+    - 24693f46e2eb5f98
+    - 2e716e21070d739d
+    - 2fb4019a35e427e8
+    - 310c830c7dcd960a
+    - 3450707237dd8d47
+    - 35d866910e259e39
+    - 36b9c9cb73b79163
+    - 3a15c9cb0fa4bc72
+    - 3b708fe97f56ac20
+    - 3dfa2b7510a5aee9
+    - 4063c79b7436b301
+    - 41eb1e4d3263285b
+    - 4235a38bac272c55
+    - 472f53d5ed2d4191
+    - 495f8d997abb0827
+    - 496ea4e48ea5ee9c
+    - 499bd50ef74cffe5
+    - 49b30d3ad899537e
+    - 4a36f89dafb0a101
+    - 4c2e1df4570bebd6
+    - 4d7314369ab19a34
+    - 4f2cdf9e58e13c11
+    - 50eee1f18330d45e
+    - 5522738f3007a454
+    - 576183587590d09c
+    - 591813cff22d653f
+    - 5a8d926e4f46ec09
+    - 5b3f7f5938d4e853
+    - 5bea2c1f3984fd17
+    - 5c55d03fd5d5c477
+    - 5ca8e2a5128ffc67
+    - 5e7f06142e977dfd
+    - 5ebe9beb1b4ba494
+    - 5f0f67562e85cc5b
+    - 63f15dd24f76a485
+    - 6aefe06c88cc6aa5
+    - 6c452d3a760ba1ad
+    - 6dbbdc54ad939e7f
+    - 70df2bfd15daec86
+    - 71067f90c963ec79
+    - 7148c31132fd948d
+    - 733988d48829d546
+    - 734cd0dc97a71153
+    - 736c6068e253c25c
+    - 73daeb0abf7030ac
+    - 7449bad0723fe283
+    - 750a33ca97ad80ca
+    - 769ec087fea9c42a
+    - 78075ff39fa34460
+    - 7a7ba00dda5103af
+    - 7ae72b95145f540e
+    - 7fcfe074fe821547
+    - 8086ff6b242489a7
+    - 9084d14f98d22340
+    - 90d66183e64d3c8e
+    - 940635f16be1e148
+    - 96d61d282831ff04
+    - 98cf07abfb489c1c
+    - 99c81d63635d006a
+    - 9ab2707615526b01
+    - 9c0fc2cda7817f04
+    - a1311a0b2ec8a111
+    - a1f9f193ac6ee97c
+    - a4edbfd82a2ad5f2
+    - a5ea51e88c522b3b
+    - aa2bfe52462f5e54
+    - aa435b9aa88eb0a1
+    - abd4ffb57b0e2dcf
+    - ae091177c08a97a0
+    - ae2c81c23afc62ef
+    - ae524b54d9b5acbe
+    - af97b52edf8ed587
+    - b08f821c395d4fbe
+    - b32d5dbe5299d7e5
+    - b57e25e25b34c845
+    - b9a532775dff1fb6
+    - baa9735317b4aa72
+    - bae9264d6d972b80
+    - bc10de9bfef9c2cb
+    - bc1f12077b34309a
+    - bd20edc0c3d6528a
+    - bfab8aab7aaf99ef
+    - c1ef372c178707e3
+    - c3981046dd7878b3
+    - c5c229be4c0d7c0a
+    - ca120419f251c74b
+    - ca79e52557341f36
+    - d25352aee0327514
+    - d4055fafa3794fa8
+    - e45887ebba1b35ff
+    - e476fdc0cb20462c
+    - e619c1c43ea828e3
+    - e9e770dcee78b3c7
+    - ec32d5357eb214b6
+    - ed9a173a86d743b5
+    - eed1b161f8dc56d4
+    - ef9183ad431d7457
+    - ef97a7d1515b74d6
+    - f2b1c8584a68d310
+    - f75907b9759399c4
+    - f84f756b48f26fd9
+    - fa2f6597462ddabd
+    - fe9d46d6cc2990f0
   region_hashes:
     symbols: 2b2b0ac83969e611
   schema_version: 1.0.0
 ---
-# code-doc-monitor — remediation (engineering reference)
+# custodex — remediation (engineering reference)
 
-> Auto-maintained by code-doc-monitor itself (dogfood). The prose is human;
+> Auto-maintained by custodex itself (dogfood). The prose is human;
 > the symbol table below is generated from the code and kept in sync.
 
 <!-- CDM:BEGIN symbols -->

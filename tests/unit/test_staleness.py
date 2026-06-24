@@ -12,14 +12,14 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     DocumentSpec,
     MonitorConfig,
     StalenessConfig,
 )
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.staleness import (
+from custodex.errors import ConfigError
+from custodex.staleness import (
     ReviewedDoc,
     StalenessStatus,
     detect_stale,

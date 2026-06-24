@@ -12,7 +12,7 @@ updated: "2026-06-13"
 # `.py` files, so the SAME machinery that syncs src/taskflow → docs/ syncs
 # tests/ → test-docs/: one test-doc per test file, each tracked against the test
 # file's `test_*` functions via a managed `symbols` region. Edit/rename a test and
-# its test-doc drifts for review; `cdmon monitor --apply` heals it.
+# its test-doc drifts for review; `cdx monitor --apply` heals it.
 
 # This unit's coverage scope: the demo's test tree.
 dir-covered:

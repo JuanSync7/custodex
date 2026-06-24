@@ -12,9 +12,9 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from code_doc_monitor.config import Audience, CodeRef, DocumentSpec
-from code_doc_monitor.errors import ExtractionError
-from code_doc_monitor.extract import (
+from custodex.config import Audience, CodeRef, DocumentSpec
+from custodex.errors import ExtractionError
+from custodex.extract import (
     Record,
     build_document_surface,
     extract_argparse_records,
@@ -210,7 +210,7 @@ def test_switches_tcl_regexp_charclass(tmp_path):
 def test_extract_file_tolerates_non_utf8_bytes(tmp_path):
     # Real-world source files aren't always clean UTF-8 (genbuild has one with a
     # 0x85 byte). Extraction must not crash — bad bytes are replaced, not fatal.
-    from code_doc_monitor.extract import extract_file
+    from custodex.extract import extract_file
 
     p = tmp_path / "legacy.py"
     p.write_bytes(

@@ -19,19 +19,19 @@ from typing import Any
 
 import pytest
 
-from code_doc_monitor.registry import RegistrationPayload
-from code_doc_monitor.sinks import RepoIdentity
+from custodex.registry import RegistrationPayload
+from custodex.sinks import RepoIdentity
 
 
 @pytest.fixture(params=["memory", "sql"])
 def store(request: pytest.FixtureRequest) -> Any:
     """A fresh Store of each kind — proves InMemoryStore/SqlStore parity (K6)."""
     if request.param == "memory":
-        from code_doc_monitor.server.store import InMemoryStore
+        from custodex.server.store import InMemoryStore
 
         return InMemoryStore()
     pytest.importorskip("sqlalchemy", reason="the [server] extra is not installed")
-    from code_doc_monitor.server.db import SqlStore, create_all, engine_from_url
+    from custodex.server.db import SqlStore, create_all, engine_from_url
 
     engine = engine_from_url("sqlite:///:memory:")
     create_all(engine)

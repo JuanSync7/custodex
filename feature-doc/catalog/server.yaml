@@ -8,7 +8,7 @@ features:
     summary: >-
       create_app builds the central FastAPI app over a dependency-injected Store
       (defaulting to InMemoryStore); importing the server subpackage requires the
-      [server] extra (fastapi), kept lazy so `import code_doc_monitor` core pulls
+      [server] extra (fastapi), kept lazy so `import custodex` core pulls
       in nothing from here, and main launches it via uvicorn on port 33333.
     subsystem: server
     modules: [server]
@@ -156,7 +156,7 @@ features:
     constraints: [K7, K8, K10]
 
   - id: FEAT-SERVER-014
-    title: Standalone per-repo `cdmon serve`
+    title: Standalone per-repo `cdx serve`
     summary: >-
       build_standalone_store / build_standalone_app build an InMemoryStore holding
       ONLY the current repo, auto-registered OPEN (no token), pre-synced read-only
@@ -189,7 +189,7 @@ features:
     constraints: [K10]
 
   - id: FEAT-SERVER-017
-    title: Client-side `cdmon register`
+    title: Client-side `cdx register`
     summary: >-
       register_repo builds a RegistrationPayload (identity from
       repo_identity_from_config: repo_id/name/url plus commit from config or

@@ -1,4 +1,4 @@
-# code-doc-monitor — EPIC-2 roadmap (backlog)
+# custodex — EPIC-2 roadmap (backlog)
 
 Epics → subtasks → **vertical slices**. Each slice is one subagent's job: a TDD
 loop (test-first), a single validable goal, additive (never breaks a prior
@@ -38,7 +38,7 @@ Status legend: ☐ todo · ◐ in progress · ✅ done · ⊘ blocked
   inert non-matching waiver is silent; missing `reason` → ConfigError.)*
 
 **A3 — Reporting & gate**
-- ✅ **A-05** `cdmon coverage` CLI: % documented + three baskets, `--json`.
+- ✅ **A-05** `cdx coverage` CLI: % documented + three baskets, `--json`.
   *Goal:* correct numbers + exit code on a fixture. *(real repo baseline: 18.2%
   public-symbol / 22.2% file documented.)*
 - ✅ **A-06** coverage gate: `--fail-under N` (gates on `percent_public_symbols`);
@@ -49,7 +49,7 @@ Status legend: ☐ todo · ◐ in progress · ✅ done · ⊘ blocked
   `coverage.py` (`suggest_owners`), NOT the Backend Protocol (avoid widening it
   for a coverage concern). Sibling-owned → existing doc; unowned file → proposed
   new doc id `pkg-sub-mod`. LLM-enhanced suggester deferred (`.project/problems/A-07.md`).
-- ✅ **A-08** `cdmon coverage --write [PATH]`. *Decision:* writes a dedicated
+- ✅ **A-08** `cdx coverage --write [PATH]`. *Decision:* writes a dedicated
   regenerable manifest (`.cdmon/coverage.json`, gitignored), NOT into the
   comment-bearing `cdmon.yaml` (would need ruamel = new dep, breaks K0; config
   stays `extra=forbid` hand-owned). Idempotent (K7): 2nd run "unchanged".
@@ -85,10 +85,10 @@ Status legend: ☐ todo · ◐ in progress · ✅ done · ⊘ blocked
   fill-then-lock. **Interim `llm` == `generated`** (renderer-backed → rendered in
   sync; no-renderer → UNHEALABLE/ESCALATE, never silently stale): the SAFE choice,
   documented in `config.RegionMode` + LAYOUT_STANDARD §7.)*
-- ✅ **B-05** LAYOUT_STANDARD + `cdmon lint --modes` surface the per-region `mode`
+- ✅ **B-05** LAYOUT_STANDARD + `cdx lint --modes` surface the per-region `mode`
   + lock/advisory STATE. *Goal:* lint reports each region's mode + state without
   re-validating (a state surface, NOT a new gate — lint's pass/fail is unchanged).
-  *(`layout.RegionState`/`region_states`/`config_region_states`; `cdmon lint --modes`
+  *(`layout.RegionState`/`region_states`/`config_region_states`; `cdx lint --modes`
   prints `doc::region — mode [renderer|no-renderer] [locked] [advisory]`.)*
 - ✅ **B-06** pure-`llm` (no-renderer) prose authoring — REPLACES the interim
   `llm`==`generated` rule. *Goal:* a `mode: llm` region with no renderer is
@@ -109,29 +109,29 @@ rule is gone; a no-renderer `llm` region is now real backend-authored prose).
 
 ## EPIC C — PR-driven loop & trigger
 
-- ✅ **C-01** `docs:gate` MR job in `.gitlab-ci.yml` (offline `cdmon check`+`lint`).
-- ✅ **C-02** `cdmon sync-pr` (+`--dry-run`): heals + emits a git-free `difflib`
+- ✅ **C-01** `docs:gate` MR job in `.gitlab-ci.yml` (offline `cdx check`+`lint`).
+- ✅ **C-02** `cdx sync-pr` (+`--dry-run`): heals + emits a git-free `difflib`
   patch of changed docs; empty + idempotent when clean; honors region authority
   (human/locked bodies never in the patch). `sync_pr(monitor, *, dry_run)`.
-- ✅ **C-03** bot-PR opener `cdmon open-docs-pr` (injected `PRTransport`;
+- ✅ **C-03** bot-PR opener `cdx open-docs-pr` (injected `PRTransport`;
   `GitLabTransport` stdlib-urllib default; deterministic branch from patch hash;
   dry-run prints plan; empty→no-op). `pr.py` 100%, real HTTP the only uncovered leaf.
 - ☑ **C-04** loop-safety: doc-only commit produces no re-trigger (simulated).
   *Goal:* guard proven with a fixture commit graph. → `syncpr.should_sync` +
-  `cdmon should-sync` (exit 0 proceed / 1 skip) + the `.gitlab-ci.yml` `docs:heal`
+  `cdx should-sync` (exit 0 proceed / 1 skip) + the `.gitlab-ci.yml` `docs:heal`
   guard; truth-table + CLI-exit-code tests prove doc-only→skip, mixed→proceed,
   empty→skip.
 - ☑ **C-05** provenance: doc-PR links source commit/PR; record carries
   `source_sha`. *Goal:* record + trailer assert the link. → additive
   `ReviewRecord.source_sha` (old logs still parse, K6) stamped by
-  `Monitor`/`cdmon monitor --ref`; ref precedence: flag → `$CI_COMMIT_SHA` → none.
+  `Monitor`/`cdx monitor --ref`; ref precedence: flag → `$CI_COMMIT_SHA` → none.
 
 > **EPIC C COMPLETE** (C-01..C-05). The PR-driven loop is closed end-to-end and
 > SAFE: `check`/`sync-pr` produce the docs patch, `open-docs-pr` opens the MR with
 > a provenance `ref`, `should_sync` structurally prevents the bot's doc-only commit
 > from re-triggering the heal, and every record carries `source_sha` (the same ref
 > the MR shows). EPIC D builds the outcome/feedback edge on this same schema
-> additivity (`cdmon resolve` + a resolution field).
+> additivity (`cdx resolve` + a resolution field).
 
 ## EPIC D — Outcome/feedback edge & learning
 
@@ -139,10 +139,10 @@ rule is gone; a no-renderer `llm` region is now real backend-authored prose).
   resolved_text/by/at. *Goal:* versioned-additive; old logs still parse. **DONE**
   — `Resolution` enum + `ResolutionRecord` (frozen, `note` appended last → K6
   back-compat); `resolution_record_schema()`.
-- ☑ **D-02** `cdmon resolve <record_id> …`: append a human outcome. *Goal:*
+- ☑ **D-02** `cdx resolve <record_id> …`: append a human outcome. *Goal:*
   outcome persisted + queryable. **DONE** — append-only `.cdmon/resolutions.jsonl`
   (`append_resolution`/`read_resolutions`), `resolved_index` (last-write-wins) +
-  `summarize_with_resolutions`; `cdmon resolve` (loud K8 on unknown id, injected
+  `summarize_with_resolutions`; `cdx resolve` (loud K8 on unknown id, injected
   `now`) + `report` resolved/unresolved counts.
 - ☑ **D-03** `similar.py`: rank N most-similar past resolved records. Pure.
   *Goal:* a planted near-duplicate ranks first; deterministic.
@@ -154,7 +154,7 @@ rule is gone; a no-renderer `llm` region is now real backend-authored prose).
   groups RESOLVED records by the GENERALIZABLE shape `(doc_id, drift_kind, audience)`
   (NOT `surface_hash`); a shape with ≥K resolved records UNANIMOUSLY sharing ONE
   DECISION resolution (`invalidated`/`rejected`) → one `PromotionCandidate`.
-  `overridden`/`accepted` excluded; `cdmon promotions [--min-count N] [--json]`.
+  `overridden`/`accepted` excluded; `cdx promotions [--min-count N] [--json]`.
 - ☑ **D-06** rule application: promoted rule resolves that shape with **no
   backend call**. *Goal:* post-promotion, zero backend invocations for it. **DONE**
   — `PromotionRule` + `rule_for(drift, rules)`; `Monitor(..., rules=())` opt-in
@@ -171,7 +171,7 @@ LLM is no longer consulted for it — the cost curve bends DOWN as it learns.
 ## EPIC E — Central server + DB
 
 > **STACK DECISIONS (user-chosen, 2026-06-05):** FastAPI in a
-> `code_doc_monitor.server` subpackage behind a `[server]` pip extra (K0: core
+> `custodex.server` subpackage behind a `[server]` pip extra (K0: core
 > install unchanged; server opt-in, lazy). **Postgres-first** via SQLAlchemy +
 > Alembic. **Per-repo bearer token** auth. *Testing reconciliation (K4/K9 offline
 > gate is sacred):* SQLAlchemy models use portable column types (JSON/JSONB) so
@@ -188,7 +188,7 @@ LLM is no longer consulted for it — the cost curve bends DOWN as it learns.
   wraps→drains-outbox-oldest-first→retries→queues, NEVER raises (K4); `CentralConfig`
   additive repo fields; `make_sink` loud-on-missing-`repo_id` (K8). 583 tests, gate green.
 - ☑ **E-02** repo registration payload/client. *Goal:* correct payload via mock transport.
-- ☑ **E-03** server skeleton: `code_doc_monitor/server/` ([server] extra, FastAPI),
+- ☑ **E-03** server skeleton: `custodex/server/` ([server] extra, FastAPI),
   `/ingest` + `/repos`, TestClient. *Goal:* posted record stored & retrievable;
   validated by the SHARED schema (K6). DI'd `Store` Protocol (in-memory now →
   Postgres E-04); unknown-repo ingest → 404 (no auto-register); lazy extra
@@ -228,7 +228,7 @@ query API + per-repo status view — the data plane EPIC F's SPA consumes.
 - ☑ **F-01** Vite+React+TS scaffold + API client + repos-with-status page. *Goal:*
   renders repos from a mocked API; Vitest green; `npm run build` clean. **DONE** —
   `dashboard/` SPA; lint clean, 9 Vitest tests green (no network), build → `dist/`
-  zero TS errors; Python gate still 648 passed + `cdmon check` exit 0.
+  zero TS errors; Python gate still 648 passed + `cdx check` exit 0.
 - ☑ **F-02** per-repo drift/action/log timeline view. *Goal:* renders records (mocked API). — DONE (RepoDetail filterable timeline + resolution badges; 26 frontend tests green).
 - ☑ **F-03** coverage view (% + baskets per repo). *Goal:* renders snapshot. — DONE (Coverage % + 3 baskets + empty state).
 - ☑ **F-04** resolve/escalate from UI → POST → outcome record. *Goal:* action persists (mocked API + a server integration test). — DONE (`POST /repos/{id}/resolutions` of the SHARED `ResolutionRecord`, token-protected via the E-06 `_verify_token`, 404 on unknown repo/record → 202; RepoDetail resolve form POSTs with a Bearer + reflects the new badge; TestClient auth+persist matrix + Vitest capture tests green).
@@ -238,26 +238,26 @@ query API + per-repo status view — the data plane EPIC F's SPA consumes.
 > **EPIC F COMPLETE** (F-01…F-05). The `dashboard/` React+Vite+TS SPA reads the OPEN
 > EPIC-E endpoints (repos/status/records/resolutions/coverage/health) and writes the ONE
 > Bearer-protected mutation (resolve). Python gate 658 passed/2 deselected, whole-pkg
-> 98.19%; frontend gate lint+38 Vitest+build all green; `cdmon check` exit 0.
+> 98.19%; frontend gate lint+38 Vitest+build all green; `cdx check` exit 0.
 
 ## EPIC G — Deployability (drop into any repo)
 
-- ☑ **G-01** `cdmon init --central <url>`: wires HttpSink + registration. *Goal:*
+- ☑ **G-01** `cdx init --central <url>`: wires HttpSink + registration. *Goal:*
   working client config for a fresh fixture repo.
-- ☑ **G-02** packaging + `cdmon doctor` prereq check. *Goal:* fresh-venv install + doctor green.
+- ☑ **G-02** packaging + `cdx doctor` prereq check. *Goal:* fresh-venv install + doctor green.
 - ☑ **G-03** shipped CI templates (GitLab + GitHub Actions) for adopters. *Goal:*
   template lints; dry-run. *(Done: `templates/ci/{gitlab-ci,github-actions}.adopter.yml`
   + README; a `cdmon-gate` job (doctor+check+lint) and a default-branch `cdmon-docs-pr`
   job (should-sync guard → monitor --apply → open-docs-pr); a template-honesty test
   parses every script line and fails if a template names a command the CLI doesn't expose.)*
-- ☑ **G-04** external example repo adopting cdmon end-to-end (not the dogfood).
+- ☑ **G-04** external example repo adopting cdx end-to-end (not the dogfood).
   *Goal:* external fixture reports to a TestClient server. *(Done: `examples/external-repo/`
   — widget.py + docs/api.md managed `symbols` region + cdmon.yaml http central block;
   `tests/test_example_external.py` copies it, drifts the source, heals (check→monitor
   --apply), registers + reports the healed records to an in-process TestClient server via
   HttpSink (bearer E-06), asserts repo+records land, and a WRONG token is 403'd.)*
 
-**EPIC G COMPLETE** — cdmon is droppable into any repo: `init --central` bootstraps the
+**EPIC G COMPLETE** — cdx is droppable into any repo: `init --central` bootstraps the
 client config, `doctor` is the CI preflight, the shipped CI templates wire the gate +
 docs-PR jobs, and an external example proves the whole client→server loop offline.
 
@@ -269,8 +269,8 @@ docs-PR jobs, and an external example proves the whole client→server loop offl
   escalation_rate, override_rate + `detect_promotions` candidates), worst-first;
   computed in `app.py` from store reads (InMemoryStore + SqlStore, no new method);
   TestClient tests assert exact rates + ordering.
-- ☑ **H-02** self-dogfood expansion: cdmon covers its OWN new modules toward
-  100%. *Goal:* `cdmon coverage` on own repo ≥ threshold. **DONE** — engine-scoped
+- ☑ **H-02** self-dogfood expansion: cdx covers its OWN new modules toward
+  100%. *Goal:* `cdx coverage` on own repo ≥ threshold. **DONE** — engine-scoped
   self-coverage 42.2%→100% public symbols (316/316; 4 re-export `__init__`
   symbols waived); CI gate flipped to `--fail-under 95`; `tests/test_dogfood.py`
   asserts the floor so it can't silently regress.
@@ -289,7 +289,7 @@ docs-PR jobs, and an external example proves the whole client→server loop offl
   *Goal:* issue payload asserted, no live call. **DONE** — new `issues.py`
   (`IssuePlan`, injected `IssueTransport`, GitLab/GitHub stdlib-urllib transports with
   the real POST the only `# pragma: no cover` leaf, `plan_coverage_issue`/
-  `open_coverage_issue`) + `cdmon surface-gaps [--config] [--dry-run]
+  `open_coverage_issue`) + `cdx surface-gaps [--config] [--dry-run]
   [--provider gitlab|github]`; fake-transport + dry-run-no-call tests; deterministic
   payload; `issues.py` added to `cdmon.yaml` so the self-coverage gate stays green.
 
@@ -387,7 +387,7 @@ registrations behind the now-proven seam.
 
 ## EPIC R — Reference, Traceability & Wiki  (the golden feature catalog + 1:1 demo/test/source mapping, single-source-of-truth wikis)
 
-**North star.** Every *feature* of code-doc-monitor is cataloged exactly ONCE in
+**North star.** Every *feature* of custodex is cataloged exactly ONCE in
 `feature-doc/` (the golden reference, asserted correct against source). Demos,
 tests, and source symbols each carry an inline back-reference to the feature
 IDs they exercise; a traceability engine proves every feature has ≥1 demo AND
@@ -395,7 +395,7 @@ IDs they exercise; a traceability engine proves every feature has ≥1 demo AND
 annotations — so there is **no duplicated prose** to drift (the catalog entry,
 the test docstring, and the source docstring are the only sources of truth; the
 wikis are regenerated, never hand-edited). This is itself a code↔doc drift
-problem, so the whole epic is **dogfoodable** under `cdmon`'s own discipline
+problem, so the whole epic is **dogfoodable** under `cdx`'s own discipline
 (K7 idempotent, K10 deterministic, K8 loud, K0 no new heavy dep).
 
 Format decisions (proceeding on these; revisit on request): catalog is a
@@ -410,7 +410,7 @@ directories (the user asked for clear boundaries), done in gate-green sub-slices
 - ✅ **R-01** `featurecatalog.py`: a pydantic `Feature` model (`extra=forbid`,
   frozen) + `load_catalog(dir)` over `feature-doc/catalog/*.yaml`. Fields:
   `id` (e.g. `FEAT-EXTRACT-001`, unique, pattern-checked), `title`, `summary`,
-  `subsystem`, `modules: [str]` (must name real `code_doc_monitor` modules),
+  `subsystem`, `modules: [str]` (must name real `custodex` modules),
   `constraints: [str]` (K-refs), `status`, `demos: [str]`, `tests: [str]`. *Goal:*
   loader parses a fixture catalog; duplicate ID → `CatalogError` (K8); unknown
   module ref → `CatalogError`; malformed/extra key → loud; deterministic sorted
@@ -426,7 +426,7 @@ directories (the user asked for clear boundaries), done in gate-green sub-slices
 
 **R2 — Traceability engine**
 - ✅ **R-03** `traceability.py`: cross-reference catalog × demo tags × test
-  annotations × source index → a `TraceMatrix` + gap report; `cdmon trace`
+  annotations × source index → a `TraceMatrix` + gap report; `cdx trace`
   (`--json`, `--fail-on-gap`). *Goal:* on a fixture, a feature with no demo/test
   is reported as a gap with the right exit code; deterministic (K10).
 
@@ -443,14 +443,14 @@ directories (the user asked for clear boundaries), done in gate-green sub-slices
   helper neutralized 16 `Path(__file__)` repo-root anchors before moving; root
   `conftest.py` auto-marks by path; `tests/smoke/test_boundaries.py` marker-lint
   (no stranded/unclassified test). Baseline 1440 → **1442 passed** (+2 lint), full
-  gate green, `cdmon` green; 62/65 git renames. See `.project/slices/R-05.md`.
+  gate green, `cdx` green; 62/65 git renames. See `.project/slices/R-05.md`.
 
 **R5 — Test annotation + test wiki**
 - ✅ **R-06** `testwiki.py` AST-parses the test tree (NEVER imports it — K1) →
   `TestModule`/`TestCase` (nodeid, boundary-from-path, docstring summary, `Feature:`
   refs); `render_test_wiki_md` → `feature-doc/wiki/TEST_WIKI.md` (70 modules, 1363
   cases). All 70 test files annotated with module-level `Features:` tags (3-subagent
-  fan-out) + 2 new CLI tests (`cdmon build`, `cdmon serve` guard) so EVERY feature
+  fan-out) + 2 new CLI tests (`cdx build`, `cdx serve` guard) so EVERY feature
   has ≥1 test. **`build_matrix(...).is_complete() == True`** — `features_without_test`
   AND `features_without_demo` both empty, 0 unknown refs. Full suite 1464 passed.
   See `.project/slices/R-06.md`.
@@ -464,12 +464,12 @@ directories (the user asked for clear boundaries), done in gate-green sub-slices
   EPIC-R machinery → catalog now **190**; matrix stays `is_complete()`). srcindex.py
   100% covered. See `.project/slices/R-07.md`.
 
-**R7 — `cdmon wiki` CLI + dogfood + traceability gate**
-- ✅ **R-08** `code_doc_monitor/wiki.py` (`WIKI_TARGETS` + `regenerate`) + `cdmon wiki`
+**R7 — `cdx wiki` CLI + dogfood + traceability gate**
+- ✅ **R-08** `custodex/wiki.py` (`WIKI_TARGETS` + `regenerate`) + `cdx wiki`
   [`--check`]: one command regenerates `feature-doc/FEATURES.md` + `wiki/TEST_WIKI.md`
   + `wiki/SOURCE_WIKI.md` + `wiki/TRACEABILITY.md` from their single sources;
   idempotent (re-run = all unchanged, K7), deterministic (K10); `--check` exits
-  nonzero listing stale files (K8). `cdmon trace --fail-on-gap` + `cdmon wiki --check`
+  nonzero listing stale files (K8). `cdx trace --fail-on-gap` + `cdx wiki --check`
   wired into `.gitlab-ci.yml` `docs:gate` (offline, K4). Added FEAT-REFERENCE-007
   (catalog **191**, matrix stays complete — 191/191 have a test AND a demo). wiki.py
   100% covered. See `.project/slices/R-08.md`.
@@ -477,7 +477,7 @@ directories (the user asked for clear boundaries), done in gate-green sub-slices
 **EPIC R COMPLETE** (R-01…R-08). The golden feature reference, its 1:1 demo and test
 mappings, and the test/source wikis now all regenerate from ONE source each
 (`feature-doc/catalog/*.yaml`, the tests' own docstrings, the source AST) and are
-gated against drift: `cdmon wiki --check` (freshness) + `cdmon trace --fail-on-gap`
+gated against drift: `cdx wiki --check` (freshness) + `cdx trace --fail-on-gap`
 (191/191 features have a test AND a demo) run offline in CI. cdmon's own
 code↔doc-drift discipline (K7/K8/K10) is now applied to cdmon's own documentation —
 191 features across 19 subsystems, every public module catalogued (no orphan
@@ -486,7 +486,7 @@ unit/integration/system/smoke boundaries. Follow-on (not blocking): a Confluence
 Atlassian export of the in-repo wikis; per-test prose enrichment for the test wiki.
 
 **R-09 — the wikis in the console (dashboard).** ✅ Surfaces the EPIC-R wikis in the
-cdmon frontend. **Server:** a global, public `GET /wiki` (`code_doc_monitor/server/app.py`)
+cdx frontend. **Server:** a global, public `GET /wiki` (`custodex/server/app.py`)
 reads the committed `feature-doc/` wikis and renders each to HTML via the engine's
 own `build.render_markdown` (zero new dep, K0); `create_app` gains an injectable
 `wiki_dir` (defaults to the repo's `feature-doc/`); graceful `{"sections":[]}` when
@@ -499,7 +499,7 @@ loading/error/empty states); 7 new Vitest tests. Added **FEAT-SERVER-019**
 Verified end to end in a real browser (Playwright): nav shows "Wiki" first → click
 lazy-loads + switches to the full wiki → client-side section switching renders the
 real catalog/traceability/test/source content. Python gate green (97.68%), dashboard
-`npm test:run` 141 passed + `build` OK, all 5 `cdmon` gates exit 0. See
+`npm test:run` 141 passed + `build` OK, all 5 `cdx` gates exit 0. See
 `.project/slices/R-09.md`. Follow-on (not blocking): the Test Wiki section payload is
 ~1.4 MB (1363 cases) — a per-section `GET /wiki/{id}` fetch would trim the initial
 load; in-wiki full-text search.
@@ -612,7 +612,7 @@ network — `file://`).
 > The token never enters argv/URL (GIT_ASKPASS); `remote_url` is SSRF-allowlisted;
 > the engine core stays K0 (`cryptography` lazy, `[server]`-extra only). Verified
 > end-to-end over the REAL `demo/` tree as a `file://` origin (no network). Dogfood
-> green: `cdmon check`/`lint`/`coverage --fail-under 95`/`trace --fail-on-gap`/`wiki
+> green: `cdx check`/`lint`/`coverage --fail-under 95`/`trace --fail-on-gap`/`wiki
 > --check` all exit 0; **196/196** features have a test AND a demo (4 new
 > `FEAT-GITSYNC-*`). Follow-on (not blocking): browser-OAuth web-login SSO (only if
 > the console goes interactive multi-tenant); SSH deploy keys (air-gapped adopters).

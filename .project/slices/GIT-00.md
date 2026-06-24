@@ -10,7 +10,7 @@ success AND error, and `_build_clone_argv` proves the secret never enters argv.
 
 ## In scope
 
-New module `code_doc_monitor/gitfetch.py` (engine, stdlib-only — K0):
+New module `custodex/gitfetch.py` (engine, stdlib-only — K0):
 
 ```python
 class RemoteSpec(BaseModel):                       # frozen, extra=forbid

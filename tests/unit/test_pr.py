@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.errors import TransportError
-from code_doc_monitor.pr import (
+from custodex.errors import TransportError
+from custodex.pr import (
     GitHubTransport,
     GitLabTransport,
     MergeRequestPlan,
@@ -27,7 +27,7 @@ from code_doc_monitor.pr import (
     open_docs_pr,
     plan_docs_pr,
 )
-from code_doc_monitor.syncpr import SyncResult
+from custodex.syncpr import SyncResult
 
 # A realistic two-doc patch + the healed contents on disk.
 PATCH = (
@@ -299,7 +299,7 @@ def test_gitlab_builds_default_http_leaf_without_network(
 ) -> None:
     """When no http is injected, submit builds the stdlib leaf lazily; we stub the
     one real urlopen so the build-default branch runs with NO network (K4)."""
-    import code_doc_monitor.pr as pr_mod
+    import custodex.pr as pr_mod
 
     posted: list[tuple[str, str]] = []
 
@@ -566,7 +566,7 @@ def test_github_builds_default_http_leaf_without_network(
 ) -> None:
     """No http injected → submit builds the stdlib leaf lazily; stub the one real
     urlopen so the build-default branch runs with NO network (K4)."""
-    import code_doc_monitor.pr as pr_mod
+    import custodex.pr as pr_mod
 
     posted: list[tuple[str, str]] = []
 

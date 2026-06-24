@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "code-doc-monitor"
+name = "custodex"
 version = "0.1.0"
-description = "Standardized code→documentation drift monitor: detect drift, let an LLM fix or invalidate it, log every verdict for human review, and emit a public schema to a central system."
+description = "Custodex — keeps your code and docs in sync, owned, and accountable: detect drift (code↔doc and doc↔doc), fix or invalidate it with an LLM, peg an owner to every doc, track review SLAs, and log every verdict for human review."
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2",
@@ -19,7 +19,7 @@ dependencies = [
 agent = [
     "langgraph>=1,<2",
 ]
-# The central FastAPI server (code_doc_monitor.server). Optional so the core
+# The central FastAPI server (custodex.server). Optional so the core
 # engine + CLIENT side (sinks/registry) keep a minimal dependency surface (K0);
 # the server subpackage imports fastapi only when used (lazy, like `agent`).
 # httpx is the FastAPI TestClient transport.
@@ -58,18 +58,23 @@ dev = [
 ]
 
 [project.scripts]
-cdmon = "code_doc_monitor.cli:app"
+cdx = "custodex.cli:app"
 # The central server launcher (needs the [server] extra). Equivalent to
-# `uvicorn code_doc_monitor.server.app:create_app --factory`.
-cdmon-server = "code_doc_monitor.server.app:main"
+# `uvicorn custodex.server.app:create_app --factory`.
+cdx-server = "custodex.server.app:main"
+# Deprecated aliases — `cdmon`/`cdmon-server` were the pre-rebrand names (the tool
+# is now Custodex/`cdx`). Kept as working aliases so existing scripts, CI, and
+# muscle memory don't break; they point at the same entrypoints.
+cdmon = "custodex.cli:app"
+cdmon-server = "custodex.server.app:main"
 
 [tool.setuptools.packages.find]
-include = ["code_doc_monitor*"]
+include = ["custodex*"]
 exclude = ["tests*"]
 
 # Ship the agent's Markdown artifacts (AGENT/PROTOCOL/TOOL/PERSONA) with the wheel.
 [tool.setuptools.package-data]
-"code_doc_monitor.agent" = ["prompts/*.md"]
+"custodex.agent" = ["prompts/*.md"]
 
 # ----------------------------------------------------------------------------
 # Ruff — lint + format
@@ -84,10 +89,10 @@ select = ["E", "F", "I", "W", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 # Typer's option/argument defaults are calls by design (B008).
-"code_doc_monitor/cli.py" = ["B008"]
+"custodex/cli.py" = ["B008"]
 # FastAPI's `Depends(...)` in route-handler defaults is the idiomatic DI pattern
 # (B008), exactly like typer's option defaults above.
-"code_doc_monitor/server/app.py" = ["B008"]
+"custodex/server/app.py" = ["B008"]
 
 # ----------------------------------------------------------------------------
 # mypy — strict-ish

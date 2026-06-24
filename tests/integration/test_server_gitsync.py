@@ -32,9 +32,9 @@ pytest.importorskip("fastapi", reason="the [server] extra is not installed")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _NOW = "2026-06-10T00:00:00Z"
 _REPO = "acme/widget"
@@ -46,7 +46,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: cloned
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-10"
 ---
 root: "../.."
@@ -106,7 +106,7 @@ def _git(repo: Path, *args: str) -> None:
 def _seed_docs(config_dir: Path) -> None:
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app
+    from custodex.cli import app
 
     r = CliRunner().invoke(app, ["monitor", "--config", str(config_dir), "--apply"])
     assert r.exit_code == 0, r.output
@@ -145,7 +145,7 @@ def store(request: pytest.FixtureRequest) -> Any:
     if request.param == "memory":
         return InMemoryStore()
     pytest.importorskip("sqlalchemy", reason="the [server] extra is not installed")
-    from code_doc_monitor.server.db import SqlStore, create_all, engine_from_url
+    from custodex.server.db import SqlStore, create_all, engine_from_url
 
     engine = engine_from_url("sqlite:///:memory:")
     create_all(engine)
@@ -252,7 +252,7 @@ def test_allowlisted_self_hosted_host_passes(
 ) -> None:
     # An env-allowlisted host is accepted; we still clone a real file:// repo, but
     # prove the https-host check itself does not reject an allowlisted name.
-    from code_doc_monitor.server import app as app_mod
+    from custodex.server import app as app_mod
 
     monkeypatch.setenv("CDMON_ALLOWED_GIT_HOSTS", "git.corp")
     assert "git.corp" in app_mod._allowed_git_hosts()

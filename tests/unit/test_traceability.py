@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.traceability (EPIC R, R-03).
+"""Tests for custodex.traceability (EPIC R, R-03).
 
 The feature ⇄ demo/test/source coverage matrix: a pure, deterministic engine
 that scans evidence files for the inline ``Feature:`` tag convention, crosses
@@ -18,9 +18,9 @@ import pytest
 from pydantic import ValidationError
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
-from code_doc_monitor.featurecatalog import Feature, FeatureCatalog
-from code_doc_monitor.traceability import (
+from custodex.cli import app
+from custodex.featurecatalog import Feature, FeatureCatalog
+from custodex.traceability import (
     _TAG_RE,
     FEATURE_REF_RE,
     EvidenceKind,
@@ -316,12 +316,12 @@ def test_integration_render_matrix_md_complete_says_none(tmp_path: Path) -> None
 
 
 # --------------------------------------------------------------------------
-# system / e2e — `cdmon trace` over a tmp fixture via the Typer CLI runner
+# system / e2e — `cdx trace` over a tmp fixture via the Typer CLI runner
 # --------------------------------------------------------------------------
 
 
 def _cli_fixture(tmp_path: Path, *, complete: bool) -> None:
-    """Lay out catalog/ + tests/ + demo/ under tmp_path for `cdmon trace`."""
+    """Lay out catalog/ + tests/ + demo/ under tmp_path for `cdx trace`."""
     _write_catalog(
         tmp_path / "feature-doc", _feat("FEAT-EXTRACT-001", module="extract")
     )

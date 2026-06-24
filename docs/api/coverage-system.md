@@ -1,9 +1,73 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: c517174e060739b2
+  fingerprint: 0fcc2a58c16a72d9
+  fingerprint_tiers:
+    composite: 0fcc2a58c16a72d9
+    docstring: dbb21710739ecb71
+    signature: 9c42d71c49d57a48
+  region_anchors:
+    symbols:
+    - 051af376199dec21
+    - 051af376199dec21
+    - 051af376199dec21
+    - 0a00684f58d55fb2
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0a12e5898c92bfc6
+    - 0b1efd3918e93d36
+    - 0d2ea7328ecf80d3
+    - 14360f8e77a83e3b
+    - 1806ec6f4332752f
+    - 19d970d62be117c8
+    - 1b781ce08f7f383e
+    - 1f478039981ec67a
+    - 28e334513f048254
+    - 2b1c7b749aa1db9e
+    - 2c3a315a764aa111
+    - 2dae765203afe6c5
+    - 34334567f8fc4ede
+    - 3920de84732eea78
+    - 3a9f60b22e1d58ff
+    - 427afbd939cfaab7
+    - '4378315705150641'
+    - 487c77375bf56e8e
+    - 4bb7544f582c78bb
+    - 4ec889db5ffabb51
+    - 586156833bfe91d6
+    - 587bbbca22cfe971
+    - 591e52541f62a54b
+    - 67a05c12dcf6fc16
+    - 6ae91c1e3dfb0110
+    - 6df6dbb794e027fc
+    - 74fc029dfd6da994
+    - 758f487fe8e9fcc5
+    - 76350496c0742633
+    - 78e6f4adcfaeb0b7
+    - 7a544cef931f264e
+    - 7ad564ee6eb9440b
+    - 7d557c38ede78f03
+    - 7dfb1e0cf30ef6a6
+    - 80355d08016cb600
+    - 86f1cfd890083f71
+    - 96d81dfc954ed1d1
+    - 98abd7deb3704062
+    - 9b2cb3e08a55927c
+    - 9b65a806fdded268
+    - 9cf2dab4f3165cc4
+    - a0349ffb70fca838
+    - b13b21cc700ecdf8
+    - b1accca467354d09
+    - b82edecb7b28df76
+    - becdfe67c10eaffd
+    - ceb64a017275373b
+    - d3f8b859a1d6f6e6
+    - ebc5463059b9e69c
+    - f3ed7c6531101567
+    - f5360eea84dad3bf
+    - f5cdddaecbe5e409
   region_hashes:
-    symbols: fd9462ac5f4b71ff
+    symbols: 88c39ba5596976d6
   schema_version: 1.0.0
 ---
 # coverage-system
@@ -38,7 +102,7 @@ cdm:
 | RptUndocumented | class | class RptUndocumented(BaseModel) |
 | RptUnit | class | class RptUnit(BaseModel) |
 | SymbolInventory | class | class SymbolInventory(BaseModel) |
-| _GENERATED_BY | variable | _GENERATED_BY = 'cdmon rpt' |
+| _GENERATED_BY | variable | _GENERATED_BY = 'cdx rpt' |
 | _LANGUAGE_BY_EXT | variable | _LANGUAGE_BY_EXT: dict[str, str] = {'.py': 'python', '.pyi': 'python'} |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |

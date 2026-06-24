@@ -1,4 +1,4 @@
-"""CDM-06 — tests for the full `cdmon` CLI (offline, via CliRunner).
+"""CDM-06 — tests for the full `cdx` CLI (offline, via CliRunner).
 
 Features: FEAT-CLI-004, FEAT-CLI-005, FEAT-CLI-006, FEAT-CLI-007, FEAT-CLI-008
 Features: FEAT-CLI-009, FEAT-CLI-013
@@ -19,15 +19,15 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from code_doc_monitor.blocks import symbol_table
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import (
+from custodex.blocks import symbol_table
+from custodex.cli import app
+from custodex.config import (
     Audience,
     CodeRef,
     DocumentSpec,
     MonitorConfig,
 )
-from code_doc_monitor.extract import build_document_surface
+from custodex.extract import build_document_surface
 
 runner = CliRunner()
 
@@ -329,7 +329,7 @@ def test_lint_bad_config_clean_error(tmp_path: Path, monkeypatch) -> None:
     assert "error:" in result.output
 
 
-# --- B-05: `cdmon lint --modes` per-region authority STATE surface -------------
+# --- B-05: `cdx lint --modes` per-region authority STATE surface -------------
 
 
 def _write_config_with_human(tmp_path: Path) -> Path:
@@ -386,7 +386,7 @@ def test_lint_modes_does_not_suppress_structural_failures(
     assert "generated" in result.output
 
 
-# --- A-05/06: `cdmon coverage` CLI + `--fail-under` gate ----------------------
+# --- A-05/06: `cdx coverage` CLI + `--fail-under` gate ----------------------
 
 # A repo where one file is fully documented, a second public symbol is an
 # undocumented gap, and a third is waived with a reason. Drives every basket.
@@ -531,7 +531,7 @@ def test_coverage_renders_file_baskets(tmp_path: Path, monkeypatch) -> None:
     assert "vendor.py — third-party; documented upstream" in out
 
 
-# --- A-08: `cdmon coverage --write [PATH]` manifest writer (K1/K7/K10) --------
+# --- A-08: `cdx coverage --write [PATH]` manifest writer (K1/K7/K10) --------
 
 
 def test_coverage_write_creates_manifest(tmp_path: Path, monkeypatch) -> None:
@@ -614,7 +614,7 @@ def test_coverage_write_manifest_is_valid_json(tmp_path: Path, monkeypatch) -> N
     assert text == json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
-# --- C-01: `cdmon sync-pr` doc-patch producer --------------------------------
+# --- C-01: `cdx sync-pr` doc-patch producer --------------------------------
 
 
 def test_sync_pr_prints_patch_and_heals(tmp_path: Path, monkeypatch) -> None:
@@ -668,7 +668,7 @@ def test_sync_pr_bad_config_clean_error(tmp_path: Path, monkeypatch) -> None:
     assert "Traceback" not in result.output
 
 
-# --- C-03: `cdmon open-docs-pr` bot-PR opener --------------------------------
+# --- C-03: `cdx open-docs-pr` bot-PR opener --------------------------------
 
 
 def test_open_docs_pr_dry_run_prints_plan_and_leaves_tree(
@@ -711,7 +711,7 @@ def test_open_docs_pr_submits_via_stubbed_gitlab_leaf(
     tmp_path: Path, monkeypatch
 ) -> None:
     """End to end: heal + open an MR, with the one real urlopen leaf stubbed (K4)."""
-    import code_doc_monitor.pr as pr_mod
+    import custodex.pr as pr_mod
 
     _make_fixture(tmp_path, clean=False)
     monkeypatch.chdir(tmp_path)
@@ -738,7 +738,7 @@ def test_open_docs_pr_submits_via_stubbed_gitlab_leaf(
     assert "OUT OF DATE" not in (tmp_path / "guide.md").read_text(encoding="utf-8")
 
 
-# --- E-02: `cdmon register` repo registration client -------------------------
+# --- E-02: `cdx register` repo registration client -------------------------
 
 
 def _write_register_config(tmp_path: Path, *, with_repo_id: bool = True) -> Path:
@@ -787,7 +787,7 @@ def test_register_dry_run_prints_payload_no_network(
 
 def test_register_submits_via_stubbed_leaf(tmp_path: Path, monkeypatch) -> None:
     """End to end: register a repo with the one real urlopen leaf stubbed (K4)."""
-    import code_doc_monitor.registry as registry_mod
+    import custodex.registry as registry_mod
 
     _write_register_config(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -818,7 +818,7 @@ def test_register_missing_repo_id_is_loud(tmp_path: Path, monkeypatch) -> None:
     assert "Traceback" not in result.output
 
 
-# --- C-04: `cdmon should-sync` exit codes (proceed 0 / skip 1) ------------------
+# --- C-04: `cdx should-sync` exit codes (proceed 0 / skip 1) ------------------
 
 
 def test_should_sync_proceeds_on_non_doc_change(tmp_path: Path, monkeypatch) -> None:
@@ -855,11 +855,11 @@ def test_should_sync_bad_config_clean_error(tmp_path: Path, monkeypatch) -> None
     assert "Traceback" not in result.output
 
 
-# --- C-05: `cdmon monitor --ref` stamps provenance onto records -----------------
+# --- C-05: `cdx monitor --ref` stamps provenance onto records -----------------
 
 
 def test_monitor_ref_stamps_source_sha(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_all
+    from custodex.reviewlog import read_all
 
     _make_fixture(tmp_path, clean=False)
     monkeypatch.chdir(tmp_path)
@@ -871,7 +871,7 @@ def test_monitor_ref_stamps_source_sha(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_monitor_falls_back_to_ci_commit_sha_env(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_all
+    from custodex.reviewlog import read_all
 
     _make_fixture(tmp_path, clean=False)
     monkeypatch.chdir(tmp_path)
@@ -884,7 +884,7 @@ def test_monitor_falls_back_to_ci_commit_sha_env(tmp_path: Path, monkeypatch) ->
 
 
 def test_monitor_ref_flag_overrides_env(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_all
+    from custodex.reviewlog import read_all
 
     _make_fixture(tmp_path, clean=False)
     monkeypatch.chdir(tmp_path)
@@ -898,7 +898,7 @@ def test_monitor_ref_flag_overrides_env(tmp_path: Path, monkeypatch) -> None:
 def test_monitor_no_ref_no_env_leaves_source_sha_none(
     tmp_path: Path, monkeypatch
 ) -> None:
-    from code_doc_monitor.reviewlog import read_all
+    from custodex.reviewlog import read_all
 
     _make_fixture(tmp_path, clean=False)
     monkeypatch.chdir(tmp_path)
@@ -910,12 +910,12 @@ def test_monitor_no_ref_no_env_leaves_source_sha_none(
     assert all(rec.source_sha is None for rec in records)
 
 
-# --- D-01/D-02: `cdmon resolve` (capture the human outcome) --------------------
+# --- D-01/D-02: `cdx resolve` (capture the human outcome) --------------------
 
 
 def _seed_review_log(tmp_path: Path) -> str:
     """Run monitor to write a real review log; return one record_id from it."""
-    from code_doc_monitor.reviewlog import read_all
+    from custodex.reviewlog import read_all
 
     _make_fixture(tmp_path, clean=False)
     runner.invoke(app, ["monitor", "--apply"])
@@ -925,7 +925,7 @@ def _seed_review_log(tmp_path: Path) -> str:
 
 
 def test_resolve_appends_resolution_and_confirms(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_resolutions
+    from custodex.reviewlog import read_resolutions
 
     monkeypatch.chdir(tmp_path)
     rid = _seed_review_log(tmp_path)
@@ -954,7 +954,7 @@ def test_resolve_unknown_id_is_clean_error(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_resolve_overridden_stores_text(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_resolutions
+    from custodex.reviewlog import read_resolutions
 
     monkeypatch.chdir(tmp_path)
     rid = _seed_review_log(tmp_path)
@@ -986,8 +986,8 @@ def test_resolve_bad_resolution_is_clean_error(tmp_path: Path, monkeypatch) -> N
 
 
 def test_resolve_injected_now_is_deterministic(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor import cli as cli_mod
-    from code_doc_monitor.reviewlog import read_resolutions
+    from custodex import cli as cli_mod
+    from custodex.reviewlog import read_resolutions
 
     monkeypatch.chdir(tmp_path)
     rid = _seed_review_log(tmp_path)
@@ -998,7 +998,7 @@ def test_resolve_injected_now_is_deterministic(tmp_path: Path, monkeypatch) -> N
 
 
 def test_resolve_custom_log_path(tmp_path: Path, monkeypatch) -> None:
-    from code_doc_monitor.reviewlog import read_resolutions
+    from custodex.reviewlog import read_resolutions
 
     monkeypatch.chdir(tmp_path)
     rid = _seed_review_log(tmp_path)
@@ -1022,7 +1022,7 @@ def test_report_shows_resolved_unresolved_counts(tmp_path: Path, monkeypatch) ->
     assert payload["unresolved"] >= 0
 
 
-# --- D-05/D-06: `cdmon promotions` (read-only view of promotion candidates) ---
+# --- D-05/D-06: `cdx promotions` (read-only view of promotion candidates) ---
 
 
 def _seed_resolved(
@@ -1034,12 +1034,12 @@ def _seed_resolved(
     drift_kind: str = "HASH",
 ) -> None:
     """Append `n` resolved records of one shape (each a distinct surface_hash)."""
-    from code_doc_monitor.reviewlog import (
+    from custodex.reviewlog import (
         DEFAULT_RESOLUTIONS_PATH,
         append,
         append_resolution,
     )
-    from code_doc_monitor.schema import (
+    from custodex.schema import (
         Resolution,
         ResolutionRecord,
         ReviewRecord,
@@ -1123,7 +1123,7 @@ def test_promotions_empty(tmp_path: Path, monkeypatch) -> None:
     assert "no promotable" in result.output.lower()
 
 
-# --- H-04: `cdmon surface-gaps` (coverage gaps -> tracker issue) ------------
+# --- H-04: `cdx surface-gaps` (coverage gaps -> tracker issue) ------------
 
 
 def test_surface_gaps_dry_run_lists_gap(tmp_path: Path, monkeypatch) -> None:
@@ -1183,7 +1183,7 @@ def test_surface_gaps_opens_issue_github(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_REPOSITORY", "acme/widget")
     monkeypatch.setenv("CDMON_GITHUB_TOKEN", "ghtok")
-    import code_doc_monitor.issues as issues_mod
+    import custodex.issues as issues_mod
 
     def fake_request(self, method, url, *, body, token):
         return {"html_url": "https://github.com/acme/widget/issues/9"}
@@ -1195,7 +1195,7 @@ def test_surface_gaps_opens_issue_github(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_build_renders_html_twin(tmp_path: Path, monkeypatch) -> None:
-    # FEAT-CLI-006: `cdmon build` renders every html:true doc to a .html twin.
+    # FEAT-CLI-006: `cdx build` renders every html:true doc to a .html twin.
     cfg = (
         'version: "1.0.0"\n'
         'root: "."\n'
@@ -1220,7 +1220,7 @@ def test_build_renders_html_twin(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_serve_loud_without_config_cdmon_index(tmp_path: Path, monkeypatch) -> None:
-    # FEAT-CLI-013: `cdmon serve` loud-guards (exit 1) when cwd has no
+    # FEAT-CLI-013: `cdx serve` loud-guards (exit 1) when cwd has no
     # config/cdmon/index.yaml — never binds a socket on this path.
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["serve"])

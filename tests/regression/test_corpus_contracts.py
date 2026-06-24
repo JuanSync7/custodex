@@ -13,9 +13,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from code_doc_monitor.config import Audience
-from code_doc_monitor.drift import DriftKind
-from code_doc_monitor.schema import (
+from custodex.config import Audience
+from custodex.drift import DriftKind
+from custodex.schema import (
     ProposedFix,
     ResolutionRecord,
     ReviewRecord,
@@ -141,7 +141,7 @@ def test_reporting_never_raises_when_transport_down(tmp_path: Path) -> None:
     type the fake client doesn't raise (or removing the try/except) makes
     `emit` propagate the OSError → this reds.
     """
-    from code_doc_monitor.sinks import HttpSink, RepoIdentity
+    from custodex.sinks import HttpSink, RepoIdentity
 
     outbox = tmp_path / "outbox.jsonl"
     repo = RepoIdentity(
@@ -178,7 +178,7 @@ class _SpyBackend:
     """Counts `propose` calls; a matched-rule drift must NEVER reach it."""
 
     def __init__(self) -> None:
-        from code_doc_monitor.backends import MockBackend
+        from custodex.backends import MockBackend
 
         self._inner = MockBackend()
         self.calls = 0
@@ -198,10 +198,10 @@ def test_matched_rule_resolves_with_zero_backend_calls(tmp_path: Path) -> None:
     BREAK-IT (confirmed bites): moving the rule check AFTER `backend.propose` in
     `monitor.run` makes `spy.calls == 1` for a matched drift → this reds.
     """
-    from code_doc_monitor.monitor import Monitor
-    from code_doc_monitor.promotion import PromotionRule
-    from code_doc_monitor.reviewlog import read_all
-    from code_doc_monitor.sinks import NullSink
+    from custodex.monitor import Monitor
+    from custodex.promotion import PromotionRule
+    from custodex.reviewlog import read_all
+    from custodex.sinks import NullSink
 
     root, cfg = make_repo_with_region_drift(tmp_path)
     spy = _SpyBackend()
@@ -237,8 +237,8 @@ def test_default_no_rules_is_additive_backend_for_everything(tmp_path: Path) -> 
     The additivity proof — the learned-rule feature is OFF by default, so every
     prior behaviour is unchanged (the backend is still consulted for each drift).
     """
-    from code_doc_monitor.monitor import Monitor
-    from code_doc_monitor.sinks import NullSink
+    from custodex.monitor import Monitor
+    from custodex.sinks import NullSink
 
     root, cfg = make_repo_with_region_drift(tmp_path)
     spy = _SpyBackend()
@@ -259,8 +259,8 @@ def make_repo_with_region_drift(tmp_path: Path) -> tuple[Path, object]:
     what the chosen path resolves): a CORRECT fingerprint + a STALE region body →
     a single REGION drift, no co-occurring HASH drift to muddy the spy count.
     """
-    from code_doc_monitor.config import CodeRef, DocumentSpec, MonitorConfig
-    from code_doc_monitor.extract import build_document_surface
+    from custodex.config import CodeRef, DocumentSpec, MonitorConfig
+    from custodex.extract import build_document_surface
 
     from ._fixtures import SHARED_V1
 

@@ -1,4 +1,4 @@
-"""EPIC SVR (SVR-03) — the ``cdmon settings`` CLI (offline, read-only, K1/K4).
+"""EPIC SVR (SVR-03) — the ``cdx settings`` CLI (offline, read-only, K1/K4).
 
 Resolves a settings file + env overrides and prints the effective server runtime
 settings + secret presence (never the values); loud ConfigError → nonzero exit.
@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor.cli import app
+from custodex.cli import app
 
 runner = CliRunner()
 

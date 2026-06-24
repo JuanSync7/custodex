@@ -1,17 +1,17 @@
-# Drop-in GitLab CI for repos ADOPTING code-doc-monitor (cdmon).
+# Drop-in GitLab CI for repos ADOPTING custodex (cdx).
 #
 # Copy this into your repo as `.gitlab-ci.yml` (or `include:` it) and adjust the
-# install line / config path. It mirrors cdmon's OWN pipeline patterns
-# (.gitlab-ci.yml in the cdmon repo) but trimmed to what an adopter needs:
+# install line / config path. It mirrors Custodex's OWN pipeline patterns
+# (.gitlab-ci.yml in the cdx repo) but trimmed to what an adopter needs:
 #
-#   cdmon-gate      An OFFLINE doc-drift gate on every MR/branch: `cdmon doctor`
-#                   (preflight wiring), then `cdmon check` (content drift, K1) and
-#                   `cdmon lint` (Layout Standard). Any failing => the pipeline
+#   cdx-gate      An OFFLINE doc-drift gate on every MR/branch: `cdx doctor`
+#                   (preflight wiring), then `cdx check` (content drift, K1) and
+#                   `cdx lint` (Layout Standard). Any failing => the pipeline
 #                   fails, so doc drift never lands silently. No network, no LLM.
 #
-#   cdmon-docs-pr   Post-default-branch heal: on a push to the default branch it
-#                   heals the docs and opens a docs MR (`cdmon open-docs-pr`). It is
-#                   GUARDED by `cdmon should-sync` (the structural loop-breaker):
+#   cdx-docs-pr   Post-default-branch heal: on a push to the default branch it
+#                   heals the docs and opens a docs MR (`cdx open-docs-pr`). It is
+#                   GUARDED by `cdx should-sync` (the structural loop-breaker):
 #                   the push's changed-file list is piped to `should-sync`, which
 #                   exits 1 (SKIP) when EVERY changed file is a managed doc path —
 #                   i.e. the bot's own doc-only commit — so the heal does NOT
@@ -23,7 +23,7 @@
 # token MUST be a protected + masked secret, NEVER committed):
 #   CDMON_CENTRAL_TOKEN   the bearer token the central server checks (E-06).
 #   (the central URL + repo_id live in your committed cdmon.yaml `central:` block;
-#    run `cdmon register` once to announce the repo, then `cdmon monitor` reports.)
+#    run `cdx register` once to announce the repo, then `cdx monitor` reports.)
 
 stages:
   - gate
@@ -33,50 +33,50 @@ default:
   image: python:3.11-slim
 
 variables:
-  # Path to your committed cdmon config (override per repo).
+  # Path to your committed cdx config (override per repo).
   CDMON_CONFIG: "cdmon.yaml"
 
-.cdmon-setup: &cdmon-setup
+.cdx-setup: &cdx-setup
   - python -m venv .venv
-  # Install cdmon. Pin to a release/tag in a real adopter (e.g. a Git URL or an
+  # Install Custodex. Pin to a release/tag in a real adopter (e.g. a Git URL or an
   # internal index). The `[server]` extra is NOT needed on the client side.
-  - .venv/bin/pip install code-doc-monitor
+  - .venv/bin/pip install custodex
 
-cdmon-gate:
+cdx-gate:
   stage: gate
   script:
-    - *cdmon-setup
-    # Offline preflight: is this repo wired to run cdmon + report? (warnings on a
+    - *cdx-setup
+    # Offline preflight: is this repo wired to run cdx + report? (warnings on a
     # merely-absent runtime prereq; a structurally-broken config FAILS).
-    - .venv/bin/cdmon doctor --config "$CDMON_CONFIG"
+    - .venv/bin/cdx doctor --config "$CDMON_CONFIG"
     # Detect-only content gate (K1) + structural lint gate — either fails the job.
-    - .venv/bin/cdmon check --config "$CDMON_CONFIG"
-    - .venv/bin/cdmon lint --config "$CDMON_CONFIG"
+    - .venv/bin/cdx check --config "$CDMON_CONFIG"
+    - .venv/bin/cdx lint --config "$CDMON_CONFIG"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH'
 
-cdmon-docs-pr:
+cdx-docs-pr:
   stage: docs
   script:
-    - *cdmon-setup
+    - *cdx-setup
     # Announce this repo to the central server (idempotent; safe to re-run).
     # Drop this line if you are not reporting to a central server.
-    - .venv/bin/cdmon register --config "$CDMON_CONFIG"
+    - .venv/bin/cdx register --config "$CDMON_CONFIG"
     # Loop-safety guard: collect the push's changed files and ask `should-sync`
     # whether to heal. It exits 1 (SKIP) when EVERY changed file is a managed doc
     # path (the bot's own doc-only commit), so this job opens NO new MR.
     - |
       CHANGED="$(git diff --name-only "${CI_COMMIT_BEFORE_SHA:-HEAD~1}" HEAD || true)"
-      if ! printf '%s\n' "$CHANGED" | .venv/bin/cdmon should-sync --config "$CDMON_CONFIG"; then
+      if ! printf '%s\n' "$CHANGED" | .venv/bin/cdx should-sync --config "$CDMON_CONFIG"; then
         echo "doc-only commit (bot heal) — skipping heal to avoid re-triggering the loop"
         exit 0
       fi
     # Real code change: heal the docs (recording review records, which `monitor`
     # reports to the central server when `central:` is wired) and open a docs MR,
     # stamping provenance (--ref) so the record's source_sha matches the MR ref.
-    - .venv/bin/cdmon monitor --apply --config "$CDMON_CONFIG" --ref "$CI_COMMIT_SHA"
-    - .venv/bin/cdmon open-docs-pr --config "$CDMON_CONFIG" --ref "$CI_COMMIT_SHA"
+    - .venv/bin/cdx monitor --apply --config "$CDMON_CONFIG" --ref "$CI_COMMIT_SHA"
+    - .venv/bin/cdx open-docs-pr --config "$CDMON_CONFIG" --ref "$CI_COMMIT_SHA"
   rules:
     # Default-branch pushes only — the heal opens an MR off the default branch.
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'

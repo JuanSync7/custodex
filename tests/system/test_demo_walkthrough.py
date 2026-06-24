@@ -1,7 +1,7 @@
 """M-03 — the demo walkthrough drives the detect -> heal loop end to end (offline).
 
 ``demo/walkthrough.py`` copies the checked-in demo into a tempdir, induces real
-drift, then runs ``cdmon`` through its core loop on the COPY: detect drift, heal
+drift, then runs ``cdx`` through its core loop on the COPY: detect drift, heal
 with the mock backend, re-check clean, show the review log, show the
 ``scheduler.py`` coverage gap, and pass ``doctor``. This test runs it as a
 subprocess (offline, deterministic — the mock backend, no network) and asserts
@@ -41,9 +41,9 @@ def test_walkthrough_runs_the_full_heal_loop() -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
     # The loop is visible in order: drift detected -> healed -> clean again.
-    assert "drift detected (cdmon check exit 1)" in out
+    assert "drift detected (cdx check exit 1)" in out
     assert "FIX" in out  # the recorded verdict in the heal step / review log
-    assert "clean (cdmon check exit 0)" in out
+    assert "clean (cdx check exit 0)" in out
     # The review log step ran and reported recorded records.
     assert '"by_verdict"' in out
     # The real coverage gap surfaces.

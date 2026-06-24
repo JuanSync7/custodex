@@ -1,6 +1,6 @@
 """config documents/code-refs/sync-runs tables (Y-01).
 
-ADDITIVE migration mirroring ``code_doc_monitor.server.db``'s ``ConfigDocumentRow`` /
+ADDITIVE migration mirroring ``custodex.server.db``'s ``ConfigDocumentRow`` /
 ``ConfigCodeRefRow`` / ``SyncRunRow`` 1:1 — the "indexed columns + full JSON" hybrid
 (K6): a portable JSON column (``JSONB`` on Postgres, JSON on SQLite via the SAME
 ``_json_type`` the models use) holding the FULL shared pydantic model, plus indexed
@@ -21,7 +21,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from code_doc_monitor.server.db import _json_type
+from custodex.server.db import _json_type
 
 # revision identifiers, used by Alembic.
 revision: str = "0003_config_sync"

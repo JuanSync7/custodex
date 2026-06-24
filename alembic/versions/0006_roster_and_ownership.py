@@ -1,9 +1,9 @@
 """add the central roster table for ownership accountability (OWN-04).
 
-ADDITIVE migration mirroring ``code_doc_monitor.server.db.RosterRow`` 1:1 — the
+ADDITIVE migration mirroring ``custodex.server.db.RosterRow`` 1:1 — the
 central roster of identities (people / teams) the server cross-checks document
 ownership against to flag departed-owner orphans. ``identity`` is the FULL
-:class:`~code_doc_monitor.ownership.Identity` JSON (the K6 source of truth, via the
+:class:`~custodex.ownership.Identity` JSON (the K6 source of truth, via the
 SAME ``_json_type`` the model uses); ``name`` is the unique business key;
 ``kind``/``active`` are the indexed projection the orphan cascade reads.
 
@@ -26,7 +26,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from code_doc_monitor.server.db import _json_type
+from custodex.server.db import _json_type
 
 # revision identifiers, used by Alembic.
 revision: str = "0006_roster_and_ownership"

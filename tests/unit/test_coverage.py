@@ -1,4 +1,4 @@
-"""Tests for code_doc_monitor.coverage (A-03).
+"""Tests for custodex.coverage (A-03).
 
 Pure ownership resolution: crosses a :class:`SymbolInventory` with a
 :class:`MonitorConfig`'s document code_refs to decide what is documented vs an
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from code_doc_monitor.config import (
+from custodex.config import (
     Audience,
     CodeRef,
     CoverageConfig,
@@ -22,7 +22,7 @@ from code_doc_monitor.config import (
     MonitorConfig,
     WaiverEntry,
 )
-from code_doc_monitor.coverage import (
+from custodex.coverage import (
     CoverageReport,
     OwnedFile,
     OwnedSymbol,
@@ -32,7 +32,7 @@ from code_doc_monitor.coverage import (
     resolve_coverage,
     suggest_owners,
 )
-from code_doc_monitor.inventory import discover_files, discover_symbols
+from custodex.inventory import discover_files, discover_symbols
 
 # --------------------------------------------------------------------------
 # Real fixture mini-repo: 3 files, mixed ownership.

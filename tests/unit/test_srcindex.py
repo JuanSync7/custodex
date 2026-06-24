@@ -1,8 +1,8 @@
-"""Tests for code_doc_monitor.srcindex (EPIC R, R-07).
+"""Tests for custodex.srcindex (EPIC R, R-07).
 
 The source index + source wiki engine: a pure, deterministic engine that
 inventories every public symbol of a package (reusing
-:func:`code_doc_monitor.inventory.discover_files`/``discover_symbols`` — no AST
+:func:`custodex.inventory.discover_files`/``discover_symbols`` — no AST
 re-impl, K0), folds each file into its TOP-LEVEL module, and joins each module to
 the catalog features whose ``modules`` name it (the inverse of
 ``Feature.modules``). ``modules_without_feature`` is the deferred R-02 "no orphan
@@ -21,10 +21,10 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import code_doc_monitor as _pkg
-from code_doc_monitor.errors import InventoryError
-from code_doc_monitor.featurecatalog import Feature, FeatureCatalog, load_catalog
-from code_doc_monitor.srcindex import (
+import custodex as _pkg
+from custodex.errors import InventoryError
+from custodex.featurecatalog import Feature, FeatureCatalog, load_catalog
+from custodex.srcindex import (
     ModuleIndex,
     SourceIndex,
     build_source_index,
@@ -264,11 +264,11 @@ def _real_catalog() -> FeatureCatalog:
 
 def test_real_tree_no_feature_names_missing_module() -> None:
     """Every catalog feature names a real module of the package (K8)."""
-    idx = build_source_index(REPO_ROOT / "code_doc_monitor", _real_catalog())
+    idx = build_source_index(REPO_ROOT / "custodex", _real_catalog())
     assert idx.features_without_module_match() == ()
 
 
 def test_real_tree_no_orphan_public_module() -> None:
     """The deferred R-02 guarantee: every public module maps to a feature."""
-    idx = build_source_index(REPO_ROOT / "code_doc_monitor", _real_catalog())
+    idx = build_source_index(REPO_ROOT / "custodex", _real_catalog())
     assert idx.modules_without_feature() == ()

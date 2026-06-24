@@ -1,10 +1,10 @@
-"""N-02 — tests for index↔disk reverse validation + ``cdmon index`` (K1/K7/K8/K10).
+"""N-02 — tests for index↔disk reverse validation + ``cdx index`` (K1/K7/K8/K10).
 
 Covers the reverse invariant in :func:`load_bundle` (an on-disk unit absent from
 ``index.yaml`` is a loud :class:`ConfigError`), the deterministic
 :func:`regenerate_index` rewriter (alphabetical units, refreshed ``updated`` via
 the injected clock seam, globals preserved byte-for-byte, idempotent K7), the
-:func:`write_index` writer, and the ``cdmon index`` CLI (default rewrite +
+:func:`write_index` writer, and the ``cdx index`` CLI (default rewrite +
 ``--check`` read-only drift gate K1).
 
 Features: FEAT-CONFIGV2-009, FEAT-CONFIGV2-004, FEAT-CONFIGV2-003, FEAT-CLI-002
@@ -17,17 +17,17 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor import cli as cli_mod
-from code_doc_monitor import config as config_mod
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import (
+from custodex import cli as cli_mod
+from custodex import config as config_mod
+from custodex.cli import app
+from custodex.config import (
     load_bundle,
     load_config_dir,
     load_index_file,
     regenerate_index,
     write_index,
 )
-from code_doc_monitor.errors import ConfigError
+from custodex.errors import ConfigError
 
 # Reuse the N-01 fixture bodies so the two suites stay in lock-step.
 from tests.integration.test_config_v2 import (
@@ -201,10 +201,10 @@ def test_regenerate_preserves_globals_and_other_frontmatter(
     assert idx.backend.kind == "mock"
     assert "api-index" in idx.region_templates
     assert idx.coverage.waive[0].reason == "re-export aggregator"
-    assert idx.frontmatter.repo == "code-doc-monitor"
-    assert idx.frontmatter.generated_by == "cdmon"
+    assert idx.frontmatter.repo == "custodex"
+    assert idx.frontmatter.generated_by == "cdx"
     # the repo line (a global non-units, non-updated line) is preserved verbatim
-    assert "repo: code-doc-monitor" in orig and "repo: code-doc-monitor" in text
+    assert "repo: custodex" in orig and "repo: custodex" in text
 
 
 def test_regenerate_is_idempotent(tmp_path: Path, frozen_clock: str) -> None:
@@ -245,7 +245,7 @@ def test_regenerate_appends_units_block_when_absent(
     # An index with NO units block in the body at all.
     (d / "index.yaml").write_text(
         '---\ncdmon-config-version: "2.0.0"\nrepo: r\n'
-        'generated-by: cdmon\nupdated: "2026-01-01"\n---\n'
+        'generated-by: cdx\nupdated: "2026-01-01"\n---\n'
         'root: "../.."\nversion: "2.0.0"\n',
         encoding="utf-8",
     )
@@ -265,7 +265,7 @@ def test_regenerate_inserts_updated_when_absent(
     # Frontmatter with NO updated line. (IndexFrontmatter requires it, so this
     # only exercises regenerate's text surgery, then we re-add via the rewrite.)
     (d / "index.yaml").write_text(
-        '---\ncdmon-config-version: "2.0.0"\nrepo: r\ngenerated-by: cdmon\n---\n'
+        '---\ncdmon-config-version: "2.0.0"\nrepo: r\ngenerated-by: cdx\n---\n'
         'root: "../.."\nunits: []\n',
         encoding="utf-8",
     )
@@ -308,7 +308,7 @@ def test_integration_unindexed_then_regenerate_fixes(
     (d / "third.yaml").write_text(
         _AGENT_YAML.replace("unit: agent-workflow", "unit: third", 1)
         .replace("id: agent-workflow", "id: third-doc", 1)
-        .replace("code_doc_monitor/agent", "code_doc_monitor/third", 1),
+        .replace("custodex/agent", "custodex/third", 1),
         encoding="utf-8",
     )
     with pytest.raises(ConfigError):
@@ -319,12 +319,12 @@ def test_integration_unindexed_then_regenerate_fixes(
 
 
 # --------------------------------------------------------------------------- #
-# CLI: cdmon index [--config-dir] [--check].
+# CLI: cdx index [--config-dir] [--check].
 # --------------------------------------------------------------------------- #
 
 
 def test_cli_index_rewrites_drifted_index(tmp_path: Path, frozen_clock: str) -> None:
-    """`cdmon index` rewrites a drifted index to list every on-disk unit."""
+    """`cdx index` rewrites a drifted index to list every on-disk unit."""
     d = _write_tree(tmp_path)
     (d / "newunit.yaml").write_text(
         _FOUNDATION_YAML.replace("unit: foundation", "unit: newunit", 1),
@@ -337,7 +337,7 @@ def test_cli_index_rewrites_drifted_index(tmp_path: Path, frozen_clock: str) -> 
 
 
 def test_cli_index_second_run_is_noop(tmp_path: Path, frozen_clock: str) -> None:
-    """A second `cdmon index` produces byte-identical output (K7)."""
+    """A second `cdx index` produces byte-identical output (K7)."""
     d = _write_tree(tmp_path)
     runner.invoke(app, ["index", "--config-dir", str(d)])
     after_first = (d / "index.yaml").read_text(encoding="utf-8")
@@ -347,7 +347,7 @@ def test_cli_index_second_run_is_noop(tmp_path: Path, frozen_clock: str) -> None
 
 
 def test_cli_index_check_exits_1_on_drift(tmp_path: Path, frozen_clock: str) -> None:
-    """`cdmon index --check` exits 1 when on-disk index differs (CI gate)."""
+    """`cdx index --check` exits 1 when on-disk index differs (CI gate)."""
     d = _write_tree(tmp_path)
     (d / "drifty.yaml").write_text(
         _FOUNDATION_YAML.replace("unit: foundation", "unit: drifty", 1),
@@ -363,7 +363,7 @@ def test_cli_index_check_exits_1_on_drift(tmp_path: Path, frozen_clock: str) -> 
 def test_cli_index_check_exits_0_when_synced(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`cdmon index --check` exits 0 when in sync — even with a MOVED clock (N-06).
+    """`cdx index --check` exits 0 when in sync — even with a MOVED clock (N-06).
 
     The on-disk and regenerated frontmatter ``updated:`` stamps ALWAYS differ in
     real use (regenerate refreshes the wall clock), so the check must be

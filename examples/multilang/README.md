@@ -1,9 +1,9 @@
-# Golden example — one tool, five languages, one `cdmon check`
+# Golden example — one tool, five languages, one `cdx check`
 
 A tiny **greeter** tool implemented across five source languages, each mapped by
 [`cdmon.yaml`](cdmon.yaml) onto a managed document. It is the reference example
-for code-doc-monitor's multi-language support: a single `cdmon check` keeps every
-document honest, and `cdmon build` renders the human-facing HTML twins.
+for custodex's multi-language support: a single `cdx check` keeps every
+document honest, and `cdx build` renders the human-facing HTML twins.
 
 | Source | Language | Extracted as | Document | Audience | Table |
 |---|---|---|---|---|---|
@@ -18,23 +18,23 @@ single table — one document can track a multi-language surface.
 
 Every language-specific detail lives in `cdmon.yaml` (selectors + region
 templates), never in the engine (constraint **K0**). Nothing here is hard-coded
-into code-doc-monitor.
+into custodex.
 
 ## Try it
 
 ```bash
 cd examples/multilang
-cdmon surface              # what each language yields
-cdmon check                # are the docs still true? (exit 1 on drift)
-cdmon monitor --apply      # regenerate the tables + fingerprints to close drift
-cdmon build                # render docs/*.html twins (humans) from the .md (LLMs)
+cdx surface              # what each language yields
+cdx check                # are the docs still true? (exit 1 on drift)
+cdx monitor --apply      # regenerate the tables + fingerprints to close drift
+cdx build                # render docs/*.html twins (humans) from the .md (LLMs)
 ```
 
 ### See drift get caught and closed
 
 Add an option to `code/cli.py` (e.g. `parser.add_argument("--quiet", ...)`),
-then `cdmon check` — `cli.md` is flagged as drifted. `cdmon monitor --apply`
-regenerates its options table and `cdmon build` refreshes `cli.html`.
+then `cdx check` — `cli.md` is flagged as drifted. `cdx monitor --apply`
+regenerates its options table and `cdx build` refreshes `cli.html`.
 
 ### Audience matters
 

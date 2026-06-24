@@ -5,7 +5,7 @@ cdmon. These tests keep them HONEST against the real CLI:
 
 * both YAML files ``yaml.safe_load`` cleanly (a malformed template would break an
   adopter's pipeline silently);
-* every ``cdmon <subcommand>`` named in any script line is a REAL command the CLI
+* every ``cdx <subcommand>`` named in any script line is a REAL command the CLI
   exposes — so renaming/removing a command (e.g. ``check`` -> ``verify``) breaks
   this test, not the adopter's pipeline weeks later;
 * the gate job references ``doctor`` + ``check`` + ``lint`` and the docs-PR job
@@ -25,20 +25,20 @@ from pathlib import Path
 import typer
 import yaml
 
-from code_doc_monitor.cli import app
+from custodex.cli import app
 from tests._repo import REPO_ROOT
 
 _TEMPLATES = REPO_ROOT / "templates" / "ci"
 _GITLAB = _TEMPLATES / "gitlab-ci.adopter.yml"
 _GITHUB = _TEMPLATES / "github-actions.adopter.yml"
 
-# Every `cdmon <token>` occurrence in a script line. `<token>` is the first
-# non-flag word after `cdmon`; the `--config`/`--apply` flags are skipped.
-_CDMON_CALL = re.compile(r"\bcdmon\s+([a-z][a-z0-9-]*)")
+# Every `cdx <token>` occurrence in a script line. `<token>` is the first
+# non-flag word after `cdx`; the `--config`/`--apply` flags are skipped.
+_CDMON_CALL = re.compile(r"\bcd(?:x|mon)\s+([a-z][a-z0-9-]*)")
 
 
 def _real_commands() -> set[str]:
-    """The canonical click command names the `cdmon` CLI exposes (one source)."""
+    """The canonical click command names the `cdx` CLI exposes (one source)."""
     return set(typer.main.get_command(app).commands.keys())
 
 
@@ -110,10 +110,10 @@ def test_templates_reference_only_real_subcommands() -> None:
     real = _real_commands()
     for path in (_GITLAB, _GITHUB):
         referenced = _referenced_subcommands(path)
-        assert referenced, f"{path.name} referenced no cdmon subcommands"
+        assert referenced, f"{path.name} referenced no cdx subcommands"
         unknown = referenced - real
         assert not unknown, (
-            f"{path.name} references cdmon command(s) the CLI does not expose: "
+            f"{path.name} references cdx command(s) the CLI does not expose: "
             f"{sorted(unknown)} (known: {sorted(real)})"
         )
 
@@ -136,12 +136,12 @@ def test_docs_pr_job_guards_with_should_sync_and_opens_a_pr() -> None:
 
 def test_gitlab_template_has_both_jobs() -> None:
     doc = yaml.safe_load(_GITLAB.read_text(encoding="utf-8"))
-    assert "cdmon-gate" in doc
-    assert "cdmon-docs-pr" in doc
+    assert "cdx-gate" in doc
+    assert "cdx-docs-pr" in doc
 
 
 def test_github_template_has_both_jobs() -> None:
     doc = yaml.safe_load(_GITHUB.read_text(encoding="utf-8"))
     jobs = doc.get("jobs", {})
-    assert "cdmon-gate" in jobs
-    assert "cdmon-docs-pr" in jobs
+    assert "cdx-gate" in jobs
+    assert "cdx-docs-pr" in jobs

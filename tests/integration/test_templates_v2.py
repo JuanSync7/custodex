@@ -1,7 +1,7 @@
 """W-02 Part A — canonical config/cdmon v2 templates + scaffolder + endpoint.
 
 Each canonical template ROUND-TRIPS through its N-01..N-05 loader; the scaffolder
-produces a ``load_bundle``-valid directory; ``cdmon init --v2`` scaffolds (and is
+produces a ``load_bundle``-valid directory; ``cdx init --v2`` scaffolds (and is
 loud on an existing dir without ``--force``); and ``GET /config/templates`` serves
 all four. Offline (K4), deterministic (K10).
 
@@ -16,17 +16,17 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from code_doc_monitor import cli
-from code_doc_monitor.cli import app
-from code_doc_monitor.config import (
+from custodex import cli
+from custodex.cli import app
+from custodex.config import (
     load_bundle,
     load_ignore_file,
     load_index_file,
     load_unit_file,
 )
-from code_doc_monitor.docstyle import load_doc_style
-from code_doc_monitor.errors import ConfigError
-from code_doc_monitor.templates_v2 import (
+from custodex.docstyle import load_doc_style
+from custodex.errors import ConfigError
+from custodex.templates_v2 import (
     DOC_STYLE_TEMPLATE,
     EXAMPLE_UNIT_STEM,
     IGNORE_TEMPLATE,
@@ -173,7 +173,7 @@ def test_scaffold_wraps_oserror(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# cdmon init --v2.
+# cdx init --v2.
 # --------------------------------------------------------------------------- #
 
 
@@ -235,7 +235,7 @@ def test_init_without_v2_writes_single_file_unchanged(
     result = runner.invoke(app, ["init", "--path", "cdmon.yaml"])
     assert result.exit_code == 0, result.output
     text = (tmp_path / "cdmon.yaml").read_text(encoding="utf-8")
-    assert "code-doc-monitor configuration" in text
+    assert "custodex configuration" in text
     assert not (tmp_path / "config" / "cdmon").exists()
 
 
@@ -248,7 +248,7 @@ def test_config_templates_endpoint_returns_all_four() -> None:
     pytest.importorskip("fastapi", reason="the [server] extra is not installed")
     from fastapi.testclient import TestClient
 
-    from code_doc_monitor.server import InMemoryStore, create_app
+    from custodex.server import InMemoryStore, create_app
 
     client = TestClient(create_app(InMemoryStore()))
     resp = client.get("/config/templates")

@@ -9,7 +9,7 @@ Add the per-repo ownership-of-record (config = truth) and the pure resolver.
 2. `dump_unit_file(load_unit_file(text))` is **byte-identical** for a unit whose
    docs carry owner/team/dri (idempotent round-trip, K7) — fields emitted by
    `_document_to_yaml` after `nav_label`, before `region_keys`, defaults dropped.
-3. New `code_doc_monitor/ownership.py`: `Identity`, `RosterSnapshot`,
+3. New `custodex/ownership.py`: `Identity`, `RosterSnapshot`,
    `EffectiveOwner`, and `resolve_ownership(config, *, unit_owner=None)` returns
    one `EffectiveOwner` per document, sorted by `doc_id` (K10), with
    `accountable = dri or owner or team or unit_owner[doc_id]` and
@@ -34,12 +34,12 @@ Add the per-repo ownership-of-record (config = truth) and the pure resolver.
 
 ## Dogfood
 `config.py` is tracked → its surface drifts `docs/api/*`. After green:
-`cdmon monitor --apply --config config/cdmon` then `cdmon check` exit 0. New
+`cdx monitor --apply --config config/cdmon` then `cdx check` exit 0. New
 `ownership.py` is NOT yet tracked (added to coverage waiver like other new modules,
 or covered by a doc later). Add **FEAT-OWNERSHIP-001** (config fields) +
 **FEAT-OWNERSHIP-002** (`resolve_ownership`) to `feature-doc/catalog/ownership.yaml`
-(NEW), a `demo/DEMOS.md` case + tagged tests; run `cdmon wiki` so FEATURES.md /
-TRACEABILITY.md update; `cdmon trace --fail-on-gap` exit 0.
+(NEW), a `demo/DEMOS.md` case + tagged tests; run `cdx wiki` so FEATURES.md /
+TRACEABILITY.md update; `cdx trace --fail-on-gap` exit 0.
 
 ## Constraints
 K0 (no new dep), K1/K10 (resolver pure, sorted), K6 (additive fields), K7 (round-trip

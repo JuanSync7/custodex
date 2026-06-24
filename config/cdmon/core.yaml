@@ -3,7 +3,7 @@
 # stem ("core"), or load_unit_file raises a loud ConfigError (K8).
 cdmon-config-version: "2.0.0"
 unit: core
-title: "code-doc-monitor engine core"
+title: "custodex engine core"
 owner: cdmon-team
 created: "2026-06-07"
 updated: "2026-06-07"
@@ -12,9 +12,9 @@ updated: "2026-06-07"
 
 # This unit owns the engine package root. The nested `agent` and `server` units
 # own their subdirectories; under Z-01a deepest-wins attribution a file directly
-# under code_doc_monitor (not under agent/ or server/) belongs to THIS unit.
+# under custodex (not under agent/ or server/) belongs to THIS unit.
 dir-covered:
-  - code_doc_monitor
+  - custodex
 
 # Only .py files count toward coverage under dir-covered.
 source-files-format:
@@ -35,12 +35,12 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/config.py
-      - path: code_doc_monitor/_v2base.py    # leaf: shared v2 frontmatter primitives
-      - path: code_doc_monitor/docstyle.py
-      - path: code_doc_monitor/templates_v2.py
-      - path: code_doc_monitor/errors.py
-      - path: code_doc_monitor/schema.py     # SHARED — only the public types here
+      - path: custodex/config.py
+      - path: custodex/_v2base.py    # leaf: shared v2 frontmatter primitives
+      - path: custodex/docstyle.py
+      - path: custodex/templates_v2.py
+      - path: custodex/errors.py
+      - path: custodex/schema.py     # SHARED — only the public types here
         symbols: [Verdict, ProposedFix]
 
   - id: pipeline
@@ -48,24 +48,24 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/extract.py
-      - path: code_doc_monitor/manifest.py
-      - path: code_doc_monitor/blocks.py
-      - path: code_doc_monitor/drift.py
+      - path: custodex/extract.py
+      - path: custodex/manifest.py
+      - path: custodex/blocks.py
+      - path: custodex/drift.py
 
   - id: remediation
     path: docs/api/remediation.md
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/backends.py
-      - path: code_doc_monitor/monitor.py
-      - path: code_doc_monitor/heal.py
-      - path: code_doc_monitor/generate.py
-      - path: code_doc_monitor/sinks.py
-      - path: code_doc_monitor/reviewlog.py
-      - path: code_doc_monitor/schema.py      # SHARED — whole module here
-      - path: code_doc_monitor/ticket.py
+      - path: custodex/backends.py
+      - path: custodex/monitor.py
+      - path: custodex/heal.py
+      - path: custodex/generate.py
+      - path: custodex/sinks.py
+      - path: custodex/reviewlog.py
+      - path: custodex/schema.py      # SHARED — whole module here
+      - path: custodex/ticket.py
 
   # Coverage ownership: file/symbol discovery, the doc-coverage cross, and the
   # generated coverage.rpt builder/renderer (CONFIG-V2 §3, N-04).
@@ -74,9 +74,9 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/inventory.py
-      - path: code_doc_monitor/coverage.py
-      - path: code_doc_monitor/report.py
+      - path: custodex/inventory.py
+      - path: custodex/coverage.py
+      - path: custodex/report.py
 
   # Doc rendering surface: index region, HTML twins, layout lint + scaffolding.
   - id: layout-build
@@ -84,9 +84,9 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/index.py
-      - path: code_doc_monitor/build.py
-      - path: code_doc_monitor/layout.py
+      - path: custodex/index.py
+      - path: custodex/build.py
+      - path: custodex/layout.py
 
   # The PR sync loop (EPIC C) + coverage-gap issues (EPIC H): should-sync gate +
   # docs-PR open/update + the surface-gaps issue transports.
@@ -95,9 +95,9 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/syncpr.py
-      - path: code_doc_monitor/pr.py
-      - path: code_doc_monitor/issues.py
+      - path: custodex/syncpr.py
+      - path: custodex/pr.py
+      - path: custodex/issues.py
 
   # The central-system client (EPIC E/G): repo registry + record envelope, plus
   # the server-side config-sync engine that reads a registered repo read-only.
@@ -106,11 +106,11 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/registry.py
-      - path: code_doc_monitor/configsync.py
-      - path: code_doc_monitor/gitfetch.py    # EPIC GIT: clone-on-demand (STEP 0)
-      - path: code_doc_monitor/secrets.py     # EPIC GIT: at-rest credential sealing (PHASE 1)
-      - path: code_doc_monitor/gitauth.py     # EPIC GIT: short-lived token minting (PHASE 2)
+      - path: custodex/registry.py
+      - path: custodex/configsync.py
+      - path: custodex/gitfetch.py    # EPIC GIT: clone-on-demand (STEP 0)
+      - path: custodex/secrets.py     # EPIC GIT: at-rest credential sealing (PHASE 1)
+      - path: custodex/gitauth.py     # EPIC GIT: short-lived token minting (PHASE 2)
     # context_refs (EDITOR E-01, additive/K6): generation-context "glance-through"
     # references, NOT documented surface and NOT coverage. configsync reprojects a
     # registered repo into the SQL rows the central server serves, so an author of
@@ -125,17 +125,17 @@ documents:
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/similar.py
-      - path: code_doc_monitor/promotion.py
+      - path: custodex/similar.py
+      - path: custodex/promotion.py
 
-  # Ops surface: the `cdmon` CLI command functions + the `doctor` self-check.
+  # Ops surface: the `cdx` CLI command functions + the `doctor` self-check.
   - id: ops
     path: docs/api/ops.md
     audience: eng-guide
     region_keys: [symbols]
     code_refs:
-      - path: code_doc_monitor/cli.py
-      - path: code_doc_monitor/doctor.py
+      - path: custodex/cli.py
+      - path: custodex/doctor.py
 
   # The project README — a USER-GUIDE narrative monitored against the CLI surface
   # it documents (FEAT-CONFIGV2-016). It declares NO managed region, so the engine
@@ -143,10 +143,10 @@ documents:
   # `cli.py` public surface. Because the audience is user-guide, a docstring- or
   # comment-only change to cli.py is a NON-event (K3) — only a real change to the
   # public command surface drifts the README, which then surfaces a ReviewRecord
-  # for a human to act on (K5). Reheal its fingerprint with `cdmon monitor --apply`
+  # for a human to act on (K5). Reheal its fingerprint with `cdx monitor --apply`
   # after a CLI surface change, exactly like the other tracked docs.
   - id: readme
     path: README.md
     audience: user-guide
     code_refs:
-      - path: code_doc_monitor/cli.py
+      - path: custodex/cli.py

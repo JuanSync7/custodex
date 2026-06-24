@@ -1,22 +1,25 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 26adcc20b8d53970
+  fingerprint: d3b54e32a4b94369
   fingerprint_tiers:
-    composite: 26adcc20b8d53970
-    signature: 26adcc20b8d53970
+    composite: d3b54e32a4b94369
+    signature: d3b54e32a4b94369
   schema_version: 1.0.0
 ---
-# code-doc-monitor
+# Custodex
 
-> The standardized, self-healing code→documentation drift monitor: extract a code
-> surface, detect drift against the managed docs, and **fix, invalidate, or
-> escalate** it — recording every verdict for human review. This README is itself
-> monitored by `cdmon` against the CLI surface it documents.
+> **Custodex** — keeps your code and docs in sync, owned, and accountable.
+> It catches drift across **code↔doc *and* doc↔doc**, pegs an **owner** to every
+> doc, tracks **review SLAs**, and — when something drifts — **fixes, invalidates,
+> or escalates** it, recording every verdict for human review. This README is
+> itself monitored by `cdx` against the CLI surface it documents.
 
 A **standardized, reusable** system that keeps documentation in sync with the
-code it describes — and, when it drifts, asks an LLM to **fix or invalidate** the
-drift while logging every decision for human review.
+code (and other docs) it describes — and, when it drifts, asks an LLM to **fix or
+invalidate** the drift while logging every decision for human review. Custodex is
+the *custodian* of your documentation: it keeps the record straight, and keeps
+someone answerable for it.
 
 It generalizes the `docsync` pattern (extract a code surface → fingerprint it →
 detect drift against the docs) into a project-agnostic tool, and closes the loop
@@ -34,7 +37,7 @@ config ──> extract ──> drift ──┬─> clean → exit 0
 ## Why
 
 A detector that only **warns** still needs a human to act; a fixer that acts
-**silently** can't be trusted. code-doc-monitor detects, auto-remediates with an
+**silently** can't be trusted. Custodex detects, auto-remediates with an
 LLM, and records the **original drift + the proposed fix** so a person (or a
 central dashboard) can audit what changed and why — a self-healing monitor that
 still keeps a human in the review seat.
@@ -44,7 +47,7 @@ still keeps a human in the review seat.
 Write a config that maps groups of code files — down to functions, line ranges,
 or variables — onto **logical documents**, each tagged with an **audience**. The
 canonical form is the `config/cdmon/` directory layout (an `index.yaml` plus
-per-area unit files; `cdmon` auto-detects it with no `--config`); a single
+per-area unit files; `cdx` auto-detects it with no `--config`); a single
 `cdmon.yaml`/`.json` file is also supported as a back-compat path. Each document
 carries an audience:
 
@@ -55,48 +58,48 @@ carries an audience:
 
 ```bash
 # --- set up ---
-cdmon init                 # write a single-file config template (offline)
-cdmon init --v2            # ...scaffold the multi-file config/cdmon/ layout instead
-cdmon init --central URL --repo-id ID   # ...wired for HTTP reporting to a central server (sink=http + url + repo_id + auth_env + outbox); --token-env VAR (default CDMON_CENTRAL_TOKEN), --repo-url URL; ready to `cdmon register` + report (G-01)
-cdmon index [--check]      # regenerate config/cdmon/index.yaml's units: from the on-disk unit files; --check is a read-only CI gate (exit 1 on an out-of-sync index)
-cdmon doctor               # offline, read-only preflight: PASS/WARN/FAIL on config, documents, backend prereq, central wiring, optional extras; exit 0 unless a structural FAIL (absent runtime prereq/unset token = WARN, never FAIL; no network) (G-02)
+cdx init                 # write a single-file config template (offline)
+cdx init --v2            # ...scaffold the multi-file config/cdmon/ layout instead
+cdx init --central URL --repo-id ID   # ...wired for HTTP reporting to a central server (sink=http + url + repo_id + auth_env + outbox); --token-env VAR (default CDMON_CENTRAL_TOKEN), --repo-url URL; ready to `cdx register` + report (G-01)
+cdx index [--check]      # regenerate config/cdmon/index.yaml's units: from the on-disk unit files; --check is a read-only CI gate (exit 1 on an out-of-sync index)
+cdx doctor               # offline, read-only preflight: PASS/WARN/FAIL on config, documents, backend prereq, central wiring, optional extras; exit 0 unless a structural FAIL (absent runtime prereq/unset token = WARN, never FAIL; no network) (G-02)
 
 # --- author / inspect docs ---
-cdmon new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
-cdmon surface              # dump the extracted per-document surface (debug)
-cdmon build                # render every `html: true` doc to its derived `.html` twin (keeps the Layout Standard's HTML pairing fresh)
-cdmon lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter
+cdx new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
+cdx surface              # dump the extracted per-document surface (debug)
+cdx build                # render every `html: true` doc to its derived `.html` twin (keeps the Layout Standard's HTML pairing fresh)
+cdx lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter
 
 # --- detect & heal ---
-cdmon check                # detect *content* drift; non-zero exit on drift (the warning)
-cdmon monitor --apply      # detect → LLM verdict → record → apply fix → re-check
-cdmon monitor --ref SHA    # ...and stamp each record's source_sha provenance (else $CI_COMMIT_SHA; C-05)
-cdmon sync-pr [--dry-run]  # heal docs + emit a unified-diff patch of the changed docs (the docs-PR content); --dry-run computes the same patch without touching the tree; --out FILE writes it
-cdmon open-docs-pr [--dry-run]  # heal docs then open a docs MR (branch+commit+MR) via the default GitLab transport (stdlib urllib; from CI env); clean repo is a no-op; --dry-run prints the MR plan as JSON from a dry sync (no mutation, no network); --target/--ref set the target branch + provenance ref
-cdmon should-sync [FILES...]  # loop-safety guard: exit 0 to proceed / 1 to skip a heal; skips when every changed file is a managed doc (a bot doc-only commit). `git diff --name-only | cdmon should-sync` (C-04)
+cdx check                # detect *content* drift; non-zero exit on drift (the warning)
+cdx monitor --apply      # detect → LLM verdict → record → apply fix → re-check
+cdx monitor --ref SHA    # ...and stamp each record's source_sha provenance (else $CI_COMMIT_SHA; C-05)
+cdx sync-pr [--dry-run]  # heal docs + emit a unified-diff patch of the changed docs (the docs-PR content); --dry-run computes the same patch without touching the tree; --out FILE writes it
+cdx open-docs-pr [--dry-run]  # heal docs then open a docs MR (branch+commit+MR) via the default GitLab transport (stdlib urllib; from CI env); clean repo is a no-op; --dry-run prints the MR plan as JSON from a dry sync (no mutation, no network); --target/--ref set the target branch + provenance ref
+cdx should-sync [FILES...]  # loop-safety guard: exit 0 to proceed / 1 to skip a heal; skips when every changed file is a managed doc (a bot doc-only commit). `git diff --name-only | cdx should-sync` (C-04)
 
 # --- review log & learning ---
-cdmon report               # summarize the review log + resolved/unresolved counts (--verdict ESCALATE lists those records)
-cdmon resolve REC --resolution accepted [--by NAME] [--text ...] [--note ...]  # record a human outcome (accepted|overridden|rejected|invalidated) as a separate append-only event linked to a review record; the review log stays immutable (K5)
-cdmon promotions           # list promotion candidates: shapes (doc_id,drift_kind,audience) whose ≥N resolved records ALL share one DECISION (invalidated|rejected) — promotable to a deterministic rule the monitor applies with ZERO backend calls (--min-count N; --json) (D-05/D-06)
+cdx report               # summarize the review log + resolved/unresolved counts (--verdict ESCALATE lists those records)
+cdx resolve REC --resolution accepted [--by NAME] [--text ...] [--note ...]  # record a human outcome (accepted|overridden|rejected|invalidated) as a separate append-only event linked to a review record; the review log stays immutable (K5)
+cdx promotions           # list promotion candidates: shapes (doc_id,drift_kind,audience) whose ≥N resolved records ALL share one DECISION (invalidated|rejected) — promotable to a deterministic rule the monitor applies with ZERO backend calls (--min-count N; --json) (D-05/D-06)
 
 # --- coverage ---
-cdmon coverage             # doc-coverage % + gaps/waivers (--json; --fail-under N gates)
-cdmon coverage --write     # write a deterministic manifest (payload + gap→owner suggestions) to .cdmon/coverage.json (idempotent; --write PATH for a custom path)
-cdmon rpt [--write]        # build the config/cdmon dir-layout coverage report; print it, or --write it to config/cdmon/coverage.rpt
-cdmon surface-gaps [--dry-run] [--provider gitlab|github]  # turn undocumented-public-symbol coverage gaps into a tracker issue (grouped by suggested owner); no gaps is a no-op; --dry-run prints the deterministic IssuePlan JSON without building/calling a transport; else opens the issue via the provider's stdlib-urllib transport (from CI env; loud if unset) (H-04)
+cdx coverage             # doc-coverage % + gaps/waivers (--json; --fail-under N gates)
+cdx coverage --write     # write a deterministic manifest (payload + gap→owner suggestions) to .cdmon/coverage.json (idempotent; --write PATH for a custom path)
+cdx rpt [--write]        # build the config/cdmon dir-layout coverage report; print it, or --write it to config/cdmon/coverage.rpt
+cdx surface-gaps [--dry-run] [--provider gitlab|github]  # turn undocumented-public-symbol coverage gaps into a tracker issue (grouped by suggested owner); no gaps is a no-op; --dry-run prints the deterministic IssuePlan JSON without building/calling a transport; else opens the issue via the provider's stdlib-urllib transport (from CI env; loud if unset) (H-04)
 
 # --- central server ---
-cdmon register [--dry-run] # announce this repo to the central server: POST its identity (RegistrationPayload) to <central url>/repos (bearer from central.auth_env; stdlib only); --dry-run prints the payload without any network call (E-02)
-cdmon sync [--mode local|git] [--remote URL --repo-id ID]  # run a config sync. LOCAL (no --remote): read-only against the cwd, prints drift+coverage+commits-ahead (or --json). REMOTE: POST {mode} to <URL>/repos/{ID}/sync (bearer from --token-env) and print the server's run summary
-cdmon serve [--host H --port P]  # serve THIS repo's standalone console + API locally over the built Astro frontend — no central access (L-01); needs a config/cdmon/ layout (run `cdmon init --v2` first)
+cdx register [--dry-run] # announce this repo to the central server: POST its identity (RegistrationPayload) to <central url>/repos (bearer from central.auth_env; stdlib only); --dry-run prints the payload without any network call (E-02)
+cdx sync [--mode local|git] [--remote URL --repo-id ID]  # run a config sync. LOCAL (no --remote): read-only against the cwd, prints drift+coverage+commits-ahead (or --json). REMOTE: POST {mode} to <URL>/repos/{ID}/sync (bearer from --token-env) and print the server's run summary
+cdx serve [--host H --port P]  # serve THIS repo's standalone console + API locally over the built Astro frontend — no central access (L-01); needs a config/cdmon/ layout (run `cdx init --v2` first)
 
 # --- feature catalog & traceability (EPIC R) ---
-cdmon wiki [--check]       # regenerate the golden feature-doc/FEATURES.md + feature-doc/wiki/* from their single sources; --check is the CI freshness gate (fails if any wiki is stale)
-cdmon trace [--fail-on-gap]  # traceability gate: prove every catalog feature has ≥1 demo AND ≥1 test via inline `Feature:` tags scanned from tests/ and demo/ (--fail-on-gap exits 1 on a gap)
+cdx wiki [--check]       # regenerate the golden feature-doc/FEATURES.md + feature-doc/wiki/* from their single sources; --check is the CI freshness gate (fails if any wiki is stale)
+cdx trace [--fail-on-gap]  # traceability gate: prove every catalog feature has ≥1 demo AND ≥1 test via inline `Feature:` tags scanned from tests/ and demo/ (--fail-on-gap exits 1 on a gap)
 
 # --- public contract ---
-cdmon schema               # emit the public ReviewRecord JSON schema
+cdx schema               # emit the public ReviewRecord JSON schema
 ```
 
 ### Drop-in CI + a worked example (EPIC G)
@@ -106,9 +109,9 @@ cdmon schema               # emit the public ReviewRecord JSON schema
   `cdmon-gate` job (`doctor` → `check` → `lint`, offline) and a default-branch
   `cdmon-docs-pr` job (`should-sync` guard → `monitor --apply` → `open-docs-pr`).
   See `templates/ci/README.md`; set `CDMON_CENTRAL_TOKEN` as a CI secret (E-06). A
-  repo test keeps the templates honest — they reference only real `cdmon`
+  repo test keeps the templates honest — they reference only real `cdx`
   subcommands.
-- **`examples/external-repo/`** — a small self-contained repo that ADOPTS cdmon
+- **`examples/external-repo/`** — a small self-contained repo that ADOPTS cdx
   (its own `src/widget.py` + `docs/api.md` + `cdmon.yaml`). Its test heals it and
   reports the healed records to an in-process central server (`TestClient`) with a
   bearer token, proving the whole client→server loop offline (the capstone, G-04).
@@ -116,16 +119,16 @@ cdmon schema               # emit the public ReviewRecord JSON schema
 
 ## Document Layout Standard
 
-Beyond keeping content in sync, code-doc-monitor standardizes **how a managed
+Beyond keeping content in sync, custodex standardizes **how a managed
 doc is written** so every adopting project lays its docs out the same way: a
 canonical skeleton (front matter → `#` title → `>` purpose → prose →
 `CDM:BEGIN/END` regions), a managed front-matter schema
 (`cdm.schema_version` / `audience` / `fingerprint`), and an HTML-twin pairing
 rule (`X.md` → `X.html`, derived-not-edited, carrying an embedded source hash).
 helium's `HELIUM:AUTOGEN … START/END` markers are a documented alias of the same
-grammar. The standard is **machine-checked** — `cdmon lint` is a structure gate
-orthogonal to `check`'s content gate (run both in CI), `cdmon new-doc` scaffolds
-a conformant file, and `cdmon build` (re)renders the `.html` twins. See
+grammar. The standard is **machine-checked** — `cdx lint` is a structure gate
+orthogonal to `check`'s content gate (run both in CI), `cdx new-doc` scaffolds
+a conformant file, and `cdx build` (re)renders the `.html` twins. See
 [`docs/LAYOUT_STANDARD.md`](docs/LAYOUT_STANDARD.md).
 
 ## Backends (pluggable, offline by default)
@@ -147,11 +150,11 @@ backend-agnostic: all four return the same `BackendResult` JSON contract.
 instead of a single monolithic prompt. Its prompt is **composed from separated
 Markdown artifacts**, loaded *only when a node needs them*:
 
-- [`AGENT.md`](code_doc_monitor/agent/prompts/AGENT.md) — the recipe + audience-aware judgement rules,
-- [`PROTOCOL.md`](code_doc_monitor/agent/prompts/PROTOCOL.md) — the strict JSON verdict contract,
-- [`TOOL.md`](code_doc_monitor/agent/prompts/TOOL.md) — the two fix shapes (loaded only for a healable drift),
-- [`PERSONA.md`](code_doc_monitor/agent/prompts/PERSONA.md) — voice (loaded only when `use_persona`),
-- [`EXEMPLARS.md`](code_doc_monitor/agent/prompts/EXEMPLARS.md) — few-shot exemplars from past resolved drift (loaded only when similar records are retrieved; D-04).
+- [`AGENT.md`](custodex/agent/prompts/AGENT.md) — the recipe + audience-aware judgement rules,
+- [`PROTOCOL.md`](custodex/agent/prompts/PROTOCOL.md) — the strict JSON verdict contract,
+- [`TOOL.md`](custodex/agent/prompts/TOOL.md) — the two fix shapes (loaded only for a healable drift),
+- [`PERSONA.md`](custodex/agent/prompts/PERSONA.md) — voice (loaded only when `use_persona`),
+- [`EXEMPLARS.md`](custodex/agent/prompts/EXEMPLARS.md) — few-shot exemplars from past resolved drift (loaded only when similar records are retrieved; D-04).
 
 The agent's **runtime** is a second config-only choice — *the one knob the brief
 asked for*: the agent uses the headless Claude Code CLI by default, and can be
@@ -177,7 +180,7 @@ The agent ships behind an opt-in extra: `pip install -e '.[agent]'` (or `[dev]`)
 ## Central server (optional `[server]` extra)
 
 The central side of the sink/registry is a FastAPI app in
-`code_doc_monitor.server` that ingests repo registrations + review records over
+`custodex.server` that ingests repo registrations + review records over
 the **same** versioned schemas the client sends — no DTOs. It ships behind an
 opt-in extra (`pip install -e '.[server]'`) and is imported lazily, so the core
 engine pulls in no `fastapi`. `create_app()` registers ~two dozen routes; the
@@ -194,7 +197,7 @@ main groups:
 
 Reads are open; writes are protected by a per-repo bearer token (E-06). A
 malformed body is a `422` (pydantic against the shared model). Run it with
-`cdmon-server` or `uvicorn code_doc_monitor.server.app:create_app --factory`.
+`cdx-server` or `uvicorn custodex.server.app:create_app --factory`.
 
 **Storage** is selected from the environment by `store_from_env()`: with
 `$CDMON_DATABASE_URL` set, the schema is migrated to head (Alembic) and a
@@ -259,17 +262,17 @@ the apply-fix and link→generate flows end-to-end, offline.
 ## Feature catalog & traceability (EPIC R)
 
 A golden **feature catalog** under `feature-doc/catalog/*.yaml` is the single
-source of truth for every feature of code-doc-monitor (19 subsystems; the exact
+source of truth for every feature of custodex (19 subsystems; the exact
 feature count is the header of `feature-doc/FEATURES.md`). From it,
-`cdmon wiki` regenerates four artifacts — never hand-edited:
+`cdx wiki` regenerates four artifacts — never hand-edited:
 
 - `feature-doc/FEATURES.md` — the rendered feature reference,
 - `feature-doc/wiki/SOURCE_WIKI.md` — per-module public symbols + feature links,
 - `feature-doc/wiki/TEST_WIKI.md` — every test case grouped by boundary,
 - `feature-doc/wiki/TRACEABILITY.md` — the feature × demo × test matrix.
 
-`cdmon wiki --check` is the CI freshness gate (fails if any wiki is stale).
-`cdmon trace --fail-on-gap` proves every feature traces 1:1 to a demo **and** a
+`cdx wiki --check` is the CI freshness gate (fails if any wiki is stale).
+`cdx trace --fail-on-gap` proves every feature traces 1:1 to a demo **and** a
 test by scanning inline `Feature: <id>` tags in `tests/` and `demo/` (currently
 complete — every catalogued feature has both). Both run offline in CI (the
 `docs:gate` job).
@@ -278,18 +281,18 @@ complete — every catalogued feature has both). Both run offline in CI (the
 
 Every handled drift becomes a versioned `ReviewRecord` (the public contract for
 the central monitoring system). The JSON Schema is generated from the model —
-`cdmon schema` — and a snapshot lives at
+`cdx schema` — and a snapshot lives at
 [`docs/REVIEW_RECORD_SCHEMA.json`](docs/REVIEW_RECORD_SCHEMA.json).
 
 ## Dogfooding
 
-code-doc-monitor monitors **its own** source against its own engineering docs:
+Custodex monitors **its own** source against its own engineering docs:
 the shipped [`config/cdmon/`](config/cdmon) dir layout (an `index.yaml` plus the
 per-area unit files) maps this package's modules onto the docs under `docs/api/`
-(with `schema.py` as a shared, multiply-referenced file). Run `cdmon check` here
+(with `schema.py` as a shared, multiply-referenced file). Run `cdx check` here
 (it auto-detects `config/cdmon/`) to see it in action; the dogfood is asserted in
 `tests/system/test_dogfood.py`. Any edit to a tracked module drifts the matching
-`docs/api/*` doc — reheal with `cdmon monitor --apply` before the suite is green.
+`docs/api/*` doc — reheal with `cdx monitor --apply` before the suite is green.
 
 ## Status
 
@@ -307,8 +310,8 @@ constraints (K0–K10), and the architecture.
 ```bash
 python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'  # [dev] includes both extras
 .venv/bin/ruff format --check . && .venv/bin/ruff check .
-.venv/bin/mypy code_doc_monitor
-.venv/bin/pytest -q --cov=code_doc_monitor --cov-branch
+.venv/bin/mypy custodex
+.venv/bin/pytest -q --cov=custodex --cov-branch
 ```
 
 The LangGraph agent backend is an opt-in extra; for a runtime-only install use
@@ -325,8 +328,8 @@ pipeline (plus GitLab's SAST + Secret-Detection templates):
 
 - **`tests:offline`** — the default offline suite on every push/MR (mock backend,
   no network, no DB; coverage-gated).
-- **`docs:gate`** — the offline doc gates: `cdmon check` + `cdmon lint` + the
-  EPIC-R `cdmon wiki --check` + `cdmon trace --fail-on-gap`.
+- **`docs:gate`** — the offline doc gates: `cdx check` + `cdx lint` + the
+  EPIC-R `cdx wiki --check` + `cdx trace --fail-on-gap`.
 - **`docs:heal`** — the default-branch docs-PR loop (`should-sync` → `monitor
   --apply` → `open-docs-pr`).
 - **`tests:pg`** — the DB store contract against a **real Postgres** (`-m pg`); the

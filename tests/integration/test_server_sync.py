@@ -33,15 +33,15 @@ pytest.importorskip(
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from code_doc_monitor.registry import RegistrationPayload  # noqa: E402
-from code_doc_monitor.server import InMemoryStore, create_app  # noqa: E402
-from code_doc_monitor.server.db import (  # noqa: E402
+from custodex.registry import RegistrationPayload  # noqa: E402
+from custodex.server import InMemoryStore, create_app  # noqa: E402
+from custodex.server.db import (  # noqa: E402
     SqlStore,
     create_all,
     engine_from_url,
 )
-from code_doc_monitor.server.store import Store, hash_token  # noqa: E402
-from code_doc_monitor.sinks import RepoIdentity  # noqa: E402
+from custodex.server.store import Store, hash_token  # noqa: E402
+from custodex.sinks import RepoIdentity  # noqa: E402
 
 _REPO = "acme/widget"
 _TOKEN = "s3cret-token"
@@ -55,7 +55,7 @@ _INDEX_YAML = """\
 ---
 cdmon-config-version: "2.0.0"
 repo: widget
-generated-by: cdmon
+generated-by: cdx
 updated: "2026-06-07"
 ---
 root: "../.."
@@ -118,7 +118,7 @@ def _git(repo: Path, *args: str) -> str:
 def _build_git_repo(tmp_path: Path) -> Path:
     from typer.testing import CliRunner
 
-    from code_doc_monitor.cli import app as cli_app
+    from custodex.cli import app as cli_app
 
     repo = tmp_path / "repo"
     cfg = repo / "config" / "cdmon"

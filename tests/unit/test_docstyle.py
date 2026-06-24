@@ -1,6 +1,6 @@
 """N-05 — tests for ``doc-style.yaml`` + the writing-template composer (K8/K10).
 
-Covers the :mod:`code_doc_monitor.docstyle` models (frontmatter/kind validation,
+Covers the :mod:`custodex.docstyle` models (frontmatter/kind validation,
 hyphenated-alias round-trip), :func:`load_doc_style` (loud on a missing template
 file, K8), :meth:`DocStyleMap.style_for` (mapping overrides defaults),
 :func:`resolve_style_files`, and :func:`read_style_guidance` (the four bodies in
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from code_doc_monitor.config import load_bundle
-from code_doc_monitor.docstyle import (
+from custodex.config import load_bundle
+from custodex.docstyle import (
     STYLE_CATEGORIES,
     DocStyleMap,
     DocStyleMapping,
@@ -26,7 +26,7 @@ from code_doc_monitor.docstyle import (
     read_style_guidance,
     resolve_style_files,
 )
-from code_doc_monitor.errors import ConfigError
+from custodex.errors import ConfigError
 from tests.integration.test_config_v2 import _write_tree
 
 # All template stems referenced by the fixtures below, per category.
