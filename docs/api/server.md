@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 2613a063fffed614
+  fingerprint: 01bb52a19ee8bb9c
   fingerprint_tiers:
-    composite: 2613a063fffed614
-    docstring: 4609233fcfecdb3f
-    signature: 6444e0fa083691f7
+    composite: 01bb52a19ee8bb9c
+    docstring: d8eae6c9f545c94d
+    signature: 1ac0fbf4a371c0b9
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -48,6 +48,7 @@ cdm:
     - 31a3e50b8f5221db
     - 331fcb711b55798f
     - 337ab9db6bad7258
+    - 34a2555fd4d71104
     - 3685ba08c417c495
     - 369c045a16e5d732
     - 373c1fae3f8a3746
@@ -71,11 +72,13 @@ cdm:
     - 4a4f3ab2f63a4d70
     - 4a5a5b4f0f371856
     - 4b6efaecc8f7dadc
+    - 4e6a0be38bfb2e03
     - 4e7c579155b8c53d
     - 4e8617b2d6609600
     - 536d95baa30f412c
     - 5469690a8bc40782
     - 550988527d9b6ea0
+    - 57f3d76d1c75e4b2
     - 5832414bab2bf2ab
     - 5975bdeeb9d7dc5f
     - 5b32fe40a1173dc0
@@ -112,6 +115,7 @@ cdm:
     - 8a290d89bd71388a
     - 8f071a0ee4ad3809
     - 91e25a1bd843b417
+    - 9226de5c220d98ef
     - 932c919339ac3a6d
     - 93b85db9aae2db64
     - 95027cf1e5bce55b
@@ -152,6 +156,7 @@ cdm:
     - cf4613c27c5db0da
     - cfc0082becb20fac
     - d085aef79729a8a1
+    - d098dc649eb707a0
     - d1301a344a55bfa7
     - d402bd229d320919
     - d51df2124b2d643d
@@ -163,6 +168,7 @@ cdm:
     - db401b971ca3b2f9
     - de0ca6e8403d2e27
     - de106aa8e1278a0c
+    - e099951288fd9e8b
     - e435b85a94b85b45
     - e8b7003029e54d54
     - e94c061a7001dbd7
@@ -175,7 +181,7 @@ cdm:
     - f95e33eaf5a43c96
     - fa2f6597462ddabd
   region_hashes:
-    symbols: 28dccfe4a682451e
+    symbols: 9eef313dfcfaa00a
   schema_version: 1.0.0
 ---
 # server
@@ -194,6 +200,7 @@ cdm:
 | ConfigCodeRefRow | class | class ConfigCodeRefRow(Base) |
 | ConfigContextRef | class | class ConfigContextRef(BaseModel) |
 | ConfigDocEdge | class | class ConfigDocEdge(BaseModel) |
+| ConfigDocEdgeRow | class | class ConfigDocEdgeRow(Base) |
 | ConfigDocument | class | class ConfigDocument(BaseModel) |
 | ConfigDocumentRow | class | class ConfigDocumentRow(Base) |
 | ConfigEdit | variable | ConfigEdit = ... |
@@ -223,6 +230,7 @@ cdm:
 | InMemoryStore.config_documents_for | method | def config_documents_for(self, repo_id: str, sync_kind: str \| None = None) -> list[ConfigDocument] |
 | InMemoryStore.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | InMemoryStore.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
+| InMemoryStore.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | InMemoryStore.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | InMemoryStore.latest_sync_run | method | def latest_sync_run(self, repo_id: str, sync_kind: str \| None = None) -> SyncRun \| None |
 | InMemoryStore.list_repos | method | def list_repos(self) -> list[RegisteredRepo] |
@@ -264,6 +272,7 @@ cdm:
 | SqlStore.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | SqlStore.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
 | SqlStore.coverage_snapshots_for | method | def coverage_snapshots_for(self, repo_id: str) -> list[dict] |
+| SqlStore.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | SqlStore.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | SqlStore.latest_sync_run | method | def latest_sync_run(self, repo_id: str, sync_kind: str \| None = None) -> SyncRun \| None |
 | SqlStore.list_repos | method | def list_repos(self) -> list[RegisteredRepo] |
@@ -290,6 +299,7 @@ cdm:
 | Store.config_documents_for | method | def config_documents_for(self, repo_id: str, sync_kind: str \| None = None) -> list[ConfigDocument] |
 | Store.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | Store.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
+| Store.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | Store.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | Store.latest_sync_run | method | def latest_sync_run(self, repo_id: str, sync_kind: str \| None = None) -> SyncRun \| None |
 | Store.list_repos | method | def list_repos(self) -> list[RegisteredRepo] |
@@ -305,6 +315,7 @@ cdm:
 | Store.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
 | Store.upsert_identity | method | def upsert_identity(self, identity: Identity) -> None |
 | StoredConfigEdit | class | class StoredConfigEdit(BaseModel) |
+| StoredDocEdge | class | class StoredDocEdge(BaseModel) |
 | SyncRequest | class | class SyncRequest(BaseModel) |
 | SyncRun | class | class SyncRun(BaseModel) |
 | SyncRunRow | class | class SyncRunRow(Base) |
@@ -333,6 +344,7 @@ cdm:
 | _default_now | function | def _default_now() -> str |
 | _default_static_dir | function | def _default_static_dir(root: Path \| None = None) -> Path \| None |
 | _disk_editable_parts | function | def _disk_editable_parts(local_path: str \| None) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], DocStyleOptions] |
+| _doc_edges_of | function | def _doc_edges_of(doc: ConfigDocument) -> list[StoredDocEdge] |
 | _iso_to_epoch | function | def _iso_to_epoch(iso: str) -> int |
 | _json_type | function | def _json_type() -> TypeEngine[dict] |
 | _load_wiki_sections | function | def _load_wiki_sections(wiki_dir: Path \| None) -> list[dict[str, str]] |

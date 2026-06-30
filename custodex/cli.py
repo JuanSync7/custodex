@@ -47,8 +47,10 @@ from .config import (
 from .docdeps import (
     InferredEdge,
     detect_suspect_links,
+    impacted_by,
     infer_edges_from_links,
     render_deps_text,
+    render_impact_text,
     stamp_edges,
 )
 from .docstyle import DocStyleMap
@@ -1476,6 +1478,13 @@ def deps(
         help="Infer edges from Markdown cross-links between managed docs and print "
         "paste-ready `depends_on` config (the low-tedium authoring aid). Read-only.",
     ),
+    impact: str | None = typer.Option(
+        None,
+        "--impact",
+        metavar="DOC",
+        help="Show the blast radius of changing DOC — the documents that "
+        "(transitively) depend on it and would need re-review. Read-only.",
+    ),
     as_json: bool = typer.Option(
         False, "--json", help="Emit the dependency graph / suggestions as JSON."
     ),
@@ -1486,11 +1495,26 @@ def deps(
     edge and whether it is OK / suspect / unstamped, all derived from config (the
     source of truth) + the downstream's stored baseline stamps. ``--suggest`` instead
     proposes edges inferred from existing Markdown cross-links so a human approves a
-    graph rather than authoring it. No backend, no network.
+    graph rather than authoring it; ``--impact DOC`` answers the proactive "what must
+    I review if I change DOC" by walking the dependents reverse-reachable from DOC. No
+    backend, no network.
     """
     try:
         cfg, config_dir = _load(config)
         root = resolve_repo_root(config_dir, cfg.root)
+        if impact is not None:
+            impacted = impacted_by(cfg, impact)
+            if as_json:
+                typer.echo(
+                    json.dumps(
+                        {"upstream": impact, "impacted": list(impacted)},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                typer.echo(render_impact_text(impact, impacted))
+            return
         if suggest:
             inferred = infer_edges_from_links(cfg, root)
             if as_json:

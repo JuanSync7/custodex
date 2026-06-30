@@ -1160,6 +1160,41 @@ tbody th {
 .settings-table th[scope="col"]:nth-child(2) {
   width: 58%;
 }
+/* EPIC B — the Dependencies view reuses the coverage table look with FOUR columns
+   (Document, Depends on, Relationship, Audience); restate the widths for fixed
+   layout and give the relationship a neutral accent-tinted mono chip. */
+.dep-summary {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  margin: 0 0 1.1rem;
+}
+.dep-table {
+  table-layout: fixed;
+}
+.dep-table th[scope="col"]:nth-child(1) {
+  width: 30%;
+}
+.dep-table th[scope="col"]:nth-child(2) {
+  width: 30%;
+}
+.dep-table th[scope="col"]:nth-child(3) {
+  width: 22%;
+}
+.dep-table th[scope="col"]:nth-child(4) {
+  width: 18%;
+}
+.dep-upstream {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  color: var(--text);
+  font-weight: 600;
+}
+.chip.dep-type {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  text-transform: lowercase;
+}
 .settings-secrets {
   list-style: none;
   margin: 0.5rem 0 0;

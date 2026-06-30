@@ -38,7 +38,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `cli.py`
 - Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `index`, `init`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `staleness`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`
 
 ## `config`
 
@@ -50,7 +50,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `configsync.py`
 - Public symbols: `GitInfo`, `SyncResult`, `__all__`, `read_config_at`, `run_sync`
-- Implemented by: `FEAT-CONFIGV2-012`, `FEAT-DOCDEPS-007`, `FEAT-GITSYNC-005`, `FEAT-STALENESS-005`
+- Implemented by: `FEAT-CONFIGV2-012`, `FEAT-DOCDEPS-007`, `FEAT-DOCDEPS-008`, `FEAT-GITSYNC-005`, `FEAT-STALENESS-005`
 
 ## `coverage`
 
@@ -61,8 +61,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `docdeps`
 
 - Path: `docdeps.py`
-- Public symbols: `InferredEdge`, `SuspectLink`, `SuspectStatus`, `__all__`, `detect_suspect_links`, `infer_edges_from_links`, `render_deps_text`, `stamp_edges`, `upstream_fingerprint`
-- Implemented by: `FEAT-DOCDEPS-002`, `FEAT-DOCDEPS-003`, `FEAT-DOCDEPS-004`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-006`
+- Public symbols: `InferredEdge`, `SuspectLink`, `SuspectStatus`, `__all__`, `detect_suspect_links`, `impacted_by`, `infer_edges_from_links`, `render_deps_text`, `render_impact_text`, `stamp_edges`, `upstream_fingerprint`
+- Implemented by: `FEAT-DOCDEPS-002`, `FEAT-DOCDEPS-003`, `FEAT-DOCDEPS-004`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-006`, `FEAT-DOCDEPS-009`
 
 ## `docstyle`
 
@@ -79,8 +79,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `drift`
 
 - Path: `drift.py`
-- Public symbols: `Drift`, `DriftKind`, `DriftReport`, `__all__`, `detect`
-- Implemented by: `FEAT-CONFIGV2-016`, `FEAT-DOCDEPS-004`, `FEAT-DRIFT-001`, `FEAT-DRIFT-002`, `FEAT-DRIFT-003`, `FEAT-DRIFT-004`, `FEAT-DRIFT-005`, `FEAT-DRIFT-006`, `FEAT-DRIFT-007`, `FEAT-DRIFT-008`, `FEAT-DRIFT-009`, `FEAT-DRIFT-010`
+- Public symbols: `ChangeSeverity`, `Drift`, `DriftKind`, `DriftReport`, `__all__`, `classify_change_severity`, `detect`
+- Implemented by: `FEAT-CONFIGV2-016`, `FEAT-DOCDEPS-004`, `FEAT-DRIFT-001`, `FEAT-DRIFT-002`, `FEAT-DRIFT-003`, `FEAT-DRIFT-004`, `FEAT-DRIFT-005`, `FEAT-DRIFT-006`, `FEAT-DRIFT-007`, `FEAT-DRIFT-008`, `FEAT-DRIFT-009`, `FEAT-DRIFT-010`, `FEAT-DRIFT-011`
 
 ## `errors`
 
@@ -158,7 +158,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `monitor.py`
 - Public symbols: `DEFAULT_EXEMPLAR_TOP_N`, `DEFAULT_LOG_PATH`, `HandledDrift`, `Monitor`, `MonitorResult`, `RULE_CAUSE_PREFIX`, `__all__`
-- Implemented by: `FEAT-DOCDEPS-006`, `FEAT-MONITOR-001`, `FEAT-MONITOR-002`, `FEAT-MONITOR-003`, `FEAT-MONITOR-004`, `FEAT-MONITOR-005`, `FEAT-MONITOR-006`, `FEAT-MONITOR-007`, `FEAT-MONITOR-008`, `FEAT-MONITOR-009`
+- Implemented by: `FEAT-DOCDEPS-006`, `FEAT-DRIFT-011`, `FEAT-MONITOR-001`, `FEAT-MONITOR-002`, `FEAT-MONITOR-003`, `FEAT-MONITOR-004`, `FEAT-MONITOR-005`, `FEAT-MONITOR-006`, `FEAT-MONITOR-007`, `FEAT-MONITOR-008`, `FEAT-MONITOR-009`
 
 ## `ownership`
 
@@ -200,7 +200,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `schema.py`
 - Public symbols: `ProposedFix`, `Resolution`, `ResolutionRecord`, `ReviewRecord`, `Verdict`, `__all__`, `new_record_id`, `resolution_record_schema`, `review_record_schema`
-- Implemented by: `FEAT-RECORD-001`, `FEAT-RECORD-002`, `FEAT-RECORD-003`, `FEAT-RECORD-004`, `FEAT-RECORD-005`, `FEAT-RECORD-006`
+- Implemented by: `FEAT-DRIFT-011`, `FEAT-RECORD-001`, `FEAT-RECORD-002`, `FEAT-RECORD-003`, `FEAT-RECORD-004`, `FEAT-RECORD-005`, `FEAT-RECORD-006`
 
 ## `secrets`
 
@@ -211,8 +211,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `server`
 
 - Path: `server/__init__.py`
-- Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocEdge`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `ReassignOwnerEdit`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
-- Implemented by: `FEAT-DOCDEPS-007`, `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-OWNERSHIP-009`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`, `FEAT-SETTINGS-004`, `FEAT-SETTINGS-005`, `FEAT-SETTINGS-006`, `FEAT-SETTINGS-007`, `FEAT-STALENESS-005`, `FEAT-STALENESS-006`
+- Public symbols: `AddCodeRefEdit`, `ApplyFixResponse`, `Base`, `ConfigCodeRef`, `ConfigCodeRefRow`, `ConfigContextRef`, `ConfigDocEdge`, `ConfigDocEdgeRow`, `ConfigDocument`, `ConfigDocumentRow`, `ConfigEdit`, `ConfigEditRow`, `CoverageIngest`, `CoverageSnapshotRow`, `CreateDocEdit`, `DocStyleOptions`, `DocsPrRequest`, `DocumentTree`, `EditCodeRef`, `EditContextRef`, `EditDocStyle`, `EditableConfigTree`, `EditableDocument`, `GenerateRequest`, `GenerateResponse`, `InMemoryStore`, `ReassignOwnerEdit`, `RecordRow`, `RegisteredRepo`, `RemoveCodeRefEdit`, `RepoHealth`, `RepoRow`, `RepoStatus`, `RepoTelemetry`, `ResolutionRow`, `RosterRow`, `SetContextRefsEdit`, `SetDocStyleEdit`, `ShapeStat`, `SqlStore`, `Store`, `StoredConfigEdit`, `StoredDocEdge`, `SyncRequest`, `SyncRun`, `SyncRunRow`, `WIKI_SECTIONS`, `__all__`, `build_standalone_app`, `build_standalone_store`, `create_all`, `create_app`, `effective_identity`, `engine_from_url`, `hash_token`, `main`, `resolve_repo_id`, `store_from_env`
+- Implemented by: `FEAT-DOCDEPS-007`, `FEAT-DOCDEPS-008`, `FEAT-OWNERSHIP-005`, `FEAT-OWNERSHIP-006`, `FEAT-OWNERSHIP-007`, `FEAT-OWNERSHIP-008`, `FEAT-OWNERSHIP-009`, `FEAT-SERVER-001`, `FEAT-SERVER-002`, `FEAT-SERVER-003`, `FEAT-SERVER-004`, `FEAT-SERVER-005`, `FEAT-SERVER-006`, `FEAT-SERVER-007`, `FEAT-SERVER-008`, `FEAT-SERVER-009`, `FEAT-SERVER-010`, `FEAT-SERVER-011`, `FEAT-SERVER-012`, `FEAT-SERVER-013`, `FEAT-SERVER-014`, `FEAT-SERVER-015`, `FEAT-SERVER-016`, `FEAT-SERVER-019`, `FEAT-SETTINGS-004`, `FEAT-SETTINGS-005`, `FEAT-SETTINGS-006`, `FEAT-SETTINGS-007`, `FEAT-STALENESS-005`, `FEAT-STALENESS-006`
 
 ## `settings`
 

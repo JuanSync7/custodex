@@ -53,7 +53,9 @@ from .store import (
     ConfigCodeRef,
     ConfigDocument,
     RegisteredRepo,
+    StoredDocEdge,
     SyncRun,
+    _doc_edges_of,
     effective_identity,
     hash_token,
 )
@@ -180,6 +182,29 @@ class ConfigCodeRefRow(Base):
     path: Mapped[str] = mapped_column(String)
     unit: Mapped[str | None] = mapped_column(String, nullable=True)
     code_ref: Mapped[dict] = mapped_column(_json_type())
+
+
+class ConfigDocEdgeRow(Base):
+    """A doc↔doc edge FLATTENED for reverse lookup — FULL JSON + indexed (B-09).
+
+    The ``depends_on`` of each :class:`ConfigDocumentRow` projected into a standalone,
+    indexable row so "which docs depend on X" is an indexed ``WHERE upstream_id = X``
+    instead of a JSON scan over every document. ``edge`` is the FULL
+    :class:`StoredDocEdge` JSON (the K6 source of truth — a future edge field rides in
+    it with no migration); the scalar columns are the indexed projection. Derived from
+    the documents on every ``replace_config`` and replaced together with them per
+    ``(repo_id, sync_kind)``. ``id`` is the surrogate insertion-order PK (K10).
+    """
+
+    __tablename__ = "config_doc_edges"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    repo_id: Mapped[str] = mapped_column(String, index=True)
+    doc_id: Mapped[str] = mapped_column(String, index=True)
+    upstream_id: Mapped[str] = mapped_column(String, index=True)
+    sync_kind: Mapped[str] = mapped_column(String, index=True)
+    type: Mapped[str] = mapped_column(String)
+    edge: Mapped[dict] = mapped_column(_json_type())
 
 
 class SyncRunRow(Base):
@@ -512,6 +537,12 @@ class SqlStore:
                     ConfigCodeRefRow.sync_kind == sync_kind,
                 )
             )
+            session.execute(
+                delete(ConfigDocEdgeRow).where(
+                    ConfigDocEdgeRow.repo_id == repo_id,
+                    ConfigDocEdgeRow.sync_kind == sync_kind,
+                )
+            )
             for doc in documents:
                 session.add(
                     ConfigDocumentRow(
@@ -526,6 +557,19 @@ class SqlStore:
                         document=doc.model_dump(mode="json"),
                     )
                 )
+                # B-09: flatten this document's depends_on into the reverse-lookup
+                # index (the SAME projection the in-memory store derives on read).
+                for edge in _doc_edges_of(doc):
+                    session.add(
+                        ConfigDocEdgeRow(
+                            repo_id=edge.repo_id,
+                            doc_id=edge.doc_id,
+                            upstream_id=edge.upstream_id,
+                            sync_kind=edge.sync_kind,
+                            type=edge.type,
+                            edge=edge.model_dump(mode="json"),
+                        )
+                    )
             for ref in code_refs:
                 session.add(
                     ConfigCodeRefRow(
@@ -547,6 +591,28 @@ class SqlStore:
         with self._session() as session:
             rows = session.scalars(stmt.order_by(ConfigDocumentRow.id)).all()
             return [ConfigDocument.model_validate(r.document) for r in rows]
+
+    def doc_edges_for(
+        self,
+        repo_id: str,
+        *,
+        sync_kind: str | None = None,
+        upstream_id: str | None = None,
+    ) -> list[StoredDocEdge]:
+        """Query the INDEXED reverse-lookup table (B-09); re-validate the JSON (K6).
+
+        ``upstream_id`` hits ``ix_config_doc_edges_upstream_id`` directly — the O(1)
+        "who depends on X" reverse query. ORDER BY the surrogate ``id`` preserves the
+        document-then-edge insertion order (K10), matching the in-memory store.
+        """
+        stmt = select(ConfigDocEdgeRow).where(ConfigDocEdgeRow.repo_id == repo_id)
+        if sync_kind is not None:
+            stmt = stmt.where(ConfigDocEdgeRow.sync_kind == sync_kind)
+        if upstream_id is not None:
+            stmt = stmt.where(ConfigDocEdgeRow.upstream_id == upstream_id)
+        with self._session() as session:
+            rows = session.scalars(stmt.order_by(ConfigDocEdgeRow.id)).all()
+            return [StoredDocEdge.model_validate(r.edge) for r in rows]
 
     def code_refs_for(
         self,

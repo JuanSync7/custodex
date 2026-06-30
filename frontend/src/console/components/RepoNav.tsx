@@ -7,6 +7,7 @@
 import { Link, useLocation } from "react-router-dom";
 import {
   linkToCoverage,
+  linkToDependencies,
   linkToDocuments,
   linkToHealth,
   linkToMapping,
@@ -24,6 +25,7 @@ type View =
   | "drift"
   | "mapping"
   | "documents"
+  | "dependencies"
   | "ownership"
   | "coverage"
   | "health";
@@ -32,6 +34,7 @@ function activeView(pathname: string): View {
   if (pathname.endsWith("/coverage")) return "coverage";
   if (pathname.endsWith("/health")) return "health";
   if (pathname.endsWith("/documents")) return "documents";
+  if (pathname.endsWith("/dependencies")) return "dependencies";
   if (pathname.endsWith("/ownership")) return "ownership";
   if (pathname.endsWith("/mapping")) return "mapping";
   return "drift";
@@ -47,6 +50,11 @@ export function RepoNav({ repoId }: RepoNavProps) {
     { view: "drift", label: "Drift", to: linkToRepo(repoId) },
     { view: "mapping", label: "Mapping", to: linkToMapping(repoId) },
     { view: "documents", label: "Documents", to: linkToDocuments(repoId) },
+    {
+      view: "dependencies",
+      label: "Dependencies",
+      to: linkToDependencies(repoId),
+    },
     { view: "ownership", label: "Ownership", to: linkToOwnership(repoId) },
     { view: "coverage", label: "Coverage", to: linkToCoverage(repoId) },
     { view: "health", label: "Health", to: linkToHealth(repoId) },

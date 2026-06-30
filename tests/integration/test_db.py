@@ -647,3 +647,47 @@ def test_alembic_migration_0006_roster_up_then_down(tmp_path: Path) -> None:
     after = set(inspect(engine).get_table_names())
     assert "roster" not in after
     assert {"repos", "config_documents"} <= after
+
+
+def test_alembic_migration_0007_doc_edges_up_then_down(tmp_path: Path) -> None:
+    """0007 (B-09) creates config_doc_edges (the reverse-lookup index); down drops it.
+
+    Features: FEAT-DOCDEPS-008
+    """
+    from alembic import command
+
+    db = tmp_path / "migrate_0007.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0006 -> config_doc_edges does NOT exist yet (additive 0007 adds it).
+    command.upgrade(cfg, "0006_roster_and_ownership")
+    assert "config_doc_edges" not in set(inspect(engine).get_table_names())
+
+    # upgrade head (through 0007) -> the table exists with its key columns.
+    command.upgrade(cfg, "head")
+    assert "config_doc_edges" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("config_doc_edges")}
+    assert {
+        "id",
+        "repo_id",
+        "doc_id",
+        "upstream_id",
+        "sync_kind",
+        "type",
+        "edge",
+    } <= cols
+    # the reverse-lookup column is indexed (the whole point of the table).
+    indexed = {
+        col
+        for ix in inspect(engine).get_indexes("config_doc_edges")
+        for col in ix["column_names"]
+    }
+    assert "upstream_id" in indexed
+
+    # downgrade to 0006 -> config_doc_edges dropped; the rest remain.
+    command.downgrade(cfg, "0006_roster_and_ownership")
+    after = set(inspect(engine).get_table_names())
+    assert "config_doc_edges" not in after
+    assert {"config_documents", "roster"} <= after

@@ -22,7 +22,14 @@ from custodex.config import (
     MonitorConfig,
     RegionMode,
 )
-from custodex.drift import Drift, DriftKind, DriftReport, detect
+from custodex.drift import (
+    ChangeSeverity,
+    Drift,
+    DriftKind,
+    DriftReport,
+    classify_change_severity,
+    detect,
+)
 from custodex.extract import build_document_surface
 from custodex.manifest import (
     render_doc,
@@ -840,3 +847,104 @@ def test_old_doc_without_anchors_has_no_delta(tmp_path: Path) -> None:
     drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
     assert drift.anchors_added == ()
     assert drift.anchors_removed == ()
+
+
+# --------------------------------------------------------------------------- #
+# P-05: breaking-change severity (Drift.change_severity) — the Griffe-style       #
+# verdict over the P2 tiers + P4 anchors.                                         #
+#                                                                                 #
+# Feature: FEAT-DRIFT-011                                                          #
+# --------------------------------------------------------------------------- #
+def test_classify_change_severity_truth_table() -> None:
+    C = ChangeSeverity
+    # a removed/renamed symbol dominates → BREAKING (even alongside an addition).
+    assert classify_change_severity((), (), ("greet",)) is C.BREAKING
+    assert classify_change_severity(("signature",), ("new",), ("old",)) is C.BREAKING
+    # only additions (no removal) → ADDITIVE, even though they move the sig tier.
+    assert classify_change_severity(("signature",), ("new",), ()) is C.ADDITIVE
+    # same symbol set, signature tier moved in place → BREAKING.
+    assert classify_change_severity(("signature",), (), ()) is C.BREAKING
+    # only docstring/body prose moved, same symbols → COSMETIC.
+    assert classify_change_severity(("docstring",), (), ()) is C.COSMETIC
+    assert classify_change_severity(("body",), (), ()) is C.COSMETIC
+    # no signal at all (a pre-P2/P4 composite-only doc) → UNKNOWN.
+    assert classify_change_severity((), (), ()) is C.UNKNOWN
+
+
+def test_classify_change_severity_masked_breaking_is_a_documented_choice() -> None:
+    """A DELIBERATE limitation (guarded so a future change is a decision, not an
+    accident): an addition concurrent with an in-place signature change reads
+    ADDITIVE — the aggregate signals cannot separate it from a pure addition (which
+    also moves the `signature` tier), so step 2 wins. A removal is never masked."""
+    C = ChangeSeverity
+    # add + (would-be) in-place signature change, no removal → ADDITIVE (masked).
+    assert classify_change_severity(("signature",), ("new",), ()) is C.ADDITIVE
+    assert (
+        classify_change_severity(("signature", "docstring"), ("new",), ()) is C.ADDITIVE
+    )
+    # but a removal alongside the addition is ALWAYS caught (step 1) → BREAKING.
+    assert classify_change_severity(("signature",), ("new",), ("gone",)) is C.BREAKING
+
+
+def test_added_symbol_is_additive(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_PLUS_SYMBOL)  # adds public `farewell`
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.ADDITIVE
+
+
+def test_removed_symbol_is_breaking(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_PLUS_SYMBOL)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_V1)  # drops `farewell`
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.BREAKING
+
+
+def test_inplace_signature_change_is_breaking(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_tiers(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_SIG_EDIT)  # same symbol, dropped param
+    report = detect(_config(root, (spec,)), tmp_path)
+    drift = _hash_drift(report)
+    assert drift.change_severity is ChangeSeverity.BREAKING
+    # and it surfaces in the human summary (additive token).
+    assert "[breaking]" in report.summary()
+
+
+def test_docstring_only_change_is_cosmetic(tmp_path: Path) -> None:
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_tiers(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_V2)  # docstring (+private body) changed
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.COSMETIC
+
+
+def test_old_doc_severity_is_unknown(tmp_path: Path) -> None:
+    """A composite-only doc has no structural signal → UNKNOWN (and no summary tag)."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(_synced_doc_text(spec, root), encoding="utf-8")
+    _write_code(root, CODE_SIG_EDIT)
+    report = detect(_config(root, (spec,)), tmp_path)
+    assert _hash_drift(report).change_severity is ChangeSeverity.UNKNOWN
+    # UNKNOWN stays silent in the summary (no severity token).
+    assert "[unknown]" not in report.summary()

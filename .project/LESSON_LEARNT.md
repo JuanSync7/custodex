@@ -2094,3 +2094,26 @@ own implementing modules are inside the thing being gated.
   at `feature-doc/catalog/<name>.yaml` — NOT a `docs/api/*` doc. → New core module ⇒
   add the waiver + a catalog file + `Feature:` tags on a test AND a `DEMOS.md` entry,
   then `cdx wiki`/`cdx trace`.
+
+- [DOCDEPS-04] **A catalog feature's `modules:` list is VALIDATED against the real
+  module registry — a submodule name is not a module name.** `feature-doc/catalog/
+  docdeps.yaml` listing `modules: [store, configsync, server]` made `cdx wiki` fail
+  loudly with `feature FEAT-DOCDEPS-008 names unknown module(s): store` — the server's
+  `store.py`/`db.py`/`app.py` are all catalogued under the single `server` module
+  (mirroring how FEAT-DOCDEPS-007 used `[configsync, server]`). The pytest gate is
+  GREEN at this point; only the `cdx wiki` regeneration step catches it. → When adding
+  a catalog entry, set `modules:` to top-level module names that already appear in
+  other entries (grep the catalog), and always run `cdx wiki` before declaring a slice
+  done — `ruff`/`mypy`/`pytest` do not exercise the catalog.
+
+- [DOCDEPS-05] **Classify breaking-change severity from signals you ALREADY capture —
+  don't add a second analysis pass.** B-12's `change_severity` (breaking/additive/
+  cosmetic) is a pure verdict over P2 `drifted_tiers` + P4 `anchors_added/removed`, not
+  a new diff: a removed anchor or an in-place `signature`-tier move ⇒ BREAKING, an added
+  anchor ⇒ ADDITIVE, a docstring/body-only move ⇒ COSMETIC. The ONE thing the aggregate
+  signals can't separate is a SIMULTANEOUS add + in-place signature change (reported
+  ADDITIVE) — that needs per-symbol signature digests, a deliberate further deferral
+  documented in the function. Threading it onto the `ReviewRecord` reused the
+  `drifted_tiers` precedent: stringly-typed field (the enum stays in `drift.py`),
+  additive schema **minor bump 1.1.0→1.2.0**, regen the golden `cdx schema` artifacts
+  (`docs/REVIEW_RECORD_SCHEMA.json` + `frontend/src/console/schema.review.json`).

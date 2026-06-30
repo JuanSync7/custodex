@@ -592,3 +592,24 @@ export interface StalenessData {
   stale_count: number;
   now: string;
 }
+
+// ── EPIC B — the doc↔doc dependency graph (GET /repos/:id/doc-graph) ─────────
+// The role one document plays toward an upstream it `depends_on` (config.DocEdgeType).
+export type DocEdgeType = "depends" | "refines" | "implements" | "verifies";
+
+// One downstream→upstream edge of the declared dependency graph.
+export interface DocGraphEdge {
+  doc_id: string;
+  doc_path: string;
+  audience: Audience;
+  upstream_id: string;
+  type: DocEdgeType;
+}
+
+// server: GET /repos/:id/doc-graph → {edges, edge_count}. The DECLARED dependency
+// graph (who-depends-on-what); suspect freshness stays repo-local (K2), so this hub
+// view shows the structure, not the per-edge review status.
+export interface DocGraph {
+  edges: DocGraphEdge[];
+  edge_count: number;
+}

@@ -43,8 +43,10 @@ __all__ = [
     "upstream_fingerprint",
     "detect_suspect_links",
     "infer_edges_from_links",
+    "impacted_by",
     "stamp_edges",
     "render_deps_text",
+    "render_impact_text",
 ]
 
 # Frozen + extra="forbid": a suspect-link verdict is an immutable snapshot and an
@@ -216,6 +218,46 @@ def infer_edges_from_links(
     return tuple(sorted(out, key=lambda e: (e.doc_id, e.upstream_id)))
 
 
+def impacted_by(
+    config: MonitorConfig, upstream_id: str, *, transitive: bool = True
+) -> tuple[str, ...]:
+    """The blast radius of changing ``upstream_id`` — its dependents (pure, K1/K10).
+
+    The PROACTIVE complement to :func:`detect_suspect_links`: before editing a
+    document, ask which downstream documents declare a dependency on it and would
+    need re-review. Walks the REVERSE of the ``depends_on`` graph from
+    ``upstream_id``. ``transitive`` (the default) follows the whole chain — if ``a``
+    depends_on ``b`` depends_on ``c``, changing ``c`` impacts both ``b`` and ``a`` —
+    and is cycle-safe; ``transitive=False`` returns only the DIRECT dependents.
+    Returns the impacted document ids sorted (K10), excluding ``upstream_id`` itself.
+    Loud (K8) when ``upstream_id`` is not a managed document.
+
+    Pure over the declared config graph (no file reads, no clock) and independent of
+    ``docdeps.enabled`` — the dependency graph exists whether or not suspect-link
+    detection is switched on.
+    """
+    ids = {doc.id for doc in config.documents}
+    if upstream_id not in ids:
+        raise DriftError(
+            f"unknown document id {upstream_id!r} — not a managed document"
+        )
+    # Reverse adjacency: upstream id -> the set of downstreams that depend on it.
+    rev: dict[str, set[str]] = {}
+    for doc in config.documents:
+        for edge in doc.depends_on:
+            rev.setdefault(edge.doc, set()).add(doc.id)
+    impacted: set[str] = set()
+    frontier = sorted(rev.get(upstream_id, set()))
+    while frontier:
+        node = frontier.pop()
+        if node in impacted or node == upstream_id:
+            continue  # cycle-safe: never revisit, never include the origin
+        impacted.add(node)
+        if transitive:
+            frontier.extend(rev.get(node, set()))
+    return tuple(sorted(impacted))
+
+
 def stamp_edges(
     config: MonitorConfig, root: Path, downstream_id: str, *, only: str | None = None
 ) -> tuple[str, ...]:
@@ -285,4 +327,20 @@ def render_deps_text(
                 f"    → {link.upstream_id} [{link.type.value}] "
                 f"{link.status.value} — {link.detail}"
             )
+    return "\n".join(lines)
+
+
+def render_impact_text(upstream_id: str, impacted: Sequence[str]) -> str:
+    """A deterministic plain-text blast-radius report (K10) — ``cdx deps --impact``.
+
+    Lists the documents that (transitively) depend on ``upstream_id`` and would need
+    re-review if it changed; an empty radius reads as an explicit "safe to change".
+    """
+    if not impacted:
+        return f"# nothing depends on {upstream_id!r} — safe to change"
+    lines = [
+        f"# {len(impacted)} document(s) depend on {upstream_id!r} — "
+        "review them after changing it:"
+    ]
+    lines.extend(f"  → {doc_id}" for doc_id in impacted)
     return "\n".join(lines)

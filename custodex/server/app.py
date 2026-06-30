@@ -1287,18 +1287,21 @@ def create_app(
         """The repo's doc↔doc dependency GRAPH from the synced config (EPIC B).
 
         Reads each mirrored document's declared ``depends_on`` edges and returns the
-        downstream→upstream graph (deduped by doc_id, sorted). The hub serves the
-        cross-repo GRAPH — WHO depends on WHAT — so a reverse query ("which docs
-        depend on X") is answerable centrally; suspect STATUS stays repo-local (the
-        doc files needed to hash an upstream's body live in the repo, K2). Open read.
+        downstream→upstream graph (sorted). The hub serves the cross-repo GRAPH — WHO
+        depends on WHAT — so a reverse query ("which docs depend on X") is answerable
+        centrally; suspect STATUS stays repo-local (the doc files needed to hash an
+        upstream's body live in the repo, K2). ``sync_kind`` defaults to the canonical
+        ``"git"`` baseline view (matching the Documents page) so the graph reflects
+        ONE deterministic view rather than an order-dependent merge across the git +
+        local partitions — and so this forward graph and ``/doc-graph/reverse`` always
+        agree. Open read.
         """
         _require_known_repo(store, repo_id)
+        kind = sync_kind or "git"
         edges: list[dict[str, object]] = []
-        seen: set[str] = set()
-        for d in store.config_documents_for(repo_id, sync_kind):
-            if d.doc_id in seen:
-                continue
-            seen.add(d.doc_id)
+        # doc_id is unique within one (repo, sync_kind) partition (the merged config
+        # validates unique ids), so no cross-doc dedup is needed once scoped to `kind`.
+        for d in store.config_documents_for(repo_id, kind):
             for edge in d.depends_on:
                 edges.append(
                     {
@@ -1311,6 +1314,38 @@ def create_app(
                 )
         edges.sort(key=lambda e: (str(e["doc_id"]), str(e["upstream_id"])))
         return {"edges": edges, "edge_count": len(edges)}
+
+    @app.get("/repos/{repo_id:path}/doc-graph/reverse")
+    def doc_graph_reverse_for(
+        repo_id: str,
+        doc: str,
+        store: Store = Depends(get_store),
+        sync_kind: str | None = None,
+    ) -> dict[str, object]:
+        """Reverse dependency lookup: which documents depend ON ``doc`` (B-10).
+
+        Backed by the INDEXED ``config_doc_edges`` table (B-09) — an indexed
+        ``WHERE upstream_id = doc`` rather than a scan over every document — so the
+        hub answers "who depends on X" directly. Returns the DIRECT (one-hop)
+        dependents, sorted (K10). ``sync_kind`` defaults to the SAME canonical
+        ``"git"`` baseline view as ``/doc-graph`` so the two routes always agree on
+        whether an edge exists (a doc_id is unique within one partition, so no dedup
+        is needed). The engine's ``cdx deps --impact`` computes the TRANSITIVE blast
+        radius repo-side, where the full config graph lives. Open read; ``doc`` is a
+        required query param.
+        """
+        _require_known_repo(store, repo_id)
+        kind = sync_kind or "git"
+        dependents: list[dict[str, object]] = [
+            {"doc_id": edge.doc_id, "type": edge.type}
+            for edge in store.doc_edges_for(repo_id, sync_kind=kind, upstream_id=doc)
+        ]
+        dependents.sort(key=lambda d: str(d["doc_id"]))
+        return {
+            "upstream_id": doc,
+            "dependents": dependents,
+            "count": len(dependents),
+        }
 
     # `{repo_id:path}` so a repo_id containing slashes (e.g. "acme/widget", the
     # org/name form) is captured whole rather than splitting path segments.

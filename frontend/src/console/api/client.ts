@@ -5,6 +5,7 @@ import type {
   ConfigDocumentTree,
   ConfigEdit,
   CoverageSnapshot,
+  DocGraph,
   EditableConfigTree,
   GenerateRequest,
   GenerateResponse,
@@ -189,6 +190,11 @@ export class ApiClient {
     return this.getJson<StalenessData>(
       `/repos/${encodeRepoId(repoId)}/staleness?include_fresh=true`,
     );
+  }
+
+  /** GET {base}/repos/{repoId}/doc-graph → DocGraph (EPIC B doc↔doc graph). */
+  docGraphFor(repoId: string): Promise<DocGraph> {
+    return this.getJson<DocGraph>(`/repos/${encodeRepoId(repoId)}/doc-graph`);
   }
 
   /**

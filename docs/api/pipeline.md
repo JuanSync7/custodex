@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 55dc1beeba729d3d
+  fingerprint: 4d9b3db333546a1e
   fingerprint_tiers:
-    composite: 55dc1beeba729d3d
-    docstring: 0b9166f35e6def76
-    signature: b110e6051b92afa0
+    composite: 4d9b3db333546a1e
+    docstring: 622a3e4583feb530
+    signature: 9846a1331a18c2c0
   region_anchors:
     symbols:
     - 004e9ebd1915d8c9
@@ -15,6 +15,7 @@ cdm:
     - 051af376199dec21
     - 051af376199dec21
     - 0712dcd00be0a81f
+    - 074762df4f3a44ff
     - 0a12e5898c92bfc6
     - 0c27f67f2c31b80d
     - 0e521d4fec62ad6d
@@ -63,6 +64,7 @@ cdm:
     - 7fd0737abe5f54c6
     - 80525ce65b460521
     - 8321704f2df523e7
+    - 885465b0a905f535
     - 899dae061ed4d088
     - 8b4c82401c9c9ece
     - 8cf2f5b57de3a251
@@ -111,7 +113,7 @@ cdm:
     - fb7f1b86375d74b7
     - fcfd897c8f21f0c1
   region_hashes:
-    symbols: c43c5fc3a89aed42
+    symbols: a4e5c92ab0f2bd60
   schema_version: 1.0.0
 ---
 # custodex — pipeline (engineering reference)
@@ -122,6 +124,7 @@ cdm:
 <!-- CDM:BEGIN symbols -->
 | symbol | kind | signature |
 |--------|------|-----------|
+| ChangeSeverity | class | class ChangeSeverity(str, Enum) |
 | Doc | class | class Doc(BaseModel) |
 | DocumentSurface | class | class DocumentSurface(BaseModel) |
 | DocumentSurface.fingerprint | method | def fingerprint(self, *, include_body: bool = False) -> SurfaceFingerprint |
@@ -162,7 +165,7 @@ cdm:
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
-| __all__ | variable | __all__ = ['DriftKind', 'Drift', 'DriftReport', 'detect'] |
+| __all__ | variable | __all__ = ... |
 | _body_ast_hash | function | def _body_ast_hash(node: ast.FunctionDef \| ast.AsyncFunctionDef) -> str |
 | _cell | function | def _cell(text: str) -> str |
 | _class_signature | function | def _class_signature(node: ast.ClassDef) -> str |
@@ -194,6 +197,7 @@ cdm:
 | _variable_symbols | function | def _variable_symbols(node: ast.Assign \| ast.AnnAssign) -> list[Symbol] |
 | anchor_id | function | def anchor_id(qualified_name: str) -> str |
 | build_document_surface | function | def build_document_surface(doc: DocumentSpec, root: Path) -> DocumentSurface |
+| classify_change_severity | function | def classify_change_severity(drifted_tiers: Sequence[str], anchors_added: Sequence[str], anchors_removed: Sequence[str]) -> ChangeSeverity |
 | detect | function | def detect(config: MonitorConfig, config_dir: Path) -> DriftReport |
 | drop_upstream_hash | function | def drop_upstream_hash(meta: dict[str, Any], upstream_id: str) -> dict[str, Any] |
 | expected_region | function | def expected_region(region_id: str, surface: DocumentSurface, template: RegionTemplate \| None = None) -> str \| None |

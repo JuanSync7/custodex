@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**229 features** across 23 subsystems.
+**232 features** across 23 subsystems.
 
 ## agent
 
@@ -430,6 +430,8 @@ coverage_snapshot projects a CoverageReport into the deterministic, JSON-safe wi
 | `FEAT-DOCDEPS-005` | cdx deps + cdx resolve --edge + the configurable gate | cli, docdeps | K1, K4, K8 | — | — | implemented |
 | `FEAT-DOCDEPS-006` | Monitor records suspect links + baselines new edges (human-in-loop) | monitor, docdeps | K5, K6, K7 | — | — | implemented |
 | `FEAT-DOCDEPS-007` | Central hub mirrors the doc↔doc graph (GET /doc-graph) | configsync, server | K2, K6 | — | — | implemented |
+| `FEAT-DOCDEPS-008` | Indexed reverse-dependency lookup (config_doc_edges + GET /doc-graph/reverse) | configsync, server | K2, K6, K10 | — | — | implemented |
+| `FEAT-DOCDEPS-009` | Proactive blast radius (cdx deps --impact) | docdeps, cli | K1, K4, K10 | — | — | implemented |
 
 ### `FEAT-DOCDEPS-001` — Doc↔doc edge config models (declaration = config, K2)
 
@@ -459,6 +461,14 @@ The Monitor never sends a SUSPECT_LINK to the backend (a fix would clobber the d
 
 configsync._build_rows projects each document's declared `depends_on` edges into the synced ConfigDocument as an additive field — it rides in the full JSON blob, so NO migration and it round-trips through BOTH the in-memory and the SQL store. The read-time `GET /repos/{id}/doc-graph` route serves the cross-repo dependency GRAPH (who-depends-on-what, deduped + sorted) so a reverse query is answerable centrally; suspect STATUS stays repo-local because the doc files needed to hash an upstream's body live in the repo (K2). The central DB stays a rebuildable mirror, not truth.
 
+### `FEAT-DOCDEPS-008` — Indexed reverse-dependency lookup (config_doc_edges + GET /doc-graph/reverse)
+
+The hub FLATTENS every document's `depends_on` into a standalone, indexable `config_doc_edges` row (a StoredDocEdge — the SqlStore writes it on replace_config under Alembic 0007; the in-memory store derives the SAME list on read), so "which docs depend on X" is an indexed `WHERE upstream_id = X` instead of a JSON scan over every document. `GET /repos/{id}/doc-graph/reverse?doc=X` serves the direct dependents (deduped by downstream id, sorted, K10) — a required `doc` query (422 if omitted, K8); the table is a DERIVED index re-projected on every sync, so the central DB stays a rebuildable mirror (K2/K6), not truth.
+
+### `FEAT-DOCDEPS-009` — Proactive blast radius (cdx deps --impact)
+
+docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before editing a document, walk the dependents reverse-reachable from it to answer "what must I review if I change DOC". Pure over the declared config graph (no file reads, no clock, K1/K10), transitive by default and cycle-safe, sorted, loud (K8) on an unknown id, and independent of `docdeps.enabled` (the graph exists either way). `cdx deps --impact DOC` surfaces it read-only (no backend, no network, K4) — an empty radius reads as an explicit "safe to change"; `--json` emits the machine form.
+
 ## drift
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -473,6 +483,7 @@ configsync._build_rows projects each document's declared `depends_on` edges into
 | `FEAT-DRIFT-008` | Persistent human-review advisory | drift | K1 | — | — | implemented |
 | `FEAT-DRIFT-009` | LLM-authored region staleness | drift | K1, K4 | — | — | implemented |
 | `FEAT-DRIFT-010` | Report aggregation and human summary | drift | K1 | — | — | implemented |
+| `FEAT-DRIFT-011` | Breaking-change severity classification | drift, schema, monitor | K6, K10 | — | — | implemented |
 
 ### `FEAT-DRIFT-001` — Detect-only drift grading
 
@@ -513,6 +524,10 @@ A pure-llm region (no mechanical renderer) is backend-authored prose, not graded
 ### `FEAT-DRIFT-010` — Report aggregation and human summary
 
 DriftReport bundles the tuple of drifts with an ok property (true when no drift) and a summary() that renders one human-readable line per drift — doc_id, optional region, kind, an UNHEALABLE marker and detail.
+
+### `FEAT-DRIFT-011` — Breaking-change severity classification
+
+On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from the P2 drifted_tiers + the P4 anchor deltas already computed (no new analysis): classify_change_severity returns BREAKING for a removed/renamed symbol or an in-place signature change (same symbol set, signature tier moved), ADDITIVE for a purely added symbol (additions are non-breaking even though they move the signature tier), COSMETIC for a docstring/body-only move, and UNKNOWN for a composite-only old doc with no structural signal. It rides on Drift.change_severity, is annotated in DriftReport.summary() for a HASH drift (UNKNOWN stays silent), and is mirrored onto the ReviewRecord as the additive 1.2.0 `change_severity` field so the audit log and central hub see breaking vs additive vs cosmetic at a glance.
 
 ## extract
 

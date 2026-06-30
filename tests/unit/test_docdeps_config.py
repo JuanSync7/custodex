@@ -26,6 +26,7 @@ from custodex.config import (
     UnitFile,
     UnitFrontmatter,
     dump_unit_file,
+    load_bundle,
     load_config,
     load_unit_file,
 )
@@ -178,6 +179,39 @@ def test_unknown_upstream_id_is_loud(tmp_path: Path) -> None:
     with pytest.raises(ConfigError) as exc:
         load_config(p)
     assert "nope" in str(exc.value)
+
+
+def test_dangling_cross_unit_edge_via_dir_loader_is_typed(tmp_path: Path) -> None:
+    """A dangling ``depends_on`` through the multi-file dir loader raises a TYPED
+    ConfigError, not a raw pydantic ValidationError (K8).
+
+    Regression for the EPIC B follow-up review: ``load_bundle`` constructs the merged
+    ``MonitorConfig`` (which runs ``_depends_on_targets_exist``) — that construction
+    must be wrapped so the dir-layout path matches the single-file ``load_config``'s
+    contract. The single-file equivalent is ``test_unknown_upstream_id_is_loud``.
+    """
+    cfg = tmp_path / "config" / "cdmon"
+    cfg.mkdir(parents=True)
+    (cfg / "index.yaml").write_text(
+        '---\ncdmon-config-version: "2.0.0"\nrepo: t\ngenerated-by: cdx\n'
+        'updated: "2026-06-30"\n---\nroot: "../.."\nversion: "2.0.0"\n'
+        "backend: {kind: mock}\nunits:\n  - file: core.yaml\n",
+        encoding="utf-8",
+    )
+    (cfg / "core.yaml").write_text(
+        '---\ncdmon-config-version: "2.0.0"\nunit: core\ntitle: t\nowner: eng\n'
+        'created: "2026-06-30"\nupdated: "2026-06-30"\n---\n'
+        "documents:\n"
+        "  - id: api\n"
+        "    path: docs/api.md\n"
+        "    audience: eng-guide\n"
+        "    depends_on:\n"
+        "      - doc: ghost\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError) as exc:
+        load_bundle(cfg)
+    assert "ghost" in str(exc.value)
 
 
 def test_known_upstream_id_loads(tmp_path: Path) -> None:

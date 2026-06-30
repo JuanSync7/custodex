@@ -1200,3 +1200,38 @@ so a reverse query is answerable centrally; suspect status stays repo-local (K2)
 downstream→upstream edges with their type; an unknown repo is 404. Pinned by
 `tests/integration/test_docdeps_server.py`.
 Features: FEAT-DOCDEPS-007
+
+### DEMO-089 — Indexed reverse lookup: who depends on X
+**What it shows.** The hub flattens every document's `depends_on` into the indexed
+`config_doc_edges` table (Alembic 0007, mirrored derive-on-read by the in-memory store),
+so "which docs depend on X" is an indexed `WHERE upstream_id = X` instead of a JSON scan.
+`GET /repos/{id}/doc-graph/reverse?doc=X` serves the direct dependents (deduped, sorted).
+**How to observe.** After a sync, `GET /repos/acme%2Fwidget/doc-graph/reverse?doc=io-api`
+returns the documents that depend on `io-api`; a leaf returns an empty list; a missing
+`doc` query is 422 and an unknown repo is 404. Pinned by
+`tests/integration/test_docdeps_server.py` + `tests/integration/test_db.py`.
+Features: FEAT-DOCDEPS-008
+
+### DEMO-090 — Blast radius: `cdx deps --impact`
+**What it shows.** The proactive complement to suspect detection: BEFORE editing a
+document, `cdx deps --impact DOC` walks the dependents reverse-reachable from `DOC`
+(transitive, cycle-safe) and lists every document that would need re-review — turning the
+"what will I break" question into one read-only command (no backend, no network, K1/K4).
+**How to observe.** `cdx deps --impact io-api` prints the documents that depend on
+`io-api`; a leaf prints "safe to change"; an unknown id is a loud error; `--json` emits
+the machine form. Pinned by `tests/system/test_docdeps_cli.py` +
+`tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-009
+
+### DEMO-091 — Breaking-change severity on a HASH drift
+**What it shows.** A code↔doc HASH drift now carries a Griffe-style severity classified
+from the tier + anchor signals Custodex already captures: a removed/renamed symbol or an
+in-place signature change is **breaking**, a purely added symbol is **additive**, and a
+docstring/body-only move is **cosmetic** — so a reviewer (and the central audit) can tell
+an API-breaking doc drift from a harmless prose update at a glance.
+**How to observe.** Change a tracked module's public signature and `cdx check` annotates
+the HASH line `[breaking]`; add a new public symbol and it reads `[additive]`; edit only a
+docstring and it reads `[cosmetic]`. The verdict rides on the `ReviewRecord`'s additive
+`change_severity` field (schema 1.2.0). Pinned by `tests/unit/test_drift.py` +
+`tests/integration/test_monitor.py`.
+Features: FEAT-DRIFT-011

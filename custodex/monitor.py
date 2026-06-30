@@ -240,6 +240,8 @@ class Monitor:
             source_sha=self._source_sha,
             ticket=ticket,
             drifted_tiers=drift.drifted_tiers,  # P2: which tier(s) moved (HASH)
+            # P5: breaking/additive/cosmetic severity of the HASH change.
+            change_severity=drift.change_severity.value,
         )
 
     def _target_record(self, drift: Drift, surface_hash: str) -> ReviewRecord:

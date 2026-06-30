@@ -1185,20 +1185,30 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
     # exclude from ignore.yaml ∪ translated .gitignore ∪ defaults) and rebuild the
     # merged config so MonitorConfig.coverage IS the derived one. The intermediate
     # bundle gives effective_coverage the units + index in one object.
-    base_config = MonitorConfig(
-        version=index.version,
-        root=index.root,
-        documents=tuple(documents),
-        region_templates=index.region_templates,
-        backend=index.backend,
-        agent=index.agent,
-        central=index.central,
-        apply_default=index.apply_default,
-        coverage=index.coverage,
-        staleness=index.staleness,
-        docdeps=index.docdeps,
-        fingerprint_body_tier=index.fingerprint_body_tier,
-    )
+    # Wrap construction so a whole-config model validator (e.g. a depends_on edge
+    # naming an upstream id present in no unit — EPIC B's
+    # `_depends_on_targets_exist`) surfaces as a typed ConfigError (K8), NOT a raw
+    # pydantic ValidationError. The single-file loader load_config does the same
+    # (above); the cross-file invariants checked manually before this construction
+    # (duplicate id, dir-covered overlap) already raise ConfigError, so this keeps
+    # the multi-file path's contract: malformed input is always a CodeDocMonitorError.
+    try:
+        base_config = MonitorConfig(
+            version=index.version,
+            root=index.root,
+            documents=tuple(documents),
+            region_templates=index.region_templates,
+            backend=index.backend,
+            agent=index.agent,
+            central=index.central,
+            apply_default=index.apply_default,
+            coverage=index.coverage,
+            staleness=index.staleness,
+            docdeps=index.docdeps,
+            fingerprint_body_tier=index.fingerprint_body_tier,
+        )
+    except ValidationError as exc:
+        raise ConfigError(f"Invalid config in {config_dir}:\n{exc}") from exc
     base_bundle = ConfigBundle(
         config=base_config,
         index=index,

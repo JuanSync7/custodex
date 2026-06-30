@@ -103,3 +103,32 @@ features:
     subsystem: docdeps
     modules: [configsync, server]
     constraints: [K2, K6]
+
+  - id: FEAT-DOCDEPS-008
+    title: Indexed reverse-dependency lookup (config_doc_edges + GET /doc-graph/reverse)
+    summary: >-
+      The hub FLATTENS every document's `depends_on` into a standalone, indexable
+      `config_doc_edges` row (a StoredDocEdge — the SqlStore writes it on replace_config
+      under Alembic 0007; the in-memory store derives the SAME list on read), so "which
+      docs depend on X" is an indexed `WHERE upstream_id = X` instead of a JSON scan over
+      every document. `GET /repos/{id}/doc-graph/reverse?doc=X` serves the direct
+      dependents (deduped by downstream id, sorted, K10) — a required `doc` query (422 if
+      omitted, K8); the table is a DERIVED index re-projected on every sync, so the
+      central DB stays a rebuildable mirror (K2/K6), not truth.
+    subsystem: docdeps
+    modules: [configsync, server]
+    constraints: [K2, K6, K10]
+
+  - id: FEAT-DOCDEPS-009
+    title: Proactive blast radius (cdx deps --impact)
+    summary: >-
+      docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before
+      editing a document, walk the dependents reverse-reachable from it to answer "what
+      must I review if I change DOC". Pure over the declared config graph (no file reads,
+      no clock, K1/K10), transitive by default and cycle-safe, sorted, loud (K8) on an
+      unknown id, and independent of `docdeps.enabled` (the graph exists either way).
+      `cdx deps --impact DOC` surfaces it read-only (no backend, no network, K4) — an
+      empty radius reads as an explicit "safe to change"; `--json` emits the machine form.
+    subsystem: docdeps
+    modules: [docdeps, cli]
+    constraints: [K1, K4, K10]

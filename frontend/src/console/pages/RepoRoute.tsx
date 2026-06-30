@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import RepoNav from "../components/RepoNav";
 import Coverage from "./Coverage";
+import Dependencies from "./Dependencies";
 import Documents from "./Documents";
 import Health from "./Health";
 import Mapping from "./Mapping";
@@ -33,6 +34,10 @@ function dispatch(tail: string): { repoId: string; page: ReactNode } {
   if (tail.endsWith("/documents")) {
     const repoId = decodePath(tail.slice(0, -"/documents".length));
     return { repoId, page: <Documents repoId={repoId} /> };
+  }
+  if (tail.endsWith("/dependencies")) {
+    const repoId = decodePath(tail.slice(0, -"/dependencies".length));
+    return { repoId, page: <Dependencies repoId={repoId} /> };
   }
   if (tail.endsWith("/ownership")) {
     const repoId = decodePath(tail.slice(0, -"/ownership".length));

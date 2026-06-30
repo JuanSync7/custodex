@@ -110,6 +110,43 @@ def test_resolve_unknown_edge_is_loud(tmp_path: Path) -> None:
     assert "ghost" in res.stdout or "ghost" in (res.stderr or "")
 
 
+# --- B-10: `cdx deps --impact` (the proactive blast radius) -----------------
+# Feature: FEAT-DOCDEPS-009
+
+
+def test_deps_impact_shows_dependents(tmp_path: Path) -> None:
+    cfg = _setup(tmp_path)
+    res = runner.invoke(app, ["deps", "--impact", "overview", "--config", str(cfg)])
+    assert res.exit_code == 0
+    assert "api" in res.stdout
+    assert "depend on" in res.stdout
+
+
+def test_deps_impact_leaf_is_safe(tmp_path: Path) -> None:
+    cfg = _setup(tmp_path)
+    res = runner.invoke(app, ["deps", "--impact", "api", "--config", str(cfg)])
+    assert res.exit_code == 0
+    assert "safe to change" in res.stdout
+
+
+def test_deps_impact_unknown_doc_is_loud(tmp_path: Path) -> None:
+    cfg = _setup(tmp_path)
+    res = runner.invoke(app, ["deps", "--impact", "ghost", "--config", str(cfg)])
+    assert res.exit_code != 0
+    assert "ghost" in res.stdout or "ghost" in (res.stderr or "")
+
+
+def test_deps_impact_json(tmp_path: Path) -> None:
+    import json
+
+    cfg = _setup(tmp_path)
+    res = runner.invoke(
+        app, ["deps", "--impact", "overview", "--json", "--config", str(cfg)]
+    )
+    assert res.exit_code == 0
+    assert json.loads(res.stdout) == {"impacted": ["api"], "upstream": "overview"}
+
+
 def test_deps_suggest_infers_from_markdown_link(tmp_path: Path) -> None:
     # api body links to overview.md but does NOT declare the edge yet... use a doc
     # whose only relation is the inline link, then drop the declared edge.

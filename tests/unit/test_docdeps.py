@@ -26,11 +26,14 @@ from custodex.docdeps import (
     SuspectLink,
     SuspectStatus,
     detect_suspect_links,
+    impacted_by,
     infer_edges_from_links,
     render_deps_text,
+    render_impact_text,
     stamp_edges,
     upstream_fingerprint,
 )
+from custodex.errors import DriftError
 from custodex.manifest import parse_doc, parse_text, stored_upstream_hashes
 
 
@@ -245,3 +248,125 @@ def test_render_deps_text_lists_edges(tmp_path: Path) -> None:
     )
     text = render_deps_text(links)
     assert "api" in text and "overview" in text and "suspect" in text
+
+
+# --------------------------------------------------------------------------- #
+# impacted_by — the proactive blast radius (reverse-reachable dependents)
+#
+# Feature: FEAT-DOCDEPS-009
+# --------------------------------------------------------------------------- #
+def _chain_cfg() -> MonitorConfig:
+    """a → b → c (a depends_on b, b depends_on c) plus an unrelated `solo`."""
+    return _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(id="solo", path="solo.md", audience=Audience.ENG_GUIDE),
+        )
+    )
+
+
+def test_impacted_by_is_transitive_by_default() -> None:
+    # changing c impacts b (direct) and a (transitive through b).
+    assert impacted_by(_chain_cfg(), "c") == ("a", "b")
+
+
+def test_impacted_by_direct_only() -> None:
+    assert impacted_by(_chain_cfg(), "c", transitive=False) == ("b",)
+
+
+def test_impacted_by_leaf_has_empty_radius() -> None:
+    # nobody depends on `a` (it is the top of the chain) → safe to change.
+    assert impacted_by(_chain_cfg(), "a") == ()
+    assert impacted_by(_chain_cfg(), "solo") == ()
+
+
+def test_impacted_by_unknown_doc_is_loud() -> None:
+    import pytest
+
+    with pytest.raises(DriftError, match="unknown document id 'ghost'"):
+        impacted_by(_chain_cfg(), "ghost")
+
+
+def test_impacted_by_is_cycle_safe() -> None:
+    # a depends_on b AND b depends_on a (a degenerate cycle) must terminate.
+    cyclic = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+        )
+    )
+    assert impacted_by(cyclic, "a") == ("b",)
+    assert impacted_by(cyclic, "b") == ("a",)
+
+
+def test_impacted_by_cycle_with_external_dependent() -> None:
+    # a↔b cycle PLUS c→b: changing b must reach a (via the cycle) and c, once each.
+    cfg = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+            DocumentSpec(
+                id="c",
+                path="c.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    assert impacted_by(cfg, "b") == ("a", "c")
+    assert impacted_by(cfg, "a") == ("b", "c")
+
+
+def test_impacted_by_ignores_docdeps_enabled() -> None:
+    # the dependency GRAPH exists even when suspect detection is switched off.
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+        ),
+        enabled=False,
+    )
+    assert impacted_by(cfg, "c") == ("b",)
+
+
+def test_render_impact_text_empty_and_nonempty() -> None:
+    assert "safe to change" in render_impact_text("c", ())
+    text = render_impact_text("c", ("a", "b"))
+    assert "2 document(s)" in text and "→ a" in text and "→ b" in text
