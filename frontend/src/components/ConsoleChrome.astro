@@ -15,7 +15,7 @@ import ConnectionStatus from "../console/components/ConnectionStatus.tsx";
 
 interface Props {
   /** Which rail item is active on this page. */
-  active?: "fleet" | "wiki" | "home" | "demo" | "tutorial";
+  active?: "fleet" | "wiki" | "guide" | "home" | "demo" | "tutorial";
   /** The page label (names the main landmark). */
   crumb: string;
 }
@@ -66,6 +66,12 @@ const REPO = "https://github.com/JuanSync7/custodex";
                 <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
               </svg>
               Wiki
+            </a>
+            <a class={item(active === "guide")} href="/guide/overview">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle><path d="m15 9-2 6-4 2 2-6 4-2Z"></path>
+              </svg>
+              Guide
             </a>
             <a class={item(active === "tutorial")} href="/tutorial">
               <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -119,6 +125,12 @@ const REPO = "https://github.com/JuanSync7/custodex";
                 <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" /><path d="M14 3v5h5" /><path d="m9 14 2 2 3-4" />
               </svg>
               Wiki
+            </a>
+            <a class={item(active === "guide")} href="/guide/overview">
+              <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle><path d="m15 9-2 6-4 2 2-6 4-2Z"></path>
+              </svg>
+              Guide
             </a>
             <a class="nav__item" href="/docs" target="_blank" rel="noreferrer">
               <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
