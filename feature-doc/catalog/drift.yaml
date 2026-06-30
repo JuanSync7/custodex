@@ -114,3 +114,21 @@ features:
     subsystem: drift
     modules: [drift]
     constraints: [K1]
+
+  - id: FEAT-DRIFT-011
+    title: Breaking-change severity classification
+    summary: >-
+      On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from
+      the P2 drifted_tiers + the P4 anchor deltas already computed (no new analysis):
+      classify_change_severity returns BREAKING for a removed/renamed symbol or an
+      in-place signature change (same symbol set, signature tier moved), ADDITIVE for
+      a purely added symbol (additions are non-breaking even though they move the
+      signature tier), COSMETIC for a docstring/body-only move, and UNKNOWN for a
+      composite-only old doc with no structural signal. It rides on
+      Drift.change_severity, is annotated in DriftReport.summary() for a HASH drift
+      (UNKNOWN stays silent), and is mirrored onto the ReviewRecord as the additive
+      1.2.0 `change_severity` field so the audit log and central hub see breaking vs
+      additive vs cosmetic at a glance.
+    subsystem: drift
+    modules: [drift, schema, monitor]
+    constraints: [K6, K10]

@@ -21,6 +21,7 @@ audience.
 from __future__ import annotations
 
 import difflib
+from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 
@@ -28,6 +29,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .blocks import REGION_KEYS, expected_region, known_region_ids
 from .config import Audience, MonitorConfig, RegionMode, resolve_repo_root
+from .docdeps import detect_suspect_links
 from .extract import build_document_surface
 from .index import render_index
 from .manifest import (
@@ -40,7 +42,14 @@ from .manifest import (
     stored_region_hash,
 )
 
-__all__ = ["DriftKind", "Drift", "DriftReport", "detect"]
+__all__ = [
+    "DriftKind",
+    "ChangeSeverity",
+    "classify_change_severity",
+    "Drift",
+    "DriftReport",
+    "detect",
+]
 
 
 class DriftKind(str, Enum):
@@ -50,6 +59,72 @@ class DriftKind(str, Enum):
     HASH = "HASH"
     REGION = "REGION"
     UNHEALABLE = "UNHEALABLE"
+    # EPIC B: an upstream doc this one ``depends_on`` changed since last review.
+    # Never auto-edited (healable=False) — resolved by ``cdx resolve --edge``.
+    SUSPECT_LINK = "SUSPECT_LINK"
+
+
+class ChangeSeverity(str, Enum):
+    """Griffe-style severity of a HASH (code↔doc surface) change (P5).
+
+    Classifies WHAT a HASH drift means for a downstream consumer, derived purely
+    from signals ``detect`` ALREADY captures — the P2 ``drifted_tiers`` and the P4
+    anchor-identity deltas — so it is a verdict layer, not a new analysis:
+
+    * ``BREAKING`` — a documented symbol was removed/renamed, or (with the same
+      symbol set) a public signature changed: a consumer can break.
+    * ``ADDITIVE`` — only new symbols appeared (no removals): backward-compatible.
+    * ``COSMETIC`` — only docstring/body prose moved, same symbols and signatures:
+      no API impact.
+    * ``UNKNOWN`` — not classifiable: a non-HASH drift, or an OLD doc carrying
+      neither per-tier digests nor stored anchors to diff against.
+    """
+
+    BREAKING = "breaking"
+    ADDITIVE = "additive"
+    COSMETIC = "cosmetic"
+    UNKNOWN = "unknown"
+
+
+def classify_change_severity(
+    drifted_tiers: Sequence[str],
+    anchors_added: Sequence[str],
+    anchors_removed: Sequence[str],
+) -> ChangeSeverity:
+    """Map the structural HASH signals onto a :class:`ChangeSeverity` (pure, K10).
+
+    Precedence (the Griffe spirit — removals/changes break, additions don't):
+
+    1. a removed/renamed documented symbol ⇒ ``BREAKING``;
+    2. else a newly-added symbol ⇒ ``ADDITIVE`` (additions are non-breaking, even
+       though they also move the aggregate signature tier);
+    3. else a moved ``signature`` tier with NO anchor delta ⇒ ``BREAKING`` (the same
+       symbol set, so a signature changed in place — or an old doc whose signature
+       tier moved with no anchors to attribute it to: flag it, conservatively);
+    4. else any moved tier (docstring/body only) ⇒ ``COSMETIC``;
+    5. else ``UNKNOWN`` (no signal — a pre-P2/P4 doc with only a composite hash).
+
+    Caveat (a known false-negative class, not a one-off): whenever a symbol is
+    ADDED in the same edit that also changes an existing symbol's signature IN
+    PLACE, this returns ``ADDITIVE`` (step 2 wins) even though the in-place change
+    is genuinely breaking — so ``ADDITIVE`` is NOT a guarantee of backward
+    compatibility when ``anchors_added`` is non-empty. The aggregate signals cannot
+    separate the two: a pure addition ALSO moves the ``signature`` tier (the set of
+    signatures grew), so promoting "signature in tiers" above the addition check
+    would instead mislabel every pure addition BREAKING — the wrong, noisier
+    direction. Distinguishing them needs per-symbol signature digests (a deliberate
+    further deferral). The reverse direction — a removed/renamed symbol — is always
+    caught first (step 1), so a deletion is never masked.
+    """
+    if anchors_removed:
+        return ChangeSeverity.BREAKING
+    if anchors_added:
+        return ChangeSeverity.ADDITIVE
+    if "signature" in drifted_tiers:
+        return ChangeSeverity.BREAKING
+    if drifted_tiers:
+        return ChangeSeverity.COSMETIC
+    return ChangeSeverity.UNKNOWN
 
 
 class Drift(BaseModel):
@@ -76,6 +151,10 @@ class Drift(BaseModel):
     # removed / renamed. Empty when the doc predates P4 (no stored anchors).
     anchors_added: tuple[str, ...] = ()
     anchors_removed: tuple[str, ...] = ()
+    # P5: the Griffe-style breaking-change severity of a HASH drift, classified from
+    # drifted_tiers + the anchor deltas above (breaking/additive/cosmetic). UNKNOWN
+    # for non-HASH drifts and for an OLD doc with no per-tier/anchor signals.
+    change_severity: ChangeSeverity = ChangeSeverity.UNKNOWN
 
 
 class DriftReport(BaseModel):
@@ -98,7 +177,15 @@ class DriftReport(BaseModel):
         for d in self.drifts:
             loc = f" [{d.region_id}]" if d.region_id else ""
             heal = "" if d.healable else " (UNHEALABLE)"
-            lines.append(f"  {d.doc_id}{loc}: {d.kind.value}{heal} — {d.detail}")
+            # P5: annotate a HASH drift with its breaking-change severity (additive
+            # to the line — substring assertions still hold; UNKNOWN stays silent).
+            sev = (
+                f" [{d.change_severity.value}]"
+                if d.kind is DriftKind.HASH
+                and d.change_severity is not ChangeSeverity.UNKNOWN
+                else ""
+            )
+            lines.append(f"  {d.doc_id}{loc}: {d.kind.value}{sev}{heal} — {d.detail}")
         return "\n".join(lines)
 
 
@@ -192,6 +279,12 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                         f" (anchored symbols changed: +{len(anchors_added)}/"
                         f"-{len(anchors_removed)})"
                     )
+            # P5: classify the breaking-change severity from the structural signals
+            # just computed (no new analysis) so check/monitor/the audit record can
+            # say breaking vs additive vs cosmetic at a glance.
+            change_severity = classify_change_severity(
+                drifted_tiers, anchors_added, anchors_removed
+            )
             drifts.append(
                 Drift(
                     kind=DriftKind.HASH,
@@ -203,6 +296,7 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                     drifted_tiers=drifted_tiers,
                     anchors_added=anchors_added,
                     anchors_removed=anchors_removed,
+                    change_severity=change_severity,
                 )
             )
 
@@ -315,5 +409,21 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                         diff=_short_diff(expected, current_body, region_id),
                     )
                 )
+
+    # EPIC B: append doc↔doc suspect links (a downstream whose upstream changed).
+    # Pure data like any other Drift; never auto-edited (healable=False) — a human
+    # re-confirms with `cdx resolve --edge`. Gated by `docdeps.enabled` inside
+    # detect_suspect_links. Detection writes nothing (K1).
+    for link in detect_suspect_links(config, root):
+        drifts.append(
+            Drift(
+                kind=DriftKind.SUSPECT_LINK,
+                doc_id=link.doc_id,
+                doc_path=link.doc_path,
+                detail=f"{link.upstream_id}: {link.detail}",
+                healable=False,
+                audience=link.audience,
+            )
+        )
 
     return DriftReport(drifts=tuple(drifts))

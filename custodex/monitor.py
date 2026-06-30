@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict
 from . import reviewlog
 from .backends import Backend, BackendResult, FixRequest, make_backend
 from .config import DocumentSpec, MonitorConfig, RegionMode, resolve_repo_root
+from .docdeps import SuspectStatus, detect_suspect_links, stamp_edges
 from .docstyle import DocStyleMap
 from .drift import Drift, DriftKind, DriftReport, detect
 from .extract import DocumentSurface, build_document_surface
@@ -239,6 +240,8 @@ class Monitor:
             source_sha=self._source_sha,
             ticket=ticket,
             drifted_tiers=drift.drifted_tiers,  # P2: which tier(s) moved (HASH)
+            # P5: breaking/additive/cosmetic severity of the HASH change.
+            change_severity=drift.change_severity.value,
         )
 
     def _target_record(self, drift: Drift, surface_hash: str) -> ReviewRecord:
@@ -306,6 +309,11 @@ class Monitor:
         records: list[ReviewRecord] = []
 
         for drift in report.drifts:
+            # EPIC B: doc↔doc suspect links never go to the backend (a fix would
+            # clobber the downstream prose). They are handled below by a dedicated
+            # pass that has the structured upstream id + status.
+            if drift.kind is DriftKind.SUSPECT_LINK:
+                continue
             spec = self._spec_for(drift.doc_id)
             surface = build_document_surface(spec, self.root)
             doc_path = self.root / spec.path
@@ -410,9 +418,58 @@ class Monitor:
 
             handled.append(HandledDrift(drift=drift, result=result, applied=applied))
 
+        # EPIC B — doc↔doc suspect links (no backend; human-in-loop, K5). On
+        # ``--apply`` a brand-new UNSTAMPED edge is baselined (establishing a
+        # baseline is not "blessing a change" — the downstream was authored against
+        # the current upstream), recorded as a FIX. A genuinely SUSPECT edge (the
+        # upstream changed) is ESCALATE'd to a human and the downstream is NEVER
+        # auto-edited — it is cleared with ``cdx resolve --edge``. A no-op when no
+        # edges are declared, so a pre-EPIC-B config is byte-identical (K6).
+        self._handle_suspect_links(effective_apply, handled, records)
+
         remaining = self.check().drifts
         return MonitorResult(
             handled=tuple(handled),
             remaining=remaining,
             records=tuple(records),
         )
+
+    def _handle_suspect_links(
+        self,
+        effective_apply: bool,
+        handled: list[HandledDrift],
+        records: list[ReviewRecord],
+    ) -> None:
+        """Record (and on --apply, baseline) doc↔doc suspect links (EPIC B B-06)."""
+        for link in detect_suspect_links(self.config, self.root):
+            spec = self._spec_for(link.doc_id)
+            surface = build_document_surface(spec, self.root)
+            applied = False
+            if link.status is SuspectStatus.UNSTAMPED and effective_apply:
+                stamp_edges(self.config, self.root, link.doc_id, only=link.upstream_id)
+                result = BackendResult(
+                    verdict=Verdict.FIX,
+                    cause=(
+                        f"established the doc↔doc baseline for the new edge "
+                        f"{link.doc_id} → {link.upstream_id}"
+                    ),
+                    fix=None,
+                )
+                applied = True
+            else:
+                result = BackendResult(
+                    verdict=Verdict.ESCALATE, cause=link.detail, fix=None
+                )
+            drift = Drift(
+                kind=DriftKind.SUSPECT_LINK,
+                doc_id=link.doc_id,
+                doc_path=link.doc_path,
+                detail=f"{link.upstream_id}: {link.detail}",
+                healable=False,
+                audience=link.audience,
+            )
+            record = self._record_for(drift, result, surface)
+            reviewlog.append(self._log_path, record)
+            self._sink.emit(record)
+            records.append(record)
+            handled.append(HandledDrift(drift=drift, result=result, applied=applied))

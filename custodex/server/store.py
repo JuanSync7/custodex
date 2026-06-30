@@ -28,6 +28,8 @@ __all__ = [
     "RegisteredRepo",
     "ConfigDocument",
     "ConfigContextRef",
+    "ConfigDocEdge",
+    "StoredDocEdge",
     "ConfigCodeRef",
     "SyncRun",
     "Store",
@@ -99,6 +101,63 @@ class ConfigContextRef(BaseModel):
     note: str | None = None
 
 
+class ConfigDocEdge(BaseModel):
+    """One doc↔doc dependency edge on a :class:`ConfigDocument` (EPIC B).
+
+    The mirror projection of the on-disk :class:`~custodex.config.DocEdge`: ``doc``
+    is the upstream document id this one ``depends_on`` and ``type`` its role
+    (depends/refines/implements/verifies, stored as a plain string so a new role
+    never needs a migration). Frozen + ``extra="forbid"`` (K8).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    doc: str
+    type: str = "depends"
+
+
+class StoredDocEdge(BaseModel):
+    """One doc↔doc edge FLATTENED into the reverse-lookup index (B-09).
+
+    The projection of a :class:`ConfigDocument`'s ``depends_on`` into a standalone,
+    indexable row: the downstream (``doc_id``) → upstream (``upstream_id``) edge of
+    ``type``, scoped by ``(repo_id, sync_kind)`` exactly like the document it came
+    from. ``ConfigDocEdge`` carries only ``doc``/``type`` (it lives nested under one
+    document, which already supplies the downstream id + scope); ``StoredDocEdge``
+    carries the full edge so a reverse query ("which docs depend on X") is answerable
+    by indexing ``upstream_id`` alone — the O(1) lookup the SqlStore's
+    ``config_doc_edges`` table provides, mirrored derive-on-read by the in-memory
+    store. Frozen + ``extra="forbid"`` (K8).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    repo_id: str
+    doc_id: str  # the downstream (dependent) document
+    upstream_id: str  # the document it depends on (the reverse-lookup key)
+    type: str = "depends"
+    sync_kind: str
+
+
+def _doc_edges_of(doc: ConfigDocument) -> list[StoredDocEdge]:
+    """Flatten one document's ``depends_on`` into :class:`StoredDocEdge` rows (K10).
+
+    The ONE projection both stores share: the SqlStore writes these on
+    ``replace_config``; the in-memory store derives them on read — so the indexed
+    table and the derived list are byte-identical (K6/K10).
+    """
+    return [
+        StoredDocEdge(
+            repo_id=doc.repo_id,
+            doc_id=doc.doc_id,
+            upstream_id=edge.doc,
+            type=edge.type,
+            sync_kind=doc.sync_kind,
+        )
+        for edge in doc.depends_on
+    ]
+
+
 class ConfigDocument(BaseModel):
     """One config document as synced from a repo's ``config/cdmon/`` (Y-01).
 
@@ -137,6 +196,12 @@ class ConfigDocument(BaseModel):
     sla_days: int | None = None
     region_keys: tuple[str, ...] = ()
     context_refs: tuple[ConfigContextRef, ...] = ()
+    # EPIC B — the document's declared doc↔doc dependency edges, mirrored at sync
+    # (additive, K6: rides in the full JSON blob, NO migration; pre-EPIC-B rows
+    # parse with the empty tuple). The GET /doc-graph route reads these to serve the
+    # cross-repo dependency GRAPH; suspect STATUS stays repo-local (the doc files
+    # live in the repo, K2), so the hub shows WHO-depends-on-WHAT, not freshness.
+    depends_on: tuple[ConfigDocEdge, ...] = ()
     sync_kind: str
     ref: str | None = None
     synced_at: str
@@ -291,6 +356,23 @@ class Store(Protocol):
         self, repo_id: str, sync_kind: str | None = None
     ) -> list[ConfigDocument]:
         """This repo's config documents, optionally filtered by ``sync_kind`` (K10)."""
+        ...
+
+    def doc_edges_for(
+        self,
+        repo_id: str,
+        *,
+        sync_kind: str | None = None,
+        upstream_id: str | None = None,
+    ) -> list[StoredDocEdge]:
+        """This repo's doc↔doc edges as flat rows (B-09 — the reverse-lookup index).
+
+        The ``depends_on`` of every synced document, flattened into standalone
+        :class:`StoredDocEdge` rows. ``sync_kind`` scopes to one synced view;
+        ``upstream_id`` filters to the edges pointing AT that document — the O(1)
+        "which docs depend on X" reverse query the ``config_doc_edges`` index serves.
+        Insertion order: document order then in-document edge order (K10).
+        """
         ...
 
     def code_refs_for(
@@ -508,6 +590,28 @@ class InMemoryStore:
             for d in self._config_documents
             if d.repo_id == repo_id and (sync_kind is None or d.sync_kind == sync_kind)
         ]
+
+    def doc_edges_for(
+        self,
+        repo_id: str,
+        *,
+        sync_kind: str | None = None,
+        upstream_id: str | None = None,
+    ) -> list[StoredDocEdge]:
+        # Derive the flat edge rows on read from the synced documents (the SqlStore
+        # keeps a real indexed table; this in-memory store derives the SAME list).
+        out: list[StoredDocEdge] = []
+        for d in self._config_documents:
+            if d.repo_id != repo_id or (
+                sync_kind is not None and d.sync_kind != sync_kind
+            ):
+                continue
+            out.extend(
+                edge
+                for edge in _doc_edges_of(d)
+                if upstream_id is None or edge.upstream_id == upstream_id
+            )
+        return out
 
     def code_refs_for(
         self,

@@ -50,3 +50,8 @@ function encodePath(repoId: string): string {
 export function linkToOwnership(repoId: string): string {
   return `/repos/${encodePath(repoId)}/ownership`;
 }
+
+/** Build the dependencies href for a repo id (EPIC B — the doc↔doc graph view). */
+export function linkToDependencies(repoId: string): string {
+  return `/repos/${encodePath(repoId)}/dependencies`;
+}

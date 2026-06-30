@@ -74,6 +74,18 @@ class RegionMode(str, Enum):        # per-region authority (B-01)
     HUMAN = "human"                 # a human owns it; heal NEVER writes it (advisory only)
     LLM_SEEDED = "llm-seeded"       # llm until a human edits it, then locks to human
 
+class DocEdgeType(str, Enum):       # EPIC B: the role of a doc→doc edge
+    DEPENDS="depends"; REFINES="refines"; IMPLEMENTS="implements"; VERIFIES="verifies"
+class DocEdge(BaseModel):           # frozen, extra="forbid" — one upstream dependency
+    doc: str                        # upstream document id (must resolve, K8)
+    type: DocEdgeType = DocEdgeType.DEPENDS
+    note: str | None = None
+class DocDepsConfig(BaseModel):     # the `docdeps:` block (additive, K6) — NOTHING hardcoded
+    enabled: bool = True            # detect suspect links at all
+    gate: bool = True               # SUSPECT_LINK counts toward `cdx check` exit 1
+    default_type: DocEdgeType = DocEdgeType.DEPENDS
+    infer_from_links: bool = False  # auto-INCLUDE edges inferred from md cross-links (suggest is always available)
+
 class DocumentSpec(BaseModel):
     id: str
     path: str                       # repo-relative doc path
@@ -81,7 +93,8 @@ class DocumentSpec(BaseModel):
     code_refs: tuple[CodeRef,...]
     region_keys: tuple[str,...] = ()  # managed regions this doc carries
     region_modes: dict[str, RegionMode] = {}  # region id -> mode; absent => generated (B-01)
-    # model_validator: every region_modes key MUST be in region_keys, else ConfigError (K8)
+    depends_on: tuple[DocEdge,...] = ()  # EPIC B: doc→doc upstream deps (additive K6)
+    # model_validator: region_modes keys in region_keys; depends_on has no self-edge / no dup upstream (K8)
     def mode_for(self, region_id: str) -> RegionMode  # declared mode or GENERATED
 
 class MonitorConfig(BaseModel):
@@ -93,6 +106,8 @@ class MonitorConfig(BaseModel):
     central: CentralConfig = CentralConfig()
     apply_default: bool = False     # monitor auto-applies FIX by default?
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (defaulted, additive)
+    docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (additive)
+    # model_validator: every depends_on.doc must name a known document id (else ConfigError, K8)
 
 def load_config(path: Path) -> MonitorConfig     # yaml|json by suffix; ConfigError on bad input
 CONFIG_TEMPLATE: str                             # documented starter config
@@ -622,6 +637,15 @@ def stored_region_hash(doc: Doc, region_id: str) -> str | None
 def set_region_hash(meta: dict, region_id: str, value: str) -> dict   # additive under cdm.region_hashes
 def region_is_locked(doc: Doc, region_id: str, current_body: str) -> bool
 ```
+EPIC B per-edge upstream stamps — additive `cdm.upstream_hashes` (upstream doc id
+-> hash of that upstream's body at last review). `set_fingerprint` already copies
+the whole `cdm` map forward, so an edge stamp survives a code↔doc heal (zero blast
+radius), exactly like `region_hashes`:
+```python
+def stored_upstream_hashes(doc: Doc) -> dict[str, str]                 # {} when absent
+def set_upstream_hash(meta: dict, upstream_id: str, value: str) -> dict   # additive under cdm.upstream_hashes
+def drop_upstream_hash(meta: dict, upstream_id: str) -> dict           # remove a stamp (edge deleted)
+```
 `region_is_locked` is the SINGLE shared lock predicate (CDM-07 "one shared
 truth") consumed by drift + heal: a region is locked iff it has a stored region
 hash AND `region_body_hash(current_body) != stored_region_hash(...)` (a human
@@ -639,6 +663,8 @@ REGION_KEYS: frozenset[str]   # e.g. {"symbols"}
 ```python
 class DriftKind(str, Enum):
     MISSING_DOC="MISSING_DOC"; HASH="HASH"; REGION="REGION"; UNHEALABLE="UNHEALABLE"
+    SUSPECT_LINK="SUSPECT_LINK"   # EPIC B: an upstream doc this one depends_on changed
+                                  # (healable=False — resolved by `cdx resolve --edge`, not auto-edit)
 class Drift(BaseModel):
     kind: DriftKind; doc_id: str; doc_path: str; detail: str
     region_id: str | None = None; healable: bool = True
@@ -660,6 +686,40 @@ Audience rule (K3): a HASH drift whose only change is in docstrings/comments or
 private/local symbols is reported for `eng-guide` but suppressed for
 `user-guide` (the surface filter already excludes those for user-guide, so the
 hash simply won't move — the rule is enforced by extraction + asserted here).
+
+EPIC B — `detect()` also appends `SUSPECT_LINK` drifts (healable=False) by calling
+`docdeps.detect_suspect_links(config, root)` when `config.docdeps.enabled`. They
+are pure data like any other Drift; `cdx check`'s EXIT code honours
+`config.docdeps.gate` (a report whose only drifts are SUSPECT_LINK exits 0 when
+`gate=False`). detect stays K1 — no stamp is ever written here.
+
+## `docdeps.py`  (EPIC B — doc↔doc suspect links — pure, mirrors `ownership.py`, K0/K1/K10)
+The edge DECLARATION is config (`DocumentSpec.depends_on`, K2 truth); the per-edge
+baseline STAMP is the downstream doc's `cdm.upstream_hashes` front-matter
+(machine-managed, like `cdm.fingerprint`). This module is pure: the one writer
+(`write_edge_stamp`) is impure file I/O isolated from detection and called ONLY by
+the mutation commands (`link`/`resolve`/`monitor --apply`), never by `check`.
+```python
+class DocEdgeType(str, Enum):              # config: DocEdge.type
+    DEPENDS="depends"; REFINES="refines"; IMPLEMENTS="implements"; VERIFIES="verifies"
+class SuspectStatus(str, Enum):
+    OK="ok"; UNSTAMPED="unstamped"; SUSPECT="suspect"; MISSING_UPSTREAM="missing_upstream"
+class SuspectLink(BaseModel):              # frozen, extra=forbid — one downstream→upstream edge verdict
+    doc_id: str; doc_path: str; upstream_id: str; type: DocEdgeType
+    status: SuspectStatus; detail: str; audience: Audience
+class InferredEdge(BaseModel):             # frozen — a link-inference suggestion (author→approve)
+    doc_id: str; upstream_id: str; via: str   # the relative md link that implied it
+
+def upstream_fingerprint(doc: manifest.Doc) -> str   # sha256[:16] of normalized BODY (not front-matter); K10
+def detect_suspect_links(config: MonitorConfig, root: Path) -> tuple[SuspectLink, ...]  # pure, sorted (K1/K10)
+def infer_edges_from_links(config: MonitorConfig, root: Path) -> tuple[InferredEdge, ...]  # pure, sorted
+def render_deps_text(config, suspects, *, suspect_only=False) -> str   # the `cdx deps` human view (K10)
+def write_edge_stamp(doc_path: Path, upstream_id: str, value: str) -> bool   # IMPURE writer (only mutation cmds)
+```
+`detect_suspect_links`: for each downstream doc with `depends_on`, recompute each
+upstream's `upstream_fingerprint` and compare to `manifest.stored_upstream_hashes`
+on the downstream — equal⇒OK, differ⇒SUSPECT, absent⇒UNSTAMPED, upstream file
+gone⇒MISSING_UPSTREAM. Sorted by `(doc_id, upstream_id)` (K10).
 
 ## `schema.py`  (public, versioned — K6)
 ```python

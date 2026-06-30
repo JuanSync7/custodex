@@ -50,6 +50,14 @@ documents:
     # EPIC SLA — recently reviewed, so this user-guide is FRESH (within its SLA).
     reviewed: "2026-06-15"
     region_keys: ["symbols"]
+    # EPIC B — this user-guide tour DEPENDS ON the io-api reference (saving/loading
+    # task graphs): if the I/O doc changes, this tour is flagged SUSPECT until a
+    # human re-confirms it (`cdx resolve --edge getting-started io-api`). The edge
+    # is declared in config (the source of truth, K2) and baselined in the doc's
+    # `cdm.upstream_hashes`; `cdx deps` shows it.
+    depends_on:
+      - doc: io-api
+        type: depends
     code_refs:
       - path: src/taskflow/core/model.py
         symbols: ["Task"]

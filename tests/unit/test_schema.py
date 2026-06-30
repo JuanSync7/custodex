@@ -62,13 +62,13 @@ def test_review_record_round_trips_through_json() -> None:
     data = rec.model_dump_json()
     again = ReviewRecord.model_validate_json(data)
     assert again == rec
-    assert again.schema_version == "1.1.0"
+    assert again.schema_version == "1.2.0"
     assert again.fix is not None
     assert again.fix.region_id == "symbols"
 
 
 def test_review_record_default_schema_version() -> None:
-    assert _record().schema_version == "1.1.0"  # P2 minor bump
+    assert _record().schema_version == "1.2.0"  # P5 minor bump (change_severity)
 
 
 def test_fix_is_optional() -> None:
@@ -125,6 +125,41 @@ def test_review_record_schema_is_versioned_json_schema() -> None:
         "config_snapshot",
     ):
         assert field in props, field
+
+
+def test_change_severity_defaults_unknown_and_round_trips() -> None:
+    """P5: `change_severity` is additive — default "unknown", a set value survives."""
+    assert _record().change_severity == "unknown"
+    rec = _record(change_severity="breaking")
+    again = ReviewRecord.model_validate_json(rec.model_dump_json())
+    assert again.change_severity == "breaking"
+
+
+def test_legacy_record_without_change_severity_still_parses() -> None:
+    """K6 back-compat: a pre-P5 JSONL line (no change_severity) still validates."""
+    import json
+
+    legacy = json.dumps(
+        {
+            "schema_version": "1.1.0",
+            "record_id": "abc123",
+            "doc_id": "pipeline",
+            "doc_path": "docs/api/pipeline.md",
+            "audience": "eng-guide",
+            "drift_kind": "HASH",
+            "drift_detail": "surface moved",
+            "cause": "signature changed",
+            "verdict": "FIX",
+            "surface_hash": "deadbeef",
+            "backend_kind": "mock",
+            "detected_at": "2026-06-01T00:00:00Z",
+            "resolved_at": "2026-06-01T00:00:01Z",
+            "config_snapshot": {},
+        }
+    )
+    rec = ReviewRecord.model_validate_json(legacy)
+    assert rec.change_severity == "unknown"  # absent additive field defaults (K6)
+    assert rec.schema_version == "1.1.0"  # the old line's own version is preserved
 
 
 def test_source_sha_defaults_none_and_round_trips() -> None:

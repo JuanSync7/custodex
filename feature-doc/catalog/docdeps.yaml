@@ -1,0 +1,134 @@
+# Feature catalog — `docdeps` subsystem (EPIC B: document↔document dependencies).
+# The doc↔doc analogue of code↔doc drift — the pillar Custodex previously lacked
+# (.project/COMPETITORS.md). A document declares it `depends_on` an upstream document
+# (the DECLARATION is config, the source of truth K2); the downstream carries a
+# per-edge baseline STAMP — the upstream's content hash at last review — in its
+# `cdm.upstream_hashes` front matter. When the upstream's body changes, the stamp no
+# longer matches and the edge is SUSPECT until a human re-confirms it with
+# `cdx resolve --edge` (the proven Doorstop two-fingerprint + per-edge-ack model).
+# Golden source of truth (EPIC R discipline).
+features:
+  - id: FEAT-DOCDEPS-001
+    title: Doc↔doc edge config models (declaration = config, K2)
+    summary: >-
+      DocumentSpec gains an additive `depends_on` list of DocEdge (upstream doc id +
+      typed role: depends/refines/implements/verifies), and MonitorConfig gains a
+      `docdeps` policy block (enabled/gate/default_type/infer_from_links) so NOTHING
+      about Pillar B is hardcoded (K0). Loud validators (K8): a self-edge, a duplicate
+      upstream, or an edge to an unknown document id is a ConfigError; the edge
+      round-trips byte-stable through dump_unit_file (K7). A pre-EPIC-B config with no
+      `depends_on` loads unchanged (additive, K6).
+    subsystem: docdeps
+    modules: [config]
+    constraints: [K0, K2, K6, K8]
+
+  - id: FEAT-DOCDEPS-002
+    title: Pure suspect-link detection (the two-fingerprint model)
+    summary: >-
+      docdeps.detect_suspect_links projects config + the downstream's stored baseline
+      stamps into one verdict per edge — OK / SUSPECT / UNSTAMPED / MISSING_UPSTREAM —
+      by recomputing each upstream's `upstream_fingerprint` (a normalized hash of the
+      upstream BODY only, so the upstream's own `cdm.fingerprint` re-stamp never trips a
+      suspect link) and comparing it to `cdm.upstream_hashes`. Pure + offline (K1), no
+      clock, sorted by (doc_id, upstream_id) (K10) — the doc↔doc analogue of
+      ownership.detect_orphans. Manifest stores the per-edge stamps additively under
+      `cdm.upstream_hashes`, surviving a code↔doc heal.
+    subsystem: docdeps
+    modules: [docdeps, manifest]
+    constraints: [K1, K2, K10]
+
+  - id: FEAT-DOCDEPS-003
+    title: Link inference + the per-edge baseline writer
+    summary: >-
+      docdeps.infer_edges_from_links scans each managed doc for relative Markdown
+      cross-links that resolve to another managed doc and suggests them as edges (the
+      low-tedium "suggest" — a human approves a graph rather than authoring one; external
+      links, anchors, self-links and already-declared edges are skipped). stamp_edges is
+      the one isolated impure writer — it (re)writes a downstream's baseline stamps,
+      idempotently (K7) and per-edge — used only by the mutation commands, never by the
+      detect-only check (K1).
+    subsystem: docdeps
+    modules: [docdeps]
+    constraints: [K1, K7, K10]
+
+  - id: FEAT-DOCDEPS-004
+    title: SUSPECT_LINK surfaces through drift.detect (audience-scoped)
+    summary: >-
+      drift.detect appends doc↔doc suspect links as ordinary Drift data with a new
+      DriftKind.SUSPECT_LINK (healable=False — resolved by a human ack, never
+      auto-edited), carrying the DOWNSTREAM doc's audience (K3), so `cdx check` and
+      `cdx monitor` see them with zero extra wiring. Detection writes nothing (K1); the
+      `docdeps.enabled` knob gates whether they are computed at all.
+    subsystem: docdeps
+    modules: [drift, docdeps]
+    constraints: [K1, K3]
+
+  - id: FEAT-DOCDEPS-005
+    title: cdx deps + cdx resolve --edge + the configurable gate
+    summary: >-
+      `cdx deps` shows the dependency graph + suspect status (read-only, K1/K4);
+      `cdx deps --suggest` prints paste-ready `depends_on` config inferred from Markdown
+      links; `cdx resolve --edge DOWN UP` re-stamps exactly that one edge after review
+      (the finer-grained Doorstop `clear`, never re-blessing a whole doc) and is loud
+      (K8) on an undeclared edge. `cdx check`'s nonzero exit honours the `docdeps.gate`
+      knob — Custodex gates on a suspect link by default (unlike Doorstop, which exits 0)
+      but a team can make it advisory.
+    subsystem: docdeps
+    modules: [cli, docdeps]
+    constraints: [K1, K4, K8]
+
+  - id: FEAT-DOCDEPS-006
+    title: Monitor records suspect links + baselines new edges (human-in-loop)
+    summary: >-
+      The Monitor never sends a SUSPECT_LINK to the backend (a fix would clobber the
+      downstream prose). On `--apply` it establishes the baseline for a brand-new
+      UNSTAMPED edge (recorded as a FIX — establishing a baseline is not blessing a
+      change); a genuinely SUSPECT edge (the upstream changed) is ESCALATE'd to a human
+      as an auditable ReviewRecord and the downstream is NEVER auto-edited (K5). A re-run
+      with no change writes nothing (K7); a config with no edges is byte-identical (K6).
+    subsystem: docdeps
+    modules: [monitor, docdeps]
+    constraints: [K5, K6, K7]
+
+  - id: FEAT-DOCDEPS-007
+    title: Central hub mirrors the doc↔doc graph (GET /doc-graph)
+    summary: >-
+      configsync._build_rows projects each document's declared `depends_on` edges into
+      the synced ConfigDocument as an additive field — it rides in the full JSON blob, so
+      NO migration and it round-trips through BOTH the in-memory and the SQL store. The
+      read-time `GET /repos/{id}/doc-graph` route serves the cross-repo dependency GRAPH
+      (who-depends-on-what, deduped + sorted) so a reverse query is answerable centrally;
+      suspect STATUS stays repo-local because the doc files needed to hash an upstream's
+      body live in the repo (K2). The central DB stays a rebuildable mirror, not truth.
+    subsystem: docdeps
+    modules: [configsync, server]
+    constraints: [K2, K6]
+
+  - id: FEAT-DOCDEPS-008
+    title: Indexed reverse-dependency lookup (config_doc_edges + GET /doc-graph/reverse)
+    summary: >-
+      The hub FLATTENS every document's `depends_on` into a standalone, indexable
+      `config_doc_edges` row (a StoredDocEdge — the SqlStore writes it on replace_config
+      under Alembic 0007; the in-memory store derives the SAME list on read), so "which
+      docs depend on X" is an indexed `WHERE upstream_id = X` instead of a JSON scan over
+      every document. `GET /repos/{id}/doc-graph/reverse?doc=X` serves the direct
+      dependents (deduped by downstream id, sorted, K10) — a required `doc` query (422 if
+      omitted, K8); the table is a DERIVED index re-projected on every sync, so the
+      central DB stays a rebuildable mirror (K2/K6), not truth.
+    subsystem: docdeps
+    modules: [configsync, server]
+    constraints: [K2, K6, K10]
+
+  - id: FEAT-DOCDEPS-009
+    title: Proactive blast radius (cdx deps --impact)
+    summary: >-
+      docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before
+      editing a document, walk the dependents reverse-reachable from it to answer "what
+      must I review if I change DOC". Pure over the declared config graph (no file reads,
+      no clock, K1/K10), transitive by default and cycle-safe, sorted, loud (K8) on an
+      unknown id, and independent of `docdeps.enabled` (the graph exists either way).
+      `cdx deps --impact DOC` surfaces it read-only (no backend, no network, K4) — an
+      empty radius reads as an explicit "safe to change"; `--json` emits the machine form.
+    subsystem: docdeps
+    modules: [docdeps, cli]
+    constraints: [K1, K4, K10]

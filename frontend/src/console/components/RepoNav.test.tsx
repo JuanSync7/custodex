@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import RepoNav from "./RepoNav";
 import {
   linkToCoverage,
+  linkToDependencies,
   linkToDocuments,
   linkToHealth,
   linkToMapping,
@@ -38,6 +39,10 @@ describe("RepoNav", () => {
       "href",
       linkToDocuments(repoId),
     );
+    expect(screen.getByRole("link", { name: "Dependencies" })).toHaveAttribute(
+      "href",
+      linkToDependencies(repoId),
+    );
     expect(screen.getByRole("link", { name: "Ownership" })).toHaveAttribute(
       "href",
       linkToOwnership(repoId),
@@ -61,6 +66,7 @@ describe("RepoNav", () => {
       "Drift",
       "Mapping",
       "Documents",
+      "Dependencies",
       "Ownership",
       "Coverage",
       "Health",
@@ -110,6 +116,14 @@ describe("RepoNav", () => {
   it("marks Documents active on the /documents suffix", () => {
     renderAt(repoId, linkToDocuments(repoId));
     expect(screen.getByRole("link", { name: "Documents" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("marks Dependencies active on the /dependencies suffix", () => {
+    renderAt(repoId, linkToDependencies(repoId));
+    expect(screen.getByRole("link", { name: "Dependencies" })).toHaveAttribute(
       "aria-current",
       "page",
     );

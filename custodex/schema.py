@@ -72,11 +72,11 @@ class ReviewRecord(BaseModel):
 
     model_config = _MODEL_CONFIG
 
-    # P2 minor bump (K6): `drifted_tiers` added additively. The bump is the
-    # public signal that the structured tier metadata is available; old "1.0.0"
-    # records still validate (the new field defaults), and a flag-off record's
-    # other bytes are unchanged.
-    schema_version: str = "1.1.0"
+    # P5 minor bump (K6): `change_severity` added additively (after `drifted_tiers`
+    # at P2/1.1.0). The bump is the public signal that the breaking-change taxonomy
+    # is available; old "1.0.0"/"1.1.0" records still validate (the new field
+    # defaults), and a flag-off record's other bytes are unchanged.
+    schema_version: str = "1.2.0"
     record_id: str
     doc_id: str
     doc_path: str
@@ -106,6 +106,12 @@ class ReviewRecord(BaseModel):
     # without stored per-tier digests. Default () keeps pre-P2 records valid — an
     # old JSONL line without it still `model_validate_json`s. Appended LAST.
     drifted_tiers: tuple[str, ...] = ()
+    # P5 breaking-change severity (ADDITIVE, K6): the Griffe-style classification of
+    # a HASH drift ("breaking"/"additive"/"cosmetic"), stringly-typed here (like
+    # `drift_kind`) — the ChangeSeverity enum lives in drift.py. "unknown" for
+    # non-HASH drifts or an OLD doc without the structural signals. Default keeps
+    # pre-P5 records valid (an old JSONL line still validates). Appended LAST.
+    change_severity: str = "unknown"
 
 
 def review_record_schema() -> dict:

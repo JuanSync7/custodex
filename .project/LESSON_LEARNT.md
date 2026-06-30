@@ -2066,3 +2066,54 @@ own implementing modules are inside the thing being gated.
   nodeids (`path::func`), so even a pure rename (`…_two_units` → `…_three_units`)
   drifts it and the `wikis fresh` gate fails. → Run `cdx wiki` as the LAST step
   after any test add/remove/RENAME, not just after catalog edits.
+
+- [DOCDEPS-01] **A doc↔doc edge's UPSTREAM must be a doc the "mutate→heal→
+  converge" demo/dogfood tests never touch.** Pillar B is *correct* to flag a
+  downstream SUSPECT when its upstream's body changes — but the demo heal-loop
+  tests (walkthrough, generate, apply_fix, demo_e2e) deliberately mutate the
+  central `core-api` doc and assert `cdx check` converges to ZERO drift. An edge
+  `getting-started depends_on core-api` made every one of those flows leave a
+  non-auto-healable SUSPECT_LINK behind → 8 failures. Re-anchoring the edge on a
+  STABLE upstream (`io-api`, whose `io.py` no demo flow edits) demonstrates the
+  feature in `cdx deps` without breaking convergence. → When dogfooding a
+  suspect-link edge, pick an upstream outside the heal path, or the
+  convergence-asserting tests break. (The trace evidence comes from `DEMOS.md` +
+  test tags, NOT the live demo config — so the live edge only needs to be stable.)
+- [DOCDEPS-02] **Separate the two fingerprints: hash the upstream's BODY, never
+  its front matter.** The downstream stores a per-edge baseline (`cdm.upstream_hashes`)
+  distinct from its own code↔doc `cdm.fingerprint`. Hashing the upstream's BODY
+  (reusing `manifest.region_body_hash`) — not the whole file — means the upstream's
+  own `cdm.fingerprint` re-stamp on a code↔doc heal does NOT trip a suspect link;
+  only a real prose/region change does. A whole-file hash would make every code↔doc
+  heal of an upstream falsely suspect every downstream. → Body-only is the load-bearing
+  choice that keeps doc↔doc orthogonal to code↔doc.
+- [DOCDEPS-03] **A new public module is an `srcindex` "orphan" until config
+  references it.** Adding `custodex/docdeps.py` failed `test_real_tree_no_orphan_public_module`
+  immediately. The established pattern for an EPIC core module (ownership/settings/
+  staleness) is a coverage WAIVER in `config/cdmon/index.yaml` with a reason pointing
+  at `feature-doc/catalog/<name>.yaml` — NOT a `docs/api/*` doc. → New core module ⇒
+  add the waiver + a catalog file + `Feature:` tags on a test AND a `DEMOS.md` entry,
+  then `cdx wiki`/`cdx trace`.
+
+- [DOCDEPS-04] **A catalog feature's `modules:` list is VALIDATED against the real
+  module registry — a submodule name is not a module name.** `feature-doc/catalog/
+  docdeps.yaml` listing `modules: [store, configsync, server]` made `cdx wiki` fail
+  loudly with `feature FEAT-DOCDEPS-008 names unknown module(s): store` — the server's
+  `store.py`/`db.py`/`app.py` are all catalogued under the single `server` module
+  (mirroring how FEAT-DOCDEPS-007 used `[configsync, server]`). The pytest gate is
+  GREEN at this point; only the `cdx wiki` regeneration step catches it. → When adding
+  a catalog entry, set `modules:` to top-level module names that already appear in
+  other entries (grep the catalog), and always run `cdx wiki` before declaring a slice
+  done — `ruff`/`mypy`/`pytest` do not exercise the catalog.
+
+- [DOCDEPS-05] **Classify breaking-change severity from signals you ALREADY capture —
+  don't add a second analysis pass.** B-12's `change_severity` (breaking/additive/
+  cosmetic) is a pure verdict over P2 `drifted_tiers` + P4 `anchors_added/removed`, not
+  a new diff: a removed anchor or an in-place `signature`-tier move ⇒ BREAKING, an added
+  anchor ⇒ ADDITIVE, a docstring/body-only move ⇒ COSMETIC. The ONE thing the aggregate
+  signals can't separate is a SIMULTANEOUS add + in-place signature change (reported
+  ADDITIVE) — that needs per-symbol signature digests, a deliberate further deferral
+  documented in the function. Threading it onto the `ReviewRecord` reused the
+  `drifted_tiers` precedent: stringly-typed field (the enum stays in `drift.py`),
+  additive schema **minor bump 1.1.0→1.2.0**, regen the golden `cdx schema` artifacts
+  (`docs/REVIEW_RECORD_SCHEMA.json` + `frontend/src/console/schema.review.json`).

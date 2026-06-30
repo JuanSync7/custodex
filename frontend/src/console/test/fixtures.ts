@@ -4,6 +4,7 @@ import type {
   ApplyFixResponse,
   ConfigDocumentTree,
   CoverageSnapshot,
+  DocGraph,
   EditableConfigTree,
   EditableDocument,
   GenerateResponse,
@@ -629,4 +630,26 @@ export const staleness: StalenessData = {
   ],
   stale_count: 2,
   now: "2026-06-22T00:00:00Z",
+};
+
+// EPIC B — the declared doc↔doc dependency graph for the busy demo repo: the user
+// guide depends on the io-api reference, and core-api refines it.
+export const docGraph: DocGraph = {
+  edges: [
+    {
+      doc_id: "core-api",
+      doc_path: "docs/api/core-api.md",
+      audience: "eng-guide",
+      upstream_id: "io-api",
+      type: "refines",
+    },
+    {
+      doc_id: "getting-started",
+      doc_path: "docs/getting-started.md",
+      audience: "user-guide",
+      upstream_id: "io-api",
+      type: "depends",
+    },
+  ],
+  edge_count: 2,
 };

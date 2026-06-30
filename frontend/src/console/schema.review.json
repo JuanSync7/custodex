@@ -1,5 +1,25 @@
 {
   "$defs": {
+    "AcceptanceCheck": {
+      "additionalProperties": false,
+      "description": "One acceptance-criterion line a reviewer confirms (K8 immutable).\n\n``auto_satisfied`` is the agent's CLAIM that the proposed change already\nmeets this criterion; the human still confirms it.",
+      "properties": {
+        "auto_satisfied": {
+          "default": false,
+          "title": "Auto Satisfied",
+          "type": "boolean"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "AcceptanceCheck",
+      "type": "object"
+    },
     "Audience": {
       "description": "Who a document is written for \u2014 drives extraction and drift verdicts.",
       "enum": [
@@ -8,6 +28,118 @@
       ],
       "title": "Audience",
       "type": "string"
+    },
+    "DriftTicket": {
+      "additionalProperties": false,
+      "description": "The structured, human-validatable artifact for one handled drift (K6).\n\nFrozen + ``extra=\"forbid\"``: an immutable audited artifact (K8). Built\ndeterministically from the drift/verdict/cause/fix/surface (K10), never from\na clock or I/O. Carries a ``schema_version`` and is emitted from the model.",
+      "properties": {
+        "acceptance_criteria": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AcceptanceCheck"
+          },
+          "title": "Acceptance Criteria",
+          "type": "array"
+        },
+        "affected_symbols": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Affected Symbols",
+          "type": "array"
+        },
+        "audience": {
+          "title": "Audience",
+          "type": "string"
+        },
+        "change_kind": {
+          "title": "Change Kind",
+          "type": "string"
+        },
+        "diff": {
+          "default": "",
+          "title": "Diff",
+          "type": "string"
+        },
+        "doc_id": {
+          "title": "Doc Id",
+          "type": "string"
+        },
+        "doc_path": {
+          "title": "Doc Path",
+          "type": "string"
+        },
+        "drift_kind": {
+          "title": "Drift Kind",
+          "type": "string"
+        },
+        "proposed_change": {
+          "title": "Proposed Change",
+          "type": "string"
+        },
+        "recommended_action": {
+          "title": "Recommended Action",
+          "type": "string"
+        },
+        "region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region Id"
+        },
+        "root_cause": {
+          "title": "Root Cause",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/TicketSeverity"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "ticket_id": {
+          "title": "Ticket Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "verdict": {
+          "title": "Verdict",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ticket_id",
+        "title",
+        "summary",
+        "severity",
+        "drift_kind",
+        "doc_id",
+        "doc_path",
+        "audience",
+        "root_cause",
+        "proposed_change",
+        "change_kind",
+        "verdict",
+        "recommended_action"
+      ],
+      "title": "DriftTicket",
+      "type": "object"
     },
     "ProposedFix": {
       "additionalProperties": false,
@@ -60,6 +192,16 @@
       "title": "ProposedFix",
       "type": "object"
     },
+    "TicketSeverity": {
+      "description": "How urgently a human should look at a drift ticket.",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "TicketSeverity",
+      "type": "string"
+    },
     "Verdict": {
       "description": "The backend's decision for one drift (mirrors SPEC *Verdict*).",
       "enum": [
@@ -83,6 +225,11 @@
     },
     "cause": {
       "title": "Cause",
+      "type": "string"
+    },
+    "change_severity": {
+      "default": "unknown",
+      "title": "Change Severity",
       "type": "string"
     },
     "config_snapshot": {
@@ -110,6 +257,14 @@
       "title": "Drift Kind",
       "type": "string"
     },
+    "drifted_tiers": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Drifted Tiers",
+      "type": "array"
+    },
     "fix": {
       "anyOf": [
         {
@@ -130,7 +285,7 @@
       "type": "string"
     },
     "schema_version": {
-      "default": "1.0.0",
+      "default": "1.2.0",
       "title": "Schema Version",
       "type": "string"
     },
@@ -149,6 +304,17 @@
     "surface_hash": {
       "title": "Surface Hash",
       "type": "string"
+    },
+    "ticket": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DriftTicket"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "verdict": {
       "$ref": "#/$defs/Verdict"

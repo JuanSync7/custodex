@@ -49,6 +49,7 @@ from .ownership import resolve_accountable_durable
 from .server.store import (
     ConfigCodeRef,
     ConfigContextRef,
+    ConfigDocEdge,
     ConfigDocument,
     SyncRun,
 )
@@ -354,6 +355,11 @@ def _build_rows(
                 context_refs=tuple(
                     ConfigContextRef(path=cr.path, note=cr.note)
                     for cr in spec.context_refs
+                ),
+                # EPIC B: mirror the declared doc↔doc edges (additive, K6).
+                depends_on=tuple(
+                    ConfigDocEdge(doc=edge.doc, type=edge.type.value)
+                    for edge in spec.depends_on
                 ),
                 sync_kind=mode,
                 ref=ref,

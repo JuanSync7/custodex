@@ -22,6 +22,7 @@ import json
 import os
 import re
 import sys
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,11 +40,22 @@ from .config import (
     load_config,
     load_config_dir,
     regenerate_index,
+    resolve_repo_root,
     write_index,
     write_template,
 )
+from .docdeps import (
+    InferredEdge,
+    detect_suspect_links,
+    impacted_by,
+    infer_edges_from_links,
+    render_deps_text,
+    render_impact_text,
+    stamp_edges,
+)
 from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
+from .drift import DriftKind
 from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
 from .featurecatalog import load_catalog
@@ -479,7 +491,12 @@ def surface(
 
 @app.command()
 def check(config: Path = _CONFIG_OPTION) -> None:
-    """Detect drift; exit 1 when drift is present, 0 when clean (K1)."""
+    """Detect drift; exit 1 when drift is present, 0 when clean (K1).
+
+    A ``SUSPECT_LINK`` (doc↔doc) drift is always REPORTED, but whether it counts
+    toward the nonzero exit is the ``docdeps.gate`` config knob (default: gates,
+    unlike Doorstop which exits 0 on a suspect link). Code↔doc drift always gates.
+    """
     try:
         cfg, config_dir = _load(config)
         report = Monitor(cfg, config_dir).check()
@@ -488,7 +505,12 @@ def check(config: Path = _CONFIG_OPTION) -> None:
         raise typer.Exit(code=1) from exc
 
     typer.echo(report.summary())
-    raise typer.Exit(code=0 if report.ok else 1)
+    gating = [
+        d
+        for d in report.drifts
+        if d.kind is not DriftKind.SUSPECT_LINK or cfg.docdeps.gate
+    ]
+    raise typer.Exit(code=1 if gating else 0)
 
 
 @app.command()
@@ -1337,13 +1359,20 @@ def _parse_resolution(value: str) -> Resolution:
 
 @app.command()
 def resolve(
-    record_id: str = typer.Argument(
-        ..., help="The ReviewRecord id to record an outcome for."
+    record_id: str | None = typer.Argument(
+        None, help="The ReviewRecord id to record an outcome for."
     ),
-    resolution: str = typer.Option(
-        ...,
+    resolution: str | None = typer.Option(
+        None,
         "--resolution",
         help="The human outcome: accepted | overridden | rejected | invalidated.",
+    ),
+    edge: tuple[str, str] | None = typer.Option(
+        None,
+        "--edge",
+        help="DOWNSTREAM UPSTREAM: re-confirm one doc↔doc edge after reviewing it "
+        "(the per-edge ack — re-stamps just that edge's baseline, EPIC B). Use "
+        "instead of a record_id.",
     ),
     by: str | None = typer.Option(
         None, "--by", help="Who resolved it (stored as resolved_by)."
@@ -1366,12 +1395,22 @@ def resolve(
 ) -> None:
     """Record the human OUTCOME of a handled drift as a separate append-only event.
 
-    Validates that ``record_id`` EXISTS in the review log (a loud K8 error if not —
-    no traceback), then appends a :class:`~custodex.schema.ResolutionRecord`
-    to the resolutions log (the review log is NEVER mutated; the outcome is linked by
-    FK, K5). The timestamp is injected via the ``_now`` seam (deterministic in tests,
-    K10). ``report`` joins reviews↔resolutions to show resolved/unresolved counts.
+    Two modes. With ``--edge DOWN UP`` (EPIC B): re-stamp exactly that one doc↔doc
+    edge's baseline after a human has reviewed the upstream change — the finer-grained
+    Doorstop ``clear`` (never re-bless a whole doc). Otherwise: validate ``record_id``
+    EXISTS in the review log (a loud K8 error if not), then append a
+    :class:`~custodex.schema.ResolutionRecord` to the resolutions log (the review log
+    is NEVER mutated; linked by FK, K5). The timestamp is injected via ``_now`` (K10).
     """
+    if edge is not None:
+        _resolve_edge(edge[0], edge[1], config)
+        return
+    if record_id is None or resolution is None:
+        typer.echo(
+            "error: provide a RECORD_ID and --resolution, or --edge DOWN UP",
+            err=True,
+        )
+        raise typer.Exit(code=2)
     try:
         _cfg, config_dir = _load(config)
         wanted = _parse_resolution(resolution)
@@ -1398,6 +1437,128 @@ def resolve(
         raise typer.Exit(code=1) from exc
 
     typer.echo(f"resolved {record_id} as {wanted.value}")
+
+
+def _resolve_edge(downstream: str, upstream: str, config: Path) -> None:
+    """Re-stamp one doc↔doc edge's baseline (the per-edge ack, EPIC B B-05).
+
+    Loud (K8) when the edge is not declared in config — the declaration is the
+    source of truth (K2); a typo or a forgotten ``depends_on`` must not silently
+    create an edge. Idempotent (K7): an already-current edge re-stamps nothing.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        spec = next((d for d in cfg.documents if d.id == downstream), None)
+        if spec is None or all(e.doc != upstream for e in spec.depends_on):
+            raise SchemaError(
+                f"no declared edge {downstream!r} → {upstream!r}: add it to the "
+                f"document's depends_on (or run `cdx deps --suggest`) first"
+            )
+        changed = stamp_edges(cfg, root, downstream, only=upstream)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if changed:
+        typer.echo(f"re-stamped edge {downstream} → {upstream} (suspect link cleared)")
+    else:
+        typer.echo(f"edge {downstream} → {upstream} already current — nothing to do")
+
+
+@app.command()
+def deps(
+    config: Path = _CONFIG_OPTION,
+    suspect: bool = typer.Option(
+        False, "--suspect", help="Show only edges that need review (hide OK edges)."
+    ),
+    suggest: bool = typer.Option(
+        False,
+        "--suggest",
+        help="Infer edges from Markdown cross-links between managed docs and print "
+        "paste-ready `depends_on` config (the low-tedium authoring aid). Read-only.",
+    ),
+    impact: str | None = typer.Option(
+        None,
+        "--impact",
+        metavar="DOC",
+        help="Show the blast radius of changing DOC — the documents that "
+        "(transitively) depend on it and would need re-review. Read-only.",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the dependency graph / suggestions as JSON."
+    ),
+) -> None:
+    """Show the doc↔doc dependency graph + suspect status (read-only, K1/K4).
+
+    The doc↔doc analogue of ``cdx ownership``: lists every declared ``depends_on``
+    edge and whether it is OK / suspect / unstamped, all derived from config (the
+    source of truth) + the downstream's stored baseline stamps. ``--suggest`` instead
+    proposes edges inferred from existing Markdown cross-links so a human approves a
+    graph rather than authoring it; ``--impact DOC`` answers the proactive "what must
+    I review if I change DOC" by walking the dependents reverse-reachable from DOC. No
+    backend, no network.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        if impact is not None:
+            impacted = impacted_by(cfg, impact)
+            if as_json:
+                typer.echo(
+                    json.dumps(
+                        {"upstream": impact, "impacted": list(impacted)},
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                typer.echo(render_impact_text(impact, impacted))
+            return
+        if suggest:
+            inferred = infer_edges_from_links(cfg, root)
+            if as_json:
+                typer.echo(
+                    json.dumps(
+                        [e.model_dump(mode="json") for e in inferred],
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                typer.echo(_render_suggestions(inferred))
+            return
+        links = detect_suspect_links(cfg, root, include_ok=not suspect)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [link.model_dump(mode="json") for link in links],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        typer.echo(render_deps_text(links, suspect_only=suspect))
+
+
+def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:
+    """Render inferred edges as paste-ready ``depends_on`` config (EPIC B B-05)."""
+    if not inferred:
+        return "# no new doc↔doc edges inferred from Markdown links"
+    by_doc: dict[str, list[str]] = {}
+    for e in inferred:
+        by_doc.setdefault(e.doc_id, []).append(e.upstream_id)
+    lines = [f"# {len(inferred)} inferred edge(s) — add to the relevant documents:"]
+    for doc_id in sorted(by_doc):
+        lines.append(f"# document {doc_id!r}:")
+        lines.append("    depends_on:")
+        for up in sorted(by_doc[doc_id]):
+            lines.append(f"      - doc: {up}")
+    return "\n".join(lines)
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:

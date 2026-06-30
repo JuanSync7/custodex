@@ -523,3 +523,42 @@ def test_record_carries_drifted_tiers_for_body_change(tmp_path: Path) -> None:
     hash_recs = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
     assert hash_recs, "expected a HASH record for the body-only change"
     assert hash_recs[0].drifted_tiers == ("body",)
+    # P5: the same body-only change classifies as a COSMETIC breaking-change severity.
+    assert hash_recs[0].change_severity == "cosmetic"
+
+
+# --------------------------------------------------------------------------- #
+# P-05: a HASH record carries the breaking-change severity (change_severity)     #
+# Feature: FEAT-DRIFT-011                                                         #
+# --------------------------------------------------------------------------- #
+def test_record_carries_breaking_change_severity_for_signature(tmp_path: Path) -> None:
+    """Changing a public function's signature records change_severity 'breaking'."""
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    spec = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols",),
+    )
+    config = MonitorConfig(root=".", documents=(spec,))
+    from custodex.layout import scaffold_doc
+
+    surface = build_document_surface(spec, tmp_path)
+    (tmp_path / "guide.md").write_text(
+        scaffold_doc(spec, surface, include_body=False), encoding="utf-8"
+    )
+    assert Monitor(config, tmp_path, now=_now, sink=NullSink()).check().ok
+
+    # Add a parameter to a public function (an IN-PLACE signature change — same
+    # symbol identity) → the signature tier moves, no anchor delta → breaking.
+    (tmp_path / "code.py").write_text(
+        CODE.replace(
+            "def public_fn(x: int) -> int:", "def public_fn(x: int, y: int) -> int:"
+        ),
+        encoding="utf-8",
+    )
+    result = Monitor(config, tmp_path, now=_now, sink=NullSink()).run(apply=False)
+    hash_recs = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
+    assert hash_recs, "expected a HASH record for the signature change"
+    assert hash_recs[0].change_severity == "breaking"

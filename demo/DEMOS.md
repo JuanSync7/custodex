@@ -1134,3 +1134,104 @@ next read with no re-sync.
 stale + never-reviewed docs and a `stale_count`. Pinned by
 `tests/integration/test_staleness_server.py`.
 Features: FEAT-STALENESS-006
+
+### DEMO-082 — Declare a doc↔doc dependency (config = truth)
+**What it shows.** A document declares it `depends_on` an upstream document (a typed edge:
+depends/refines/implements/verifies) in config — the source of truth (K2) — and the whole
+policy (enable/gate/default-type/inference) is a `docdeps` config block, nothing hardcoded.
+A self-edge, a duplicate upstream, or an edge to an unknown doc id is a loud ConfigError.
+**How to observe.** The demo's `getting-started` user-guide declares `depends_on: [{doc:
+core-api, type: refines}]`; a config with an unknown upstream id fails to load. Pinned by
+`tests/unit/test_docdeps_config.py`.
+Features: FEAT-DOCDEPS-001
+
+### DEMO-083 — Suspect-link detection (the two-fingerprint model)
+**What it shows.** The downstream stores a per-edge baseline hash of the upstream's BODY in
+its `cdm.upstream_hashes` front matter (separate from its own `cdm.fingerprint`); when the
+upstream's body changes the stamp no longer matches and the edge is SUSPECT. Hashing the
+body (not the front matter) means the upstream's own code↔doc re-stamp never trips it.
+**How to observe.** `detect_suspect_links` returns OK after stamping, then SUSPECT once the
+upstream body is edited; the verdict is pure + sorted. Pinned by `tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-002
+
+### DEMO-084 — Infer edges from Markdown links + per-edge baseline
+**What it shows.** Rather than draw the graph by hand, `infer_edges_from_links` proposes
+edges from the relative Markdown cross-links docs already contain (author→approve), and
+`stamp_edges` writes one edge's baseline idempotently (never on the detect-only check).
+**How to observe.** A doc linking `[overview](overview.md)` yields one inferred edge;
+re-stamping an unchanged edge writes nothing. Pinned by `tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-003
+
+### DEMO-085 — SUSPECT_LINK through cdx check (audience-scoped)
+**What it shows.** A suspect link surfaces through the normal drift path as
+`DriftKind.SUSPECT_LINK` (healable=False — never auto-edited), carrying the downstream
+doc's audience, so `cdx check` reports it with zero extra wiring; `docdeps.enabled` gates
+whether it is computed at all.
+**How to observe.** After an upstream edit, `detect` reports a SUSPECT_LINK for the
+downstream; disabling docdeps suppresses it. Pinned by `tests/unit/test_drift_suspect_link.py`.
+Features: FEAT-DOCDEPS-004
+
+### DEMO-086 — cdx deps + cdx resolve --edge + the gate
+**What it shows.** `cdx deps` shows the graph + suspect status, `cdx deps --suggest` prints
+paste-ready config from inferred links, and `cdx resolve --edge DOWN UP` re-stamps exactly
+one edge (the Doorstop `clear`). `cdx check` gates on a suspect link by default (unlike
+Doorstop, which exits 0) — tunable via `docdeps.gate`.
+**How to observe.** `cdx check` exits 1 on a suspect edge, then 0 after `cdx resolve --edge`;
+with `docdeps.gate: false` it stays 0 but still reports. Pinned by
+`tests/system/test_docdeps_cli.py`.
+Features: FEAT-DOCDEPS-005
+
+### DEMO-087 — Monitor records suspect links + baselines new edges
+**What it shows.** The Monitor never sends a suspect link to the backend (a fix would
+clobber the downstream); on `--apply` it baselines a brand-new UNSTAMPED edge (recorded as
+a FIX) but ESCALATEs a genuinely changed upstream to a human and never auto-edits the
+downstream. A re-run with no change is a no-op (K7).
+**How to observe.** `monitor --apply` baselines the new edge then is idempotent; after an
+upstream change it records an ESCALATE and leaves the downstream untouched. Pinned by
+`tests/integration/test_monitor_docdeps.py`.
+Features: FEAT-DOCDEPS-006
+
+### DEMO-088 — Central hub mirrors the doc↔doc graph
+**What it shows.** A sync projects each document's declared `depends_on` edges into the
+server mirror (additive — it rides in the ConfigDocument JSON, no migration, both stores),
+and `GET /repos/{id}/doc-graph` serves the cross-repo dependency graph (who-depends-on-what)
+so a reverse query is answerable centrally; suspect status stays repo-local (K2).
+**How to observe.** After a sync, `GET /repos/acme%2Fwidget/doc-graph` returns the
+downstream→upstream edges with their type; an unknown repo is 404. Pinned by
+`tests/integration/test_docdeps_server.py`.
+Features: FEAT-DOCDEPS-007
+
+### DEMO-089 — Indexed reverse lookup: who depends on X
+**What it shows.** The hub flattens every document's `depends_on` into the indexed
+`config_doc_edges` table (Alembic 0007, mirrored derive-on-read by the in-memory store),
+so "which docs depend on X" is an indexed `WHERE upstream_id = X` instead of a JSON scan.
+`GET /repos/{id}/doc-graph/reverse?doc=X` serves the direct dependents (deduped, sorted).
+**How to observe.** After a sync, `GET /repos/acme%2Fwidget/doc-graph/reverse?doc=io-api`
+returns the documents that depend on `io-api`; a leaf returns an empty list; a missing
+`doc` query is 422 and an unknown repo is 404. Pinned by
+`tests/integration/test_docdeps_server.py` + `tests/integration/test_db.py`.
+Features: FEAT-DOCDEPS-008
+
+### DEMO-090 — Blast radius: `cdx deps --impact`
+**What it shows.** The proactive complement to suspect detection: BEFORE editing a
+document, `cdx deps --impact DOC` walks the dependents reverse-reachable from `DOC`
+(transitive, cycle-safe) and lists every document that would need re-review — turning the
+"what will I break" question into one read-only command (no backend, no network, K1/K4).
+**How to observe.** `cdx deps --impact io-api` prints the documents that depend on
+`io-api`; a leaf prints "safe to change"; an unknown id is a loud error; `--json` emits
+the machine form. Pinned by `tests/system/test_docdeps_cli.py` +
+`tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-009
+
+### DEMO-091 — Breaking-change severity on a HASH drift
+**What it shows.** A code↔doc HASH drift now carries a Griffe-style severity classified
+from the tier + anchor signals Custodex already captures: a removed/renamed symbol or an
+in-place signature change is **breaking**, a purely added symbol is **additive**, and a
+docstring/body-only move is **cosmetic** — so a reviewer (and the central audit) can tell
+an API-breaking doc drift from a harmless prose update at a glance.
+**How to observe.** Change a tracked module's public signature and `cdx check` annotates
+the HASH line `[breaking]`; add a new public symbol and it reads `[additive]`; edit only a
+docstring and it reads `[cosmetic]`. The verdict rides on the `ReviewRecord`'s additive
+`change_severity` field (schema 1.2.0). Pinned by `tests/unit/test_drift.py` +
+`tests/integration/test_monitor.py`.
+Features: FEAT-DRIFT-011
