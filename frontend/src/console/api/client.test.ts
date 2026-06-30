@@ -160,6 +160,25 @@ describe("ApiClient", () => {
     expect(calls[0].init?.method).toBe("GET");
   });
 
+  it("builds GET /worklist for a repo (WL-01; slash-preserving id)", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      owners: [],
+      item_count: 0,
+      doc_count: 0,
+      includes_suspect: false,
+    });
+    const client = new ApiClient({ baseUrl: "/api", fetchImpl });
+
+    const result = await client.worklistFor("acme/widget");
+
+    expect(calls[0].url).toBe("/api/repos/acme/widget/worklist");
+    expect(calls[0].init?.method).toBe("GET");
+    // Reads are OPEN — no Authorization header is sent.
+    const headers = calls[0].init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(result.includes_suspect).toBe(false);
+  });
+
   it("builds GET /documents with the sync_kind param (default git)", async () => {
     const { fetchImpl, calls } = fakeFetch([]);
     const client = new ApiClient({ baseUrl: "/api", fetchImpl });

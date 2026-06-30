@@ -10,6 +10,7 @@ import {
   linkToMapping,
   linkToOwnership,
   linkToRepo,
+  linkToWorklist,
 } from "../routing";
 
 /** Render RepoNav at a controlled path so we can assert the active tab. */
@@ -24,7 +25,7 @@ function renderAt(repoId: string, path: string) {
 describe("RepoNav", () => {
   const repoId = "demo-taskflow";
 
-  it("renders all five tabs with the routing helpers' hrefs", () => {
+  it("renders all tabs with the routing helpers' hrefs", () => {
     renderAt(repoId, linkToRepo(repoId));
 
     expect(screen.getByRole("link", { name: "Drift" })).toHaveAttribute(
@@ -47,6 +48,10 @@ describe("RepoNav", () => {
       "href",
       linkToOwnership(repoId),
     );
+    expect(screen.getByRole("link", { name: "Worklist" })).toHaveAttribute(
+      "href",
+      linkToWorklist(repoId),
+    );
     expect(screen.getByRole("link", { name: "Coverage" })).toHaveAttribute(
       "href",
       linkToCoverage(repoId),
@@ -57,7 +62,7 @@ describe("RepoNav", () => {
     );
   });
 
-  it("orders Mapping right after Drift", () => {
+  it("orders Mapping right after Drift and Worklist after Ownership", () => {
     renderAt(repoId, linkToRepo(repoId));
     const labels = screen
       .getAllByRole("link")
@@ -68,6 +73,7 @@ describe("RepoNav", () => {
       "Documents",
       "Dependencies",
       "Ownership",
+      "Worklist",
       "Coverage",
       "Health",
     ]);
@@ -127,6 +133,17 @@ describe("RepoNav", () => {
       "aria-current",
       "page",
     );
+  });
+
+  it("marks Worklist active on the /worklist suffix", () => {
+    renderAt(repoId, linkToWorklist(repoId));
+    expect(screen.getByRole("link", { name: "Worklist" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: "Ownership" }),
+    ).not.toHaveAttribute("aria-current");
   });
 
   it("marks Coverage active on the /coverage suffix", () => {

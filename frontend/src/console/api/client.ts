@@ -20,6 +20,7 @@ import type {
   StoredConfigEdit,
   SyncMode,
   SyncRun,
+  Worklist,
 } from "../types";
 
 /** Server-side query filters for `GET /repos/{id}/records` (all optional). */
@@ -195,6 +196,12 @@ export class ApiClient {
   /** GET {base}/repos/{repoId}/doc-graph → DocGraph (EPIC B doc↔doc graph). */
   docGraphFor(repoId: string): Promise<DocGraph> {
     return this.getJson<DocGraph>(`/repos/${encodeRepoId(repoId)}/doc-graph`);
+  }
+
+  /** GET {base}/repos/{repoId}/worklist → Worklist (WL-01 per-owner review
+   *  triage). The HUB view omits suspect items (repo-local, K2). */
+  worklistFor(repoId: string): Promise<Worklist> {
+    return this.getJson<Worklist>(`/repos/${encodeRepoId(repoId)}/worklist`);
   }
 
   /**

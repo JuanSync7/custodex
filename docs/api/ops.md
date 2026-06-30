@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 26c940b572f35a33
+  fingerprint: d6e04236f40aba10
   fingerprint_tiers:
-    composite: 26c940b572f35a33
-    docstring: a83373d6b0a204e8
-    signature: 6fc3245896d1e880
+    composite: d6e04236f40aba10
+    docstring: e7f342c6f4d5e3c2
+    signature: 9ecdddf43a912161
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -69,14 +69,83 @@ cdm:
     - e4d92308184e72ca
     - e62f7af7ce023782
     - eafe895eb8119e6e
+    - eb2554c8c13b73f9
     - edcc4b4214b84e54
     - f4e94e73272ff576
     - f93464a48a2b9281
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 0821a14df1294005
+    symbols: ee747d76c20f3f44
   schema_version: 1.0.0
+  symbol_sigs:
+    01b8016fdce455c4: 2557e4d98b703179
+    051af376199dec21: d7a9bca79ac72d1b
+    09ab528f037a044d: ed7f14a5d44a7718
+    0a12e5898c92bfc6: 73646d29304739ea
+    0c9d51b72e16a207: 468c2620ca834755
+    0d4275088d28bef2: 804a8d60c67bdf84
+    0d6e4079e36703eb: 14346d3eb68974a0
+    0dad8198442ebc15: 7778f05ebf2516e7
+    12a435ec8454c6d1: a2ca2be3282d0600
+    1a4e31eebbd1771e: 7bd3f0f4e54746a8
+    1bc04b5291c26a46: 76a6557de9f6049e
+    1d3c8aff2168435b: 7f757c94419dec88
+    207a1702d707ef3c: 71a2fc7acc980cfe
+    20f65c28671b4093: 195057ec33efc577
+    24c458cfb46d9a45: 953d02f5d1ac5781
+    2a07ca57ed083879: 8faa07d8fc6c7c1d
+    44575cf5b28512d7: deba6b00c018c6ab
+    484de142f352dff3: 1cc66be4e6718295
+    49e9627e39c92dd0: b0cee0ff8f060823
+    4e95b8c32f60f796: 73f7a91734c59485
+    602fda589448378a: 8afb4765b2d48e0c
+    62067d75d7bbed60: 0dd0bdc9a39f47d0
+    655076b86b1c4c83: d224333854a59422
+    663f896d732e2207: 28d51fc52e99427c
+    6eb2db11cfd447e6: f16bdd54bea272d8
+    7022c89609e06451: 407c3e26ff00f036
+    706a95d834379a05: e06b473a8e4f7ffc
+    72f4be89d6ebab14: 82cdb795b1cfefb7
+    731dc691eb24a65c: 6816e5852f596606
+    7482f6dd334689ff: beadfe23310d2a49
+    75c75efe327a8ef3: 41b3443a5133331f
+    763cdc62a869262b: 3209114b9963834b
+    7de97367c9cdc3c6: 44bb81b499473b41
+    845e91831319e89c: 9b02c4079bd0db59
+    85877352f834ad30: b4c547466f9413b4
+    87780fa5de684e87: 1f59070663e4290f
+    8790ad57e78ac78e: ad31f36f63f1c6dd
+    8dcd689ac1fd0270: a7eb5a10b67891e6
+    9185806e77b1178b: 8446552e330a2629
+    9d60841e0a7891df: c248d77560c78ff0
+    a03de20603d8e571: 6449da01ac7f34b1
+    a0df5f85a3810828: 2fd0a8856a8fe719
+    a172cedcae47474b: c411ee4fd4d39f0a
+    a1c1adc663fbd6f0: 0064962060915ac9
+    b0e0fabb95a65a96: 696debc0d868ba0a
+    b6611f50a091a760: d58ee2994d2cfcbf
+    b9ac8d502e11101f: 671891d916aa7ce5
+    bb54068aea85faa7: defb9df3f00a5f13
+    c3a3091b9d32267d: f236e1b17349fc02
+    ca8e9a370614b71a: e54511e80c59cee7
+    cde0fb0dec1400c5: 6602cc7d080e1dca
+    d3a3ed1c7e737699: aa2501b9d4a86c13
+    d42417752e8efd40: cc09f0e5b8fffe46
+    d734efde26c583c9: ade7c8da67ef271b
+    da966368ea663ea5: f39ba256826afdf5
+    df0ad6e43880f09c: 3019fb39391d3113
+    df2a20195d34af2d: e7547f090ffd00e5
+    e31271f86c854de9: aabc8b4ca7ed96f6
+    e4d92308184e72ca: 08074d894c8444ae
+    e62f7af7ce023782: d6db45284c125e58
+    eafe895eb8119e6e: 2492d10714d01761
+    eb2554c8c13b73f9: 34e432f7557b73ab
+    edcc4b4214b84e54: 1fc512bec079aec4
+    f4e94e73272ff576: 7160933bfccc8fda
+    f93464a48a2b9281: df997f7601a0a995
+    fdf09cdfc26cccf6: 09c649f44a9a9980
+    fe494651a43235a5: 783cc1ef26d8217f
 ---
 # ops
 
@@ -153,4 +222,5 @@ cdm:
 | sync_pr_cmd | function | def sync_pr_cmd(config: Path = _CONFIG_OPTION, out: Path \| None = typer.Option(None, '--out', help='Write the unified-diff patch to this file instead of stdout.'), dry_run: bool = typer.Option(False, '--dry-run', help='Compute the patch WITHOUT mutating the working tree (K1).')) -> None |
 | trace | function | def trace(catalog: Path = typer.Option(Path('feature-doc') / 'catalog', '--catalog', help='The feature-doc/catalog directory of golden feature *.yaml files.'), tests_root: Path = typer.Option(Path('tests'), '--tests-root', help='Directory scanned for TEST evidence (inline `Feature:` tags).'), demo_root: Path = typer.Option(Path('demo'), '--demo-root', help='Directory scanned for DEMO evidence (inline `Feature:` tags).'), as_json: bool = typer.Option(False, '--json', help='Emit the traceability matrix as JSON instead of the human summary.'), fail_on_gap: bool = typer.Option(False, '--fail-on-gap', help='Exit nonzero if ANY feature lacks a test or demo, or any unknown ref exists (the CI gate, K8). Without it the command is informational (always exits 0).')) -> None |
 | wiki | function | def wiki(check: bool = typer.Option(False, '--check', help='Verify the wikis are fresh; exit nonzero if any is stale (no write).')) -> None |
+| worklist | function | def worklist(config: Path = _CONFIG_OPTION, owner: str \| None = typer.Option(None, '--owner', help="Show only this accountable owner's queue."), roster: Path \| None = typer.Option(None, '--roster', help='Offline roster YAML (identities: [...]) to classify ownership orphans. Without it, orphan items are skipped (no departure data).'), now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade staleness against (default: the current time).'), include_suspect: bool = typer.Option(True, '--include-suspect/--no-include-suspect', help='Include doc↔doc suspect-link items (repo-local).'), as_json: bool = typer.Option(False, '--json', help='Emit the worklist as JSON.'), fail_on_work: bool = typer.Option(False, '--fail-on-work', help='Exit 1 if ANY work item exists (a review gate). Default exits 0.')) -> None |
 <!-- CDM:END symbols -->

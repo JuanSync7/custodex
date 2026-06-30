@@ -613,3 +613,47 @@ export interface DocGraph {
   edges: DocGraphEdge[];
   edge_count: number;
 }
+
+// ── WL-01 — the per-owner review worklist (GET /repos/:id/worklist) ──────────
+// server: custodex/worklist.py (the per-owner triage of what needs review).
+
+/** Why a document is on the worklist (worklist.WorkReason). An orphan has a
+ * departed owner, a stale doc is past its review SLA, a suspect doc has an
+ * upstream that changed (repo-local only — the HUB omits these, K2). */
+export type WorkReason = "orphan" | "stale" | "suspect";
+
+/** How urgently a worklist item needs a human (worklist.WorkSeverity). */
+export type WorkSeverity = "high" | "medium" | "low";
+
+/** One thing on an owner's worklist (worklist.WorkItem). `upstream_id` is set
+ * ONLY for a suspect item (the changed upstream the doc must be re-checked
+ * against); null otherwise. */
+export interface WorkItem {
+  doc_id: string;
+  doc_path: string;
+  audience: string;
+  reason: WorkReason;
+  severity: WorkSeverity;
+  detail: string;
+  upstream_id: string | null;
+}
+
+/** One owner's bucket of the worklist (worklist.OwnerWorklist). `accountable` is
+ * null for the UNOWNED bucket (items no active owner is accountable for). */
+export interface OwnerWorklist {
+  accountable: string | null;
+  items: WorkItem[];
+  item_count: number;
+  doc_count: number;
+}
+
+// server: GET /repos/:id/worklist[?owner=NAME] → the per-owner review triage.
+// `includes_suspect` is always FALSE from the HUB (suspect freshness is repo-local,
+// K2 — run `cdx worklist` in the repo for the full picture); a repo-local view sets
+// it true.
+export interface Worklist {
+  owners: OwnerWorklist[];
+  item_count: number;
+  doc_count: number;
+  includes_suspect: boolean;
+}

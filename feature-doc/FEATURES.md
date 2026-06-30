@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**234 features** across 23 subsystems.
+**235 features** across 24 subsystems.
 
 ## agent
 
@@ -1288,3 +1288,13 @@ configsync._build_rows projects each document's `reviewed` plus the audience-res
 ### `FEAT-STALENESS-006` — Read-time GET /staleness view
 
 GET /repos/{id}/staleness grades the synced docs' `reviewed` + `sla_days` against the app clock at READ time (deduped by doc_id, FRESH omitted unless include_fresh), so a doc goes stale on the NEXT read with no re-sync — mirroring the ownership read-time cascade. Open read, deterministic.
+
+## worklist
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-WORKLIST-001` | Per-owner review worklist — the accountability join | worklist, cli, server | K0, K1, K2, K10 | — | — | implemented |
+
+### `FEAT-WORKLIST-001` — Per-owner review worklist — the accountability join
+
+worklist.build_worklist is a PURE data join (no clock, no I/O — K0/K1/K10): it buckets every document needing attention — an ownership ORPHAN (EPIC OWN), a STALE review (EPIC SLA), or a doc↔doc SUSPECT link (Pillar B) — under its accountable owner (dri→owner→team→inherited; the unowned `None` bucket sorts last). It consumes the already-computed OwnershipFinding / StalenessFinding / SuspectLink sequences plus the EffectiveOwner projection, so it is unchanged whether or not propagation is in play (a SUSPECT_TRANSITIVE link maps cleanly to a SUSPECT item). One WorkItem per (doc, reason[, upstream_id]) so no reason is hidden; counts are item-derived (item_count plus a distinct doc_count, never summed across inputs, so a doc that is stale AND suspect is one doc / two items); items sort by (severity, reason, doc_id, upstream_id). The thin impure worklist_from_repo runs the three detectors then joins. `cdx worklist` exposes it read-only — `--owner` filters to one queue, `--roster` adds orphans, `--no-include-suspect` drops the repo-local suspect items, and `--fail-on-work` is an opt-in gate (default exit 0). The hub's GET /repos/{id}/worklist reuses the /ownership + /staleness read-time cascade but OMITS suspect items (the hub has the dependency graph but not the doc bodies needed to hash an upstream — K2) and sets includes_suspect:false, an HONEST partial view; parity over the in-memory and SQL stores.

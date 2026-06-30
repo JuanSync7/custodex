@@ -13,6 +13,7 @@ import {
   linkToMapping,
   linkToOwnership,
   linkToRepo,
+  linkToWorklist,
 } from "../routing";
 
 export interface RepoNavProps {
@@ -27,6 +28,7 @@ type View =
   | "documents"
   | "dependencies"
   | "ownership"
+  | "worklist"
   | "coverage"
   | "health";
 
@@ -36,6 +38,7 @@ function activeView(pathname: string): View {
   if (pathname.endsWith("/documents")) return "documents";
   if (pathname.endsWith("/dependencies")) return "dependencies";
   if (pathname.endsWith("/ownership")) return "ownership";
+  if (pathname.endsWith("/worklist")) return "worklist";
   if (pathname.endsWith("/mapping")) return "mapping";
   return "drift";
 }
@@ -56,6 +59,7 @@ export function RepoNav({ repoId }: RepoNavProps) {
       to: linkToDependencies(repoId),
     },
     { view: "ownership", label: "Ownership", to: linkToOwnership(repoId) },
+    { view: "worklist", label: "Worklist", to: linkToWorklist(repoId) },
     { view: "coverage", label: "Coverage", to: linkToCoverage(repoId) },
     { view: "health", label: "Health", to: linkToHealth(repoId) },
   ];

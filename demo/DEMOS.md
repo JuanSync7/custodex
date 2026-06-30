@@ -1267,3 +1267,22 @@ parameter on an existing one: `cdx check` annotates the HASH line `[breaking]` (
 change, just a more accurate verdict. Pinned by `tests/unit/test_drift.py` +
 `tests/unit/test_extract.py` + `tests/unit/test_manifest.py`.
 Features: FEAT-DRIFT-012
+
+### DEMO-094 — Per-owner review worklist (`cdx worklist`)
+**What it shows.** The accountability JOIN: instead of running `cdx ownership`,
+`cdx staleness` and `cdx deps` separately, ONE command buckets every document needing
+attention — an ownership **orphan** (EPIC OWN), a **stale** review (EPIC SLA), or a
+doc↔doc **suspect** link (Pillar B) — under its accountable owner, as one prioritised
+queue per person. A document with several problems is several items but ONE document
+(distinct item/doc counts); `--owner` filters to one queue; `--fail-on-work` is an
+opt-in CI gate. The central hub serves the same join from the mirror (orphans +
+staleness) but OMITS suspect links (it has the dependency graph, not the bodies to hash
+an upstream, K2) and says so via `includes_suspect:false`.
+**How to observe.** Against the demo, `cdx worklist --roster roster.yaml` prints each
+owner's queue with a `[severity] reason` line per item (the demo's `core-api` is both
+stale and — once its DRI departs — orphaned); `cdx worklist --owner demo-team` shows
+just that queue; `--no-include-suspect` drops the suspect items; the central
+`GET /repos/{id}/worklist` returns the hub's partial join. Pinned by
+`tests/unit/test_worklist.py` + `tests/system/test_worklist_cli.py` +
+`tests/integration/test_worklist_server.py`.
+Features: FEAT-WORKLIST-001

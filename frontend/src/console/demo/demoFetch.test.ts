@@ -40,10 +40,25 @@ describe("demoFetch", () => {
     expect(statuses).toContain("never_reviewed");
   });
 
+  it("surfaces the per-owner worklist (orphan, stale, suspect) for the busy repo", async () => {
+    const wl = await client.worklistFor("acme/widget");
+    expect(wl.item_count).toBeGreaterThan(0);
+    // the repo-local demo includes suspect items (the HUB would strip them, K2)
+    expect(wl.includes_suspect).toBe(true);
+    const reasons = wl.owners.flatMap((o) => o.items.map((i) => i.reason));
+    expect(reasons).toContain("orphan");
+    expect(reasons).toContain("stale");
+    expect(reasons).toContain("suspect");
+    // an unowned bucket (null accountable) exists alongside a named owner
+    expect(wl.owners.some((o) => o.accountable === null)).toBe(true);
+    expect(wl.owners.some((o) => o.accountable !== null)).toBe(true);
+  });
+
   it("shows the quiet repo as empty, not errored", async () => {
     expect(await client.recordsFor("octo/docs")).toEqual([]);
     expect((await client.ownershipFor("octo/docs")).orphan_count).toBe(0);
     expect((await client.stalenessFor("octo/docs")).stale_count).toBe(0);
+    expect((await client.worklistFor("octo/docs")).item_count).toBe(0);
   });
 
   it("serves the global settings + config templates", async () => {

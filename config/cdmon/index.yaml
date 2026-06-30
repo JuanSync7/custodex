@@ -74,6 +74,8 @@ coverage:
       reason: "EPIC SLA staleness/review-SLA core; documented in feature-doc/catalog/staleness.yaml (api doc owned by cdx wiki)"
     - path: "custodex/docdeps.py"
       reason: "EPIC B doc↔doc dependency / suspect-link core; documented in feature-doc/catalog/docdeps.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/worklist.py"
+      reason: "WL-01 per-owner review worklist (accountability join); documented in feature-doc/catalog/worklist.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 

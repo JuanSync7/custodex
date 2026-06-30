@@ -55,3 +55,8 @@ export function linkToOwnership(repoId: string): string {
 export function linkToDependencies(repoId: string): string {
   return `/repos/${encodePath(repoId)}/dependencies`;
 }
+
+/** Build the worklist href for a repo id (WL-01 — the per-owner review triage). */
+export function linkToWorklist(repoId: string): string {
+  return `/repos/${encodePath(repoId)}/worklist`;
+}

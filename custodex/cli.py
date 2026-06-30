@@ -111,6 +111,7 @@ from .staleness import (
 from .syncpr import should_sync, sync_pr
 from .templates_v2 import scaffold_config_dir
 from .traceability import TraceMatrix, build_matrix
+from .worklist import render_worklist_text, worklist_from_repo
 
 app = typer.Typer(
     name="cdx",
@@ -2046,6 +2047,68 @@ def staleness(
         f.status in (StalenessStatus.STALE, StalenessStatus.NEVER_REVIEWED)
         for f in findings
     ):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def worklist(
+    config: Path = _CONFIG_OPTION,
+    owner: str | None = typer.Option(
+        None, "--owner", help="Show only this accountable owner's queue."
+    ),
+    roster: Path | None = typer.Option(
+        None,
+        "--roster",
+        help="Offline roster YAML (identities: [...]) to classify ownership orphans. "
+        "Without it, orphan items are skipped (no departure data).",
+    ),
+    now: str | None = typer.Option(
+        None,
+        "--now",
+        help="ISO timestamp to grade staleness against (default: the current time).",
+    ),
+    include_suspect: bool = typer.Option(
+        True,
+        "--include-suspect/--no-include-suspect",
+        help="Include doc↔doc suspect-link items (repo-local).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the worklist as JSON."),
+    fail_on_work: bool = typer.Option(
+        False,
+        "--fail-on-work",
+        help="Exit 1 if ANY work item exists (a review gate). Default exits 0.",
+    ),
+) -> None:
+    """One prioritised queue per accountable owner — the accountability JOIN (K1/K4).
+
+    Buckets every document needing attention — an ownership ORPHAN (EPIC OWN), a
+    STALE review (EPIC SLA), or a doc↔doc SUSPECT link (Pillar B) — under its
+    accountable owner, so each person sees ONE queue. Read-only, offline, deterministic
+    (``now`` is injected). ``--owner`` filters to one queue; ``--fail-on-work`` makes it
+    a CI gate (opt-in). Orphan items need ``--roster``; ``--no-include-suspect`` drops
+    the repo-local suspect items.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        snapshot = load_roster(roster) if roster is not None else None
+        wl = worklist_from_repo(
+            cfg,
+            root,
+            now=now or _now(),
+            roster=snapshot,
+            unit_owner=_unit_owner_map(config_dir),
+            include_suspect=include_suspect,
+            owner_filter=owner,
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    if as_json:
+        typer.echo(json.dumps(wl.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(render_worklist_text(wl))
+    if fail_on_work and wl.item_count > 0:
         raise typer.Exit(code=1)
 
 

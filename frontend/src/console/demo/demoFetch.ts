@@ -25,6 +25,7 @@ const REPO_SUBS = [
   "health",
   "documents",
   "doc-graph",
+  "worklist",
   "sync",
   "sync-state",
   "config/editable",
@@ -97,6 +98,8 @@ export function makeDemoFetch(): typeof fetch {
             return json(data.documents);
           case "doc-graph":
             return json(data.docGraph);
+          case "worklist":
+            return json(data.worklist);
           case "sync":
             return json(syncRunGit);
           case "sync-state":
