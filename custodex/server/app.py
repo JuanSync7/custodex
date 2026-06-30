@@ -957,6 +957,21 @@ def create_app(
                 ),
             )
 
+    def _resolve_graph_kind(store: Store, repo_id: str, sync_kind: str | None) -> str:
+        """Resolve the ONE sync_kind partition the doc-graph routes read (B-10).
+
+        Both ``/doc-graph`` and ``/doc-graph/reverse`` read a SINGLE partition so they
+        are deterministic (no order-dependent merge across git + local) and mutually
+        consistent. An explicit ``sync_kind`` wins; otherwise prefer the ``"git"``
+        baseline (matching the Documents page), but FALL BACK to ``"local"`` when the
+        repo has no git rows — so a local-only repo (a standalone ``cdx serve``, the
+        seeded demo) is never silently blank. Deterministic: a presence check, not an
+        insertion-order tiebreak (K10).
+        """
+        if sync_kind is not None:
+            return sync_kind
+        return "git" if store.config_documents_for(repo_id, "git") else "local"
+
     def _verify_token(store: Store, repo_id: str, authorization: str | None) -> None:
         """E-06 per-repo bearer auth on WRITES (404 unknown / 401 missing / 403 wrong).
 
@@ -1290,14 +1305,14 @@ def create_app(
         downstream→upstream graph (sorted). The hub serves the cross-repo GRAPH — WHO
         depends on WHAT — so a reverse query ("which docs depend on X") is answerable
         centrally; suspect STATUS stays repo-local (the doc files needed to hash an
-        upstream's body live in the repo, K2). ``sync_kind`` defaults to the canonical
-        ``"git"`` baseline view (matching the Documents page) so the graph reflects
-        ONE deterministic view rather than an order-dependent merge across the git +
-        local partitions — and so this forward graph and ``/doc-graph/reverse`` always
-        agree. Open read.
+        upstream's body live in the repo, K2). ``sync_kind`` resolves to ONE partition
+        via :func:`_resolve_graph_kind` (explicit wins; else "git", falling back to
+        "local" for a local-only repo) so the graph is a deterministic single view —
+        not an order-dependent merge — and this forward graph and
+        ``/doc-graph/reverse`` always agree. Open read.
         """
         _require_known_repo(store, repo_id)
-        kind = sync_kind or "git"
+        kind = _resolve_graph_kind(store, repo_id, sync_kind)
         edges: list[dict[str, object]] = []
         # doc_id is unique within one (repo, sync_kind) partition (the merged config
         # validates unique ids), so no cross-doc dedup is needed once scoped to `kind`.
@@ -1327,15 +1342,16 @@ def create_app(
         Backed by the INDEXED ``config_doc_edges`` table (B-09) — an indexed
         ``WHERE upstream_id = doc`` rather than a scan over every document — so the
         hub answers "who depends on X" directly. Returns the DIRECT (one-hop)
-        dependents, sorted (K10). ``sync_kind`` defaults to the SAME canonical
-        ``"git"`` baseline view as ``/doc-graph`` so the two routes always agree on
-        whether an edge exists (a doc_id is unique within one partition, so no dedup
-        is needed). The engine's ``cdx deps --impact`` computes the TRANSITIVE blast
-        radius repo-side, where the full config graph lives. Open read; ``doc`` is a
-        required query param.
+        dependents, sorted (K10). ``sync_kind`` resolves to the SAME single partition
+        as ``/doc-graph`` (via :func:`_resolve_graph_kind`: explicit wins; else "git"
+        falling back to "local") so the two routes always agree on whether an edge
+        exists and a local-only repo is never blank — and a doc_id is unique within
+        that one partition, so no dedup is needed. The engine's ``cdx deps --impact``
+        computes the TRANSITIVE blast radius repo-side, where the full config graph
+        lives. Open read; ``doc`` is a required query param.
         """
         _require_known_repo(store, repo_id)
-        kind = sync_kind or "git"
+        kind = _resolve_graph_kind(store, repo_id, sync_kind)
         dependents: list[dict[str, object]] = [
             {"doc_id": edge.doc_id, "type": edge.type}
             for edge in store.doc_edges_for(repo_id, sync_kind=kind, upstream_id=doc)

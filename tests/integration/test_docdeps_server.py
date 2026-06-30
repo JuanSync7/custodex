@@ -344,3 +344,35 @@ def test_graph_routes_canonical_view_and_sync_kind_scope(kind: str) -> None:
     assert rev_local["dependents"] == [{"doc_id": "api", "type": "depends"}]
     # ?sync_kind=git is identical to the default.
     assert rev(doc="overview", sync_kind="git") == rev_default
+
+
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_graph_routes_fall_back_to_local_when_no_git(kind: str) -> None:
+    """A LOCAL-only repo (a standalone `cdx serve`, the seeded demo) must not render
+    a blank graph under the default: the partition resolver falls back to "local"."""
+    store = _make_store(kind)
+    _register(store)
+    # ONLY the local partition is synced — no "git" rows exist.
+    store.replace_config(
+        _REPO,
+        "local",
+        [
+            _doc("overview", sync_kind="local"),
+            _doc(
+                "api",
+                depends_on=(ConfigDocEdge(doc="overview", type="depends"),),
+                sync_kind="local",
+            ),
+        ],
+        [],
+    )
+    client = TestClient(create_app(store, clock=lambda: _NOW))
+    # The default (no sync_kind) is NOT blank — it resolves to the local partition.
+    fwd = client.get(f"/repos/{_REPO}/doc-graph").json()
+    assert fwd["edge_count"] == 1
+    assert fwd["edges"][0]["doc_id"] == "api"
+    rev = client.get(
+        f"/repos/{_REPO}/doc-graph/reverse", params={"doc": "overview"}
+    ).json()
+    assert rev["count"] == 1
+    assert rev["dependents"][0]["doc_id"] == "api"
