@@ -326,7 +326,11 @@ def propagate_suspect(
     }
     specs_by_id = {doc.id: doc for doc in config.documents}
     out: list[SuspectLink] = []
-    for doc_id in reachable:
+    # Scan EVERY pending doc, not just the reverse-reachable ones: a DIRECTLY-flagged
+    # doc (in `flagged`, hence absent from `reachable`) can ALSO have a non-direct edge
+    # to another pending upstream — that edge is transitive and would otherwise be lost.
+    # The per-edge `already_edges` guard below still drops the doc's direct edge.
+    for doc_id in pending:
         spec = specs_by_id[doc_id]
         for edge in spec.depends_on:
             if edge.doc not in pending:

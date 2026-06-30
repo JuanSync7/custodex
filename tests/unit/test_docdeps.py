@@ -518,8 +518,13 @@ def test_propagate_suspect_includes_missing_upstream_origin() -> None:
     assert adv == [("a", "b")]
 
 
-def test_propagate_suspect_omits_docs_already_directly_flagged() -> None:
-    """A doc directly suspect via one edge is not ALSO listed as transitive."""
+def test_propagate_suspect_never_echoes_a_direct_edge_as_transitive() -> None:
+    """A directly-reported edge is never re-listed as a transitive advisory.
+
+    Both ``a`` and ``b`` depend ONLY on ``c``; when ``c`` changes both edges are
+    DIRECTLY suspect, so the advisory (which excludes already-reported edges) is
+    empty — neither edge is echoed.
+    """
     cfg = _cfg(
         (
             DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
@@ -533,19 +538,25 @@ def test_propagate_suspect_omits_docs_already_directly_flagged() -> None:
                 id="a",
                 path="a.md",
                 audience=Audience.ENG_GUIDE,
-                depends_on=(DocEdge(doc="b"), DocEdge(doc="c")),
+                depends_on=(DocEdge(doc="c"),),
             ),
         )
     )
     # c changed → both a (via a→c) and b (via b→c) are DIRECTLY suspect.
     direct = (_suspect("a", "c"), _suspect("b", "c"))
-    assert propagate_suspect(cfg, direct) == ()  # a already reported; no dupe
+    assert propagate_suspect(cfg, direct) == ()  # both edges already reported; no echo
 
 
 def test_propagate_suspect_surfaces_other_edge_of_a_partly_direct_doc() -> None:
-    """A doc directly flagged on ONE edge still gets its OTHER, transitively-pending
-    edge in the advisory — the exclusion is per-EDGE, not per-document. Under a
-    doc-level skip that second edge would vanish from BOTH reports (hardening)."""
+    """A doc DIRECTLY flagged on one edge still gets its OTHER, transitively-pending
+    edge in the advisory — the exclusion is per-EDGE, not per-document.
+
+    The crucial case (a 2nd-judge regression): ``a`` is itself directly flagged
+    (``a→kk`` SUSPECT), so ``a`` is an origin and is ABSENT from the reverse-reachable
+    set — yet its ``a→b`` edge (``b`` pending) must still be surfaced. Scanning only the
+    reverse-reachable docs would drop it from BOTH reports; scanning every pending doc
+    keeps it while the per-edge guard still suppresses the direct ``a→kk`` edge.
+    """
     cfg = _cfg(
         (
             DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
@@ -564,8 +575,8 @@ def test_propagate_suspect_surfaces_other_edge_of_a_partly_direct_doc() -> None:
             ),
         )
     )
-    # c changed → b directly SUSPECT; a→kk is independently UNSTAMPED (direct, non-OK).
-    direct = (_suspect("b", "c"), _suspect("a", "kk", SuspectStatus.UNSTAMPED))
+    # Both kk and c changed → a→kk and b→c are DIRECTLY suspect (a AND b flagged).
+    direct = (_suspect("b", "c"), _suspect("a", "kk"))
     adv = [(s.doc_id, s.upstream_id, s.status) for s in propagate_suspect(cfg, direct)]
     # a→b IS pending (b is suspect) and is NOT the directly-reported a→kk edge.
     assert adv == [("a", "b", SuspectStatus.SUSPECT_TRANSITIVE)]
