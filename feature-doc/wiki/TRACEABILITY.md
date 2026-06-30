@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**233 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**234 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -104,6 +104,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-DRIFT-009` | unit/test_drift.py | DEMOS.md |
 | `FEAT-DRIFT-010` | unit/test_drift.py | DEMOS.md |
 | `FEAT-DRIFT-011` | integration/test_monitor.py, unit/test_drift.py | DEMOS.md |
+| `FEAT-DRIFT-012` | integration/test_monitor.py, unit/test_drift.py, unit/test_extract.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-EXTRACT-001` | regression/test_corpus_pipeline.py, system/test_dogfood.py, system/test_example_multilang.py, system/test_system.py, unit/test_extract.py, unit/test_records.py, unit/test_testwiki.py, unit/test_traceability.py | DEMOS.md |
 | `FEAT-EXTRACT-002` | regression/test_corpus_pipeline.py, system/test_system.py, unit/test_extract.py, unit/test_records.py, unit/test_testwiki.py | DEMOS.md |
 | `FEAT-EXTRACT-003` | system/test_example_multilang.py, unit/test_extract.py, unit/test_records.py, unit/test_testwiki.py | DEMOS.md |

@@ -80,7 +80,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `drift.py`
 - Public symbols: `ChangeSeverity`, `Drift`, `DriftKind`, `DriftReport`, `__all__`, `classify_change_severity`, `detect`
-- Implemented by: `FEAT-CONFIGV2-016`, `FEAT-DOCDEPS-004`, `FEAT-DRIFT-001`, `FEAT-DRIFT-002`, `FEAT-DRIFT-003`, `FEAT-DRIFT-004`, `FEAT-DRIFT-005`, `FEAT-DRIFT-006`, `FEAT-DRIFT-007`, `FEAT-DRIFT-008`, `FEAT-DRIFT-009`, `FEAT-DRIFT-010`, `FEAT-DRIFT-011`
+- Implemented by: `FEAT-CONFIGV2-016`, `FEAT-DOCDEPS-004`, `FEAT-DRIFT-001`, `FEAT-DRIFT-002`, `FEAT-DRIFT-003`, `FEAT-DRIFT-004`, `FEAT-DRIFT-005`, `FEAT-DRIFT-006`, `FEAT-DRIFT-007`, `FEAT-DRIFT-008`, `FEAT-DRIFT-009`, `FEAT-DRIFT-010`, `FEAT-DRIFT-011`, `FEAT-DRIFT-012`
 
 ## `errors`
 
@@ -92,7 +92,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `extract.py`
 - Public symbols: `DocumentSurface`, `Extractor`, `PythonAstExtractor`, `Record`, `ShellExtractor`, `SurfaceFingerprint`, `Symbol`, `SymbolKind`, `__all__`, `anchor_id`, `build_document_surface`, `extract_argparse_records`, `extract_file`, `extract_json_records`, `extract_switches`, `get_extractor`, `register_extractor`
-- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-EXTRACT-001`, `FEAT-EXTRACT-002`, `FEAT-EXTRACT-003`, `FEAT-EXTRACT-004`, `FEAT-EXTRACT-005`, `FEAT-EXTRACT-006`, `FEAT-MANIFEST-005`
+- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-DRIFT-012`, `FEAT-EXTRACT-001`, `FEAT-EXTRACT-002`, `FEAT-EXTRACT-003`, `FEAT-EXTRACT-004`, `FEAT-EXTRACT-005`, `FEAT-EXTRACT-006`, `FEAT-MANIFEST-005`
 
 ## `featurecatalog`
 
@@ -122,7 +122,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `heal.py`
 - Public symbols: `ProposedFixLike`, `__all__`, `apply_fix`, `locked_region_ids`, `regenerate_regions`, `render_corrected`
-- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-HEAL-001`, `FEAT-HEAL-004`, `FEAT-HEAL-005`, `FEAT-HEAL-006`, `FEAT-HEAL-007`, `FEAT-HEAL-008`, `FEAT-HEAL-009`
+- Implemented by: `FEAT-CONFIGV2-017`, `FEAT-DRIFT-012`, `FEAT-HEAL-001`, `FEAT-HEAL-004`, `FEAT-HEAL-005`, `FEAT-HEAL-006`, `FEAT-HEAL-007`, `FEAT-HEAL-008`, `FEAT-HEAL-009`
 
 ## `index`
 
@@ -151,8 +151,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `manifest`
 
 - Path: `manifest.py`
-- Public symbols: `Doc`, `__all__`, `drop_upstream_hash`, `parse_doc`, `parse_text`, `region_body_hash`, `region_is_locked`, `regions`, `render_doc`, `set_fingerprint`, `set_fingerprint_tiers`, `set_region`, `set_region_anchors`, `set_region_hash`, `set_upstream_hash`, `stamp_standard_meta`, `stored_fingerprint`, `stored_fingerprint_tiers`, `stored_region_anchors`, `stored_region_hash`, `stored_upstream_hashes`
-- Implemented by: `FEAT-DOCDEPS-002`, `FEAT-MANIFEST-001`, `FEAT-MANIFEST-002`, `FEAT-MANIFEST-003`, `FEAT-MANIFEST-004`, `FEAT-MANIFEST-005`, `FEAT-MANIFEST-006`, `FEAT-MANIFEST-007`, `FEAT-MANIFEST-008`, `FEAT-MANIFEST-009`
+- Public symbols: `Doc`, `__all__`, `drop_upstream_hash`, `parse_doc`, `parse_text`, `region_body_hash`, `region_is_locked`, `regions`, `render_doc`, `set_fingerprint`, `set_fingerprint_tiers`, `set_region`, `set_region_anchors`, `set_region_hash`, `set_symbol_sigs`, `set_upstream_hash`, `stamp_standard_meta`, `stored_fingerprint`, `stored_fingerprint_tiers`, `stored_region_anchors`, `stored_region_hash`, `stored_symbol_sigs`, `stored_upstream_hashes`
+- Implemented by: `FEAT-DOCDEPS-002`, `FEAT-DRIFT-012`, `FEAT-MANIFEST-001`, `FEAT-MANIFEST-002`, `FEAT-MANIFEST-003`, `FEAT-MANIFEST-004`, `FEAT-MANIFEST-005`, `FEAT-MANIFEST-006`, `FEAT-MANIFEST-007`, `FEAT-MANIFEST-008`, `FEAT-MANIFEST-009`
 
 ## `monitor`
 

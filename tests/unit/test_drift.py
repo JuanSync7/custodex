@@ -30,13 +30,14 @@ from custodex.drift import (
     classify_change_severity,
     detect,
 )
-from custodex.extract import build_document_surface
+from custodex.extract import anchor_id, build_document_surface
 from custodex.manifest import (
     render_doc,
     set_fingerprint,
     set_fingerprint_tiers,
     set_region,
     set_region_anchors,
+    set_symbol_sigs,
 )
 
 CODE_V1 = '''\
@@ -762,7 +763,6 @@ def test_hash_drift_without_stored_tiers_falls_back(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 # P-04: anchor delta on a HASH drift (symbol moved/stable vs added/removed)     #
 # --------------------------------------------------------------------------- #
-from custodex.extract import anchor_id  # noqa: E402
 
 # CODE_V1 + a NEW public function (signature tier moves → HASH drift).
 CODE_PLUS_SYMBOL = '''\
@@ -860,9 +860,14 @@ def test_classify_change_severity_truth_table() -> None:
     # a removed/renamed symbol dominates → BREAKING (even alongside an addition).
     assert classify_change_severity((), (), ("greet",)) is C.BREAKING
     assert classify_change_severity(("signature",), ("new",), ("old",)) is C.BREAKING
-    # only additions (no removal) → ADDITIVE, even though they move the sig tier.
-    assert classify_change_severity(("signature",), ("new",), ()) is C.ADDITIVE
-    # same symbol set, signature tier moved in place → BREAKING.
+    # DIG-01: a surviving symbol's in-place signature change → BREAKING, ABOVE the
+    # addition rule (so a simultaneous add + in-place change is no longer masked).
+    assert (
+        classify_change_severity(("signature",), ("new",), (), ("greet",)) is C.BREAKING
+    )
+    # a pure addition (no survivor's signature moved) → ADDITIVE, even with sig tier.
+    assert classify_change_severity(("signature",), ("new",), (), ()) is C.ADDITIVE
+    # same symbol set, signature tier moved in place, no per-symbol digests → BREAKING.
     assert classify_change_severity(("signature",), (), ()) is C.BREAKING
     # only docstring/body prose moved, same symbols → COSMETIC.
     assert classify_change_severity(("docstring",), (), ()) is C.COSMETIC
@@ -871,18 +876,21 @@ def test_classify_change_severity_truth_table() -> None:
     assert classify_change_severity((), (), ()) is C.UNKNOWN
 
 
-def test_classify_change_severity_masked_breaking_is_a_documented_choice() -> None:
-    """A DELIBERATE limitation (guarded so a future change is a decision, not an
-    accident): an addition concurrent with an in-place signature change reads
-    ADDITIVE — the aggregate signals cannot separate it from a pure addition (which
-    also moves the `signature` tier), so step 2 wins. A removal is never masked."""
+def test_classify_change_severity_masked_case_closed_by_digests() -> None:
+    """DIG-01 closes the former masked false-negative: an addition concurrent with an
+    in-place signature change is BREAKING WHEN per-symbol digests name the changed
+    survivor; without them (a pre-DIG-01 doc, ``sigs_changed`` empty) it degrades to
+    ADDITIVE, never over-firing on a pure addition."""
     C = ChangeSeverity
-    # add + (would-be) in-place signature change, no removal → ADDITIVE (masked).
-    assert classify_change_severity(("signature",), ("new",), ()) is C.ADDITIVE
+    # add + in-place signature change of a SURVIVING symbol → BREAKING (now caught).
     assert (
-        classify_change_severity(("signature", "docstring"), ("new",), ()) is C.ADDITIVE
+        classify_change_severity(("signature",), ("new",), (), ("greet",)) is C.BREAKING
     )
-    # but a removal alongside the addition is ALWAYS caught (step 1) → BREAKING.
+    # the SAME aggregate signals, but no per-symbol digests → degrade to ADDITIVE.
+    assert classify_change_severity(("signature",), ("new",), ()) is C.ADDITIVE
+    # a pure addition with digests present (no survivor changed) stays ADDITIVE.
+    assert classify_change_severity(("signature",), ("new",), (), ()) is C.ADDITIVE
+    # a removal alongside the addition is still caught first (step 1) → BREAKING.
     assert classify_change_severity(("signature",), ("new",), ("gone",)) is C.BREAKING
 
 
@@ -948,3 +956,108 @@ def test_old_doc_severity_is_unknown(tmp_path: Path) -> None:
     assert _hash_drift(report).change_severity is ChangeSeverity.UNKNOWN
     # UNKNOWN stays silent in the summary (no severity token).
     assert "[unknown]" not in report.summary()
+
+
+# --------------------------------------------------------------------------- #
+# DIG-01: per-symbol signature digests close the masked add+in-place-signature  #
+# false-negative. `_synced_with_sigs` stamps cdm.symbol_sigs (a DIG-01 doc);    #
+# `_synced_anchored` does NOT (a pre-DIG-01 doc → graceful degrade).            #
+#                                                                              #
+# Feature: FEAT-DRIFT-012                                                       #
+# --------------------------------------------------------------------------- #
+
+# greet GAINS a parameter (in-place signature change) AND a new public `farewell`
+# is added — in a SINGLE edit. The aggregate signals alone read this as ADDITIVE.
+CODE_ADD_PLUS_SIG_EDIT = '''\
+def greet(name: str, loud: bool = False) -> str:
+    """Say hello."""
+    return f"hi {name}"
+
+
+def farewell(name: str) -> str:
+    """Say bye."""
+    return f"bye {name}"
+
+
+def _hidden(x):
+    """Internal."""
+    return x
+'''
+
+
+def _synced_with_sigs(spec: DocumentSpec, root: Path, *, include_body: bool) -> str:
+    """Synced doc text stamping composite + tiers + region anchors + symbol_sigs."""
+    surface = build_document_surface(spec, root)
+    body = "# Title\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n"
+    body, _ = set_region(body, "symbols", symbol_table(surface))
+    fp = surface.fingerprint(include_body=include_body)
+    meta = set_fingerprint({}, fp.composite)
+    meta = set_fingerprint_tiers(meta, fp)
+    meta = set_region_anchors(
+        meta, "symbols", tuple(s.anchor_id for s in surface.symbols)
+    )
+    meta = set_symbol_sigs(meta, fp.sig_by_anchor or {})
+    return render_doc(meta, body)
+
+
+def test_masked_add_plus_inplace_signature_is_breaking(tmp_path: Path) -> None:
+    """THE fix: add a symbol AND change a surviving symbol's signature in one edit →
+    BREAKING (was ADDITIVE before per-symbol digests)."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_with_sigs(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_ADD_PLUS_SIG_EDIT)  # adds farewell + greet gains a param
+    report = detect(_config(root, (spec,)), tmp_path)
+    drift = _hash_drift(report)
+    assert drift.change_severity is ChangeSeverity.BREAKING
+    # exactly the surviving symbol greet (by stable anchor_id) — not the added farewell.
+    assert drift.sigs_changed == (anchor_id("greet"),)
+    assert "[breaking]" in report.summary()
+
+
+def test_masked_add_without_digests_degrades_to_additive(tmp_path: Path) -> None:
+    """Back-compat (K6): the SAME edit on a pre-DIG-01 doc (region anchors but NO
+    symbol_sigs) degrades to the old ADDITIVE — it must never crash."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_anchored(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_ADD_PLUS_SIG_EDIT)
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.ADDITIVE  # degraded, not crashed
+    assert drift.sigs_changed == ()  # no stored digests → nothing to compare
+
+
+def test_pure_addition_with_digests_stays_additive(tmp_path: Path) -> None:
+    """No over-fire: with digests present, a PURE addition (no survivor's signature
+    moved) is still ADDITIVE."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_with_sigs(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_PLUS_SYMBOL)  # adds farewell; greet unchanged
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.ADDITIVE
+    assert drift.sigs_changed == ()  # greet's signature did not move
+
+
+def test_docstring_only_change_with_digests_stays_cosmetic(tmp_path: Path) -> None:
+    """No over-fire: with digests present, a docstring/private-body-only change of a
+    surviving symbol is still COSMETIC (its SIGNATURE digest is unchanged)."""
+    root = _setup(tmp_path)
+    _write_code(root, CODE_V1)
+    spec = _doc_spec("eng-guide", Audience.ENG_GUIDE)
+    (root / spec.path).write_text(
+        _synced_with_sigs(spec, root, include_body=False), encoding="utf-8"
+    )
+    _write_code(root, CODE_V2)  # docstring + private body changed; signatures intact
+    drift = _hash_drift(detect(_config(root, (spec,)), tmp_path))
+    assert drift.change_severity is ChangeSeverity.COSMETIC
+    assert drift.sigs_changed == ()

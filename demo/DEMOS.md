@@ -1251,3 +1251,19 @@ closure as pure graph reachability (never a suspect verdict, K2). Pinned by
 `tests/system/test_docdeps_cli.py` + `tests/integration/test_docdeps_server.py` +
 `tests/unit/test_docdeps.py`.
 Features: FEAT-DOCDEPS-010
+
+### DEMO-093 — Per-symbol digests close the masked breaking change
+**What it shows.** Before DIG-01, adding a new public symbol AND changing an existing
+symbol's signature in the SAME edit graded **additive** — the aggregate tier signals
+could not separate the in-place break from the addition. Now Custodex stamps a per-symbol
+signature digest (`cdm.symbol_sigs`, keyed by the stable `anchor_id`, hashing only the
+signature payload) at heal, and `detect` diffs the SURVIVING symbols' digests: a moved
+signature is **breaking** even alongside an addition. A pure addition stays additive and a
+docstring/body-only change stays cosmetic (no over-fire); a doc that predates DIG-01
+degrades to the old aggregate behaviour and never crashes.
+**How to observe.** Sync a doc, then in ONE edit add a public function AND change a
+parameter on an existing one: `cdx check` annotates the HASH line `[breaking]` (was
+`[additive]`), and the `ReviewRecord`'s `change_severity` reads `breaking` — no schema
+change, just a more accurate verdict. Pinned by `tests/unit/test_drift.py` +
+`tests/unit/test_extract.py` + `tests/unit/test_manifest.py`.
+Features: FEAT-DRIFT-012

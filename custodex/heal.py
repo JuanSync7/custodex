@@ -38,6 +38,7 @@ from .manifest import (
     set_region,
     set_region_anchors,
     set_region_hash,
+    set_symbol_sigs,
 )
 
 __all__ = ["ProposedFixLike", "regenerate_regions", "apply_fix", "render_corrected"]
@@ -133,6 +134,10 @@ def _corrected(
     fp = surface.fingerprint(include_body=include_body)
     meta = set_fingerprint(meta, fp.composite)
     meta = set_fingerprint_tiers(meta, fp)
+    # DIG-01: stamp the per-symbol signature digests alongside the fingerprint so drift
+    # can later tell a surviving symbol's in-place signature change from an addition.
+    # After set_fingerprint (which copied the cdm map); additive, survives heals (K7).
+    meta = set_symbol_sigs(meta, fp.sig_by_anchor or {})
     return render_doc(meta, body)
 
 

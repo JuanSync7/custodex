@@ -36,6 +36,7 @@ from .manifest import (
     set_fingerprint,
     set_fingerprint_tiers,
     set_region_anchors,
+    set_symbol_sigs,
     stamp_standard_meta,
 )
 
@@ -506,6 +507,9 @@ def scaffold_doc(
     fp = surface.fingerprint(include_body=include_body)
     meta = set_fingerprint(meta, fp.composite)
     meta = set_fingerprint_tiers(meta, fp)
+    # DIG-01: stamp the per-symbol signature digests so a freshly scaffolded doc is
+    # byte-identical to what heal produces (idempotent re-heal, K7).
+    meta = set_symbol_sigs(meta, fp.sig_by_anchor or {})
     parts = [
         f"# {spec.id}",
         "",

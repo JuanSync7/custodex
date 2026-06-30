@@ -562,3 +562,44 @@ def test_record_carries_breaking_change_severity_for_signature(tmp_path: Path) -
     hash_recs = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
     assert hash_recs, "expected a HASH record for the signature change"
     assert hash_recs[0].change_severity == "breaking"
+
+
+# Feature: FEAT-DRIFT-012
+def test_record_carries_breaking_for_masked_add_plus_inplace_signature(
+    tmp_path: Path,
+) -> None:
+    """DIG-01 end-to-end: add a public symbol AND change a SURVIVING symbol's signature
+    in ONE edit → the persisted HASH ReviewRecord reads 'breaking' (was 'additive').
+
+    scaffold_doc stamps cdm.symbol_sigs, so the masked case is detectable through the
+    monitor/record tier, not just at detect()."""
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    spec = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols",),
+    )
+    config = MonitorConfig(root=".", documents=(spec,))
+    from custodex.layout import scaffold_doc
+
+    surface = build_document_surface(spec, tmp_path)
+    (tmp_path / "guide.md").write_text(
+        scaffold_doc(spec, surface, include_body=False), encoding="utf-8"
+    )
+    assert Monitor(config, tmp_path, now=_now, sink=NullSink()).check().ok
+
+    # The masked edit: ADD a public function AND change public_fn's signature in place.
+    edited = (
+        CODE.replace(
+            "def public_fn(x: int) -> int:", "def public_fn(x: int, y: int) -> int:"
+        )
+        + '\n\ndef brand_new(z: int) -> int:\n    """New."""\n    return z\n'
+    )
+    (tmp_path / "code.py").write_text(edited, encoding="utf-8")
+    result = Monitor(config, tmp_path, now=_now, sink=NullSink()).run(apply=False)
+    hash_recs = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
+    assert hash_recs, "expected a HASH record for the masked edit"
+    # Without per-symbol digests this would be 'additive' (masked); DIG-01 → 'breaking'.
+    assert hash_recs[0].change_severity == "breaking"

@@ -383,6 +383,67 @@ def test_set_region_anchors_is_additive() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# DIG-01: per-symbol signature digests under cdm.symbol_sigs
+#
+# Feature: FEAT-DRIFT-012
+# --------------------------------------------------------------------------- #
+def test_symbol_sigs_round_trip() -> None:
+    from custodex.manifest import set_symbol_sigs, stored_symbol_sigs
+
+    meta = set_symbol_sigs({}, {"b_anchor": "h2", "a_anchor": "h1"})
+    doc = parse_text(render_doc(meta, "# body\n"))
+    # Stored with sorted keys for diff-stable front matter (K10).
+    assert stored_symbol_sigs(doc) == {"a_anchor": "h1", "b_anchor": "h2"}
+    assert list(doc.meta["cdm"]["symbol_sigs"]) == ["a_anchor", "b_anchor"]
+
+
+def test_symbol_sigs_absent_returns_none_but_empty_block_returns_empty() -> None:
+    """None distinguishes a pre-DIG-01 doc from a stamped-but-symbol-less doc."""
+    from custodex.manifest import stored_symbol_sigs
+
+    assert stored_symbol_sigs(parse_text("# x\n")) is None
+    assert stored_symbol_sigs(_doc_with_meta({"cdm": {"fingerprint": "x"}})) is None
+    # present-but-empty ⇒ {}, NOT None (a doc that was stamped with no symbols).
+    assert stored_symbol_sigs(_doc_with_meta({"cdm": {"symbol_sigs": {}}})) == {}
+
+
+def test_set_symbol_sigs_is_additive() -> None:
+    """Stamping symbol_sigs preserves the fingerprint, tiers, region anchors, edges."""
+    from custodex.manifest import (
+        set_symbol_sigs,
+        stored_region_anchors,
+        stored_symbol_sigs,
+    )
+
+    meta = {
+        "cdm": {
+            "fingerprint": "comp",
+            "fingerprint_tiers": {"signature": "s", "composite": "comp"},
+            "region_anchors": {"symbols": ["a1"]},
+            "upstream_hashes": {"overview": "hh"},
+        }
+    }
+    out = set_symbol_sigs(meta, {"a1": "sig1"})
+    d = _doc_with_meta(out)
+    assert stored_fingerprint(d) == "comp"
+    assert stored_fingerprint_tiers(d) is not None
+    assert stored_region_anchors(d, "symbols") == ("a1",)
+    assert out["cdm"]["upstream_hashes"] == {"overview": "hh"}
+    assert stored_symbol_sigs(d) == {"a1": "sig1"}
+    assert "symbol_sigs" not in meta["cdm"]  # original untouched
+
+
+def test_set_fingerprint_preserves_symbol_sigs() -> None:
+    """The per-symbol digests survive a later fingerprint heal (zero blast radius)."""
+    from custodex.manifest import set_symbol_sigs, stored_symbol_sigs
+
+    meta = set_symbol_sigs({}, {"a1": "sig1"})
+    meta = set_fingerprint(meta, "newfp")
+    assert meta["cdm"]["fingerprint"] == "newfp"
+    assert stored_symbol_sigs(_doc_with_meta(meta)) == {"a1": "sig1"}
+
+
+# --------------------------------------------------------------------------- #
 # EPIC B (B-02): per-edge upstream stamps under cdm.upstream_hashes
 # --------------------------------------------------------------------------- #
 def test_set_and_stored_upstream_hash_round_trip() -> None:
