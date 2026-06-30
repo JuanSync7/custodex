@@ -51,6 +51,7 @@ from ..settings import GitSettings, Settings, resolve_settings, secret_presence
 from ..sinks import IngestEnvelope
 from ..staleness import StalenessFinding, StalenessStatus, grade_doc
 from ..templates_v2 import V2_TEMPLATES
+from ..worklist import build_worklist
 from .edits import ConfigEdit, StoredConfigEdit
 from .store import (
     ConfigCodeRef,
@@ -1292,6 +1293,77 @@ def create_app(
             "stale_count": stale_count,
             "now": now,
         }
+
+    @app.get("/repos/{repo_id:path}/worklist")
+    def worklist_for(
+        repo_id: str,
+        store: Store = Depends(get_store),
+        sync_kind: str | None = None,
+        owner: str | None = None,
+    ) -> dict[str, object]:
+        """The per-owner review worklist, graded at READ time (WL-01).
+
+        The accountability JOIN the hub can serve: every mirrored document needing
+        attention — an ownership ORPHAN (vs the live roster) or a STALE review (vs the
+        app clock) — bucketed under its accountable owner, reusing the SAME read-time
+        cascade as ``/ownership`` + ``/staleness``. Suspect-link items are REPO-LOCAL
+        (the hub lacks the doc bodies needed to hash an upstream, K2), so the hub
+        worklist OMITS them and sets ``includes_suspect: false`` — an honest partial
+        view, not a complete one. ``owner`` filters to one queue. Open read.
+        """
+        from ..config import Audience, StalenessConfig
+
+        _require_known_repo(store, repo_id)
+        now = clock()
+        default_sla = StalenessConfig().default_days
+        owners: list[EffectiveOwner] = []
+        stale: list[StalenessFinding] = []
+        seen: set[str] = set()
+        # One pass builds BOTH the owners (for orphans) and the staleness findings,
+        # deduped by doc_id (one config across sync_kinds) — same as the sibling routes.
+        for d in store.config_documents_for(repo_id, sync_kind):
+            if d.doc_id in seen:
+                continue
+            seen.add(d.doc_id)
+            audience = Audience(d.audience)
+            owners.append(
+                EffectiveOwner(
+                    doc_id=d.doc_id,
+                    doc_path=d.path,
+                    audience=audience,
+                    owner=d.owner,
+                    team=d.team,
+                    dri=d.dri,
+                    accountable=d.accountable,
+                    durable=d.durable,
+                )
+            )
+            sla = d.sla_days if d.sla_days is not None else default_sla
+            status, age, detail = grade_doc(d.reviewed, now, sla)
+            if status is not StalenessStatus.FRESH:
+                stale.append(
+                    StalenessFinding(
+                        doc_id=d.doc_id,
+                        doc_path=d.path,
+                        audience=audience,
+                        status=status,
+                        reviewed=d.reviewed,
+                        sla_days=sla,
+                        age_days=age,
+                        detail=detail,
+                    )
+                )
+        roster = RosterSnapshot(identities=tuple(store.list_roster()))
+        orphans = detect_orphans(owners, roster)
+        worklist = build_worklist(
+            owners,
+            orphans=orphans,
+            stale=stale,
+            suspect=(),  # repo-local; the hub has the graph but not the bodies (K2)
+            owner_filter=owner,
+            includes_suspect=False,
+        )
+        return worklist.model_dump(mode="json")
 
     @app.get("/repos/{repo_id:path}/doc-graph")
     def doc_graph_for(

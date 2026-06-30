@@ -40,10 +40,30 @@ describe("demoFetch", () => {
     expect(statuses).toContain("never_reviewed");
   });
 
+  it("surfaces the per-owner worklist (orphan, stale, suspect) for the busy repo", async () => {
+    const wl = await client.worklistFor("acme/widget");
+    expect(wl.item_count).toBeGreaterThan(0);
+    // the repo-local demo includes suspect items (the HUB would strip them, K2)
+    expect(wl.includes_suspect).toBe(true);
+    const reasons = wl.owners.flatMap((o) => o.items.map((i) => i.reason));
+    expect(reasons).toContain("orphan");
+    expect(reasons).toContain("stale");
+    expect(reasons).toContain("suspect");
+    // Buckets are consistent with the Ownership tab: every item routes to a LIVE
+    // owner, and core-api's DRI-vacant orphan re-routes to the active durable owner
+    // `platform-team` — NEVER the departed DRI `dana`.
+    const accountables = wl.owners.map((o) => o.accountable);
+    expect(accountables).toContain("platform-team");
+    expect(accountables).not.toContain("dana");
+    const platform = wl.owners.find((o) => o.accountable === "platform-team")!;
+    expect(platform.items.some((i) => i.reason === "orphan")).toBe(true);
+  });
+
   it("shows the quiet repo as empty, not errored", async () => {
     expect(await client.recordsFor("octo/docs")).toEqual([]);
     expect((await client.ownershipFor("octo/docs")).orphan_count).toBe(0);
     expect((await client.stalenessFor("octo/docs")).stale_count).toBe(0);
+    expect((await client.worklistFor("octo/docs")).item_count).toBe(0);
   });
 
   it("serves the global settings + config templates", async () => {

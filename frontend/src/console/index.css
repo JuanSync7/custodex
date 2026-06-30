@@ -1195,6 +1195,63 @@ tbody th {
   color: var(--accent-strong);
   text-transform: lowercase;
 }
+/* WL-01 — the Worklist view groups items per accountable owner. Each owner is a
+   panel with a head (name + item/doc counts) and a four-column table (Severity,
+   Reason, Document, Detail) reusing the coverage table look + the signal tokens. */
+.worklist-owner {
+  margin-bottom: 1.4rem;
+}
+.worklist-owner__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+.worklist-owner__head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+.worklist-owner__unowned {
+  color: var(--text-faint);
+  font-style: italic;
+}
+.worklist-owner__counts {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+.worklist-table {
+  table-layout: fixed;
+}
+.worklist-table th[scope="col"]:nth-child(1) {
+  width: 14%;
+}
+.worklist-table th[scope="col"]:nth-child(2) {
+  width: 16%;
+}
+.worklist-table th[scope="col"]:nth-child(3) {
+  width: 30%;
+}
+.worklist-table th[scope="col"]:nth-child(4) {
+  width: 40%;
+}
+.worklist-reason {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--text-dim);
+}
+.worklist-upstream {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent-strong);
+}
 .settings-secrets {
   list-style: none;
   margin: 0.5rem 0 0;

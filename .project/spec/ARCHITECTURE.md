@@ -2944,3 +2944,43 @@ SLA column) — accountability + freshness in one view. New `staleness` catalog 
 **Slices:** **SLA-00** pin (this) · **SLA-01** `staleness.py` pure core · **SLA-02** config
 `reviewed`/`StalenessConfig` + `cdx staleness` · **SLA-03** `ConfigDocument.reviewed` +
 `/staleness` route · **SLA-04** frontend column · **SLA-05** demo + final gate. Each TDD, full gate.
+
+## `worklist.py`  (WL-01 — the per-owner review worklist; pure JOIN, mirrors `ownership.py`, K0/K1/K10)
+The accountability JOIN: one prioritised queue per accountable owner across the three
+attention signals Custodex already computes. It JOINS, never re-detects.
+```python
+class WorkReason(str, Enum): ORPHAN="orphan"; STALE="stale"; SUSPECT="suspect"
+class WorkSeverity(str, Enum): HIGH="high"; MEDIUM="medium"; LOW="low"
+class WorkItem(BaseModel):       # frozen — one (doc, reason[, upstream_id])
+    doc_id; doc_path; audience; reason: WorkReason; severity: WorkSeverity
+    detail: str; upstream_id: str | None = None
+class OwnerWorklist(BaseModel):  # accountable is None ⇒ the unowned bucket (sorts last)
+    accountable: str | None; items: tuple[WorkItem,...]; item_count: int; doc_count: int
+class Worklist(BaseModel):
+    owners: tuple[OwnerWorklist,...]; item_count: int; doc_count: int
+    includes_suspect: bool = True   # False on the HUB (no bodies to hash an upstream, K2)
+
+def build_worklist(owners, *, orphans=(), stale=(), suspect=(), owner_filter=None,
+                   includes_suspect=True) -> Worklist   # PURE join, no clock/IO
+def worklist_from_repo(config, root, *, now, roster=None, unit_owner=None,
+                       include_suspect=True, owner_filter=None) -> Worklist  # thin impure adapter
+def render_worklist_text(worklist) -> str
+```
+Buckets each finding under `accountable_by_doc[doc_id]` (the EffectiveOwner projection; missing
+⇒ None bucket). One WorkItem per (doc, reason[, upstream_id]) — never collapsed, so no reason is
+hidden; counts are item-derived (`item_count` + a DISTINCT `doc_count`, never summed across
+inputs). Status→severity maps fall back to MEDIUM so a new status never crashes (K8). Bucket by
+*accountable* (the current point of contact) — the worklist routes LIVE work — EXCEPT an
+ORPHANED doc (accountable departed): re-routed by orphan status to the live assignee
+(DRI-vacant ⇒ the still-active durable owner; owner-departed ⇒ the unowned bucket), so a
+"reassign me" item never lands in a departed person's queue.
+
+**CLI — `cdx worklist [--config][--owner][--roster][--now][--(no-)include-suspect][--json][--fail-on-work]`**
+(read-only, K1/K4): runs the three detectors via `worklist_from_repo`, prints the per-owner queue;
+`--fail-on-work` is an OPT-IN gate (default exit 0).
+
+**Server — `GET /repos/{id}/worklist[?owner=]`** (open read, read-time): reuses the `/ownership` +
+`/staleness` cascade for orphans+staleness, OMITS suspect (`suspect=()`, `includes_suspect:false`)
+because the hub lacks the bodies to hash an upstream (K2). Parity over both stores. Frontend adds a
+console **Worklist** tab. New `worklist` catalog subsystem (FEAT-WORKLIST-001), module waived in
+the dogfood `coverage.waive` (api doc owned by `cdx wiki`).
