@@ -375,6 +375,12 @@ def set_symbol_sigs(meta: dict[str, Any], sigs: dict[str, str]) -> dict[str, Any
     ``upstream_hashes``) is preserved, and because :func:`set_fingerprint` copies the
     whole ``cdm`` map, the per-symbol digests survive a later code↔doc fingerprint heal
     (zero blast radius). Stored with sorted keys for diff-stable front matter (K10).
+
+    Rollout is LAZY (the P4 ``region_anchors`` additive-migration pattern): an existing
+    doc gains its ``symbol_sigs`` block only on its NEXT drift-driven reheal, so a
+    not-yet-stamped doc keeps grading severity from the aggregate tiers
+    (:func:`stored_symbol_sigs` returns None ⇒ degrade) until its surface next changes.
+    A corpus-wide restamp is deliberately avoided — it would churn the idempotency.
     """
     out = dict(meta)
     cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
