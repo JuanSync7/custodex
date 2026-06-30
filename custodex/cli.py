@@ -49,6 +49,7 @@ from .docdeps import (
     detect_suspect_links,
     impacted_by,
     infer_edges_from_links,
+    propagate_suspect,
     render_deps_text,
     render_impact_text,
     stamp_edges,
@@ -570,6 +571,18 @@ def monitor(
             f"{handled.drift.doc_id}: {handled.drift.kind.value} -> "
             f"{handled.result.verdict.value}{applied}"
         )
+    # PROP-01: opt-in transitive-suspect advisory — purely informational, never
+    # affects the exit code (the gate stays the direct wavefront, K1/K7).
+    if cfg.docdeps.transitive:
+        root = resolve_repo_root(config_dir, cfg.root)
+        advisory = propagate_suspect(cfg, detect_suspect_links(cfg, root))
+        if advisory:
+            n_docs = len({link.doc_id for link in advisory})
+            typer.echo(
+                f"advisory: {len(advisory)} edge(s) across {n_docs} document(s) "
+                "transitively suspect (pending wavefront; does not gate). "
+                "Run `cdx deps --transitive` for detail."
+            )
     if result.remaining:
         typer.echo(f"{len(result.remaining)} drift(s) remaining:", err=True)
         for drift in result.remaining:
@@ -1485,6 +1498,13 @@ def deps(
         help="Show the blast radius of changing DOC — the documents that "
         "(transitively) depend on it and would need re-review. Read-only.",
     ),
+    transitive: bool = typer.Option(
+        False,
+        "--transitive",
+        help="Also show the EAGER transitive-suspect advisory (PROP-01): documents "
+        "whose upstream is itself pending review. Advisory only — never gates "
+        "`cdx check`.",
+    ),
     as_json: bool = typer.Option(
         False, "--json", help="Emit the dependency graph / suggestions as JSON."
     ),
@@ -1529,20 +1549,26 @@ def deps(
                 typer.echo(_render_suggestions(inferred))
             return
         links = detect_suspect_links(cfg, root, include_ok=not suspect)
+        # propagate_suspect ignores OK links, so the include_ok graph is a safe basis.
+        trans = propagate_suspect(cfg, links) if transitive else ()
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
     if as_json:
-        typer.echo(
-            json.dumps(
-                [link.model_dump(mode="json") for link in links],
-                indent=2,
-                sort_keys=True,
-            )
-        )
+        edges_json = [link.model_dump(mode="json") for link in links]
+        if transitive:
+            # Opt-in shape: only --transitive widens the payload to an object, so
+            # plain `cdx deps --json` keeps its back-compat bare-list contract (K6).
+            payload: object = {
+                "edges": edges_json,
+                "transitive": [link.model_dump(mode="json") for link in trans],
+            }
+        else:
+            payload = edges_json
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        typer.echo(render_deps_text(links, suspect_only=suspect))
+        typer.echo(render_deps_text(links, suspect_only=suspect, transitive=trans))
 
 
 def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:

@@ -25,9 +25,11 @@ from custodex.config import (
 from custodex.docdeps import (
     SuspectLink,
     SuspectStatus,
+    _reverse_reachable,
     detect_suspect_links,
     impacted_by,
     infer_edges_from_links,
+    propagate_suspect,
     render_deps_text,
     render_impact_text,
     stamp_edges,
@@ -370,3 +372,190 @@ def test_render_impact_text_empty_and_nonempty() -> None:
     assert "safe to change" in render_impact_text("c", ())
     text = render_impact_text("c", ("a", "b"))
     assert "2 document(s)" in text and "→ a" in text and "→ b" in text
+
+
+# --------------------------------------------------------------------------- #
+# _reverse_reachable — characterization: impacted_by delegates to it unchanged
+#
+# Feature: FEAT-DOCDEPS-010
+# --------------------------------------------------------------------------- #
+def test_reverse_reachable_matches_impacted_by() -> None:
+    """The extracted helper reproduces ``impacted_by`` byte-for-byte (K6/K10).
+
+    Guards the PROP-01 refactor: ``impacted_by`` now delegates to
+    ``_reverse_reachable``, so its output must be IDENTICAL on every origin —
+    including the cycle and branching graphs the original was characterized on.
+    """
+    for cfg in (_chain_cfg(),):
+        for origin in ("a", "b", "c", "solo"):
+            assert impacted_by(cfg, origin) == tuple(
+                sorted(_reverse_reachable(cfg, {origin}))
+            )
+    # direct-only mode delegates too
+    assert impacted_by(_chain_cfg(), "c", transitive=False) == tuple(
+        sorted(_reverse_reachable(_chain_cfg(), {"c"}, transitive=False))
+    )
+
+
+def test_reverse_reachable_multi_origin_union() -> None:
+    """A multi-origin frontier returns the union of each origin's reach, minus
+    the origins themselves (the propagate_suspect entry point)."""
+    cfg = _chain_cfg()  # a → b → c, plus solo
+    # origins {b, c}: reachable from b = {a}; from c = {a, b}; minus origins {b,c} = {a}
+    assert _reverse_reachable(cfg, {"b", "c"}) == {"a"}
+
+
+# --------------------------------------------------------------------------- #
+# propagate_suspect — the transitive ADVISORY (HYBRID, read-only, never gates)
+#
+# Feature: FEAT-DOCDEPS-010
+# --------------------------------------------------------------------------- #
+def _suspect(
+    doc_id: str,
+    upstream_id: str,
+    status: SuspectStatus = SuspectStatus.SUSPECT,
+    audience: Audience = Audience.ENG_GUIDE,
+) -> SuspectLink:
+    return SuspectLink(
+        doc_id=doc_id,
+        doc_path=f"{doc_id}.md",
+        upstream_id=upstream_id,
+        type=DocEdgeType.DEPENDS,
+        status=status,
+        detail="x",
+        audience=audience,
+    )
+
+
+def test_propagate_suspect_flags_transitive_dependents() -> None:
+    """In a → b → c, a change to c directly flags b; a is the transitive advisory."""
+    cfg = _chain_cfg()
+    direct = (_suspect("b", "c"),)  # c changed → b directly suspect
+    adv = propagate_suspect(cfg, direct)
+    assert [(s.doc_id, s.upstream_id, s.status) for s in adv] == [
+        ("a", "b", SuspectStatus.SUSPECT_TRANSITIVE)
+    ]
+
+
+def test_propagate_suspect_multi_hop_sorted() -> None:
+    """A deeper chain d ← c ← b ← a: a change to d advises both b and a, sorted."""
+    cfg = _cfg(
+        (
+            DocumentSpec(id="d", path="d.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="c",
+                path="c.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="d"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    links = propagate_suspect(cfg, (_suspect("c", "d"),))
+    assert [(s.doc_id, s.upstream_id) for s in links] == [("a", "b"), ("b", "c")]
+
+
+def test_propagate_suspect_empty_without_direct_flag() -> None:
+    cfg = _chain_cfg()
+    assert propagate_suspect(cfg, ()) == ()
+    # UNSTAMPED is not a *change* — it never seeds a transitive advisory.
+    assert propagate_suspect(cfg, (_suspect("b", "c", SuspectStatus.UNSTAMPED),)) == ()
+
+
+def test_propagate_suspect_includes_missing_upstream_origin() -> None:
+    cfg = _chain_cfg()
+    adv = [
+        (s.doc_id, s.upstream_id)
+        for s in propagate_suspect(
+            cfg, (_suspect("b", "c", SuspectStatus.MISSING_UPSTREAM),)
+        )
+    ]
+    assert adv == [("a", "b")]
+
+
+def test_propagate_suspect_omits_docs_already_directly_flagged() -> None:
+    """A doc directly suspect via one edge is not ALSO listed as transitive."""
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"), DocEdge(doc="c")),
+            ),
+        )
+    )
+    # c changed → both a (via a→c) and b (via b→c) are DIRECTLY suspect.
+    direct = (_suspect("a", "c"), _suspect("b", "c"))
+    assert propagate_suspect(cfg, direct) == ()  # a already reported; no dupe
+
+
+def test_propagate_suspect_uses_downstream_audience() -> None:
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.USER_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    adv = propagate_suspect(cfg, (_suspect("b", "c"),))
+    assert adv[0].doc_id == "a" and adv[0].audience is Audience.USER_GUIDE
+
+
+def test_propagate_suspect_cycle_safe() -> None:
+    """A a↔b cycle terminates and emits the one transitive edge."""
+    cfg = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+        )
+    )
+    # b changed → a directly suspect; b is transitively pending (via the cycle).
+    links = propagate_suspect(cfg, (_suspect("a", "b"),))
+    assert [(s.doc_id, s.upstream_id) for s in links] == [("b", "a")]
+
+
+def test_render_deps_text_renders_transitive_advisory() -> None:
+    direct = (_suspect("b", "c"),)
+    trans = (_suspect("a", "b", SuspectStatus.SUSPECT_TRANSITIVE),)
+    text = render_deps_text(direct, transitive=trans)
+    assert "advisory" in text and "does NOT gate" in text
+    assert "→ b" in text  # the transitive edge a → b is shown

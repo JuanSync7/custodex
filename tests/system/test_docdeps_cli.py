@@ -147,6 +147,97 @@ def test_deps_impact_json(tmp_path: Path) -> None:
     assert json.loads(res.stdout) == {"impacted": ["api"], "upstream": "overview"}
 
 
+# --- PROP-01: `cdx deps --transitive` (the eager advisory) ------------------
+# Feature: FEAT-DOCDEPS-010
+
+_CHAIN_DOCS = [
+    {"id": "leaf", "path": "docs/leaf.md", "audience": "eng-guide"},
+    {
+        "id": "mid",
+        "path": "docs/mid.md",
+        "audience": "eng-guide",
+        "depends_on": [{"doc": "leaf"}],
+    },
+    {
+        "id": "top",
+        "path": "docs/top.md",
+        "audience": "eng-guide",
+        "depends_on": [{"doc": "mid"}],
+    },
+]
+
+
+def _setup_chain(tmp_path: Path) -> Path:
+    """top → mid → leaf, each code↔doc-clean; return the config path."""
+    cfg = {"version": "1.0.0", "root": ".", "documents": _CHAIN_DOCS}
+    cfg_path = tmp_path / "cdmon.yaml"
+    cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    loaded = load_config(cfg_path)
+    bodies = {"leaf": "# Leaf\nbase\n", "mid": "# Mid\nm\n", "top": "# Top\nt\n"}
+    for spec in loaded.documents:
+        surface = build_document_surface(spec, tmp_path)
+        meta = set_fingerprint({}, surface.surface_hash())
+        (tmp_path / spec.path).write_text(
+            render_doc(meta, bodies[spec.id]), encoding="utf-8"
+        )
+    return cfg_path
+
+
+def _stamp_chain(tmp_path: Path, cfg: Path) -> None:
+    runner.invoke(app, ["resolve", "--edge", "mid", "leaf", "--config", str(cfg)])
+    runner.invoke(app, ["resolve", "--edge", "top", "mid", "--config", str(cfg)])
+
+
+def test_deps_transitive_advisory_lists_pending_downstream(tmp_path: Path) -> None:
+    cfg = _setup_chain(tmp_path)
+    _stamp_chain(tmp_path, cfg)
+    assert runner.invoke(app, ["check", "--config", str(cfg)]).exit_code == 0
+    # Change the leaf body: mid goes DIRECTLY suspect; top is only TRANSITIVELY
+    # pending (mid's body is unchanged, so top's own edge is still OK).
+    (tmp_path / "docs" / "leaf.md").write_text(
+        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
+    )
+    res = runner.invoke(app, ["deps", "--transitive", "--config", str(cfg)])
+    assert res.exit_code == 0
+    assert "mid" in res.stdout and "leaf" in res.stdout  # direct
+    assert "top" in res.stdout and "does NOT gate" in res.stdout  # advisory
+
+
+def test_check_still_gates_only_on_direct_suspect(tmp_path: Path) -> None:
+    """The advisory never changes the gate — only the DIRECT suspect fails check."""
+    cfg = _setup_chain(tmp_path)
+    _stamp_chain(tmp_path, cfg)
+    (tmp_path / "docs" / "leaf.md").write_text(
+        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
+    )
+    res = runner.invoke(app, ["check", "--config", str(cfg)])
+    assert res.exit_code == 1
+    assert "SUSPECT_LINK" in res.stdout
+    # top is pending only transitively — it is NOT minted as a drift line.
+    assert "top:" not in res.stdout
+
+
+def test_deps_transitive_json_is_opt_in_shape(tmp_path: Path) -> None:
+    import json
+
+    cfg = _setup_chain(tmp_path)
+    _stamp_chain(tmp_path, cfg)
+    (tmp_path / "docs" / "leaf.md").write_text(
+        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
+    )
+    res = runner.invoke(app, ["deps", "--transitive", "--json", "--config", str(cfg)])
+    assert res.exit_code == 0
+    payload = json.loads(res.stdout)
+    assert set(payload) == {"edges", "transitive"}
+    assert any(t["doc_id"] == "top" for t in payload["transitive"])
+    # plain `--json` keeps the back-compat bare-list contract (K6)
+    plain = json.loads(
+        runner.invoke(app, ["deps", "--json", "--config", str(cfg)]).stdout
+    )
+    assert isinstance(plain, list)
+
+
 def test_deps_suggest_infers_from_markdown_link(tmp_path: Path) -> None:
     # api body links to overview.md but does NOT declare the edge yet... use a doc
     # whose only relation is the inline link, then drop the declared edge.

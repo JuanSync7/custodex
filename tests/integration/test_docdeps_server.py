@@ -263,7 +263,74 @@ def test_doc_graph_reverse_route_lists_dependents(kind: str) -> None:
     leaf = client.get(
         f"/repos/{_REPO}/doc-graph/reverse", params={"doc": "guide"}
     ).json()
-    assert leaf == {"upstream_id": "guide", "dependents": [], "count": 0}
+    assert leaf == {
+        "upstream_id": "guide",
+        "dependents": [],
+        "count": 0,
+        "transitive": False,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# PROP-01: GET /doc-graph/reverse?transitive=true — the blast-radius closure
+# served as pure GRAPH reachability over the indexed edge table (never a suspect
+# verdict — the doc bodies live in the repo, K2). Cycle-safe, deterministic.
+#
+# Feature: FEAT-DOCDEPS-010
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_doc_graph_reverse_transitive_closure(kind: str) -> None:
+    store = _make_store(kind)
+    _register(store)
+    # overview ← api ← guide (guide depends_on api depends_on overview).
+    store.replace_config(
+        _REPO,
+        "git",
+        [
+            _doc("overview"),
+            _doc("api", depends_on=(ConfigDocEdge(doc="overview"),)),
+            _doc("guide", depends_on=(ConfigDocEdge(doc="api"),)),
+        ],
+        [],
+    )
+    client = TestClient(create_app(store, clock=lambda: _NOW))
+
+    def rev(**params: str) -> dict:
+        return client.get(f"/repos/{_REPO}/doc-graph/reverse", params=params).json()
+
+    # default: only the DIRECT dependent of overview.
+    direct = rev(doc="overview")
+    assert [d["doc_id"] for d in direct["dependents"]] == ["api"]
+    assert direct["transitive"] is False
+    # transitive: the WHOLE blast radius — api AND guide — sorted, with no edge type.
+    trans = rev(doc="overview", transitive="true")
+    assert [d["doc_id"] for d in trans["dependents"]] == ["api", "guide"]
+    assert trans["count"] == 2 and trans["transitive"] is True
+    assert "type" not in trans["dependents"][0]  # a closure has no single edge type
+
+
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_doc_graph_reverse_transitive_is_cycle_safe(kind: str) -> None:
+    store = _make_store(kind)
+    _register(store)
+    # a ↔ b degenerate cycle: the BFS must terminate and exclude the origin.
+    store.replace_config(
+        _REPO,
+        "git",
+        [
+            _doc("a", depends_on=(ConfigDocEdge(doc="b"),)),
+            _doc("b", depends_on=(ConfigDocEdge(doc="a"),)),
+        ],
+        [],
+    )
+    client = TestClient(create_app(store, clock=lambda: _NOW))
+    trans = client.get(
+        f"/repos/{_REPO}/doc-graph/reverse",
+        params={"doc": "a", "transitive": "true"},
+    ).json()
+    assert [d["doc_id"] for d in trans["dependents"]] == ["b"]
 
 
 def test_doc_graph_reverse_requires_doc_param() -> None:

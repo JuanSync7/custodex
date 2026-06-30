@@ -527,7 +527,11 @@ class DocDepsConfig(BaseModel):
     wants advisory-only suspect links can set it False); ``default_type`` is the
     edge role assumed when ``cdx link`` is called without one; ``infer_from_links``
     folds edges inferred from Markdown cross-links between managed docs into the
-    graph automatically (``cdx deps --suggest`` always offers them regardless).
+    graph automatically (``cdx deps --suggest`` always offers them regardless);
+    ``transitive`` opts a repo in to the EAGER transitive-suspect ADVISORY in
+    ``cdx monitor`` (PROP-01) — the blast radius of a change beyond its direct
+    dependents. It is advisory only: default OFF, never gates ``cdx check``, and
+    ``cdx deps --transitive`` shows it on demand regardless of this knob.
     """
 
     model_config = _MODEL_CONFIG
@@ -536,6 +540,7 @@ class DocDepsConfig(BaseModel):
     gate: bool = True
     default_type: DocEdgeType = DocEdgeType.DEPENDS
     infer_from_links: bool = False
+    transitive: bool = False
 
 
 class MonitorConfig(BaseModel):
