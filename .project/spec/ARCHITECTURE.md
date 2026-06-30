@@ -2970,7 +2970,10 @@ Buckets each finding under `accountable_by_doc[doc_id]` (the EffectiveOwner proj
 ⇒ None bucket). One WorkItem per (doc, reason[, upstream_id]) — never collapsed, so no reason is
 hidden; counts are item-derived (`item_count` + a DISTINCT `doc_count`, never summed across
 inputs). Status→severity maps fall back to MEDIUM so a new status never crashes (K8). Bucket by
-*accountable* (the current point of contact), not *durable* — the worklist routes LIVE work.
+*accountable* (the current point of contact) — the worklist routes LIVE work — EXCEPT an
+ORPHANED doc (accountable departed): re-routed by orphan status to the live assignee
+(DRI-vacant ⇒ the still-active durable owner; owner-departed ⇒ the unowned bucket), so a
+"reassign me" item never lands in a departed person's queue.
 
 **CLI — `cdx worklist [--config][--owner][--roster][--now][--(no-)include-suspect][--json][--fail-on-work]`**
 (read-only, K1/K4): runs the three detectors via `worklist_from_repo`, prints the per-owner queue;

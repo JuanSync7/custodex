@@ -49,9 +49,14 @@ describe("demoFetch", () => {
     expect(reasons).toContain("orphan");
     expect(reasons).toContain("stale");
     expect(reasons).toContain("suspect");
-    // an unowned bucket (null accountable) exists alongside a named owner
-    expect(wl.owners.some((o) => o.accountable === null)).toBe(true);
-    expect(wl.owners.some((o) => o.accountable !== null)).toBe(true);
+    // Buckets are consistent with the Ownership tab: every item routes to a LIVE
+    // owner, and core-api's DRI-vacant orphan re-routes to the active durable owner
+    // `platform-team` — NEVER the departed DRI `dana`.
+    const accountables = wl.owners.map((o) => o.accountable);
+    expect(accountables).toContain("platform-team");
+    expect(accountables).not.toContain("dana");
+    const platform = wl.owners.find((o) => o.accountable === "platform-team")!;
+    expect(platform.items.some((i) => i.reason === "orphan")).toBe(true);
   });
 
   it("shows the quiet repo as empty, not errored", async () => {

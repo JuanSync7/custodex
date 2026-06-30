@@ -2,7 +2,7 @@
 
 Generated from the tests' own docstrings + boundary directories — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
-**100 test modules**, 1737 cases.
+**100 test modules**, 1740 cases.
 
 ## Unit
 
@@ -1039,6 +1039,8 @@ Module features: FEAT-WORKLIST-001
 
 - `unit/test_worklist.py::test_items_bucket_under_their_accountable_owner` — (no docstring) [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_unowned_doc_goes_to_none_bucket_sorted_last` — (no docstring) [`FEAT-WORKLIST-001`]
+- `unit/test_worklist.py::test_orphan_reroutes_off_the_departed_accountable` — A DRI-vacant doc routes to its still-active durable owner; an owner-departed doc [`FEAT-WORKLIST-001`]
+- `unit/test_worklist.py::test_all_items_for_an_orphaned_doc_reroute_together` — A doc that is orphaned AND stale re-routes BOTH items off the departed owner. [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_finding_for_unknown_doc_falls_into_none_bucket` — (no docstring) [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_one_doc_with_three_problems_is_three_items_one_doc` — (no docstring) [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_two_suspect_edges_on_one_doc_are_two_items` — (no docstring) [`FEAT-WORKLIST-001`]
@@ -1048,6 +1050,7 @@ Module features: FEAT-WORKLIST-001
 - `unit/test_worklist.py::test_includes_suspect_flag_is_honest` — (no docstring) [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_empty_worklist_is_all_clear` — (no docstring) [`FEAT-WORKLIST-001`]
 - `unit/test_worklist.py::test_render_lists_owner_and_items` — (no docstring) [`FEAT-WORKLIST-001`]
+- `unit/test_worklist.py::test_render_labels_the_unowned_bucket` — (no docstring) [`FEAT-WORKLIST-001`]
 
 ## Integration
 
@@ -2483,4 +2486,4 @@ Module features: FEAT-CONFIGV2-001, FEAT-COVERAGE-001, FEAT-COVERAGE-005, FEAT-C
 - `FEAT-STALENESS-004` — system/test_staleness_cli.py::test_audience_sla_changes_the_verdict, system/test_staleness_cli.py::test_fail_on_stale_passes_when_all_fresh, system/test_staleness_cli.py::test_fail_on_stale_trips_on_stale_or_never, system/test_staleness_cli.py::test_staleness_json_includes_all_docs, system/test_staleness_cli.py::test_staleness_loud_on_bad_config, system/test_staleness_cli.py::test_staleness_loud_on_bad_staleness_block, system/test_staleness_cli.py::test_staleness_table_shows_only_docs_needing_review
 - `FEAT-STALENESS-005` — integration/test_staleness_server.py::test_staleness_dedups_doc_across_sync_kinds, integration/test_staleness_server.py::test_staleness_route_grades_at_read_time, integration/test_staleness_server.py::test_staleness_unknown_repo_is_404
 - `FEAT-STALENESS-006` — integration/test_staleness_server.py::test_staleness_dedups_doc_across_sync_kinds, integration/test_staleness_server.py::test_staleness_route_grades_at_read_time, integration/test_staleness_server.py::test_staleness_unknown_repo_is_404, system/test_demo_e2e.py::test_central_staleness_view_flags_overdue_doc
-- `FEAT-WORKLIST-001` — integration/test_worklist_server.py::test_worklist_joins_orphan_and_stale_omits_suspect, integration/test_worklist_server.py::test_worklist_owner_filter, integration/test_worklist_server.py::test_worklist_unknown_repo_is_404, system/test_worklist_cli.py::test_worklist_fail_on_work_exits_one, system/test_worklist_cli.py::test_worklist_groups_by_owner, system/test_worklist_cli.py::test_worklist_json_shape, system/test_worklist_cli.py::test_worklist_no_include_suspect_drops_suspect_items, system/test_worklist_cli.py::test_worklist_owner_filter, system/test_worklist_cli.py::test_worklist_roster_adds_orphan_items, unit/test_worklist.py::test_empty_worklist_is_all_clear, unit/test_worklist.py::test_finding_for_unknown_doc_falls_into_none_bucket, unit/test_worklist.py::test_includes_suspect_flag_is_honest, unit/test_worklist.py::test_items_bucket_under_their_accountable_owner, unit/test_worklist.py::test_items_sorted_by_severity_then_reason, unit/test_worklist.py::test_one_doc_with_three_problems_is_three_items_one_doc, unit/test_worklist.py::test_owner_filter_keeps_only_that_owner, unit/test_worklist.py::test_render_lists_owner_and_items, unit/test_worklist.py::test_severity_mapping_per_status, unit/test_worklist.py::test_two_suspect_edges_on_one_doc_are_two_items, unit/test_worklist.py::test_unowned_doc_goes_to_none_bucket_sorted_last
+- `FEAT-WORKLIST-001` — integration/test_worklist_server.py::test_worklist_joins_orphan_and_stale_omits_suspect, integration/test_worklist_server.py::test_worklist_owner_filter, integration/test_worklist_server.py::test_worklist_unknown_repo_is_404, system/test_worklist_cli.py::test_worklist_fail_on_work_exits_one, system/test_worklist_cli.py::test_worklist_groups_by_owner, system/test_worklist_cli.py::test_worklist_json_shape, system/test_worklist_cli.py::test_worklist_no_include_suspect_drops_suspect_items, system/test_worklist_cli.py::test_worklist_owner_filter, system/test_worklist_cli.py::test_worklist_roster_adds_orphan_items, unit/test_worklist.py::test_all_items_for_an_orphaned_doc_reroute_together, unit/test_worklist.py::test_empty_worklist_is_all_clear, unit/test_worklist.py::test_finding_for_unknown_doc_falls_into_none_bucket, unit/test_worklist.py::test_includes_suspect_flag_is_honest, unit/test_worklist.py::test_items_bucket_under_their_accountable_owner, unit/test_worklist.py::test_items_sorted_by_severity_then_reason, unit/test_worklist.py::test_one_doc_with_three_problems_is_three_items_one_doc, unit/test_worklist.py::test_orphan_reroutes_off_the_departed_accountable, unit/test_worklist.py::test_owner_filter_keeps_only_that_owner, unit/test_worklist.py::test_render_labels_the_unowned_bucket, unit/test_worklist.py::test_render_lists_owner_and_items, unit/test_worklist.py::test_severity_mapping_per_status, unit/test_worklist.py::test_two_suspect_edges_on_one_doc_are_two_items, unit/test_worklist.py::test_unowned_doc_goes_to_none_bucket_sorted_last

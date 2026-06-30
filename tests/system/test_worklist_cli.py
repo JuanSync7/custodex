@@ -29,6 +29,7 @@ _DOCS = [
         "path": "docs/d1.md",
         "audience": "eng-guide",
         "owner": "alice",
+        "team": "platform",  # the durable owner — survives alice's departure
         "dri": "alice",
         "reviewed": "2020-01-01",  # long past any SLA → STALE
     },
@@ -61,6 +62,8 @@ def _roster(tmp_path: Path, *, alice_active: bool) -> Path:
                 "identities": [
                     {"name": "alice", "active": alice_active},
                     {"name": "bob", "active": True},
+                    # the durable team stays active, so d1's departure is DRI-vacant.
+                    {"name": "platform", "kind": "team", "active": True},
                 ]
             }
         ),
@@ -158,7 +161,10 @@ def test_worklist_roster_adds_orphan_items(tmp_path: Path) -> None:
         ],
     )
     payload = json.loads(res.output)
-    alice = next(o for o in payload["owners"] if o["accountable"] == "alice")
-    # alice's queue now carries BOTH her stale review AND the orphan (she departed).
-    assert {i["reason"] for i in alice["items"]} == {"orphan", "stale"}
-    assert alice["doc_count"] == 1  # both items are the same doc d1
+    owners = {o["accountable"]: o for o in payload["owners"]}
+    # alice DEPARTED → her work is NOT parked in her queue; d1 is DRI-vacant, so BOTH
+    # its orphan and its stale review re-route to the still-active durable team.
+    assert "alice" not in owners
+    platform = owners["platform"]
+    assert {i["reason"] for i in platform["items"]} == {"orphan", "stale"}
+    assert platform["doc_count"] == 1  # both items are the same doc d1

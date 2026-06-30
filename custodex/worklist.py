@@ -13,8 +13,11 @@ partial mirror. :func:`worklist_from_repo` is the one thin impure adapter that r
 three detectors and hands their output to :func:`build_worklist`.
 
 Bucketing is by *accountable* (``dri → owner → team → inherited`` — the current point of
-contact), not *durable* (the survives-a-departure key): the worklist routes LIVE work.
-A document with no accountable owner falls into the ``None`` bucket (sorted last).
+contact): the worklist routes LIVE work. The exception is an ORPHANED doc, whose
+accountable has departed — its work is re-routed to the live assignee the orphan status
+implies (a DRI-vacant doc to its still-active *durable* owner; an owner-departed doc to
+the unowned bucket), so a "reassign me" item never sits in a departed person's queue. A
+document with no live assignee falls into the ``None`` bucket (sorted last).
 """
 
 from __future__ import annotations
@@ -79,7 +82,9 @@ _SEVERITY_RANK = {WorkSeverity.HIGH: 0, WorkSeverity.MEDIUM: 1, WorkSeverity.LOW
 _REASON_RANK = {WorkReason.ORPHAN: 0, WorkReason.STALE: 1, WorkReason.SUSPECT: 2}
 
 # A finding's status → its work severity. Anything unmapped falls back to MEDIUM, so a
-# new status can never crash the join (K8) — it just gets a sane default priority.
+# new status can never crash the join (K8) — it just gets a sane default priority. NOTE:
+# callers pass only ACTIONABLE findings (the detectors omit OK/FRESH by default), so the
+# non-actionable statuses are deliberately absent here (not mapped to a no-op severity).
 _ORPHAN_SEVERITY = {
     OwnershipStatus.ORPHAN_OWNER_DEPARTED: WorkSeverity.HIGH,
     OwnershipStatus.ORPHAN_DRI_VACANT: WorkSeverity.MEDIUM,
@@ -163,9 +168,16 @@ def build_worklist(
     """Join the three attention signals into a per-owner worklist (pure, K1/K10).
 
     Each finding is turned into a :class:`WorkItem` and bucketed under its document's
-    *accountable* owner (looked up from ``owners`` by ``doc_id``; missing ⇒ the unowned
-    ``None`` bucket). ``owner_filter`` keeps only that one owner's bucket. ``suspect``
-    accepts ANY :class:`SuspectLink` — direct OR the ``SUSPECT_TRANSITIVE`` advisory —
+    LIVE assignee (looked up from ``owners`` by ``doc_id``; missing ⇒ the unowned
+    ``None`` bucket). Normally that is the *accountable* owner — but an ORPHANED doc's
+    accountable has, by construction, DEPARTED, so routing work there is a dead queue.
+    EVERY item for an orphaned doc is re-routed to the live assignee the orphan STATUS
+    implies: an ``ORPHAN_DRI_VACANT`` doc to its still-active durable owner (the
+    "assign a new DRI" target), an ``ORPHAN_OWNER_DEPARTED`` doc (no active fallback) to
+    the unowned bucket. ``owner_filter`` keeps only that one NAMED owner's bucket (the
+    unowned ``None`` bucket cannot be isolated this way — ``None`` means "no filter").
+    ``suspect`` accepts ANY :class:`SuspectLink` — direct OR the ``SUSPECT_TRANSITIVE``
+    advisory —
     so the function is unchanged whether or not propagation is in play; pass
     ``includes_suspect=False`` (with ``suspect=()``) to flag a deliberately suspect-less
     worklist (the hub's K2 mirror). Owners sorted (unowned last); items sorted by
@@ -173,10 +185,27 @@ def build_worklist(
     summed across the inputs, so a doc that is stale AND suspect is one doc, two items).
     """
     accountable_by_doc = {owner.doc_id: owner.accountable for owner in owners}
+    durable_by_doc = {owner.doc_id: owner.durable for owner in owners}
+    # An orphaned document's accountable owner has departed — re-route its work to the
+    # live assignee the orphan STATUS implies (DRI-vacant ⇒ the still-active durable
+    # owner; owner-departed ⇒ no active fallback ⇒ the unowned bucket). UNOWNED docs
+    # already resolve to None, so they need no override.
+    reassign: dict[str, str | None] = {}
+    for orphan in orphans:
+        if orphan.status is OwnershipStatus.ORPHAN_DRI_VACANT:
+            reassign[orphan.doc_id] = durable_by_doc.get(orphan.doc_id)
+        elif orphan.status is OwnershipStatus.ORPHAN_OWNER_DEPARTED:
+            reassign[orphan.doc_id] = None
+
     buckets: dict[str | None, list[WorkItem]] = {}
 
     def _add(item: WorkItem) -> None:
-        buckets.setdefault(accountable_by_doc.get(item.doc_id), []).append(item)
+        bucket = (
+            reassign[item.doc_id]
+            if item.doc_id in reassign
+            else accountable_by_doc.get(item.doc_id)
+        )
+        buckets.setdefault(bucket, []).append(item)
 
     for orphan in orphans:
         _add(

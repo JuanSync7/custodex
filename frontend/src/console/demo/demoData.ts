@@ -107,15 +107,37 @@ const EMPTY_OWNERSHIP: OwnershipData = {
   orphan_count: 0,
 };
 
-// WL-01 — the per-owner review triage for the busy repo. This is the REPO-LOCAL
-// view (`includes_suspect: true`), so it shows all three reasons: `dana` owns the
-// orphaned + stale core-api and a suspect doc whose upstream moved; the Unowned
-// bucket holds io-api (never reviewed). The HUB strips suspect items (K2), but the
-// demo runs the repo-local picture so the console shows the full feature.
+// WL-01 — the per-owner review triage for the busy repo. This is the REPO-LOCAL view
+// (`includes_suspect: true`), so it shows all three reasons, bucketed under each doc's
+// LIVE assignee — consistent with the Ownership tab (same dataset): core-api is a
+// DRI-vacant orphan (`dana` departed), so its orphan + stale work re-routes to the
+// still-active durable owner `platform-team` (never `dana`'s dead queue); `getting-started`
+// (accountable `mei`) has a suspect upstream; `io-api` (accountable `ravi`) was never
+// reviewed. The HUB strips suspect items (K2), but the demo runs the repo-local picture
+// so the console shows the full feature.
 const WIDGET_WORKLIST: Worklist = {
   owners: [
     {
-      accountable: "dana",
+      accountable: "mei",
+      items: [
+        {
+          doc_id: "getting-started",
+          doc_path: "docs/getting-started.md",
+          audience: "user-guide",
+          reason: "suspect",
+          severity: "low",
+          detail:
+            "upstream `io-api` changed since this doc last referenced it — re-check the dependency",
+          upstream_id: "io-api",
+        },
+      ],
+      item_count: 1,
+      doc_count: 1,
+    },
+    {
+      // core-api's DRI `dana` departed (DRI-vacant) → its work re-routes to the
+      // still-active durable owner, NOT the departed `dana`.
+      accountable: "platform-team",
       items: [
         {
           doc_id: "core-api",
@@ -136,29 +158,19 @@ const WIDGET_WORKLIST: Worklist = {
           detail: "reviewed 172 days ago; SLA is 90 days — re-review due",
           upstream_id: null,
         },
-        {
-          doc_id: "getting-started",
-          doc_path: "docs/getting-started.md",
-          audience: "user-guide",
-          reason: "suspect",
-          severity: "low",
-          detail:
-            "upstream `io-api` changed since this doc last referenced it — re-check the dependency",
-          upstream_id: "io-api",
-        },
       ],
-      item_count: 3,
-      doc_count: 2,
+      item_count: 2,
+      doc_count: 1,
     },
     {
-      accountable: null,
+      accountable: "ravi",
       items: [
         {
           doc_id: "io-api",
           doc_path: "docs/api/io-api.md",
           audience: "eng-guide",
           reason: "stale",
-          severity: "medium",
+          severity: "high",
           detail: "never reviewed; SLA is 90 days",
           upstream_id: null,
         },

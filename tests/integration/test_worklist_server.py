@@ -129,9 +129,12 @@ def test_worklist_joins_orphan_and_stale_omits_suspect(kind: str) -> None:
         for item in owner["items"]
     )
     by_owner = {o["accountable"]: o for o in body["owners"]}
-    # alice (active) carries her STALE doc; bob (departed) carries the ORPHAN doc.
+    # alice (active) carries her STALE doc; bob DEPARTED with no active fallback, so the
+    # orphan re-routes to the UNOWNED (null) bucket — NEVER the departed bob's queue.
+    assert "bob" not in by_owner
     assert "stale" in {i["reason"] for i in by_owner["alice"]["items"]}
-    assert "orphan" in {i["reason"] for i in by_owner["bob"]["items"]}
+    # null accountable over the wire = the unowned bucket
+    assert "orphan" in {i["reason"] for i in by_owner[None]["items"]}
     assert body["item_count"] == 2 and body["doc_count"] == 2
 
 

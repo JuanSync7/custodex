@@ -23,12 +23,15 @@ from custodex.worklist import (
 )
 
 
-def _owner(doc_id: str, accountable: str | None) -> EffectiveOwner:
+def _owner(
+    doc_id: str, accountable: str | None, *, durable: str | None = None
+) -> EffectiveOwner:
     return EffectiveOwner(
         doc_id=doc_id,
         doc_path=f"docs/{doc_id}.md",
         audience=Audience.ENG_GUIDE,
         accountable=accountable,
+        durable=durable,
     )
 
 
@@ -85,10 +88,48 @@ def test_unowned_doc_goes_to_none_bucket_sorted_last() -> None:
     owners = (_owner("a", "alice"), _owner("z", None))
     wl = build_worklist(
         owners,
-        stale=(_stale("a", StalenessStatus.STALE), _stale("z", StalenessStatus.STALE)),
+        # Populate the None bucket FIRST (z before a) so the sort must actually reorder
+        # it to last — a removed sort would leave [None, alice] and fail this.
+        stale=(_stale("z", StalenessStatus.STALE), _stale("a", StalenessStatus.STALE)),
     )
     # None (unowned) bucket sorts last, after named owners.
     assert [w.accountable for w in wl.owners] == ["alice", None]
+
+
+# --------------------------------------------------------------------------- #
+# orphan re-routing — an orphan never lands in the DEPARTED accountable's queue
+# --------------------------------------------------------------------------- #
+def test_orphan_reroutes_off_the_departed_accountable() -> None:
+    """A DRI-vacant doc routes to its still-active durable owner; an owner-departed doc
+    (no active fallback) to the unowned bucket — NEVER the departed person's queue."""
+    owners = (
+        # dana (DRI) departed, but the durable team 'platform' is still active.
+        _owner("d-vacant", "dana", durable="platform"),
+        # bob is BOTH accountable and durable; bob departed → no active fallback.
+        _owner("d-departed", "bob", durable="bob"),
+    )
+    orphans = (
+        _orphan("d-vacant", OwnershipStatus.ORPHAN_DRI_VACANT),
+        _orphan("d-departed", OwnershipStatus.ORPHAN_OWNER_DEPARTED),
+    )
+    wl = build_worklist(owners, orphans=orphans)
+    by_owner = {w.accountable: [i.doc_id for i in w.items] for w in wl.owners}
+    assert by_owner == {"platform": ["d-vacant"], None: ["d-departed"]}
+    # crucially, NEITHER departed name has a bucket.
+    assert "dana" not in by_owner and "bob" not in by_owner
+
+
+def test_all_items_for_an_orphaned_doc_reroute_together() -> None:
+    """A doc that is orphaned AND stale re-routes BOTH items off the departed owner."""
+    owners = (_owner("d", "dana", durable="platform"),)
+    wl = build_worklist(
+        owners,
+        orphans=(_orphan("d", OwnershipStatus.ORPHAN_DRI_VACANT),),
+        stale=(_stale("d", StalenessStatus.STALE),),
+    )
+    (platform,) = wl.owners
+    assert platform.accountable == "platform"
+    assert {i.reason for i in platform.items} == {WorkReason.ORPHAN, WorkReason.STALE}
 
 
 def test_finding_for_unknown_doc_falls_into_none_bucket() -> None:
@@ -164,8 +205,11 @@ def test_severity_mapping_per_status() -> None:
         return build_worklist(owners, **kw).owners[0].items[0].severity  # type: ignore[arg-type]
 
     assert sev(orphans=(_orphan("a", OwnershipStatus.ORPHAN_OWNER_DEPARTED),)) is H
+    assert sev(orphans=(_orphan("a", OwnershipStatus.UNOWNED),)) is M
     assert sev(stale=(_stale("a", StalenessStatus.NEVER_REVIEWED),)) is H
     assert sev(stale=(_stale("a", StalenessStatus.STALE),)) is M
+    assert sev(suspect=(_suspect("a", "u", SuspectStatus.SUSPECT),)) is H
+    assert sev(suspect=(_suspect("a", "u", SuspectStatus.MISSING_UPSTREAM),)) is H
     assert sev(suspect=(_suspect("a", "u", SuspectStatus.UNSTAMPED),)) is L
     assert sev(suspect=(_suspect("a", "u", SuspectStatus.SUSPECT_TRANSITIVE),)) is L
 
@@ -205,3 +249,9 @@ def test_render_lists_owner_and_items() -> None:
     wl = build_worklist(owners, suspect=(_suspect("a", "up", SuspectStatus.SUSPECT),))
     text = render_worklist_text(wl)
     assert "alice" in text and "a → up" in text and "[high] suspect" in text
+
+
+def test_render_labels_the_unowned_bucket() -> None:
+    # a finding for a doc with no accountable owner renders under "(unowned)".
+    wl = build_worklist((), stale=(_stale("z", StalenessStatus.STALE),))
+    assert "(unowned)" in render_worklist_text(wl)
