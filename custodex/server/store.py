@@ -28,6 +28,7 @@ __all__ = [
     "RegisteredRepo",
     "ConfigDocument",
     "ConfigContextRef",
+    "ConfigDocEdge",
     "ConfigCodeRef",
     "SyncRun",
     "Store",
@@ -99,6 +100,21 @@ class ConfigContextRef(BaseModel):
     note: str | None = None
 
 
+class ConfigDocEdge(BaseModel):
+    """One doc↔doc dependency edge on a :class:`ConfigDocument` (EPIC B).
+
+    The mirror projection of the on-disk :class:`~custodex.config.DocEdge`: ``doc``
+    is the upstream document id this one ``depends_on`` and ``type`` its role
+    (depends/refines/implements/verifies, stored as a plain string so a new role
+    never needs a migration). Frozen + ``extra="forbid"`` (K8).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    doc: str
+    type: str = "depends"
+
+
 class ConfigDocument(BaseModel):
     """One config document as synced from a repo's ``config/cdmon/`` (Y-01).
 
@@ -137,6 +153,12 @@ class ConfigDocument(BaseModel):
     sla_days: int | None = None
     region_keys: tuple[str, ...] = ()
     context_refs: tuple[ConfigContextRef, ...] = ()
+    # EPIC B — the document's declared doc↔doc dependency edges, mirrored at sync
+    # (additive, K6: rides in the full JSON blob, NO migration; pre-EPIC-B rows
+    # parse with the empty tuple). The GET /doc-graph route reads these to serve the
+    # cross-repo dependency GRAPH; suspect STATUS stays repo-local (the doc files
+    # live in the repo, K2), so the hub shows WHO-depends-on-WHAT, not freshness.
+    depends_on: tuple[ConfigDocEdge, ...] = ()
     sync_kind: str
     ref: str | None = None
     synced_at: str

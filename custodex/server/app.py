@@ -1278,6 +1278,40 @@ def create_app(
             "now": now,
         }
 
+    @app.get("/repos/{repo_id:path}/doc-graph")
+    def doc_graph_for(
+        repo_id: str,
+        store: Store = Depends(get_store),
+        sync_kind: str | None = None,
+    ) -> dict[str, object]:
+        """The repo's doc↔doc dependency GRAPH from the synced config (EPIC B).
+
+        Reads each mirrored document's declared ``depends_on`` edges and returns the
+        downstream→upstream graph (deduped by doc_id, sorted). The hub serves the
+        cross-repo GRAPH — WHO depends on WHAT — so a reverse query ("which docs
+        depend on X") is answerable centrally; suspect STATUS stays repo-local (the
+        doc files needed to hash an upstream's body live in the repo, K2). Open read.
+        """
+        _require_known_repo(store, repo_id)
+        edges: list[dict[str, object]] = []
+        seen: set[str] = set()
+        for d in store.config_documents_for(repo_id, sync_kind):
+            if d.doc_id in seen:
+                continue
+            seen.add(d.doc_id)
+            for edge in d.depends_on:
+                edges.append(
+                    {
+                        "doc_id": d.doc_id,
+                        "doc_path": d.path,
+                        "audience": d.audience,
+                        "upstream_id": edge.doc,
+                        "type": edge.type,
+                    }
+                )
+        edges.sort(key=lambda e: (str(e["doc_id"]), str(e["upstream_id"])))
+        return {"edges": edges, "edge_count": len(edges)}
+
     # `{repo_id:path}` so a repo_id containing slashes (e.g. "acme/widget", the
     # org/name form) is captured whole rather than splitting path segments.
     @app.get("/repos/{repo_id:path}/records")

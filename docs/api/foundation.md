@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 7fa1aa291e0fb628
+  fingerprint: d63a425640371370
   fingerprint_tiers:
-    composite: 7fa1aa291e0fb628
-    docstring: 498a9e4bb336fc50
-    signature: 9db9fe40bba9a50a
+    composite: d63a425640371370
+    docstring: 7e487b8f6207c402
+    signature: 408c0bf05b4d6d7a
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -38,9 +38,12 @@ cdm:
     - 28b7f5de5919f6f2
     - 2a8f6ab973a376f0
     - 2fc7b290292b119c
+    - 38227910a6a11440
     - 38527a9330f2dad5
     - 3920de84732eea78
     - 3920de84732eea78
+    - 3ab8177372b53700
+    - 3bdccdb6b130b338
     - 3e00b4ad560e5de7
     - 4054d8813d8e592f
     - 419b5f4b65b9c5f5
@@ -84,6 +87,7 @@ cdm:
     - a36f1a6c53893358
     - a47dddeeda46352d
     - a6517d7d72f73eb9
+    - a796ab12a30a87b3
     - a8d0d1d4bb421622
     - ad1d037438d946ee
     - ad9f6cfd78f2c1ec
@@ -92,6 +96,7 @@ cdm:
     - b0e0fabb95a65a96
     - b40f2cf93387ebe8
     - b74297b27cc94564
+    - bc66577b1733cdde
     - c103ef8a6b38f57b
     - c3101973fe2f73f3
     - c3bae03d014fe39d
@@ -107,6 +112,7 @@ cdm:
     - d31f855d5547d0fb
     - d44082bccab4ddaa
     - d51a1c2ad604ab2c
+    - d64571b73123f484
     - d66e738995cfa86a
     - d810ee574fcee4f5
     - d97ca633fb31ebf6
@@ -130,7 +136,7 @@ cdm:
     - fd87e7b303770609
     - ff51b2032355ac8b
   region_hashes:
-    symbols: 1f239a6a6315c45a
+    symbols: d687b8f301376fb4
   schema_version: 1.0.0
 ---
 # custodex — foundation (engineering reference)
@@ -159,6 +165,9 @@ cdm:
 | CoverageConfig | class | class CoverageConfig(BaseModel) |
 | DEFAULT_CENTRAL_TOKEN_ENV | variable | DEFAULT_CENTRAL_TOKEN_ENV = 'CDMON_CENTRAL_TOKEN' |
 | DOC_STYLE_TEMPLATE | variable | DOC_STYLE_TEMPLATE = ... |
+| DocDepsConfig | class | class DocDepsConfig(BaseModel) |
+| DocEdge | class | class DocEdge(BaseModel) |
+| DocEdgeType | class | class DocEdgeType(str, Enum) |
 | DocStyleFrontmatter | class | class DocStyleFrontmatter(BaseModel) |
 | DocStyleFrontmatter._version_and_kind | method | def _version_and_kind(self) -> DocStyleFrontmatter |
 | DocStyleMap | class | class DocStyleMap(BaseModel) |
@@ -168,6 +177,7 @@ cdm:
 | DocStyleSelection | class | class DocStyleSelection(BaseModel) |
 | DocumentSpec | class | class DocumentSpec(BaseModel) |
 | DocumentSpec._context_refs_paths_unique | method | def _context_refs_paths_unique(self) -> DocumentSpec |
+| DocumentSpec._depends_on_well_formed | method | def _depends_on_well_formed(self) -> DocumentSpec |
 | DocumentSpec._region_modes_reference_declared_regions | method | def _region_modes_reference_declared_regions(self) -> DocumentSpec |
 | DocumentSpec.mode_for | method | def mode_for(self, region_id: str) -> RegionMode |
 | DriftError | class | class DriftError(CodeDocMonitorError) |
@@ -184,6 +194,7 @@ cdm:
 | IndexUnitRef | class | class IndexUnitRef(BaseModel) |
 | InventoryError | class | class InventoryError(CodeDocMonitorError) |
 | MonitorConfig | class | class MonitorConfig(BaseModel) |
+| MonitorConfig._depends_on_targets_exist | method | def _depends_on_targets_exist(self) -> MonitorConfig |
 | ProposedFix | class | class ProposedFix(BaseModel) |
 | RESERVED_UNIT_STEMS | variable | RESERVED_UNIT_STEMS: frozenset[str] = frozenset({'index', 'ignore', 'doc-style'}) |
 | RegionColumn | class | class RegionColumn(BaseModel) |
@@ -221,6 +232,7 @@ cdm:
 | _contextref_to_yaml | function | def _contextref_to_yaml(ref: ContextRef) -> dict |
 | _deepest_unit_for_parts | function | def _deepest_unit_for_parts(units: tuple[UnitFile, ...], file_parts: tuple[str, ...]) -> UnitFile \| None |
 | _dir_parts | function | def _dir_parts(p: str) -> tuple[str, ...] |
+| _docedge_to_yaml | function | def _docedge_to_yaml(edge: DocEdge) -> dict |
 | _document_to_yaml | function | def _document_to_yaml(doc: DocumentSpec) -> dict |
 | _fill | function | def _fill(template: str, *, repo: str, now: str) -> str |
 | _find_doc_index | function | def _find_doc_index(unit: UnitFile, doc_id: str) -> int |

@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**222 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**229 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -83,6 +83,13 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-COVERAGE-008` | regression/test_corpus_selfcoverage.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, unit/test_coverage.py | DEMOS.md |
 | `FEAT-COVERAGE-009` | regression/test_corpus_selfcoverage.py, system/test_dirlayout_e2e.py, unit/test_coverage.py | DEMOS.md |
 | `FEAT-COVERAGE-010` | integration/test_server_store_parity.py, system/test_cli.py, system/test_e2e_ticket_coverage.py, unit/test_coverage.py | DEMOS.md |
+| `FEAT-DOCDEPS-001` | unit/test_docdeps_config.py | DEMOS.md |
+| `FEAT-DOCDEPS-002` | unit/test_docdeps.py | DEMOS.md |
+| `FEAT-DOCDEPS-003` | unit/test_docdeps.py | DEMOS.md |
+| `FEAT-DOCDEPS-004` | unit/test_drift_suspect_link.py | DEMOS.md |
+| `FEAT-DOCDEPS-005` | system/test_docdeps_cli.py | DEMOS.md |
+| `FEAT-DOCDEPS-006` | integration/test_monitor_docdeps.py | DEMOS.md |
+| `FEAT-DOCDEPS-007` | integration/test_docdeps_server.py | DEMOS.md |
 | `FEAT-DRIFT-001` | regression/test_corpus_pipeline.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_demo_walkthrough.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, system/test_example_external.py, system/test_example_multilang.py, system/test_live_llm.py, system/test_system.py, unit/test_drift.py | DEMOS.md |
 | `FEAT-DRIFT-002` | system/test_system.py, unit/test_drift.py, unit/test_traceability.py | DEMOS.md |
 | `FEAT-DRIFT-003` | system/test_system.py, unit/test_drift.py | DEMOS.md |

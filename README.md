@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: d3b54e32a4b94369
+  fingerprint: 6822f145322ba0cf
   fingerprint_tiers:
-    composite: d3b54e32a4b94369
-    signature: d3b54e32a4b94369
+    composite: 6822f145322ba0cf
+    signature: 6822f145322ba0cf
   schema_version: 1.0.0
 ---
 # Custodex
@@ -77,6 +77,11 @@ cdx lint [--fix]         # validate doc *structure* (Layout Standard); --fix sta
 # --- detect & heal ---
 cdx check                # detect *content* drift; non-zero exit on drift (the warning)
 cdx monitor --apply      # detect → LLM verdict → record → apply fix → re-check
+
+# --- doc↔doc dependencies (EPIC B) ---
+cdx deps                 # show the doc→doc dependency graph + suspect status (a doc `depends_on` another; when the upstream changes the downstream is flagged SUSPECT until re-confirmed) — read-only
+cdx deps --suggest       # infer edges from Markdown cross-links between managed docs → paste-ready `depends_on` config (author→approve, not author-by-hand)
+cdx resolve --edge DOWN UP  # re-confirm exactly one doc↔doc edge after reviewing the upstream change (re-stamps just that edge's baseline; `docdeps.gate` decides whether a suspect link fails `cdx check`)
 cdx monitor --ref SHA    # ...and stamp each record's source_sha provenance (else $CI_COMMIT_SHA; C-05)
 cdx sync-pr [--dry-run]  # heal docs + emit a unified-diff patch of the changed docs (the docs-PR content); --dry-run computes the same patch without touching the tree; --out FILE writes it
 cdx open-docs-pr [--dry-run]  # heal docs then open a docs MR (branch+commit+MR) via the default GitLab transport (stdlib urllib; from CI env); clean repo is a no-op; --dry-run prints the MR plan as JSON from a dry sync (no mutation, no network); --target/--ref set the target branch + provenance ref

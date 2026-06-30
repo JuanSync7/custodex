@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: f9dc6822f7e0809d
+  fingerprint: 55dc1beeba729d3d
   fingerprint_tiers:
-    composite: f9dc6822f7e0809d
-    docstring: 1ff604eff6bba8c2
-    signature: 5fb88207d63bea31
+    composite: 55dc1beeba729d3d
+    docstring: 0b9166f35e6def76
+    signature: b110e6051b92afa0
   region_anchors:
     symbols:
     - 004e9ebd1915d8c9
@@ -70,10 +70,12 @@ cdm:
     - 96f0fd1a02672602
     - 9b90157bb848360d
     - a0437059f483f15e
+    - a621340216df5eb0
     - a856e8f87099101c
     - a86351dd510278f3
     - a9ce5af3358d811d
     - aa6dd30c353e6f30
+    - ad7d295f902239d2
     - ae65d5e6c2bbc28e
     - b6266548bc12c221
     - ba0e4afa93400b80
@@ -107,8 +109,9 @@ cdm:
     - f6efd327d3c62610
     - fa4842e3b1aaf938
     - fb7f1b86375d74b7
+    - fcfd897c8f21f0c1
   region_hashes:
-    symbols: e7105c6309853667
+    symbols: c43c5fc3a89aed42
   schema_version: 1.0.0
 ---
 # custodex — pipeline (engineering reference)
@@ -192,6 +195,7 @@ cdm:
 | anchor_id | function | def anchor_id(qualified_name: str) -> str |
 | build_document_surface | function | def build_document_surface(doc: DocumentSpec, root: Path) -> DocumentSurface |
 | detect | function | def detect(config: MonitorConfig, config_dir: Path) -> DriftReport |
+| drop_upstream_hash | function | def drop_upstream_hash(meta: dict[str, Any], upstream_id: str) -> dict[str, Any] |
 | expected_region | function | def expected_region(region_id: str, surface: DocumentSurface, template: RegionTemplate \| None = None) -> str \| None |
 | extract_argparse_records | function | def extract_argparse_records(path: Path) -> list[Record] |
 | extract_file | function | def extract_file(path: Path) -> list[Symbol] |
@@ -212,10 +216,12 @@ cdm:
 | set_region | function | def set_region(body: str, id: str, new: str) -> tuple[str, bool] |
 | set_region_anchors | function | def set_region_anchors(meta: dict[str, Any], region_id: str, anchors: tuple[str, ...]) -> dict[str, Any] |
 | set_region_hash | function | def set_region_hash(meta: dict[str, Any], region_id: str, value: str) -> dict[str, Any] |
+| set_upstream_hash | function | def set_upstream_hash(meta: dict[str, Any], upstream_id: str, value: str) -> dict[str, Any] |
 | stamp_standard_meta | function | def stamp_standard_meta(meta: dict[str, Any], *, schema_version: str, audience: str) -> dict[str, Any] |
 | stored_fingerprint | function | def stored_fingerprint(doc: Doc) -> str \| None |
 | stored_fingerprint_tiers | function | def stored_fingerprint_tiers(doc: Doc) -> SurfaceFingerprint \| None |
 | stored_region_anchors | function | def stored_region_anchors(doc: Doc, region_id: str) -> tuple[str, ...] \| None |
 | stored_region_hash | function | def stored_region_hash(doc: Doc, region_id: str) -> str \| None |
+| stored_upstream_hashes | function | def stored_upstream_hashes(doc: Doc) -> dict[str, str] |
 | symbol_table | function | def symbol_table(surface: DocumentSurface) -> str |
 <!-- CDM:END symbols -->

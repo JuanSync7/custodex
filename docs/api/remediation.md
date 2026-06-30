@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 6dafb6da173d4a99
+  fingerprint: b0087ee1946225df
   fingerprint_tiers:
-    composite: 6dafb6da173d4a99
-    docstring: 9c4e6ddadc393aa4
-    signature: 72778b04ea833c69
+    composite: b0087ee1946225df
+    docstring: 91200a7850f128f6
+    signature: 9d62c655aab8b2aa
   region_anchors:
     symbols:
     - 000f066b671bb0ba
@@ -91,6 +91,7 @@ cdm:
     - 7ae72b95145f540e
     - 7fcfe074fe821547
     - 8086ff6b242489a7
+    - 87981055c1d1d64c
     - 9084d14f98d22340
     - 90d66183e64d3c8e
     - 940635f16be1e148
@@ -142,7 +143,7 @@ cdm:
     - fa2f6597462ddabd
     - fe9d46d6cc2990f0
   region_hashes:
-    symbols: 2b2b0ac83969e611
+    symbols: f23c67a26a438386
   schema_version: 1.0.0
 ---
 # custodex — remediation (engineering reference)
@@ -192,6 +193,7 @@ cdm:
 | Monitor | class | class Monitor |
 | Monitor.__init__ | method | def __init__(self, config: MonitorConfig, config_dir: Path, *, backend: Backend \| None = None, sink: Sink \| None = None, now: Callable[[], str] \| None = None, log_path: Path \| None = None, source_sha: str \| None = None, use_exemplars: bool = False, resolutions_path: Path \| None = None, exemplar_top_n: int = DEFAULT_EXEMPLAR_TOP_N, rules: tuple[PromotionRule, ...] = (), doc_style: DocStyleMap \| None = None) -> None |
 | Monitor._doc_text | method | def _doc_text(self, drift: Drift, doc_path: Path) -> str |
+| Monitor._handle_suspect_links | method | def _handle_suspect_links(self, effective_apply: bool, handled: list[HandledDrift], records: list[ReviewRecord]) -> None |
 | Monitor._record_for | method | def _record_for(self, drift: Drift, result: BackendResult, surface: DocumentSurface, *, rule_sourced: bool = False) -> ReviewRecord |
 | Monitor._retrieve_exemplars | method | def _retrieve_exemplars(self, drift: Drift, surface_hash: str, records: list[ReviewRecord], resolutions: list[ResolutionRecord]) -> tuple[Exemplar, ...] |
 | Monitor._spec_for | method | def _spec_for(self, doc_id: str) -> DocumentSpec |

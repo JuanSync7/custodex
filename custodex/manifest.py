@@ -42,6 +42,9 @@ __all__ = [
     "stored_region_anchors",
     "set_region_anchors",
     "region_is_locked",
+    "stored_upstream_hashes",
+    "set_upstream_hash",
+    "drop_upstream_hash",
 ]
 
 # A front-matter block is a leading "---\n ... \n---\n" fence.
@@ -340,6 +343,57 @@ def set_region_anchors(
     region_anchors = dict(cdm.get("region_anchors") or {})
     region_anchors[region_id] = sorted(anchors)
     cdm["region_anchors"] = region_anchors
+    out["cdm"] = cdm
+    return out
+
+
+def stored_upstream_hashes(doc: Doc) -> dict[str, str]:
+    """Return ``cdm.upstream_hashes`` as an ``{upstream_id: hash}`` mapping (EPIC B).
+
+    The per-edge baseline stamps for Pillar B doc↔doc dependencies — the hash of
+    each upstream doc's body at the time the downstream edge was last reviewed.
+    Empty ``{}`` when the block is absent (a pre-EPIC-B doc, or a doc with no
+    ``depends_on``), so callers never special-case None.
+    """
+    cdm = doc.meta.get("cdm")
+    if isinstance(cdm, dict):
+        stamps = cdm.get("upstream_hashes")
+        if isinstance(stamps, dict):
+            return {k: v for k, v in stamps.items() if isinstance(v, str)}
+    return {}
+
+
+def set_upstream_hash(
+    meta: dict[str, Any], upstream_id: str, value: str
+) -> dict[str, Any]:
+    """Return a copy of ``meta`` with ``cdm.upstream_hashes[upstream_id]`` set (EPIC B).
+
+    Additive to the ``cdm:`` mapping (like :func:`set_region_hash`) — every other
+    key (``fingerprint``, ``region_hashes``, sibling edge stamps) is preserved, and
+    because :func:`set_fingerprint` copies the whole ``cdm`` map, an edge stamp
+    survives a later code↔doc fingerprint heal (zero blast radius).
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    stamps = dict(cdm.get("upstream_hashes") or {})
+    stamps[upstream_id] = value
+    cdm["upstream_hashes"] = stamps
+    out["cdm"] = cdm
+    return out
+
+
+def drop_upstream_hash(meta: dict[str, Any], upstream_id: str) -> dict[str, Any]:
+    """Return a copy of ``meta`` with the ``upstream_id`` edge stamp removed (EPIC B).
+
+    Used when an edge is deleted from config. Dropping an absent id is a harmless
+    no-op (K7). The ``upstream_hashes`` block is left in place (possibly empty) so
+    the front-matter shape stays stable.
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    stamps = dict(cdm.get("upstream_hashes") or {})
+    stamps.pop(upstream_id, None)
+    cdm["upstream_hashes"] = stamps
     out["cdm"] = cdm
     return out
 

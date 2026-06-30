@@ -19,6 +19,7 @@ from custodex.errors import DriftError
 from custodex.extract import SurfaceFingerprint
 from custodex.manifest import (
     Doc,
+    drop_upstream_hash,
     parse_doc,
     parse_text,
     region_body_hash,
@@ -29,9 +30,11 @@ from custodex.manifest import (
     set_fingerprint_tiers,
     set_region,
     set_region_hash,
+    set_upstream_hash,
     stored_fingerprint,
     stored_fingerprint_tiers,
     stored_region_hash,
+    stored_upstream_hashes,
 )
 
 WITH_FM = """\
@@ -377,3 +380,54 @@ def test_set_region_anchors_is_additive() -> None:
     assert stored_fingerprint_tiers(d) is not None
     assert stored_region_anchors(d, "symbols") == ("a1", "a2")
     assert "region_anchors" not in meta["cdm"]  # original untouched
+
+
+# --------------------------------------------------------------------------- #
+# EPIC B (B-02): per-edge upstream stamps under cdm.upstream_hashes
+# --------------------------------------------------------------------------- #
+def test_set_and_stored_upstream_hash_round_trip() -> None:
+    """An upstream stamp round-trips through render + parse (K7)."""
+    meta = set_upstream_hash({}, "overview", "deadbeef00112233")
+    doc = parse_text(render_doc(meta, "# body\n"))
+    assert stored_upstream_hashes(doc) == {"overview": "deadbeef00112233"}
+
+
+def test_stored_upstream_hashes_absent_is_empty() -> None:
+    """A doc with no edge stamps reports an empty mapping (not None)."""
+    doc = parse_text("# body only\n")
+    assert stored_upstream_hashes(doc) == {}
+
+
+def test_set_upstream_hash_is_additive_under_cdm() -> None:
+    """upstream_hashes lives under cdm and preserves siblings (fingerprint etc.)."""
+    meta = set_fingerprint({"title": "X"}, "fp123")
+    meta = set_upstream_hash(meta, "overview", "h_o")
+    meta = set_upstream_hash(meta, "glossary", "h_g")
+    assert meta["cdm"]["fingerprint"] == "fp123"
+    assert meta["title"] == "X"
+    assert meta["cdm"]["upstream_hashes"] == {"overview": "h_o", "glossary": "h_g"}
+
+
+def test_set_fingerprint_preserves_upstream_hashes() -> None:
+    """The edge stamps survive a later fingerprint heal (zero blast radius, B-03)."""
+    meta = set_upstream_hash({}, "overview", "hh")
+    meta = set_fingerprint(meta, "newfp")
+    assert meta["cdm"]["fingerprint"] == "newfp"
+    assert meta["cdm"]["upstream_hashes"] == {"overview": "hh"}
+
+
+def test_drop_upstream_hash_removes_one_stamp() -> None:
+    """Dropping one edge stamp leaves the siblings and the fingerprint intact."""
+    meta = set_upstream_hash({}, "overview", "h_o")
+    meta = set_upstream_hash(meta, "glossary", "h_g")
+    meta = set_fingerprint(meta, "fp")
+    meta = drop_upstream_hash(meta, "overview")
+    assert meta["cdm"]["upstream_hashes"] == {"glossary": "h_g"}
+    assert meta["cdm"]["fingerprint"] == "fp"
+
+
+def test_drop_upstream_hash_absent_is_noop() -> None:
+    """Dropping a stamp that does not exist is a harmless no-op (K7)."""
+    meta = set_upstream_hash({}, "overview", "h_o")
+    same = drop_upstream_hash(meta, "nonexistent")
+    assert same["cdm"]["upstream_hashes"] == {"overview": "h_o"}

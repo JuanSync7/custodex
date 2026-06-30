@@ -48,10 +48,13 @@ __all__ = [
     "RegionColumn",
     "RegionTemplate",
     "RegionMode",
+    "DocEdgeType",
+    "DocEdge",
     "DocumentSpec",
     "WaiverEntry",
     "CoverageConfig",
     "StalenessConfig",
+    "DocDepsConfig",
     "MonitorConfig",
     "load_config",
     "write_template",
@@ -316,6 +319,38 @@ class RegionMode(str, Enum):
     LLM_SEEDED = "llm-seeded"
 
 
+class DocEdgeType(str, Enum):
+    """The role of a doc→doc dependency edge (EPIC B).
+
+    A typed, role-labelled edge (the StrictDoc lesson) — richer than an
+    undifferentiated "depends": ``refines`` (this doc elaborates the upstream),
+    ``implements``, ``verifies`` (e.g. a test doc verifies the upstream), and the
+    generic ``depends``. The role is informational today (it labels the graph and
+    the suspect report); the suspect mechanics are identical for every type.
+    """
+
+    DEPENDS = "depends"
+    REFINES = "refines"
+    IMPLEMENTS = "implements"
+    VERIFIES = "verifies"
+
+
+class DocEdge(BaseModel):
+    """One upstream dependency of a document (EPIC B): ``doc`` is the upstream id.
+
+    The edge DECLARATION lives here in config (the source of truth, K2); the
+    per-edge baseline STAMP (the upstream's content hash at last review) lives in
+    the downstream doc's ``cdm.upstream_hashes`` front-matter, exactly like the
+    existing ``cdm.fingerprint``. ``note`` is an optional human hint.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    doc: str  # upstream document id (must resolve to a known doc — cross-checked, K8)
+    type: DocEdgeType = DocEdgeType.DEPENDS
+    note: str | None = None
+
+
 class DocumentSpec(BaseModel):
     """One logical document: an id, a path, an audience, and code refs."""
 
@@ -326,6 +361,7 @@ class DocumentSpec(BaseModel):
     audience: Audience
     code_refs: tuple[CodeRef, ...] = ()  # empty for an index/collection doc
     context_refs: tuple[ContextRef, ...] = ()  # K6: generation context, NOT coverage
+    depends_on: tuple[DocEdge, ...] = ()  # EPIC B: doc→doc upstream deps (additive K6)
     region_keys: tuple[str, ...] = ()  # managed regions this doc carries
     region_modes: dict[str, RegionMode] = {}  # region id -> mode; absent => generated
     html: bool = False  # does this doc have a derived .html twin? (layout standard)
@@ -373,6 +409,31 @@ class DocumentSpec(BaseModel):
             raise ValueError(
                 f"document {self.id!r}: duplicate context_refs path(s) "
                 f"{sorted(set(dups))!r}; each context ref must be listed once"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _depends_on_well_formed(self) -> DocumentSpec:
+        """``depends_on`` may not point at itself or list one upstream twice (K8).
+
+        The cross-reference check (the upstream id must name a REAL document) is a
+        whole-config concern and lives on :class:`MonitorConfig`; here we only catch
+        the two errors a single document can self-diagnose.
+        """
+        seen: set[str] = set()
+        dups: list[str] = []
+        for edge in self.depends_on:
+            if edge.doc == self.id:
+                raise ValueError(
+                    f"document {self.id!r}: depends_on cannot reference itself"
+                )
+            if edge.doc in seen:
+                dups.append(edge.doc)
+            seen.add(edge.doc)
+        if dups:
+            raise ValueError(
+                f"document {self.id!r}: duplicate depends_on upstream id(s) "
+                f"{sorted(set(dups))!r}; each upstream must be listed once"
             )
         return self
 
@@ -456,6 +517,27 @@ class StalenessConfig(BaseModel):
         return self
 
 
+class DocDepsConfig(BaseModel):
+    """The ``docdeps:`` block — Pillar B doc↔doc policy (EPIC B, additive K6).
+
+    NOTHING about Pillar B is hardcoded in the engine; every behaviour is a knob
+    here. ``enabled`` turns suspect-link detection on at all; ``gate`` decides
+    whether a ``SUSPECT_LINK`` counts toward ``cdx check``'s exit-1 (Custodex gates
+    by default — unlike Doorstop, which exits 0 on a suspect link — but a team that
+    wants advisory-only suspect links can set it False); ``default_type`` is the
+    edge role assumed when ``cdx link`` is called without one; ``infer_from_links``
+    folds edges inferred from Markdown cross-links between managed docs into the
+    graph automatically (``cdx deps --suggest`` always offers them regardless).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    enabled: bool = True
+    gate: bool = True
+    default_type: DocEdgeType = DocEdgeType.DEPENDS
+    infer_from_links: bool = False
+
+
 class MonitorConfig(BaseModel):
     """Top-level config: documents plus backend/central/apply settings."""
 
@@ -471,10 +553,29 @@ class MonitorConfig(BaseModel):
     apply_default: bool = False  # monitor auto-applies FIX by default?
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (additive)
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
+    docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (additive)
     # P-01: opt-in body-AST fingerprint tier. Default OFF keeps surface_hash bytes
     # identical to the pre-P1 contract, so stored fingerprints stay valid; ON folds
     # function/method bodies into non-user-guide hashes (a deliberate re-baseline).
     fingerprint_body_tier: bool = False
+
+    @model_validator(mode="after")
+    def _depends_on_targets_exist(self) -> MonitorConfig:
+        """Every ``depends_on`` upstream id must name a known document (K8).
+
+        A whole-config check (a single document cannot see its siblings): an edge
+        to a non-existent doc id is a loud :class:`ConfigError` at load, never a
+        silent dangling edge. A no-op for any pre-EPIC-B config (no ``depends_on``).
+        """
+        ids = {doc.id for doc in self.documents}
+        for doc in self.documents:
+            for edge in doc.depends_on:
+                if edge.doc not in ids:
+                    raise ValueError(
+                        f"document {doc.id!r}: depends_on references unknown "
+                        f"document id {edge.doc!r}"
+                    )
+        return self
 
 
 def load_config(path: Path) -> MonitorConfig:
@@ -846,6 +947,7 @@ class IndexFile(BaseModel):
     region_templates: dict[str, RegionTemplate] = {}
     coverage: CoverageConfig = CoverageConfig()
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
+    docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (lifted in merge)
     fingerprint_body_tier: bool = False  # P-01: mirrors MonitorConfig (lifted in merge)
     units: tuple[IndexUnitRef, ...]
     ignore: str = "ignore.yaml"
@@ -1094,6 +1196,7 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
         apply_default=index.apply_default,
         coverage=index.coverage,
         staleness=index.staleness,
+        docdeps=index.docdeps,
         fingerprint_body_tier=index.fingerprint_body_tier,
     )
     base_bundle = ConfigBundle(
@@ -1569,6 +1672,18 @@ def _document_to_yaml(doc: DocumentSpec) -> dict:
         out["code_refs"] = [_coderef_to_yaml(r) for r in doc.code_refs]
     if doc.context_refs:
         out["context_refs"] = [_contextref_to_yaml(r) for r in doc.context_refs]
+    if doc.depends_on:
+        out["depends_on"] = [_docedge_to_yaml(e) for e in doc.depends_on]
+    return out
+
+
+def _docedge_to_yaml(edge: DocEdge) -> dict:
+    """Render a :class:`DocEdge` to a minimal ordered dict (defaults dropped)."""
+    out: dict[str, object] = {"doc": edge.doc}
+    if edge.type is not DocEdgeType.DEPENDS:
+        out["type"] = edge.type.value
+    if edge.note is not None:
+        out["note"] = edge.note
     return out
 
 

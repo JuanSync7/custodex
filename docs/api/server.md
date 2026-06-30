@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: a2647abaa533011d
+  fingerprint: 2613a063fffed614
   fingerprint_tiers:
-    composite: a2647abaa533011d
-    docstring: cdf0f71c8e2745b0
-    signature: 145b4babf0bb35ec
+    composite: 2613a063fffed614
+    docstring: 4609233fcfecdb3f
+    signature: 6444e0fa083691f7
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -113,6 +113,7 @@ cdm:
     - 8f071a0ee4ad3809
     - 91e25a1bd843b417
     - 932c919339ac3a6d
+    - 93b85db9aae2db64
     - 95027cf1e5bce55b
     - 9877e4d3ed2473bb
     - 99acad598cfc3747
@@ -174,7 +175,7 @@ cdm:
     - f95e33eaf5a43c96
     - fa2f6597462ddabd
   region_hashes:
-    symbols: 3790875808d60f98
+    symbols: 28dccfe4a682451e
   schema_version: 1.0.0
 ---
 # server
@@ -192,6 +193,7 @@ cdm:
 | ConfigCodeRef | class | class ConfigCodeRef(BaseModel) |
 | ConfigCodeRefRow | class | class ConfigCodeRefRow(Base) |
 | ConfigContextRef | class | class ConfigContextRef(BaseModel) |
+| ConfigDocEdge | class | class ConfigDocEdge(BaseModel) |
 | ConfigDocument | class | class ConfigDocument(BaseModel) |
 | ConfigDocumentRow | class | class ConfigDocumentRow(Base) |
 | ConfigEdit | variable | ConfigEdit = ... |

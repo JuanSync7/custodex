@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .blocks import REGION_KEYS, expected_region, known_region_ids
 from .config import Audience, MonitorConfig, RegionMode, resolve_repo_root
+from .docdeps import detect_suspect_links
 from .extract import build_document_surface
 from .index import render_index
 from .manifest import (
@@ -50,6 +51,9 @@ class DriftKind(str, Enum):
     HASH = "HASH"
     REGION = "REGION"
     UNHEALABLE = "UNHEALABLE"
+    # EPIC B: an upstream doc this one ``depends_on`` changed since last review.
+    # Never auto-edited (healable=False) — resolved by ``cdx resolve --edge``.
+    SUSPECT_LINK = "SUSPECT_LINK"
 
 
 class Drift(BaseModel):
@@ -315,5 +319,21 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                         diff=_short_diff(expected, current_body, region_id),
                     )
                 )
+
+    # EPIC B: append doc↔doc suspect links (a downstream whose upstream changed).
+    # Pure data like any other Drift; never auto-edited (healable=False) — a human
+    # re-confirms with `cdx resolve --edge`. Gated by `docdeps.enabled` inside
+    # detect_suspect_links. Detection writes nothing (K1).
+    for link in detect_suspect_links(config, root):
+        drifts.append(
+            Drift(
+                kind=DriftKind.SUSPECT_LINK,
+                doc_id=link.doc_id,
+                doc_path=link.doc_path,
+                detail=f"{link.upstream_id}: {link.detail}",
+                healable=False,
+                audience=link.audience,
+            )
+        )
 
     return DriftReport(drifts=tuple(drifts))

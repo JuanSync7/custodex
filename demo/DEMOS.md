@@ -1134,3 +1134,69 @@ next read with no re-sync.
 stale + never-reviewed docs and a `stale_count`. Pinned by
 `tests/integration/test_staleness_server.py`.
 Features: FEAT-STALENESS-006
+
+### DEMO-082 — Declare a doc↔doc dependency (config = truth)
+**What it shows.** A document declares it `depends_on` an upstream document (a typed edge:
+depends/refines/implements/verifies) in config — the source of truth (K2) — and the whole
+policy (enable/gate/default-type/inference) is a `docdeps` config block, nothing hardcoded.
+A self-edge, a duplicate upstream, or an edge to an unknown doc id is a loud ConfigError.
+**How to observe.** The demo's `getting-started` user-guide declares `depends_on: [{doc:
+core-api, type: refines}]`; a config with an unknown upstream id fails to load. Pinned by
+`tests/unit/test_docdeps_config.py`.
+Features: FEAT-DOCDEPS-001
+
+### DEMO-083 — Suspect-link detection (the two-fingerprint model)
+**What it shows.** The downstream stores a per-edge baseline hash of the upstream's BODY in
+its `cdm.upstream_hashes` front matter (separate from its own `cdm.fingerprint`); when the
+upstream's body changes the stamp no longer matches and the edge is SUSPECT. Hashing the
+body (not the front matter) means the upstream's own code↔doc re-stamp never trips it.
+**How to observe.** `detect_suspect_links` returns OK after stamping, then SUSPECT once the
+upstream body is edited; the verdict is pure + sorted. Pinned by `tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-002
+
+### DEMO-084 — Infer edges from Markdown links + per-edge baseline
+**What it shows.** Rather than draw the graph by hand, `infer_edges_from_links` proposes
+edges from the relative Markdown cross-links docs already contain (author→approve), and
+`stamp_edges` writes one edge's baseline idempotently (never on the detect-only check).
+**How to observe.** A doc linking `[overview](overview.md)` yields one inferred edge;
+re-stamping an unchanged edge writes nothing. Pinned by `tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-003
+
+### DEMO-085 — SUSPECT_LINK through cdx check (audience-scoped)
+**What it shows.** A suspect link surfaces through the normal drift path as
+`DriftKind.SUSPECT_LINK` (healable=False — never auto-edited), carrying the downstream
+doc's audience, so `cdx check` reports it with zero extra wiring; `docdeps.enabled` gates
+whether it is computed at all.
+**How to observe.** After an upstream edit, `detect` reports a SUSPECT_LINK for the
+downstream; disabling docdeps suppresses it. Pinned by `tests/unit/test_drift_suspect_link.py`.
+Features: FEAT-DOCDEPS-004
+
+### DEMO-086 — cdx deps + cdx resolve --edge + the gate
+**What it shows.** `cdx deps` shows the graph + suspect status, `cdx deps --suggest` prints
+paste-ready config from inferred links, and `cdx resolve --edge DOWN UP` re-stamps exactly
+one edge (the Doorstop `clear`). `cdx check` gates on a suspect link by default (unlike
+Doorstop, which exits 0) — tunable via `docdeps.gate`.
+**How to observe.** `cdx check` exits 1 on a suspect edge, then 0 after `cdx resolve --edge`;
+with `docdeps.gate: false` it stays 0 but still reports. Pinned by
+`tests/system/test_docdeps_cli.py`.
+Features: FEAT-DOCDEPS-005
+
+### DEMO-087 — Monitor records suspect links + baselines new edges
+**What it shows.** The Monitor never sends a suspect link to the backend (a fix would
+clobber the downstream); on `--apply` it baselines a brand-new UNSTAMPED edge (recorded as
+a FIX) but ESCALATEs a genuinely changed upstream to a human and never auto-edits the
+downstream. A re-run with no change is a no-op (K7).
+**How to observe.** `monitor --apply` baselines the new edge then is idempotent; after an
+upstream change it records an ESCALATE and leaves the downstream untouched. Pinned by
+`tests/integration/test_monitor_docdeps.py`.
+Features: FEAT-DOCDEPS-006
+
+### DEMO-088 — Central hub mirrors the doc↔doc graph
+**What it shows.** A sync projects each document's declared `depends_on` edges into the
+server mirror (additive — it rides in the ConfigDocument JSON, no migration, both stores),
+and `GET /repos/{id}/doc-graph` serves the cross-repo dependency graph (who-depends-on-what)
+so a reverse query is answerable centrally; suspect status stays repo-local (K2).
+**How to observe.** After a sync, `GET /repos/acme%2Fwidget/doc-graph` returns the
+downstream→upstream edges with their type; an unknown repo is 404. Pinned by
+`tests/integration/test_docdeps_server.py`.
+Features: FEAT-DOCDEPS-007
