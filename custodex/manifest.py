@@ -41,6 +41,8 @@ __all__ = [
     "set_region_hash",
     "stored_region_anchors",
     "set_region_anchors",
+    "stored_symbol_sigs",
+    "set_symbol_sigs",
     "region_is_locked",
     "stored_upstream_hashes",
     "set_upstream_hash",
@@ -343,6 +345,40 @@ def set_region_anchors(
     region_anchors = dict(cdm.get("region_anchors") or {})
     region_anchors[region_id] = sorted(anchors)
     cdm["region_anchors"] = region_anchors
+    out["cdm"] = cdm
+    return out
+
+
+def stored_symbol_sigs(doc: Doc) -> dict[str, str] | None:
+    """Return ``cdm.symbol_sigs`` as an ``{anchor_id: sig_digest}`` mapping (DIG-01).
+
+    The per-symbol signature digests stamped at last heal — the hash of each documented
+    symbol's signature payload (name/kind/signature/is_public), keyed by its stable
+    ``anchor_id``. Returns ``None`` when the block is ABSENT (a doc predating DIG-01),
+    so severity classification degrades to the aggregate-tier behaviour; returns
+    ``{}`` when the block is present but empty (a stamped doc with no symbols). The
+    None-vs-empty distinction is the back-compat guard (K6/K8).
+    """
+    cdm = doc.meta.get("cdm")
+    if isinstance(cdm, dict):
+        sigs = cdm.get("symbol_sigs")
+        if isinstance(sigs, dict):
+            return {k: v for k, v in sigs.items() if isinstance(v, str)}
+    return None
+
+
+def set_symbol_sigs(meta: dict[str, Any], sigs: dict[str, str]) -> dict[str, Any]:
+    """Return a copy of ``meta`` with ``cdm.symbol_sigs`` set (DIG-01, additive).
+
+    Additive to the ``cdm:`` mapping (like :func:`set_region_anchors`) — every other key
+    (``fingerprint``, ``fingerprint_tiers``, ``region_hashes``, ``region_anchors``,
+    ``upstream_hashes``) is preserved, and because :func:`set_fingerprint` copies the
+    whole ``cdm`` map, the per-symbol digests survive a later code↔doc fingerprint heal
+    (zero blast radius). Stored with sorted keys for diff-stable front matter (K10).
+    """
+    out = dict(meta)
+    cdm = dict(out.get("cdm") or {}) if isinstance(out.get("cdm"), dict) else {}
+    cdm["symbol_sigs"] = {k: sigs[k] for k in sorted(sigs)}
     out["cdm"] = cdm
     return out
 

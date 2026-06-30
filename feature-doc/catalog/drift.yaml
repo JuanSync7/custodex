@@ -132,3 +132,24 @@ features:
     subsystem: drift
     modules: [drift, schema, monitor]
     constraints: [K6, K10]
+
+  - id: FEAT-DRIFT-012
+    title: Per-symbol signature digests close the masked breaking-change case
+    summary: >-
+      DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the
+      stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to
+      SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the
+      composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive,
+      survives later heals via the cdm-map copy, K7), with manifest
+      stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes
+      `sigs_changed` — the SURVIVING documented symbols whose signature digest moved
+      (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a
+      non-empty sigs_changed ABOVE the addition rule, closing the former masked
+      false-negative where an in-place signature change was hidden as ADDITIVE whenever a
+      symbol was also added in the same edit. A pure addition (no survivor moved) stays
+      ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that
+      predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never
+      crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
+    subsystem: drift
+    modules: [extract, manifest, heal, drift]
+    constraints: [K6, K8, K10]

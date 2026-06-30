@@ -397,6 +397,9 @@ class SurfaceFingerprint(BaseModel):     # P2: frozen; the tiered fingerprint
     docstring: str | None                # sha256[:16] of docstrings; None unless eng-guide
     body: str | None                     # sha256[:16] of body_hashes; None unless body tier on
     composite: str                       # == surface_hash(): the identity, byte-stable
+    sig_by_anchor: dict[str,str] | None = None  # DIG-01: {anchor_id -> sha256[:16] of the
+        # per-symbol signature payload}. NOT hashed into composite (byte-stable, K6/K10);
+        # None only on a hand-built fp predating DIG-01 (fingerprint() always populates it).
     def drifted_against(self, other: SurfaceFingerprint) -> tuple[str, ...]
         # ("signature"/"docstring"/"body",...) tiers whose digest differs; sorted (K10)
 
@@ -627,7 +630,18 @@ def set_fingerprint_tiers(meta: dict, fp: SurfaceFingerprint) -> dict  # additiv
 # region documents), so drift can tell a symbol add/remove/rename from an internal change.
 def stored_region_anchors(doc: Doc, region_id: str) -> tuple[str, ...] | None  # None pre-P4
 def set_region_anchors(meta: dict, region_id: str, anchors: tuple[str, ...]) -> dict
+# DIG-01 per-symbol signature digests — additive per-doc `cdm.symbol_sigs`
+# {anchor_id -> sig digest}. None pre-DIG-01 (→ severity degrades to aggregate, K6);
+# `{}` when stamped-but-symbol-less. Stamped by heal AND layout.scaffold_doc (parity).
+def stored_symbol_sigs(doc: Doc) -> dict[str, str] | None
+def set_symbol_sigs(meta: dict, sigs: dict[str, str]) -> dict   # sorted keys, additive under cdm
 ```
+DIG-01 `drift.classify_change_severity(drifted_tiers, anchors_added, anchors_removed,
+sigs_changed=())` gains a 4th param: a non-empty `sigs_changed` (SURVIVING symbols whose
+signature digest moved, from `cdm.symbol_sigs`) → `BREAKING` ABOVE the addition rule, so a
+simultaneous add + in-place signature change is no longer masked as ADDITIVE. `Drift.sigs_changed`
+is the additive field; no public-schema change (`ReviewRecord.change_severity` just gets more
+accurate). A pre-DIG-01 doc degrades to the aggregate behaviour.
 Per-region content hash (B-03) — the mode-agnostic **lock** living additively in
 `cdm.region_hashes` (id -> hash), which `set_fingerprint` already copies forward,
 so a hash survives a heal:

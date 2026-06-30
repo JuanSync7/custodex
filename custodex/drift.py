@@ -40,6 +40,7 @@ from .manifest import (
     stored_fingerprint_tiers,
     stored_region_anchors,
     stored_region_hash,
+    stored_symbol_sigs,
 )
 
 __all__ = [
@@ -90,33 +91,37 @@ def classify_change_severity(
     drifted_tiers: Sequence[str],
     anchors_added: Sequence[str],
     anchors_removed: Sequence[str],
+    sigs_changed: Sequence[str] = (),
 ) -> ChangeSeverity:
     """Map the structural HASH signals onto a :class:`ChangeSeverity` (pure, K10).
 
     Precedence (the Griffe spirit — removals/changes break, additions don't):
 
     1. a removed/renamed documented symbol ⇒ ``BREAKING``;
-    2. else a newly-added symbol ⇒ ``ADDITIVE`` (additions are non-breaking, even
+    2. else a SURVIVING symbol whose signature changed IN PLACE (``sigs_changed``,
+       DIG-01) ⇒ ``BREAKING`` — checked ABOVE the addition rule so a simultaneous
+       add + in-place change is no longer masked;
+    3. else a newly-added symbol ⇒ ``ADDITIVE`` (additions are non-breaking, even
        though they also move the aggregate signature tier);
-    3. else a moved ``signature`` tier with NO anchor delta ⇒ ``BREAKING`` (the same
-       symbol set, so a signature changed in place — or an old doc whose signature
-       tier moved with no anchors to attribute it to: flag it, conservatively);
-    4. else any moved tier (docstring/body only) ⇒ ``COSMETIC``;
-    5. else ``UNKNOWN`` (no signal — a pre-P2/P4 doc with only a composite hash).
+    4. else a moved ``signature`` tier with NO anchor/signature delta ⇒ ``BREAKING``
+       (a pre-DIG-01 doc whose signature tier moved with no per-symbol digests to
+       attribute it to: flag it, conservatively);
+    5. else any moved tier (docstring/body only) ⇒ ``COSMETIC``;
+    6. else ``UNKNOWN`` (no signal — a pre-P2/P4 doc with only a composite hash).
 
-    Caveat (a known false-negative class, not a one-off): whenever a symbol is
-    ADDED in the same edit that also changes an existing symbol's signature IN
-    PLACE, this returns ``ADDITIVE`` (step 2 wins) even though the in-place change
-    is genuinely breaking — so ``ADDITIVE`` is NOT a guarantee of backward
-    compatibility when ``anchors_added`` is non-empty. The aggregate signals cannot
-    separate the two: a pure addition ALSO moves the ``signature`` tier (the set of
-    signatures grew), so promoting "signature in tiers" above the addition check
-    would instead mislabel every pure addition BREAKING — the wrong, noisier
-    direction. Distinguishing them needs per-symbol signature digests (a deliberate
-    further deferral). The reverse direction — a removed/renamed symbol — is always
-    caught first (step 1), so a deletion is never masked.
+    DIG-01 closes the former masked false-negative: ``sigs_changed`` is the set of
+    documented symbols present BEFORE and AFTER whose signature digest differs (from
+    the stored ``cdm.symbol_sigs``), so an in-place signature change is caught even when
+    a symbol is ALSO added in the same edit. It is empty for a pure addition (no
+    survivor's signature moved), so additions still classify ``ADDITIVE`` — not the
+    noisier "every addition is breaking" direction. When ``sigs_changed`` is empty
+    because the doc predates DIG-01 (no stored per-symbol digests), the classifier falls
+    through to the aggregate behaviour above (steps 3-6), so old docs degrade gracefully
+    (K6). A removed/renamed symbol is still caught first (step 1).
     """
     if anchors_removed:
+        return ChangeSeverity.BREAKING
+    if sigs_changed:
         return ChangeSeverity.BREAKING
     if anchors_added:
         return ChangeSeverity.ADDITIVE
@@ -151,9 +156,14 @@ class Drift(BaseModel):
     # removed / renamed. Empty when the doc predates P4 (no stored anchors).
     anchors_added: tuple[str, ...] = ()
     anchors_removed: tuple[str, ...] = ()
+    # DIG-01: anchor_ids of SURVIVING documented symbols (present before AND after)
+    # whose signature digest changed in place, from the stored `cdm.symbol_sigs`. Drives
+    # the masked add+in-place-signature case to BREAKING; empty for a pure addition and
+    # for a doc that predates DIG-01 (no stored per-symbol digests). Sorted (K10).
+    sigs_changed: tuple[str, ...] = ()
     # P5: the Griffe-style breaking-change severity of a HASH drift, classified from
-    # drifted_tiers + the anchor deltas above (breaking/additive/cosmetic). UNKNOWN
-    # for non-HASH drifts and for an OLD doc with no per-tier/anchor signals.
+    # drifted_tiers + the anchor deltas + sigs_changed (breaking/additive/cosmetic).
+    # UNKNOWN for non-HASH drifts and for an OLD doc with no per-tier/anchor signals.
     change_severity: ChangeSeverity = ChangeSeverity.UNKNOWN
 
 
@@ -279,11 +289,27 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                         f" (anchored symbols changed: +{len(anchors_added)}/"
                         f"-{len(anchors_removed)})"
                     )
-            # P5: classify the breaking-change severity from the structural signals
-            # just computed (no new analysis) so check/monitor/the audit record can
-            # say breaking vs additive vs cosmetic at a glance.
+            # DIG-01: among the SURVIVING symbols (present before AND after), which
+            # signatures changed IN PLACE? Compare the stored per-symbol digests
+            # (`cdm.symbol_sigs`) to the current ones. ``None`` ⇒ a pre-DIG-01 doc, so
+            # leave it empty and let severity degrade to the aggregate behaviour (K6).
+            sigs_changed: tuple[str, ...] = ()
+            stored_sig_map = stored_symbol_sigs(doc)
+            if stored_sig_map is not None:
+                current_sig_map = current_fp.sig_by_anchor or {}
+                survivors = current_anchors & set(stored_sig_map)
+                sigs_changed = tuple(
+                    sorted(
+                        a
+                        for a in survivors
+                        if current_sig_map.get(a) != stored_sig_map.get(a)
+                    )
+                )
+            # P5/DIG-01: classify the breaking-change severity from the structural
+            # signals just computed (no new analysis) so check/monitor/the audit record
+            # can say breaking vs additive vs cosmetic at a glance.
             change_severity = classify_change_severity(
-                drifted_tiers, anchors_added, anchors_removed
+                drifted_tiers, anchors_added, anchors_removed, sigs_changed
             )
             drifts.append(
                 Drift(
@@ -296,6 +322,7 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
                     drifted_tiers=drifted_tiers,
                     anchors_added=anchors_added,
                     anchors_removed=anchors_removed,
+                    sigs_changed=sigs_changed,
                     change_severity=change_severity,
                 )
             )

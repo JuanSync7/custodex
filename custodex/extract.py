@@ -134,6 +134,14 @@ class SurfaceFingerprint(BaseModel):
     docstring: str | None
     body: str | None
     composite: str
+    # DIG-01: per-symbol signature digest {anchor_id -> sha256[:16] of the symbol's
+    # signature payload (name/kind/signature/is_public)}. Lets drift tell whether a
+    # SURVIVING symbol's signature changed IN PLACE — closing the masked add+in-place
+    # case that the aggregate tiers cannot distinguish. ``None`` only on a hand-built
+    # fingerprint predating DIG-01 (``fingerprint()`` always populates it); it is NOT
+    # part of any hashed payload, so ``composite``/``signature``/… are byte-identical
+    # to the pre-DIG-01 contract (K6/K10); stored ``cdm.fingerprint`` values stay good.
+    sig_by_anchor: dict[str, str] | None = None
 
     def drifted_against(self, other: SurfaceFingerprint) -> tuple[str, ...]:
         """Return the tier name(s) whose digest differs from ``other``, sorted (K10).
@@ -204,6 +212,11 @@ class DocumentSurface(BaseModel):
         sig_items: list[dict[str, object]] = []
         doc_items: list[dict[str, object]] = []
         body_items: list[dict[str, object]] = []
+        # DIG-01: per-symbol signature digest, keyed by the stable lineno-free
+        # anchor_id (the same identity ``region_anchors`` uses). The digest hashes ONLY
+        # the signature-bearing payload (name/kind/signature/is_public) — not docstrings
+        # or bodies — so it moves exactly when a symbol's structural signature does.
+        sig_by_anchor: dict[str, str] = {}
         for sym in self.symbols:
             base: dict[str, object] = {
                 "name": sym.name,
@@ -211,6 +224,7 @@ class DocumentSurface(BaseModel):
                 "signature": sym.signature,
                 "is_public": sym.is_public,
             }
+            sig_by_anchor[sym.anchor_id] = _hash_payload(base)
             entry = dict(base)
             if include_docstrings:
                 entry["docstring"] = sym.docstring
@@ -263,6 +277,7 @@ class DocumentSurface(BaseModel):
             docstring=docstring,
             body=body,
             composite=_hash_payload(composite_payload),
+            sig_by_anchor=sig_by_anchor,
         )
 
 

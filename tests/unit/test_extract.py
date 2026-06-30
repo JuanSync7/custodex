@@ -24,6 +24,7 @@ from custodex.extract import (
     ShellExtractor,
     SurfaceFingerprint,
     Symbol,
+    anchor_id,
     build_document_surface,
     extract_file,
     get_extractor,
@@ -307,6 +308,53 @@ def test_eng_guide_includes_private(tmp_path: Path) -> None:
     assert "_helper" in names
     assert "_PRIVATE" in names
     assert "Widget._internal" in names
+
+
+# --------------------------------------------------------------------------- #
+# DIG-01: per-symbol signature digests (SurfaceFingerprint.sig_by_anchor)        #
+#                                                                              #
+# Feature: FEAT-DRIFT-012                                                       #
+# --------------------------------------------------------------------------- #
+def test_sig_by_anchor_populated_and_keyed_by_anchor_id(tmp_path: Path) -> None:
+    _write(tmp_path, "def greet(name: str) -> str:\n    return name\n")
+    doc = _doc(Audience.ENG_GUIDE, CodeRef(path="sample.py"))
+    fp = build_document_surface(doc, tmp_path).fingerprint()
+    assert fp.sig_by_anchor is not None
+    assert anchor_id("greet") in fp.sig_by_anchor
+    assert len(fp.sig_by_anchor[anchor_id("greet")]) == 16  # sha256[:16] (K10)
+
+
+def test_sig_by_anchor_deterministic(tmp_path: Path) -> None:
+    _write(tmp_path, "def greet(name: str) -> str:\n    return name\n")
+    doc = _doc(Audience.ENG_GUIDE, CodeRef(path="sample.py"))
+    a = build_document_surface(doc, tmp_path).fingerprint().sig_by_anchor
+    b = build_document_surface(doc, tmp_path).fingerprint().sig_by_anchor
+    assert a == b
+
+
+def test_sig_by_anchor_moves_on_signature_not_on_docstring(tmp_path: Path) -> None:
+    """A symbol's digest tracks its SIGNATURE only — stable under a docstring edit,
+    moving under a parameter change (the whole point of DIG-01)."""
+    doc = _doc(Audience.ENG_GUIDE, CodeRef(path="sample.py"))
+
+    def _greet_digest() -> str:
+        fp = build_document_surface(doc, tmp_path).fingerprint()
+        assert fp.sig_by_anchor is not None
+        return fp.sig_by_anchor[anchor_id("greet")]
+
+    _write(tmp_path, 'def greet(name: str) -> str:\n    """Hi."""\n    return name\n')
+    base = _greet_digest()
+    # docstring-only change → identical signature digest.
+    _write(
+        tmp_path, 'def greet(name: str) -> str:\n    """Howdy!"""\n    return name\n'
+    )
+    assert _greet_digest() == base
+    # parameter added → different signature digest.
+    _write(
+        tmp_path,
+        'def greet(name: str, loud: bool) -> str:\n    """Hi."""\n    return name\n',
+    )
+    assert _greet_digest() != base
 
 
 # --------------------------------------------------------------------------- #

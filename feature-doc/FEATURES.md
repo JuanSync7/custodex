@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**233 features** across 23 subsystems.
+**234 features** across 23 subsystems.
 
 ## agent
 
@@ -489,6 +489,7 @@ docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the dire
 | `FEAT-DRIFT-009` | LLM-authored region staleness | drift | K1, K4 | — | — | implemented |
 | `FEAT-DRIFT-010` | Report aggregation and human summary | drift | K1 | — | — | implemented |
 | `FEAT-DRIFT-011` | Breaking-change severity classification | drift, schema, monitor | K6, K10 | — | — | implemented |
+| `FEAT-DRIFT-012` | Per-symbol signature digests close the masked breaking-change case | extract, manifest, heal, drift | K6, K8, K10 | — | — | implemented |
 
 ### `FEAT-DRIFT-001` — Detect-only drift grading
 
@@ -533,6 +534,10 @@ DriftReport bundles the tuple of drifts with an ok property (true when no drift)
 ### `FEAT-DRIFT-011` — Breaking-change severity classification
 
 On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from the P2 drifted_tiers + the P4 anchor deltas already computed (no new analysis): classify_change_severity returns BREAKING for a removed/renamed symbol or an in-place signature change (same symbol set, signature tier moved), ADDITIVE for a purely added symbol (additions are non-breaking even though they move the signature tier), COSMETIC for a docstring/body-only move, and UNKNOWN for a composite-only old doc with no structural signal. It rides on Drift.change_severity, is annotated in DriftReport.summary() for a HASH drift (UNKNOWN stays silent), and is mirrored onto the ReviewRecord as the additive 1.2.0 `change_severity` field so the audit log and central hub see breaking vs additive vs cosmetic at a glance.
+
+### `FEAT-DRIFT-012` — Per-symbol signature digests close the masked breaking-change case
+
+DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive, survives later heals via the cdm-map copy, K7), with manifest stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes `sigs_changed` — the SURVIVING documented symbols whose signature digest moved (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a non-empty sigs_changed ABOVE the addition rule, closing the former masked false-negative where an in-place signature change was hidden as ADDITIVE whenever a symbol was also added in the same edit. A pure addition (no survivor moved) stays ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
 
 ## extract
 
