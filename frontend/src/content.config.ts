@@ -15,4 +15,14 @@ const wiki = defineCollection({
   }),
 });
 
-export const collections = { wiki };
+// The hand-authored capabilities guide — the human "why & how" companion to the
+// machine-generated /wiki. These live under src/content/guides/ and are NOT touched
+// by `cdx wiki`; `/guide/*` pages render them at build time (see pages/guide/).
+const guides = defineCollection({
+  loader: glob({
+    pattern: ["*.md"],
+    base: fileURLToPath(new URL("./content/guides", import.meta.url)),
+  }),
+});
+
+export const collections = { wiki, guides };

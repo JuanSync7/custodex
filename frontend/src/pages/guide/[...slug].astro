@@ -1,0 +1,107 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import ConsoleChrome from "../../components/ConsoleChrome.astro";
+
+// The hand-authored capabilities guide, rendered inside the SAME console chrome as
+// the rest of the site (left rail + topbar via ConsoleChrome). Each markdown doc
+// under src/content/guides/ is a static `/guide/*` page; the sections are a tab bar
+// in the canvas (mirrors the /wiki page).
+
+interface SectionMeta {
+  slug: string;
+  title: string;
+  order: number;
+}
+
+export async function getStaticPaths() {
+  // metaFor lives INSIDE getStaticPaths (Astro hoists it into its own scope). Map an
+  // entry id -> slug/title by substring (robust to the glob loader's id casing).
+  function metaFor(id: string): SectionMeta | null {
+    const u = id.toLowerCase();
+    if (u.includes("overview"))
+      return { slug: "overview", title: "Overview", order: 0 };
+    if (u.includes("transitive"))
+      return { slug: "transitive-suspect", title: "Transitive suspect", order: 1 };
+    if (u.includes("breaking"))
+      return {
+        slug: "breaking-change-severity",
+        title: "Breaking-change severity",
+        order: 2,
+      };
+    if (u.includes("worklist"))
+      return { slug: "review-worklist", title: "Review worklist", order: 3 };
+    return null;
+  }
+  const entries = await getCollection("guides");
+  const known = entries
+    .map((entry) => ({ entry, meta: metaFor(entry.id) }))
+    .filter((x): x is { entry: (typeof entries)[number]; meta: SectionMeta } =>
+      Boolean(x.meta),
+    );
+  const sections = known
+    .map(({ meta }) => meta)
+    .sort((a, b) => a.order - b.order);
+  return known.map(({ entry, meta }) => ({
+    params: { slug: meta.slug },
+    props: { entry, meta, sections },
+  }));
+}
+
+const { entry, meta, sections } = Astro.props;
+const { Content } = await render(entry);
+const href = (s: SectionMeta) => `/guide/${s.slug}`;
+---
+
+<Layout title={`${meta.title} · Custodex guide`}>
+  <ConsoleChrome active="guide" crumb={`Guide · ${meta.title}`}>
+    <nav class="wikitabs" aria-label="Guide sections">
+      {
+        sections.map((s) => (
+          <a
+            class:list={["wikitab", { "wikitab--active": s.slug === meta.slug }]}
+            href={href(s)}
+            aria-current={s.slug === meta.slug ? "page" : undefined}
+          >
+            {s.title}
+          </a>
+        ))
+      }
+    </nav>
+    <article class="prose wiki-body">
+      <Content />
+    </article>
+  </ConsoleChrome>
+</Layout>
+
+<style>
+  .wikitabs {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+    margin: -0.6rem 0 1.8rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .wikitab {
+    padding: 0.55rem 0.9rem;
+    margin-bottom: -1px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 0.92rem;
+  }
+  .wikitab:hover {
+    text-decoration: none;
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .wikitab--active {
+    color: var(--primary-strong);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+  }
+  .wiki-body {
+    margin-top: 0.5rem;
+  }
+</style>
