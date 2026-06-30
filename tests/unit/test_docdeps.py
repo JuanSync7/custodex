@@ -379,21 +379,55 @@ def test_render_impact_text_empty_and_nonempty() -> None:
 #
 # Feature: FEAT-DOCDEPS-010
 # --------------------------------------------------------------------------- #
-def test_reverse_reachable_matches_impacted_by() -> None:
-    """The extracted helper reproduces ``impacted_by`` byte-for-byte (K6/K10).
+def test_reverse_reachable_pins_concrete_values_on_cycle_and_branch() -> None:
+    """Concrete characterization of the shared BFS — NOT a tautology against
+    ``impacted_by`` (K10).
 
-    Guards the PROP-01 refactor: ``impacted_by`` now delegates to
-    ``_reverse_reachable``, so its output must be IDENTICAL on every origin —
-    including the cycle and branching graphs the original was characterized on.
+    Pins the exact reverse-reachable SET (origins excluded, cycle-safe) on a chain, a
+    cycle, and a branch, so the PROP-01 extraction of ``_reverse_reachable`` from
+    ``impacted_by`` cannot regress silently.
     """
-    for cfg in (_chain_cfg(),):
-        for origin in ("a", "b", "c", "solo"):
-            assert impacted_by(cfg, origin) == tuple(
-                sorted(_reverse_reachable(cfg, {origin}))
-            )
-    # direct-only mode delegates too
-    assert impacted_by(_chain_cfg(), "c", transitive=False) == tuple(
-        sorted(_reverse_reachable(_chain_cfg(), {"c"}, transitive=False))
+    chain = _chain_cfg()  # a → b → c, plus solo
+    assert _reverse_reachable(chain, {"c"}) == {"a", "b"}
+    assert _reverse_reachable(chain, {"c"}, transitive=False) == {"b"}
+    assert _reverse_reachable(chain, {"a"}) == set()
+    assert _reverse_reachable(chain, {"solo"}) == set()
+    # a ↔ b cycle PLUS c → b: cycle-safe, excludes the origin, reaches the branch.
+    cyclic = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+            DocumentSpec(
+                id="c",
+                path="c.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    assert _reverse_reachable(cyclic, {"b"}) == {"a", "c"}
+    assert _reverse_reachable(cyclic, {"a"}) == {"b", "c"}
+
+
+def test_impacted_by_delegates_to_reverse_reachable() -> None:
+    """``impacted_by`` is ``_reverse_reachable`` sorted (delegation contract, K6)."""
+    chain = _chain_cfg()
+    for origin in ("a", "b", "c", "solo"):
+        assert impacted_by(chain, origin) == tuple(
+            sorted(_reverse_reachable(chain, {origin}))
+        )
+    assert impacted_by(chain, "c", transitive=False) == tuple(
+        sorted(_reverse_reachable(chain, {"c"}, transitive=False))
     )
 
 
@@ -506,6 +540,35 @@ def test_propagate_suspect_omits_docs_already_directly_flagged() -> None:
     # c changed → both a (via a→c) and b (via b→c) are DIRECTLY suspect.
     direct = (_suspect("a", "c"), _suspect("b", "c"))
     assert propagate_suspect(cfg, direct) == ()  # a already reported; no dupe
+
+
+def test_propagate_suspect_surfaces_other_edge_of_a_partly_direct_doc() -> None:
+    """A doc directly flagged on ONE edge still gets its OTHER, transitively-pending
+    edge in the advisory — the exclusion is per-EDGE, not per-document. Under a
+    doc-level skip that second edge would vanish from BOTH reports (hardening)."""
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(id="kk", path="kk.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"), DocEdge(doc="kk")),
+            ),
+        )
+    )
+    # c changed → b directly SUSPECT; a→kk is independently UNSTAMPED (direct, non-OK).
+    direct = (_suspect("b", "c"), _suspect("a", "kk", SuspectStatus.UNSTAMPED))
+    adv = [(s.doc_id, s.upstream_id, s.status) for s in propagate_suspect(cfg, direct)]
+    # a→b IS pending (b is suspect) and is NOT the directly-reported a→kk edge.
+    assert adv == [("a", "b", SuspectStatus.SUSPECT_TRANSITIVE)]
 
 
 def test_propagate_suspect_uses_downstream_audience() -> None:

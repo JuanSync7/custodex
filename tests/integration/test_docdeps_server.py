@@ -309,6 +309,12 @@ def test_doc_graph_reverse_transitive_closure(kind: str) -> None:
     assert [d["doc_id"] for d in trans["dependents"]] == ["api", "guide"]
     assert trans["count"] == 2 and trans["transitive"] is True
     assert "type" not in trans["dependents"][0]  # a closure has no single edge type
+    # one-hop agreement: `api`'s single direct dependent equals its full closure, so
+    # the indexed query and the BFS return the SAME set.
+    assert [d["doc_id"] for d in rev(doc="api")["dependents"]] == ["guide"]
+    assert [d["doc_id"] for d in rev(doc="api", transitive="true")["dependents"]] == [
+        "guide"
+    ]
 
 
 @pytest.mark.parametrize("kind", ["memory", "sql"])
@@ -331,6 +337,7 @@ def test_doc_graph_reverse_transitive_is_cycle_safe(kind: str) -> None:
         params={"doc": "a", "transitive": "true"},
     ).json()
     assert [d["doc_id"] for d in trans["dependents"]] == ["b"]
+    assert trans["count"] == 1 and trans["transitive"] is True
 
 
 def test_doc_graph_reverse_requires_doc_param() -> None:

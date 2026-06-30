@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 0ee9cb6dae48d394
+  fingerprint: 82bfd11eb660b5f2
   fingerprint_tiers:
-    composite: 0ee9cb6dae48d394
-    signature: 0ee9cb6dae48d394
+    composite: 82bfd11eb660b5f2
+    signature: 82bfd11eb660b5f2
   schema_version: 1.0.0
 ---
 # Custodex

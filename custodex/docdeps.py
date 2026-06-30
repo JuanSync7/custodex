@@ -300,10 +300,12 @@ def propagate_suspect(
     Derived purely from ``direct`` + the declared graph. The origins are the documents
     DIRECTLY flagged (``SUSPECT`` / ``MISSING_UPSTREAM``; ``UNSTAMPED`` is excluded — a
     never-reviewed edge is not a *change*). Every document reverse-reachable from those
-    origins gets one advisory link per declared edge to a still-pending upstream.
-    Documents already present in ``direct`` with a non-OK status are omitted (they are
-    reported there), so the advisory and the direct report never overlap. Returns ()
-    when nothing is directly flagged. Sorted by ``(doc_id, upstream_id)`` (K10).
+    origins gets one advisory link per declared edge to a still-pending upstream. EDGES
+    already present in ``direct`` with a non-OK status are omitted (they are reported
+    there), so the advisory and the direct report never overlap — even when a document
+    is directly flagged on one edge AND transitively pending on another. The exclusion
+    is per-EDGE, not per-document, so that second edge is never dropped. Returns () when
+    nothing is directly flagged. Sorted by ``(doc_id, upstream_id)`` (K10).
     """
     flagged = {
         link.doc_id
@@ -314,16 +316,23 @@ def propagate_suspect(
         return ()
     reachable = _reverse_reachable(config, flagged, transitive=True)
     pending = flagged | reachable  # every doc that is or will become suspect
-    already = {link.doc_id for link in direct if link.status is not SuspectStatus.OK}
+    # Exclude exactly the EDGES already in the direct report (edge granularity, not
+    # whole-document): a doc can be directly flagged on one edge and transitively
+    # pending on another — the second edge belongs in neither report under a doc skip.
+    already_edges = {
+        (link.doc_id, link.upstream_id)
+        for link in direct
+        if link.status is not SuspectStatus.OK
+    }
     specs_by_id = {doc.id: doc for doc in config.documents}
     out: list[SuspectLink] = []
     for doc_id in reachable:
-        if doc_id in already:
-            continue  # already in the direct report — do not double-list
         spec = specs_by_id[doc_id]
         for edge in spec.depends_on:
             if edge.doc not in pending:
                 continue  # this upstream is fine; only pending ones explain the doc
+            if (spec.id, edge.doc) in already_edges:
+                continue  # this exact edge is already in the direct report
             out.append(
                 SuspectLink(
                     doc_id=spec.id,

@@ -167,26 +167,33 @@ _CHAIN_DOCS = [
 ]
 
 
-def _setup_chain(tmp_path: Path) -> Path:
+def _setup_chain(root: Path, *, transitive: bool = False) -> Path:
     """top → mid → leaf, each code↔doc-clean; return the config path."""
-    cfg = {"version": "1.0.0", "root": ".", "documents": _CHAIN_DOCS}
-    cfg_path = tmp_path / "cdmon.yaml"
+    root.mkdir(parents=True, exist_ok=True)
+    cfg: dict[str, object] = {"version": "1.0.0", "root": ".", "documents": _CHAIN_DOCS}
+    if transitive:
+        cfg["docdeps"] = {"transitive": True}
+    cfg_path = root / "cdmon.yaml"
     cfg_path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
-    (tmp_path / "docs").mkdir(exist_ok=True)
+    (root / "docs").mkdir(exist_ok=True)
     loaded = load_config(cfg_path)
     bodies = {"leaf": "# Leaf\nbase\n", "mid": "# Mid\nm\n", "top": "# Top\nt\n"}
     for spec in loaded.documents:
-        surface = build_document_surface(spec, tmp_path)
+        surface = build_document_surface(spec, root)
         meta = set_fingerprint({}, surface.surface_hash())
-        (tmp_path / spec.path).write_text(
+        (root / spec.path).write_text(
             render_doc(meta, bodies[spec.id]), encoding="utf-8"
         )
     return cfg_path
 
 
-def _stamp_chain(tmp_path: Path, cfg: Path) -> None:
+def _stamp_chain(root: Path, cfg: Path) -> None:
     runner.invoke(app, ["resolve", "--edge", "mid", "leaf", "--config", str(cfg)])
     runner.invoke(app, ["resolve", "--edge", "top", "mid", "--config", str(cfg)])
+
+
+def _break_leaf(root: Path) -> None:
+    (root / "docs" / "leaf.md").write_text("# Leaf\nLEAF CHANGED\n", encoding="utf-8")
 
 
 def test_deps_transitive_advisory_lists_pending_downstream(tmp_path: Path) -> None:
@@ -195,22 +202,22 @@ def test_deps_transitive_advisory_lists_pending_downstream(tmp_path: Path) -> No
     assert runner.invoke(app, ["check", "--config", str(cfg)]).exit_code == 0
     # Change the leaf body: mid goes DIRECTLY suspect; top is only TRANSITIVELY
     # pending (mid's body is unchanged, so top's own edge is still OK).
-    (tmp_path / "docs" / "leaf.md").write_text(
-        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
-    )
+    _break_leaf(tmp_path)
     res = runner.invoke(app, ["deps", "--transitive", "--config", str(cfg)])
     assert res.exit_code == 0
-    assert "mid" in res.stdout and "leaf" in res.stdout  # direct
-    assert "top" in res.stdout and "does NOT gate" in res.stdout  # advisory
+    assert "mid" in res.stdout and "leaf" in res.stdout  # direct section
+    # Bind `top` to the ADVISORY block specifically (not the direct listing): split on
+    # the advisory header so a regression emitting the wrong advisory doc would fail.
+    assert "advisory —" in res.stdout and "does NOT gate" in res.stdout
+    advisory_block = res.stdout.split("advisory —", 1)[1]
+    assert "top" in advisory_block and "→ mid" in advisory_block
 
 
 def test_check_still_gates_only_on_direct_suspect(tmp_path: Path) -> None:
     """The advisory never changes the gate — only the DIRECT suspect fails check."""
     cfg = _setup_chain(tmp_path)
     _stamp_chain(tmp_path, cfg)
-    (tmp_path / "docs" / "leaf.md").write_text(
-        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
-    )
+    _break_leaf(tmp_path)
     res = runner.invoke(app, ["check", "--config", str(cfg)])
     assert res.exit_code == 1
     assert "SUSPECT_LINK" in res.stdout
@@ -223,19 +230,57 @@ def test_deps_transitive_json_is_opt_in_shape(tmp_path: Path) -> None:
 
     cfg = _setup_chain(tmp_path)
     _stamp_chain(tmp_path, cfg)
-    (tmp_path / "docs" / "leaf.md").write_text(
-        "# Leaf\nLEAF CHANGED\n", encoding="utf-8"
-    )
+    _break_leaf(tmp_path)
     res = runner.invoke(app, ["deps", "--transitive", "--json", "--config", str(cfg)])
     assert res.exit_code == 0
     payload = json.loads(res.stdout)
     assert set(payload) == {"edges", "transitive"}
-    assert any(t["doc_id"] == "top" for t in payload["transitive"])
+    # the transitive entry pins the advisory STATUS + upstream (a regression to plain
+    # `suspect`, or to the wrong upstream, would pass a bare doc_id check).
+    top = next(t for t in payload["transitive"] if t["doc_id"] == "top")
+    assert top["status"] == "suspect_transitive" and top["upstream_id"] == "mid"
+    # the already-exclusion holds through the CLI seam: mid is NOT advised transitively…
+    assert all(t["doc_id"] != "mid" for t in payload["transitive"])
+    # …but IS present in the direct edges as a real suspect.
+    assert any(
+        e["doc_id"] == "mid" and e["status"] == "suspect" for e in payload["edges"]
+    )
     # plain `--json` keeps the back-compat bare-list contract (K6)
     plain = json.loads(
         runner.invoke(app, ["deps", "--json", "--config", str(cfg)]).stdout
     )
     assert isinstance(plain, list)
+
+
+# --- PROP-01: the opt-in `cdx monitor` advisory line (docdeps.transitive knob) ----
+# Feature: FEAT-DOCDEPS-010
+
+
+def test_monitor_transitive_advisory_line_when_knob_on(tmp_path: Path) -> None:
+    """With docdeps.transitive=true, `cdx monitor` prints the advisory line naming the
+    transitively-pending downstream count."""
+    cfg = _setup_chain(tmp_path, transitive=True)
+    _stamp_chain(tmp_path, cfg)
+    _break_leaf(tmp_path)
+    res = runner.invoke(app, ["monitor", "--config", str(cfg)])
+    assert "advisory:" in res.stdout and "transitively suspect" in res.stdout
+    assert "1 document(s)" in res.stdout  # `top` is the single pending downstream
+
+
+def test_monitor_advisory_is_non_gating_and_off_by_default(tmp_path: Path) -> None:
+    """The advisory never changes the exit code (K1/K7); absent without the knob."""
+    on = _setup_chain(tmp_path / "on", transitive=True)
+    off = _setup_chain(tmp_path / "off", transitive=False)
+    _stamp_chain(tmp_path / "on", on)
+    _stamp_chain(tmp_path / "off", off)
+    _break_leaf(tmp_path / "on")
+    _break_leaf(tmp_path / "off")
+    on_res = runner.invoke(app, ["monitor", "--config", str(on)])
+    off_res = runner.invoke(app, ["monitor", "--config", str(off)])
+    # Identical exit code on/off — the advisory is purely informational.
+    assert on_res.exit_code == off_res.exit_code
+    assert "advisory:" in on_res.stdout  # knob ON → shown
+    assert "advisory:" not in off_res.stdout  # knob OFF (default) → silent
 
 
 def test_deps_suggest_infers_from_markdown_link(tmp_path: Path) -> None:

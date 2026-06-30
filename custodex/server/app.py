@@ -1352,7 +1352,11 @@ def create_app(
         echoes a ``transitive`` flag. ``sync_kind`` resolves to the SAME single
         partition as ``/doc-graph`` (via :func:`_resolve_graph_kind`: explicit wins;
         else "git" falling back to "local") so the two routes agree and a local-only
-        repo is never blank. Open read; ``doc`` is a required query param.
+        repo is never blank. Open read; ``doc`` is a required query param. An unknown or
+        non-managed ``doc`` returns an empty closure (HTTP 200) BY DESIGN — the
+        established convention for the hub's open read routes (a well-formed zero-row
+        result, not an error); the repo-side ``cdx deps --impact`` is the loud (K8)
+        path.
         """
         _require_known_repo(store, repo_id)
         kind = _resolve_graph_kind(store, repo_id, sync_kind)

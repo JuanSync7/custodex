@@ -46,6 +46,7 @@ from .config import (
 )
 from .docdeps import (
     InferredEdge,
+    SuspectLink,
     detect_suspect_links,
     impacted_by,
     infer_edges_from_links,
@@ -572,10 +573,15 @@ def monitor(
             f"{handled.result.verdict.value}{applied}"
         )
     # PROP-01: opt-in transitive-suspect advisory — purely informational, never
-    # affects the exit code (the gate stays the direct wavefront, K1/K7).
+    # affects the exit code (the gate stays the direct wavefront, K1/K7). Guarded so a
+    # doc mutated between the run and here cannot turn a clean exit into a traceback.
     if cfg.docdeps.transitive:
-        root = resolve_repo_root(config_dir, cfg.root)
-        advisory = propagate_suspect(cfg, detect_suspect_links(cfg, root))
+        advisory: tuple[SuspectLink, ...] = ()
+        try:
+            root = resolve_repo_root(config_dir, cfg.root)
+            advisory = propagate_suspect(cfg, detect_suspect_links(cfg, root))
+        except CodeDocMonitorError as exc:
+            typer.echo(f"advisory unavailable: {exc}", err=True)
         if advisory:
             n_docs = len({link.doc_id for link in advisory})
             typer.echo(
@@ -1503,7 +1509,8 @@ def deps(
         "--transitive",
         help="Also show the EAGER transitive-suspect advisory (PROP-01): documents "
         "whose upstream is itself pending review. Advisory only — never gates "
-        "`cdx check`.",
+        "`cdx check`. Applies to the default suspect listing (ignored with --impact, "
+        "which is already transitive, and with --suggest).",
     ),
     as_json: bool = typer.Option(
         False, "--json", help="Emit the dependency graph / suggestions as JSON."

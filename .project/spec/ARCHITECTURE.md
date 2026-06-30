@@ -712,7 +712,7 @@ class InferredEdge(BaseModel):             # frozen — a link-inference suggest
     doc_id: str; upstream_id: str; via: str   # the relative md link that implied it
 
 def upstream_fingerprint(doc: manifest.Doc) -> str   # sha256[:16] of normalized BODY (not front-matter); K10
-def detect_suspect_links(config: MonitorConfig, root: Path) -> tuple[SuspectLink, ...]  # pure, sorted (K1/K10)
+def detect_suspect_links(config: MonitorConfig, root: Path, *, include_ok=False) -> tuple[SuspectLink, ...]  # pure, sorted (K1/K10)
 def infer_edges_from_links(config: MonitorConfig, root: Path) -> tuple[InferredEdge, ...]  # pure, sorted
 def render_deps_text(links, *, suspect_only=False, transitive=()) -> str   # the `cdx deps` human view (K10)
 def write_edge_stamp(doc_path: Path, upstream_id: str, value: str) -> bool   # IMPURE writer (only mutation cmds)
