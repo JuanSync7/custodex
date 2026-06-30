@@ -1235,3 +1235,19 @@ docstring and it reads `[cosmetic]`. The verdict rides on the `ReviewRecord`'s a
 `change_severity` field (schema 1.2.0). Pinned by `tests/unit/test_drift.py` +
 `tests/integration/test_monitor.py`.
 Features: FEAT-DRIFT-011
+
+### DEMO-092 — Transitive suspect advisory (`cdx deps --transitive`)
+**What it shows.** The EAGER complement to direct suspect detection, kept HYBRID: in a
+chain `top → mid → leaf`, changing `leaf` flags `mid` DIRECTLY suspect (the only edge that
+gates `cdx check`), while `top` — whose upstream `mid` is now itself pending review — is
+surfaced as a **transitive** advisory. It never mints a drift (a transitive edge has no
+changed upstream body to stamp, K1/K7) and never changes the gate; it just shows the full
+blast radius NOW. Default OFF (the `docdeps.transitive` knob), shown on demand.
+**How to observe.** `cdx deps --transitive` lists the directly-suspect edges and then a
+clearly-labelled "transitively suspect (pending wavefront; does NOT gate)" advisory
+section; `cdx check` still exits non-zero only on the DIRECT suspect. Centrally,
+`GET /repos/{id}/doc-graph/reverse?doc=X&transitive=true` returns the whole reverse-reachable
+closure as pure graph reachability (never a suspect verdict, K2). Pinned by
+`tests/system/test_docdeps_cli.py` + `tests/integration/test_docdeps_server.py` +
+`tests/unit/test_docdeps.py`.
+Features: FEAT-DOCDEPS-010

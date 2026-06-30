@@ -132,3 +132,23 @@ features:
     subsystem: docdeps
     modules: [docdeps, cli]
     constraints: [K1, K4, K10]
+
+  - id: FEAT-DOCDEPS-010
+    title: Transitive suspect-propagation advisory (HYBRID — never gates)
+    summary: >-
+      docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the direct
+      suspect links as an ADVISORY. Detection stays the pure Doorstop direct wavefront —
+      only a changed-upstream edge is SUSPECT and only that gates `cdx check` — while a
+      document whose upstream is itself pending review is reported as a SUSPECT_TRANSITIVE
+      link, NEVER a drift: a transitive edge has no changed upstream body to stamp, so it
+      must not gate (K1/K7). Pure over the direct verdicts + the declared graph via a shared
+      cycle-safe reverse-reachable BFS (`_reverse_reachable`, extracted from and still
+      backing impacted_by — characterized identical), sorted (K10). Surfaced read-only in
+      `cdx deps --transitive` (opt-in `--json` shape) and an opt-in `cdx monitor` summary
+      line gated by the additive `docdeps.transitive` knob (default OFF); the hub's
+      `GET /doc-graph/reverse?transitive=true` returns the SAME closure as pure GRAPH
+      reachability over the indexed edge table — never a suspect verdict, since the bodies
+      needed to hash an upstream live in the repo, not the hub (K2).
+    subsystem: docdeps
+    modules: [docdeps, config, cli, server]
+    constraints: [K1, K2, K7, K10]

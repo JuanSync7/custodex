@@ -704,6 +704,7 @@ class DocEdgeType(str, Enum):              # config: DocEdge.type
     DEPENDS="depends"; REFINES="refines"; IMPLEMENTS="implements"; VERIFIES="verifies"
 class SuspectStatus(str, Enum):
     OK="ok"; UNSTAMPED="unstamped"; SUSPECT="suspect"; MISSING_UPSTREAM="missing_upstream"
+    SUSPECT_TRANSITIVE="suspect_transitive"   # PROP-01 advisory only — emitted by propagate_suspect, never gates
 class SuspectLink(BaseModel):              # frozen, extra=forbid — one downstream→upstream edge verdict
     doc_id: str; doc_path: str; upstream_id: str; type: DocEdgeType
     status: SuspectStatus; detail: str; audience: Audience
@@ -711,11 +712,24 @@ class InferredEdge(BaseModel):             # frozen — a link-inference suggest
     doc_id: str; upstream_id: str; via: str   # the relative md link that implied it
 
 def upstream_fingerprint(doc: manifest.Doc) -> str   # sha256[:16] of normalized BODY (not front-matter); K10
-def detect_suspect_links(config: MonitorConfig, root: Path) -> tuple[SuspectLink, ...]  # pure, sorted (K1/K10)
+def detect_suspect_links(config: MonitorConfig, root: Path, *, include_ok=False) -> tuple[SuspectLink, ...]  # pure, sorted (K1/K10)
 def infer_edges_from_links(config: MonitorConfig, root: Path) -> tuple[InferredEdge, ...]  # pure, sorted
-def render_deps_text(config, suspects, *, suspect_only=False) -> str   # the `cdx deps` human view (K10)
+def render_deps_text(links, *, suspect_only=False, transitive=()) -> str   # the `cdx deps` human view (K10)
 def write_edge_stamp(doc_path: Path, upstream_id: str, value: str) -> bool   # IMPURE writer (only mutation cmds)
+
+# B-10 / PROP-01 — the reverse-graph half (pure, cycle-safe, K10; ungated by docdeps.enabled)
+def _reverse_reachable(config, origins: set[str], *, transitive=True) -> set[str]  # shared BFS, excludes origins
+def impacted_by(config, upstream_id, *, transitive=True) -> tuple[str, ...]   # blast radius; delegates to _reverse_reachable
+def propagate_suspect(config, direct: Sequence[SuspectLink]) -> tuple[SuspectLink, ...]
+    # PROP-01 ADVISORY: the transitive closure of the DIRECT suspect links as SUSPECT_TRANSITIVE
+    # edges — origins = SUSPECT/MISSING_UPSTREAM docs, downstream's own audience (K3), sorted.
+    # NEVER mints a drift (a transitive edge has no changed upstream body to stamp — K1/K7).
 ```
+PROP-01 keeps drift the pure Doorstop **direct** wavefront (no new `DriftKind`, no schema
+bump). The eager transitive blast radius is read-only: `cdx deps --transitive`, an opt-in
+`cdx monitor` line gated by the additive `DocDepsConfig.transitive` knob (default OFF), and
+`GET /doc-graph/reverse?transitive=true` (pure graph reachability over `config_doc_edges`,
+never a suspect verdict — K2).
 `detect_suspect_links`: for each downstream doc with `depends_on`, recompute each
 upstream's `upstream_fingerprint` and compare to `manifest.stored_upstream_hashes`
 on the downstream — equal⇒OK, differ⇒SUSPECT, absent⇒UNSTAMPED, upstream file

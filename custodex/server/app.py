@@ -1336,31 +1336,58 @@ def create_app(
         doc: str,
         store: Store = Depends(get_store),
         sync_kind: str | None = None,
+        transitive: bool = False,
     ) -> dict[str, object]:
-        """Reverse dependency lookup: which documents depend ON ``doc`` (B-10).
+        """Reverse dependency lookup: which documents depend ON ``doc`` (B-10/PROP-01).
 
         Backed by the INDEXED ``config_doc_edges`` table (B-09) — an indexed
         ``WHERE upstream_id = doc`` rather than a scan over every document — so the
-        hub answers "who depends on X" directly. Returns the DIRECT (one-hop)
-        dependents, sorted (K10). ``sync_kind`` resolves to the SAME single partition
-        as ``/doc-graph`` (via :func:`_resolve_graph_kind`: explicit wins; else "git"
-        falling back to "local") so the two routes always agree on whether an edge
-        exists and a local-only repo is never blank — and a doc_id is unique within
-        that one partition, so no dedup is needed. The engine's ``cdx deps --impact``
-        computes the TRANSITIVE blast radius repo-side, where the full config graph
-        lives. Open read; ``doc`` is a required query param.
+        hub answers "who depends on X" directly. By default returns the DIRECT
+        (one-hop) dependents, sorted (K10). ``transitive=true`` walks the reverse
+        graph to the full blast radius (the same closure ``cdx deps --impact``
+        computes repo-side) using only the indexed edge table — pure GRAPH
+        reachability, never a suspect verdict, since the doc bodies needed to hash an
+        upstream live in the repo, not the hub (K2). Transitive items carry only
+        ``doc_id`` (a closure has no single edge ``type``); the response always
+        echoes a ``transitive`` flag. ``sync_kind`` resolves to the SAME single
+        partition as ``/doc-graph`` (via :func:`_resolve_graph_kind`: explicit wins;
+        else "git" falling back to "local") so the two routes agree and a local-only
+        repo is never blank. Open read; ``doc`` is a required query param. An unknown or
+        non-managed ``doc`` returns an empty closure (HTTP 200) BY DESIGN — the
+        established convention for the hub's open read routes (a well-formed zero-row
+        result, not an error); the repo-side ``cdx deps --impact`` is the loud (K8)
+        path.
         """
         _require_known_repo(store, repo_id)
         kind = _resolve_graph_kind(store, repo_id, sync_kind)
-        dependents: list[dict[str, object]] = [
-            {"doc_id": edge.doc_id, "type": edge.type}
-            for edge in store.doc_edges_for(repo_id, sync_kind=kind, upstream_id=doc)
-        ]
-        dependents.sort(key=lambda d: str(d["doc_id"]))
+        dependents: list[dict[str, object]]
+        if transitive:
+            # Cycle-safe reverse-reachability over the indexed edges (graph only, K2).
+            reached: set[str] = set()
+            stack = [doc]
+            while stack:
+                cur = stack.pop()
+                for edge in store.doc_edges_for(
+                    repo_id, sync_kind=kind, upstream_id=cur
+                ):
+                    if edge.doc_id in reached or edge.doc_id == doc:
+                        continue
+                    reached.add(edge.doc_id)
+                    stack.append(edge.doc_id)
+            dependents = [{"doc_id": dep} for dep in sorted(reached)]
+        else:
+            dependents = [
+                {"doc_id": edge.doc_id, "type": edge.type}
+                for edge in store.doc_edges_for(
+                    repo_id, sync_kind=kind, upstream_id=doc
+                )
+            ]
+            dependents.sort(key=lambda d: str(d["doc_id"]))
         return {
             "upstream_id": doc,
             "dependents": dependents,
             "count": len(dependents),
+            "transitive": transitive,
         }
 
     # `{repo_id:path}` so a repo_id containing slashes (e.g. "acme/widget", the

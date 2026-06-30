@@ -25,9 +25,11 @@ from custodex.config import (
 from custodex.docdeps import (
     SuspectLink,
     SuspectStatus,
+    _reverse_reachable,
     detect_suspect_links,
     impacted_by,
     infer_edges_from_links,
+    propagate_suspect,
     render_deps_text,
     render_impact_text,
     stamp_edges,
@@ -370,3 +372,264 @@ def test_render_impact_text_empty_and_nonempty() -> None:
     assert "safe to change" in render_impact_text("c", ())
     text = render_impact_text("c", ("a", "b"))
     assert "2 document(s)" in text and "→ a" in text and "→ b" in text
+
+
+# --------------------------------------------------------------------------- #
+# _reverse_reachable — characterization: impacted_by delegates to it unchanged
+#
+# Feature: FEAT-DOCDEPS-010
+# --------------------------------------------------------------------------- #
+def test_reverse_reachable_pins_concrete_values_on_cycle_and_branch() -> None:
+    """Concrete characterization of the shared BFS — NOT a tautology against
+    ``impacted_by`` (K10).
+
+    Pins the exact reverse-reachable SET (origins excluded, cycle-safe) on a chain, a
+    cycle, and a branch, so the PROP-01 extraction of ``_reverse_reachable`` from
+    ``impacted_by`` cannot regress silently.
+    """
+    chain = _chain_cfg()  # a → b → c, plus solo
+    assert _reverse_reachable(chain, {"c"}) == {"a", "b"}
+    assert _reverse_reachable(chain, {"c"}, transitive=False) == {"b"}
+    assert _reverse_reachable(chain, {"a"}) == set()
+    assert _reverse_reachable(chain, {"solo"}) == set()
+    # a ↔ b cycle PLUS c → b: cycle-safe, excludes the origin, reaches the branch.
+    cyclic = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+            DocumentSpec(
+                id="c",
+                path="c.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    assert _reverse_reachable(cyclic, {"b"}) == {"a", "c"}
+    assert _reverse_reachable(cyclic, {"a"}) == {"b", "c"}
+
+
+def test_impacted_by_delegates_to_reverse_reachable() -> None:
+    """``impacted_by`` is ``_reverse_reachable`` sorted (delegation contract, K6)."""
+    chain = _chain_cfg()
+    for origin in ("a", "b", "c", "solo"):
+        assert impacted_by(chain, origin) == tuple(
+            sorted(_reverse_reachable(chain, {origin}))
+        )
+    assert impacted_by(chain, "c", transitive=False) == tuple(
+        sorted(_reverse_reachable(chain, {"c"}, transitive=False))
+    )
+
+
+def test_reverse_reachable_multi_origin_union() -> None:
+    """A multi-origin frontier returns the union of each origin's reach, minus
+    the origins themselves (the propagate_suspect entry point)."""
+    cfg = _chain_cfg()  # a → b → c, plus solo
+    # origins {b, c}: reachable from b = {a}; from c = {a, b}; minus origins {b,c} = {a}
+    assert _reverse_reachable(cfg, {"b", "c"}) == {"a"}
+
+
+# --------------------------------------------------------------------------- #
+# propagate_suspect — the transitive ADVISORY (HYBRID, read-only, never gates)
+#
+# Feature: FEAT-DOCDEPS-010
+# --------------------------------------------------------------------------- #
+def _suspect(
+    doc_id: str,
+    upstream_id: str,
+    status: SuspectStatus = SuspectStatus.SUSPECT,
+    audience: Audience = Audience.ENG_GUIDE,
+) -> SuspectLink:
+    return SuspectLink(
+        doc_id=doc_id,
+        doc_path=f"{doc_id}.md",
+        upstream_id=upstream_id,
+        type=DocEdgeType.DEPENDS,
+        status=status,
+        detail="x",
+        audience=audience,
+    )
+
+
+def test_propagate_suspect_flags_transitive_dependents() -> None:
+    """In a → b → c, a change to c directly flags b; a is the transitive advisory."""
+    cfg = _chain_cfg()
+    direct = (_suspect("b", "c"),)  # c changed → b directly suspect
+    adv = propagate_suspect(cfg, direct)
+    assert [(s.doc_id, s.upstream_id, s.status) for s in adv] == [
+        ("a", "b", SuspectStatus.SUSPECT_TRANSITIVE)
+    ]
+
+
+def test_propagate_suspect_multi_hop_sorted() -> None:
+    """A deeper chain d ← c ← b ← a: a change to d advises both b and a, sorted."""
+    cfg = _cfg(
+        (
+            DocumentSpec(id="d", path="d.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="c",
+                path="c.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="d"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    links = propagate_suspect(cfg, (_suspect("c", "d"),))
+    assert [(s.doc_id, s.upstream_id) for s in links] == [("a", "b"), ("b", "c")]
+
+
+def test_propagate_suspect_empty_without_direct_flag() -> None:
+    cfg = _chain_cfg()
+    assert propagate_suspect(cfg, ()) == ()
+    # UNSTAMPED is not a *change* — it never seeds a transitive advisory.
+    assert propagate_suspect(cfg, (_suspect("b", "c", SuspectStatus.UNSTAMPED),)) == ()
+
+
+def test_propagate_suspect_includes_missing_upstream_origin() -> None:
+    cfg = _chain_cfg()
+    adv = [
+        (s.doc_id, s.upstream_id)
+        for s in propagate_suspect(
+            cfg, (_suspect("b", "c", SuspectStatus.MISSING_UPSTREAM),)
+        )
+    ]
+    assert adv == [("a", "b")]
+
+
+def test_propagate_suspect_never_echoes_a_direct_edge_as_transitive() -> None:
+    """A directly-reported edge is never re-listed as a transitive advisory.
+
+    Both ``a`` and ``b`` depend ONLY on ``c``; when ``c`` changes both edges are
+    DIRECTLY suspect, so the advisory (which excludes already-reported edges) is
+    empty — neither edge is echoed.
+    """
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+        )
+    )
+    # c changed → both a (via a→c) and b (via b→c) are DIRECTLY suspect.
+    direct = (_suspect("a", "c"), _suspect("b", "c"))
+    assert propagate_suspect(cfg, direct) == ()  # both edges already reported; no echo
+
+
+def test_propagate_suspect_surfaces_other_edge_of_a_partly_direct_doc() -> None:
+    """A doc DIRECTLY flagged on one edge still gets its OTHER, transitively-pending
+    edge in the advisory — the exclusion is per-EDGE, not per-document.
+
+    The crucial case (a 2nd-judge regression): ``a`` is itself directly flagged
+    (``a→kk`` SUSPECT), so ``a`` is an origin and is ABSENT from the reverse-reachable
+    set — yet its ``a→b`` edge (``b`` pending) must still be surfaced. Scanning only the
+    reverse-reachable docs would drop it from BOTH reports; scanning every pending doc
+    keeps it while the per-edge guard still suppresses the direct ``a→kk`` edge.
+    """
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(id="kk", path="kk.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"), DocEdge(doc="kk")),
+            ),
+        )
+    )
+    # Both kk and c changed → a→kk and b→c are DIRECTLY suspect (a AND b flagged).
+    direct = (_suspect("b", "c"), _suspect("a", "kk"))
+    adv = [(s.doc_id, s.upstream_id, s.status) for s in propagate_suspect(cfg, direct)]
+    # a→b IS pending (b is suspect) and is NOT the directly-reported a→kk edge.
+    assert adv == [("a", "b", SuspectStatus.SUSPECT_TRANSITIVE)]
+
+
+def test_propagate_suspect_uses_downstream_audience() -> None:
+    cfg = _cfg(
+        (
+            DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="c"),),
+            ),
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.USER_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+        )
+    )
+    adv = propagate_suspect(cfg, (_suspect("b", "c"),))
+    assert adv[0].doc_id == "a" and adv[0].audience is Audience.USER_GUIDE
+
+
+def test_propagate_suspect_cycle_safe() -> None:
+    """A a↔b cycle terminates and emits the one transitive edge."""
+    cfg = _cfg(
+        (
+            DocumentSpec(
+                id="a",
+                path="a.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="b"),),
+            ),
+            DocumentSpec(
+                id="b",
+                path="b.md",
+                audience=Audience.ENG_GUIDE,
+                depends_on=(DocEdge(doc="a"),),
+            ),
+        )
+    )
+    # b changed → a directly suspect; b is transitively pending (via the cycle).
+    links = propagate_suspect(cfg, (_suspect("a", "b"),))
+    assert [(s.doc_id, s.upstream_id) for s in links] == [("b", "a")]
+
+
+def test_render_deps_text_renders_transitive_advisory() -> None:
+    direct = (_suspect("b", "c"),)
+    trans = (_suspect("a", "b", SuspectStatus.SUSPECT_TRANSITIVE),)
+    text = render_deps_text(direct, transitive=trans)
+    assert "advisory" in text and "does NOT gate" in text
+    assert "→ b" in text  # the transitive edge a → b is shown

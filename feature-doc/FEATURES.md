@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**232 features** across 23 subsystems.
+**233 features** across 23 subsystems.
 
 ## agent
 
@@ -432,6 +432,7 @@ coverage_snapshot projects a CoverageReport into the deterministic, JSON-safe wi
 | `FEAT-DOCDEPS-007` | Central hub mirrors the doc↔doc graph (GET /doc-graph) | configsync, server | K2, K6 | — | — | implemented |
 | `FEAT-DOCDEPS-008` | Indexed reverse-dependency lookup (config_doc_edges + GET /doc-graph/reverse) | configsync, server | K2, K6, K10 | — | — | implemented |
 | `FEAT-DOCDEPS-009` | Proactive blast radius (cdx deps --impact) | docdeps, cli | K1, K4, K10 | — | — | implemented |
+| `FEAT-DOCDEPS-010` | Transitive suspect-propagation advisory (HYBRID — never gates) | docdeps, config, cli, server | K1, K2, K7, K10 | — | — | implemented |
 
 ### `FEAT-DOCDEPS-001` — Doc↔doc edge config models (declaration = config, K2)
 
@@ -468,6 +469,10 @@ The hub FLATTENS every document's `depends_on` into a standalone, indexable `con
 ### `FEAT-DOCDEPS-009` — Proactive blast radius (cdx deps --impact)
 
 docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before editing a document, walk the dependents reverse-reachable from it to answer "what must I review if I change DOC". Pure over the declared config graph (no file reads, no clock, K1/K10), transitive by default and cycle-safe, sorted, loud (K8) on an unknown id, and independent of `docdeps.enabled` (the graph exists either way). `cdx deps --impact DOC` surfaces it read-only (no backend, no network, K4) — an empty radius reads as an explicit "safe to change"; `--json` emits the machine form.
+
+### `FEAT-DOCDEPS-010` — Transitive suspect-propagation advisory (HYBRID — never gates)
+
+docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the direct suspect links as an ADVISORY. Detection stays the pure Doorstop direct wavefront — only a changed-upstream edge is SUSPECT and only that gates `cdx check` — while a document whose upstream is itself pending review is reported as a SUSPECT_TRANSITIVE link, NEVER a drift: a transitive edge has no changed upstream body to stamp, so it must not gate (K1/K7). Pure over the direct verdicts + the declared graph via a shared cycle-safe reverse-reachable BFS (`_reverse_reachable`, extracted from and still backing impacted_by — characterized identical), sorted (K10). Surfaced read-only in `cdx deps --transitive` (opt-in `--json` shape) and an opt-in `cdx monitor` summary line gated by the additive `docdeps.transitive` knob (default OFF); the hub's `GET /doc-graph/reverse?transitive=true` returns the SAME closure as pure GRAPH reachability over the indexed edge table — never a suspect verdict, since the bodies needed to hash an upstream live in the repo, not the hub (K2).
 
 ## drift
 
