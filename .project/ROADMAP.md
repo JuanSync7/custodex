@@ -659,11 +659,15 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   attached, declared/self edges excluded. NEW `cdx link DOWN UP [--type]`
   (dir-layout config): writes the edge via the pure unit editors + stamps the
   baseline — the missing approve verb `resolve --edge` docstrings referenced.
-  `DocDepsConfig.infer_from_links` becomes REAL: when true, `cdx deps` appends
-  the suggestions as an advisory section. *Goal:* fixture where doc A
-  backtick-mentions a symbol covered by doc B ⇒ exactly one SHARED_SYMBOL
-  suggestion with that symbol as evidence; `cdx link` then declares + stamps
-  it and the suggestion disappears (K7).
+  `cdx link --reject` records a durable repo-side rejection
+  (`.cdmon/edge-rejections.jsonl`); `docdeps.baseline: prose` (opt-in) hashes
+  the region-STRIPPED upstream body so machine reheals never trip dependents;
+  `infer_from_links` becomes REAL (a one-line advisory summary in `cdx deps`).
+  *Goal:* fixture where doc A backtick-mentions a symbol covered by doc B ⇒
+  exactly one SHARED_SYMBOL suggestion with that symbol as evidence; `cdx
+  link` declares (comment-preserving textual splice) + stamps it and the
+  suggestion disappears (K7); a rejected pair never returns. (REVISED per the
+  2026-07-02 design review — see the slice spec.)
 - ☐ **AGT-03** `kgraph.py` — the unified knowledge-graph artifact. One
   deterministic `build_graph(config, root)` folding the edges Custodex already
   computes into typed nodes/edges with provenance tiers: DOCUMENTS (code_refs),
