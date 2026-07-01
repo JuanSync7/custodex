@@ -53,3 +53,15 @@ tickets, commits, and the STATUS log.
   (sorted keys, normalized whitespace, no wall-clock in hashes). Timestamps live
   only in review records and are injected, not read from the clock inside pure
   functions (so tests are reproducible).
+- **K11 — Agents suggest; humans apply.** (Minted by EPIC AGT.) Any
+  agent/worker-produced proposal — an inferred doc↔doc edge, a generated config
+  plan, a doc draft, a fix/what-to-document suggestion — is **advisory data**
+  carrying provenance (a tier/evidence trail, never a bare float) and a
+  **deterministic, clock-free dedup key**, so re-running a suggester is
+  idempotent (K7) and a re-staged suggestion never duplicates. A proposal never
+  mutates config or documents except through an explicit, human-invoked apply
+  command (`cdx link`, `cdx onboard --apply`, `cdx write-doc --apply`, …), and
+  an applied proposal leaves the same audit trail as the equivalent human
+  action. Background loops are thin impure adapters over pure, clock-injected
+  tick functions (the `worklist_from_repo` pattern) — the loop leaf is the only
+  uncovered line, exactly like a Driver/urlopen leaf (K4).

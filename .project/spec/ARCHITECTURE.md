@@ -2984,3 +2984,249 @@ ORPHANED doc (accountable departed): re-routed by orphan status to the live assi
 because the hub lacks the bodies to hash an upstream (K2). Parity over both stores. Frontend adds a
 console **Worklist** tab. New `worklist` catalog subsystem (FEAT-WORKLIST-001), module waived in
 the dogfood `coverage.waive` (api doc owned by `cdx wiki`).
+
+## EPIC AGT — the task-agent layer  (`entities.py` / `docmap.py` / `kgraph.py` / `onboard.py` / `docwriter.py` / `workers.py` — K0/K1/K4/K5/K10/**K11**)
+
+**The architecture rule (the LazyGraphRAG split, COMPETITORS.md §13):** every index —
+entities, mentions, edge suggestions, the knowledge graph, the onboarding plan, the
+suggestion ticks — is built **deterministically, offline, at index time** from the
+extracted code surface + managed-doc prose (K1/K4/K10). The LLM enters only at
+verdict/authoring time through the EXISTING Backend/Driver seams, and every
+agent-produced proposal is advisory-with-provenance under **K11** (agents suggest;
+humans apply). Doc-side extraction is entity **LINKING against a known registry**
+(the code surface, the managed-doc set), never open-set NER — that is what makes it
+deterministic and high-precision without ML. All six modules are flat top-level
+`custodex/*.py` (the catalog validates top-level module names only).
+
+### `entities.py`  (AGT-01 — deterministic entity extraction + mention linking; pure — K0/K1/K10)
+
+```python
+class EntityKind(str, Enum):           # a CLOSED set (Backstage discipline); extend deliberately
+    DOC = "doc"; SECTION = "section"; SYMBOL = "symbol"; PATH = "path"
+    ENV_VAR = "env_var"; URL = "url"
+
+class Entity(BaseModel):               # frozen, extra="forbid" (all models in this epic)
+    id: str        # SCIP-style deterministic human-readable string id, e.g.
+                   #   "doc docs/api/drift.md" · "symbol drift.py#detect_drift" ·
+                   #   "path custodex/drift.py" · "env CDMON_SECRET_KEY"
+    kind: EntityKind
+    name: str      # display name (the qualified symbol / doc id / var name)
+
+class Mention(BaseModel):
+    doc_id: str                        # the mentioning managed doc
+    entity_id: str | None              # None ⇔ unresolved (first-class data, Obsidian rule)
+    kind: EntityKind
+    text: str                          # the raw mention as written
+    line: int                          # 1-based line within the doc BODY (provenance)
+    resolved: bool
+
+class DocEntities(BaseModel):
+    doc_id: str; doc_path: str
+    mentions: tuple[Mention, ...]      # sorted (line, text) — K10
+    sections: tuple[Entity, ...]       # this doc's own heading entities (partOf source)
+
+class EntityRegistry(BaseModel):       # the closed resolution universe
+    # doc paths→ids, doc ids, symbol names + qualified names (per-file AND global),
+    # repo file paths. Built ONCE per run; resolution is exact-match lookups only.
+    ...
+
+def build_registry(config: MonitorConfig, root: Path) -> EntityRegistry
+def extract_doc_entities(doc_id, doc_path, body, registry) -> DocEntities   # PURE
+def corpus_entities(config, root, *, doc_id=None) -> tuple[DocEntities, ...]
+def render_entities_text(results, *, unresolved_only=False) -> str
+```
+
+Mention sources (deterministic, in-order): **headings** (`#`..`######` → SECTION
+entities of the doc itself), **markdown links** (inline links, `_MD_LINK`-class regex
+improved to also skip images `![..](..)`; resolved relative→managed-doc = DOC mention,
+else URL when absolute, else PATH-unresolved), **backticked inline spans** (the mention
+syntax: `` `pkg.mod.func` ``/`` `Class.method` ``/`` `name` `` matched against symbol
+registry; `` `path/like.py` `` against file paths; `` `[A-Z][A-Z0-9_]{2,}` `` with `_`
+= ENV_VAR, self-evident). Fenced code blocks and `CDM:BEGIN/END` machine regions are
+EXCLUDED from scanning (machine-generated text must not mint mentions); inline
+backticks inside prose ARE the signal. Unresolvable backticked spans that look like
+identifiers (dotted/snake/Camel) become unresolved SYMBOL mentions — the graph-rot
+detector. Resolution is exact string match only; no fuzzy matching in core (a fuzzy/
+LLM tier is a follow-on behind the Backend seam, K11). CLI: `cdx entities [DOC_ID]
+[--json] [--unresolved]` (read-only, K1).
+
+### `docmap.py`  (AGT-02 — entity-based edge suggestions + the `cdx link` approve verb — K11)
+
+```python
+class SuggestionTier(str, Enum):       # provenance TIERS, strongest first — never a bare float
+    RESOLVED_LINK = "resolved_link"    # a markdown link to the managed upstream (was infer_edges_from_links)
+    SHARED_SYMBOL = "shared_symbol"    # downstream MENTIONS a symbol the upstream DOCUMENTS (code_refs)
+
+class ScoredEdge(BaseModel):
+    doc_id: str; upstream_id: str
+    tier: SuggestionTier
+    evidence: tuple[str, ...]          # entity ids / link targets justifying the edge; sorted
+    score: int                         # count of independent evidence items (int, K10)
+
+def suggest_edges(config, root) -> tuple[ScoredEdge, ...]
+    # UNIFIES link-inference and the entity rule; direction is PRINCIPLED, never guessed:
+    #   link rule: the doc containing the link is downstream (existing semantics);
+    #   symbol rule: doc A mentions symbol S (entities layer) AND doc B covers S via
+    #     code_refs (coverage join) AND A≠B ⇒ suggest A depends_on B.
+    # Declared edges, self-edges, and duplicate pairs excluded; the SAME pair found by
+    # both rules keeps the STRONGER tier with merged evidence. Sorted (doc_id, upstream_id).
+def render_suggestions_text(edges) -> str          # paste-ready YAML retained + tier/evidence lines
+def declare_edge(config_dir, downstream_id, upstream_id, *, type=DocEdgeType.DEPENDS,
+                 now) -> Path                       # the ONE writer: pure unit editors
+                                                    # (add_doc_edge + dump_unit_file), dir-layout only
+```
+
+`infer_edges_from_links` remains (back-compat) and becomes the RESOLVED_LINK feed.
+`DocDepsConfig.infer_from_links` becomes REAL: when true, `cdx deps` appends the
+suggestions as a clearly-labelled advisory section (never gates — K11). CLI:
+`cdx deps --suggest` upgraded (tier/evidence in text; `--json` items gain additive
+keys, list shape preserved — K6); NEW `cdx link DOWN UP [--type]` = `declare_edge`
+(loud on single-file configs / unknown ids / existing edge — K8) then `stamp_edges`
+baseline, mirroring `resolve --edge` semantics. A new pure editor
+`config.add_doc_edge(unit, doc_id, upstream, *, type) -> UnitFile` joins the editor
+family; `_docedge_to_yaml` round-trips it.
+
+### `kgraph.py`  (AGT-03 — the unified knowledge-graph artifact; pure build, snapshot mirror — K2-safe)
+
+```python
+class NodeKind(str, Enum): DOC; SECTION; SYMBOL; PATH; ENV_VAR; URL; OWNER
+class EdgeKind(str, Enum):             # closed vocabulary; directional pairs implied by reverse queries
+    DOCUMENTS = "documents"            # doc → symbol (code_refs coverage join)
+    DEPENDS_ON = "depends_on"          # doc → doc (declared docdeps)
+    MENTIONS = "mentions"              # doc → symbol/path/env (entities layer)
+    LINKS_TO = "links_to"              # doc → doc/url (resolved links; unresolved = counts)
+    PART_OF = "part_of"                # section → doc
+    OWNED_BY = "owned_by"              # doc → owner (accountable projection)
+class EdgeTier(str, Enum): DECLARED = "declared"; RESOLVED = "resolved"; INFERRED = "inferred"
+
+class GraphNode(BaseModel): id: str; kind: NodeKind; name: str
+class GraphEdge(BaseModel): source: str; target: str; kind: EdgeKind; tier: EdgeTier
+class KnowledgeGraph(BaseModel):
+    schema_version: str = "1.0.0"      # K6: emitted from pydantic, additive evolution
+    nodes: tuple[GraphNode, ...]; edges: tuple[GraphEdge, ...]
+    unresolved: dict[str, int]         # doc_id → unresolved-mention count (rot signal)
+
+def build_graph(config, root, *, unit_owner=None) -> KnowledgeGraph   # PURE fold of the
+    # existing detectors: coverage join (DOCUMENTS), docdeps (DEPENDS_ON), entities
+    # (MENTIONS/LINKS_TO/PART_OF), ownership projection (OWNED_BY). Deterministic,
+    # sorted, byte-identical across runs (K10). Base facts only — every derived
+    # quantity below is recomputed, never stored (Glean base/derived split).
+def graph_neighbors(g, node_id, *, depth=1) -> tuple[GraphEdge, ...]  # in+out, loud on unknown id
+def rank_centrality(g, *, kind=NodeKind.SYMBOL, undocumented_only=False)
+    -> tuple[tuple[str, int], ...]     # in-degree ranking; undocumented_only crosses
+                                       # MENTIONS in-degree with the absence of DOCUMENTS —
+                                       # the what-to-document priority feed (AGT-06)
+def render_graph_text(g, *, focus=None) -> str
+```
+
+CLI: `cdx graph [--focus ID] [--rank] [--json] [--write]`; `--write` emits
+`.cdmon/graph.json` (regenerable artifact, gitignored — the coverage-manifest
+precedent). **Hub (K2-safe):** the graph is computed REPO-SIDE (where bodies live) and
+pushed as an opaque versioned snapshot exactly like the coverage snapshot:
+`POST /repos/{id}/graph` (token) / `GET /repos/{id}/graph` (open read); Store gains
+`add_graph_snapshot`/`graph_for` on BOTH stores; Alembic `0008_graph_snapshots`
+mirrors `coverage_snapshots`. The hub never re-derives from bodies it doesn't hold.
+
+### `onboard.py`  (AGT-04 — the config-authoring onboarding agent; deterministic core — K11)
+
+```python
+class DocCandidate(BaseModel):  path: str; title: str | None; guessed_audience: Audience; evidence: str
+class PackageCandidate(BaseModel): name: str; dir: str; files: tuple[str, ...]; public_symbols: int
+class RepoMap(BaseModel):              # the PLAN ARTIFACT (Mintlify pattern): reviewable,
+    root: str                          # debuggable, and the input config derives from
+    docs: tuple[DocCandidate, ...]
+    packages: tuple[PackageCandidate, ...]
+    signals: dict[str, str]            # readme/agents_md/claude_md/docs_dir/existing_config paths found
+    warnings: tuple[str, ...]
+
+def analyze_repo(root, *, include=(), exclude=()) -> RepoMap
+    # deterministic; RESILIENT: an unparseable source file becomes a warning, never a crash
+def propose_config(repo_map, *, repo, now) -> OnboardPlan
+    # OnboardPlan = {units: tuple[UnitFile,...], index_text: str, docs_to_scaffold, notes}
+    # built from REAL UnitFile models via the pure editors + dump_unit_file — never
+    # string-templated YAML. One unit per top-level package (dir-covered = its dir);
+    # one eng-guide doc per package; README (when present) mapped as a user-guide doc.
+def apply_plan(plan, config_dir, *, now) -> tuple[Path, ...]   # writes + `regenerate_index`
+def render_plan_text(plan) -> str      # the Renovate onboarding-PR body: detected surfaces,
+                                       # proposed mapping + audience guesses, what-to-expect
+```
+
+CLI: `cdx onboard [--path] [--repo NAME] [--apply]` — default is DRY-RUN (prints the
+plan; K11). `--apply` writes `config/cdmon/`, scaffolds the proposed docs
+(`scaffold_doc`), then SELF-VALIDATES (load_bundle → doctor.run_checks →
+`Monitor.check`) and reports — the Mintlify **arrive-green** rule: never emit a config
+the tool itself rejects (K8). Refuses to clobber an existing config without `--force`.
+Ships the `init --v2` DOA fix: the scaffold's `doc-style.yaml` is emitted ONLY
+alongside the writing-template files it references (scaffold writes minimal generic
+templates under `templates/writing/`), so a bare-repo scaffold loads clean.
+
+### `docwriter.py`  (AGT-05 — write-new-doc-from-code + register; Backend-authored prose — K4/K5/K11)
+
+```python
+def draft_document(spec: DocumentSpec, surface: DocumentSurface, *,
+                   style_guidance: str | None = None,
+                   backend: Backend | None = None) -> str
+    # scaffold_doc skeleton + an authored purpose blockquote + an `overview` region in
+    # mode `llm` whose body comes through the Backend seam (MockBackend ⇒ the
+    # deterministic audience-aware prose stand-in, K4/K10). Byte-idempotent for an
+    # unchanged surface (K7); conformant to the Layout Standard by construction.
+def write_and_register(config_dir, *, unit, doc_id, path, audience, code_refs,
+                       backend=None, now) -> Path
+    # upsert_document (pure editor) → dump_unit_file → regenerate_index →
+    # draft_document written → heal to green. The dashboard picks it up via normal sync.
+```
+
+CLI: `cdx write-doc TARGET [--unit U] [--id ID] [--audience A] [--apply]` — TARGET is a
+source path or module; default DRY-RUN prints the draft + the config delta (K11);
+`--apply` invokes `write_and_register`. Prose regions are declared `mode: llm` so the
+existing B-06 re-authoring path keeps them fresh; human/locked regions are honored by
+writing through scaffold/heal, never raw file writes.
+
+### `workers.py`  (AGT-06 — the two background suggesters; pure ticks + default-OFF loops — K4/K7/K10/K11)
+
+```python
+class SuggestionKind(str, Enum):
+    FIX_DRIFT = "fix_drift"; RESOLVE_EDGE = "resolve_edge"; PROMOTE_RULE = "promote_rule"
+    DOCUMENT_GAP = "document_gap"; ADD_EDGE = "add_edge"
+class Suggestion(BaseModel):
+    key: str                           # DETERMINISTIC, CLOCK-FREE dedup key:
+                                       #   sha256[:16] of (kind, doc_id/target, detail-shape)
+    kind: SuggestionKind
+    doc_id: str | None; target: str    # what to act on
+    detail: str                        # the human-readable next action (embeds the exact command)
+    evidence: tuple[str, ...]
+    severity: WorkSeverity             # reuses worklist's enum (MEDIUM fallback, K8)
+
+def suggest_fixes_tick(config, root, *, now) -> tuple[Suggestion, ...]
+    # drift (detect-only) → FIX_DRIFT; suspect edges → RESOLVE_EDGE;
+    # detect_promotions → PROMOTE_RULE. Pure over injected inputs; sorted by key.
+def suggest_docs_tick(config, root, *, now) -> tuple[Suggestion, ...]
+    # coverage gaps ranked by kgraph.rank_centrality(undocumented_only=True) →
+    # DOCUMENT_GAP; suggest_edges → ADD_EDGE. Pure; sorted by key.
+```
+
+CLI: `cdx suggest [--kind fixes|docs|all] [--json] [--write]` — one-shot ticks;
+`--write` appends NEW keys to `.cdmon/suggestions.jsonl` (dedup by key, K7).
+**Server:** `WorkerSettings` in `settings.py` (`enabled: bool = False`,
+`interval_seconds: int = 900`, `kinds`) with `CDMON_WORKER_*` overlays — defaults
+reproduce today's no-worker behavior. `create_app` gains the injected worker seams
+(tick callables + clock); the two loops start via FastAPI lifespan ONLY when enabled,
+run in a thread executor (the Store is sync), and each iteration = one pure tick over
+repos with a `local_path`. The loop leaf is the only uncovered code (pragma), exactly
+like `_run_uvicorn`. Store gains `add_suggestions(repo_id, suggestions)` (INSERT-only
+new keys — dedup lives in the store so at-least-once producers are safe, K7),
+`suggestions_for(repo_id, *, include_dismissed=False)`, `dismiss_suggestion(repo_id,
+key)` on BOTH stores + Alembic `0009_suggestions`; routes `GET /repos/{id}/suggestions`
+(open read) + `POST /repos/{id}/suggestions/{key}/dismiss` (token; dismissed keys never
+resurface — the durable opt-out). Suggestions carry `source: "worker"` provenance in
+the stored envelope (the K5/K11 audit line).
+
+### Frontend  (AGT-07 — Graph explorer + Suggestions inbox)
+
+Per-repo **Graph** tab (extends the Dependencies seams: `DocGraph` additively gains
+nodes/mentions; focus-node in/out edge groups + a top-central-undocumented table — NO
+graph-viz dependency, tables/lists only) and per-repo **Suggestions** tab (the inbox:
+severity chips reused from Worklist; dismiss action mirrors the Mapping staged-edit
+lifecycle). Both follow the WL-01 6-point chain + demo fixtures (busy `acme/widget` +
+empty `octo/docs` variants) + demoFetch routes + vitest suites + ConsoleChrome parity
++ a `/guide` page per feature.
