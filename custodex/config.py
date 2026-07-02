@@ -543,6 +543,24 @@ class DocDepsConfig(BaseModel):
     transitive: bool = False
 
 
+class EntitiesConfig(BaseModel):
+    """The ``entities:`` block — the AGT-01 mention-layer knobs (additive K6).
+
+    Target-specific noise enters through config, never the engine (K0).
+    ``ignore`` lists backticked spans that mint NO mention at all (tool names,
+    config keys — whatever a repo's prose uses that is not a code entity);
+    ``env_prefixes`` gates ENV_VAR mentions: a SCREAMING_SNAKE span becomes an
+    environment-variable entity ONLY when it starts with one of these prefixes
+    (empty ⇒ no env mentions), so enum-name-like spans never masquerade as
+    environment variables.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    ignore: tuple[str, ...] = ()
+    env_prefixes: tuple[str, ...] = ()
+
+
 class MonitorConfig(BaseModel):
     """Top-level config: documents plus backend/central/apply settings."""
 
@@ -559,6 +577,7 @@ class MonitorConfig(BaseModel):
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (additive)
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (additive)
+    entities: EntitiesConfig = EntitiesConfig()  # AGT-01: mention layer (additive)
     # P-01: opt-in body-AST fingerprint tier. Default OFF keeps surface_hash bytes
     # identical to the pre-P1 contract, so stored fingerprints stay valid; ON folds
     # function/method bodies into non-user-guide hashes (a deliberate re-baseline).
@@ -953,6 +972,7 @@ class IndexFile(BaseModel):
     coverage: CoverageConfig = CoverageConfig()
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (lifted in merge)
+    entities: EntitiesConfig = EntitiesConfig()  # AGT-01: mention layer (lifted)
     fingerprint_body_tier: bool = False  # P-01: mirrors MonitorConfig (lifted in merge)
     units: tuple[IndexUnitRef, ...]
     ignore: str = "ignore.yaml"
@@ -1210,6 +1230,7 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
             coverage=index.coverage,
             staleness=index.staleness,
             docdeps=index.docdeps,
+            entities=index.entities,
             fingerprint_body_tier=index.fingerprint_body_tier,
         )
     except ValidationError as exc:

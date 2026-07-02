@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d6e04236f40aba10
+  fingerprint: 2f7b6dfa25af22b9
   fingerprint_tiers:
-    composite: d6e04236f40aba10
-    docstring: e7f342c6f4d5e3c2
-    signature: 9ecdddf43a912161
+    composite: 2f7b6dfa25af22b9
+    docstring: 6dd822fd81198cf4
+    signature: c4e69247974c4f11
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -24,6 +24,7 @@ cdm:
     - 20f65c28671b4093
     - 24c458cfb46d9a45
     - 2a07ca57ed083879
+    - 2cc497857559ff85
     - 44575cf5b28512d7
     - 484de142f352dff3
     - 49e9627e39c92dd0
@@ -76,7 +77,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: ee747d76c20f3f44
+    symbols: d3af56f4886a3e8b
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -95,6 +96,7 @@ cdm:
     20f65c28671b4093: 195057ec33efc577
     24c458cfb46d9a45: 953d02f5d1ac5781
     2a07ca57ed083879: 8faa07d8fc6c7c1d
+    2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     484de142f352dff3: 1cc66be4e6718295
     49e9627e39c92dd0: b0cee0ff8f060823
@@ -197,6 +199,7 @@ cdm:
 | coverage | function | def coverage(config: Path = _CONFIG_OPTION, json_out: bool = typer.Option(False, '--json', help='Emit the full CoverageReport as round-trippable JSON.'), fail_under: float \| None = typer.Option(None, '--fail-under', help='Exit 1 if public-symbol coverage is below this percent (informational — always exits 0 — when omitted).'), write: bool = typer.Option(False, '--write', help=f'Write a deterministic coverage manifest (payload + owner suggestions) to PATH (default {_DEFAULT_MANIFEST}); idempotent (K7).'), manifest_path: Path \| None = typer.Argument(None, metavar='[PATH]', help=f'Manifest destination for --write (default {_DEFAULT_MANIFEST}).')) -> None |
 | deps | function | def deps(config: Path = _CONFIG_OPTION, suspect: bool = typer.Option(False, '--suspect', help='Show only edges that need review (hide OK edges).'), suggest: bool = typer.Option(False, '--suggest', help='Infer edges from Markdown cross-links between managed docs and print paste-ready `depends_on` config (the low-tedium authoring aid). Read-only.'), impact: str \| None = typer.Option(None, '--impact', metavar='DOC', help='Show the blast radius of changing DOC — the documents that (transitively) depend on it and would need re-review. Read-only.'), transitive: bool = typer.Option(False, '--transitive', help='Also show the EAGER transitive-suspect advisory (PROP-01): documents whose upstream is itself pending review. Advisory only — never gates `cdx check`. Applies to the default suspect listing (ignored with --impact, which is already transitive, and with --suggest).'), as_json: bool = typer.Option(False, '--json', help='Emit the dependency graph / suggestions as JSON.')) -> None |
 | doctor | function | def doctor(config: Path = _CONFIG_OPTION) -> None |
+| entities | function | def entities(doc_id: str \| None = typer.Argument(None, metavar='[DOC_ID]', help='Limit the report to one managed document (default: every doc).'), config: Path = _CONFIG_OPTION, unresolved: bool = typer.Option(False, '--unresolved', help='Show only UNRESOLVED mentions — the graph-rot signal (a mention whose referent no longer exists, or never did).'), as_json: bool = typer.Option(False, '--json', help='Emit the per-document mention lists as JSON.')) -> None |
 | index | function | def index(config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='The config/cdmon directory whose index.yaml to regenerate.'), check: bool = typer.Option(False, '--check', help='Read-only: exit 1 if the on-disk index differs from a freshly regenerated one (CI gate), 0 when in sync. Writes nothing.')) -> None |
 | init | function | def init(path: Path = typer.Option(Path('cdmon.yaml'), '--path', help='Where to write the config template.'), force: bool = typer.Option(False, '--force', help='Overwrite an existing config file.'), central: str \| None = typer.Option(None, '--central', metavar='URL', help='Wire `central:` for HTTP reporting to this central-server URL (sink=http). Without it, the offline template is written unchanged.'), repo_id: str \| None = typer.Option(None, '--repo-id', help='Stable repo identifier the central system keys on (required for --central; defaults to the current directory name).'), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the HTTP sink reads the central bearer token from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), repo_url: str \| None = typer.Option(None, '--repo-url', help="This repo's clone/browse URL, recorded on each reported record (only with --central)."), v2: bool = typer.Option(False, '--v2', help='Scaffold the multi-file config/cdmon/ layout (index + example unit + ignore + doc-style) instead of the single-file template.'), config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='Where to scaffold the config/cdmon/ directory (only with --v2).'), repo: str \| None = typer.Option(None, '--repo', help='Repo id/name written into the scaffolded index.yaml (only with --v2; defaults to the current directory name).')) -> None |
 | lint | function | def lint(config: Path = _CONFIG_OPTION, fix: bool = typer.Option(False, '--fix', help='Stamp missing static front matter (schema_version/audience).'), modes: bool = typer.Option(False, '--modes', help="Also print each managed region's authority mode + lock/advisory state (informational — does NOT change lint's pass/fail).")) -> None |

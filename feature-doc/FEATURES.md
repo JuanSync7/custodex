@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**235 features** across 24 subsystems.
+**238 features** across 25 subsystems.
 
 ## agent
 
@@ -538,6 +538,26 @@ On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from the
 ### `FEAT-DRIFT-012` — Per-symbol signature digests close the masked breaking-change case
 
 DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive, survives later heals via the cdm-map copy, K7), with manifest stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes `sigs_changed` — the SURVIVING documented symbols whose signature digest moved (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a non-empty sigs_changed ABOVE the addition rule, closing the former masked false-negative where an in-place signature change was hidden as ADDITIVE whenever a symbol was also added in the same edit. A pure addition (no survivor moved) stays ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
+
+## entities
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-ENTITIES-001` | Deterministic entity extraction + mention linking over doc prose | entities | K0, K1, K10, K11 | — | — | implemented |
+| `FEAT-ENTITIES-002` | Registry resilience + the `entities:` config block (target noise via config) | entities, config | K0, K6, K8, K10 | — | — | implemented |
+| `FEAT-ENTITIES-003` | `cdx entities` — the mention report + the dogfood precision budget | entities, cli | K1, K4, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-ENTITIES-001` — Deterministic entity extraction + mention linking over doc prose
+
+entities.extract_doc_entities parses one managed doc's PROSE deterministically (pure, no clock, no I/O — K1/K10): fenced code blocks and CDM:BEGIN/END machine regions are stripped first (machine text never mints a mention; blank-line replacement keeps Mention.line FILE-accurate, front-matter height included), then headings become the doc's own SECTION entities (GitHub-style slugs, repeated slugs deduplicated -2/-3), inline markdown links classify as URL / DOC (managed) / PATH (full repo tree, files AND directories), and inline backtick spans classify by the pinned precision rules: spans with whitespace, braces, glob metachars or colons mint nothing (HTTP routes, CLI invocations, CDM markers); path-shaped spans resolve exact-path-then-unique-basename (an AMBIGUOUS basename mints nothing — existing- but-ambiguous is not rot); SCREAMING_SNAKE spans resolve registry-first then the configured env-prefix gate (else ignored, so enum names never masquerade as env vars); identifier spans resolve by exact registry match, where only dotted, snake_case, or multi-hump CamelCase spans may surface UNRESOLVED — a plain word resolves or is ignored, never noise. Symbol resolution is exact-match only: qualified Class.method, module-qualified stem.name (registered only while the stem is unique) and full-dotted pkg.mod.name forms; a bare name needs GLOBAL uniqueness AND no module-stem collision (the measured app/coverage/index cli.py trap is blocked); a bare name matching only a unique module stem resolves as a PATH mention to that file, and a dotted package mention (custodex.server) resolves as a PATH to the directory/module. Unresolved mentions are first-class data (the Obsidian rule) — the graph-rot signal downstream slices consume. Every entity has a SCIP-style deterministic string id ("symbol custodex/drift.py#detect_drift").
+
+### `FEAT-ENTITIES-002` — Registry resilience + the `entities:` config block (target noise via config)
+
+entities.build_registry constructs the closed resolution universe — managed-doc paths/ids, per-file public symbols via the LANGUAGE-GUARDED extractor registry (a file's suffix picks its extractor; shell functions ride along for free), and the FULL repo file+dir tree for PATH resolution (independent of the coverage inventory, so prose mentions of non-code files and directories resolve). It is RESILIENT by design: an unparseable source file or an unregistered suffix becomes a warnings entry with zero symbols — a read-only advisory scan never aborts on one bad file, so background ticks survive arbitrary adopter repos. Target-specific noise enters through config, never the engine (K0): the additive `entities:` block (EntitiesConfig, default-empty so every pre-AGT config loads unchanged, K6) carries `ignore` (spans that mint no mention — tool names, config keys, illustrative example paths) and `env_prefixes` (a SCREAMING_SNAKE span becomes an ENV_VAR entity only under a configured prefix). Wired through BOTH config forms (single-file and the config/cdmon dir layout's index.yaml globals lift).
+
+### `FEAT-ENTITIES-003` — `cdx entities` — the mention report + the dogfood precision budget
+
+`cdx entities [DOC_ID] [--json] [--unresolved]` is the read-only CLI surface (K1/K4): per-document mention lists with file-accurate line numbers, `--unresolved` filtering to the graph-rot view, `--json` emitting the sorted DocEntities dumps, and a loud typed error on an unknown doc id (K8). The PRECISION BUDGET is part of the contract, not an aspiration: the dogfood integration test runs the scanner over THIS repo's real managed corpus and pins (a) an EMPTY day-one unresolved set (the rot signal starts clean — the seeded config/cdmon `entities:` stoplist is justified entry-by-entry), (b) no mention text matching a noise shape (routes, globs, colon markers, whitespace fragments), and (c) the measured misresolution traps (app/coverage/index) staying blocked — so a precision regression fails the suite the same way a stale wiki fails the freshness gate. The DEMOS.md header-id uniqueness smoke lint ships with this slice (the review found DEMO-052/053/054 duplicated; the traceability engine scans only Features: tags, so collisions were silent).
 
 ## extract
 

@@ -782,7 +782,7 @@ the repo on demand, syncs it, and can open a docs PR upstream. The demo proves t
 end to end with NO network by using the committed `demo/` tree as a real `file://`
 git origin (exercised by `tests/system/test_demo_gitsync_e2e.py`).
 
-### DEMO-052 — Clone-on-demand: sync a repo the server does not hold
+### DEMO-095 — Clone-on-demand: sync a repo the server does not hold
 **What it shows.** `gitfetch.cloned_repo(RemoteSpec(...), secret)` shallow-clones a
 remote into a throwaway temp tree and yields it for `run_sync(mode="local")`, then
 tears it down (the user/server tree is never mutated). The token reaches git only
@@ -797,7 +797,7 @@ a coverage snapshot. See `test_demo_gitsync_e2e.py::test_demo_clone_on_demand_sy
 and `::test_demo_add_file_to_origin_then_resync_sees_it`.
 Features: FEAT-GITSYNC-001
 
-### DEMO-053 — At-rest sealed credential: seal at register, open at sync
+### DEMO-096 — At-rest sealed credential: seal at register, open at sync
 **What it shows.** A per-repo git PAT is WRITE-ONLY at register and stored
 AES-256-GCM-sealed (`secrets.SecretBox` under `$CDMON_SECRET_KEY`) — never as
 plaintext (the payload JSON is sanitized; the store keeps opaque bytes and never
@@ -809,7 +809,7 @@ the stored payload. See `test_secrets.py` (seal/open + tamper/KEK failures) and
 `test_server_gitsync.py::test_provider_secret_sealed_then_opened_and_passed_to_cloner`.
 Features: FEAT-GITSYNC-002
 
-### DEMO-054 — Minted short-lived App/OAuth token (the hot token is never stored)
+### DEMO-097 — Minted short-lived App/OAuth token (the hot token is never stored)
 **What it shows.** For a `provider_kind` of `github-app`/`gitlab-oauth`, the sealed
 credential is a longer-lived secret (an App private key / OAuth refresh token); the
 route mints a SHORT-LIVED access token from it on each op (`gitauth`: an RS256 App
@@ -1286,3 +1286,44 @@ just that queue; `--no-include-suspect` drops the suspect items; the central
 `tests/unit/test_worklist.py` + `tests/system/test_worklist_cli.py` +
 `tests/integration/test_worklist_server.py`.
 Features: FEAT-WORKLIST-001
+
+## N. The task-agent layer (EPIC AGT — entities, mapping, graph, suggesters)
+
+### DEMO-098 — Deterministic entity mentions (`cdx entities`)
+**What it shows.** The AGT-01 mention layer: every backticked symbol / path /
+env-var span and markdown link in a managed doc's PROSE, linked against a closed
+registry built from the code surface + the managed-doc set + the full repo tree —
+deterministically, offline, with no LLM anywhere (the LazyGraphRAG split: the index
+is pure; a model only ever consumes it). Machine text never mints a mention (CDM
+regions and code fences are stripped), and the precision rules never guess: a
+backticked `Class.method` or unique snake_case name resolves to its defining file
+(`symbol <path>#<name>`), a module name resolves as a PATH mention, an HTTP route,
+glob, or CLI invocation mints nothing, and a bare word that collides with a module
+stem (the `app`/`coverage`/`index` trap) is blocked rather than misresolved.
+**How to observe.** Against the demo repo, `cdx entities` prints each doc's
+mentions with file-accurate line numbers (`L42 \`TaskFlow\` [symbol] → symbol
+src/taskflow/core/engine.py#TaskFlow`); `cdx entities getting-started` filters to
+one doc; `--json` emits the sorted structured lists. Two consecutive runs are
+byte-identical (K10). Pinned by `tests/unit/test_entities.py` +
+`tests/system/test_entities_cli.py`.
+Features: FEAT-ENTITIES-001
+
+### DEMO-099 — The clean rot signal (`cdx entities --unresolved` + the stoplist)
+**What it shows.** Unresolved mentions are first-class data — the graph-rot
+detector: a prose reference to a symbol or file that no longer exists (or never
+did) surfaces as `UNRESOLVED`, while everything ambiguous is ignored rather than
+guessed. The signal is trustworthy because it starts EMPTY: target-specific noise
+enters through config (K0) — the `entities:` block's `ignore` stoplist and
+`env_prefixes` gate — and Custodex's own dogfood corpus is pinned at ZERO
+unresolved mentions by an integration test, so any regression (or any real rot)
+fails loudly. The registry is resilient: one unparseable source file becomes a
+warning, never an abort.
+**How to observe.** `cdx entities --unresolved --config config/cdmon` on this repo
+prints `0 unresolved`; rename a public symbol that the README mentions in backticks
+(or delete a file a doc references) and the mention flips to `UNRESOLVED` on the
+next run. `CDMON_`-prefixed backticked spans resolve as env-var entities because
+`config/cdmon/index.yaml` seeds `entities.env_prefixes: [CDMON_]`; an enum-name-like
+`SOME_CONSTANT` mints nothing. Pinned by `tests/integration/test_entities_dogfood.py`
++ `tests/unit/test_entities_config.py` + `tests/smoke/test_demo_ids.py` (the
+DEMOS.md id-uniqueness lint that ships with this slice).
+Features: FEAT-ENTITIES-002, FEAT-ENTITIES-003

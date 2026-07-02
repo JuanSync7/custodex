@@ -58,6 +58,7 @@ from .docdeps import (
 from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
 from .drift import DriftKind
+from .entities import corpus_entities, render_entities_text
 from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
 from .featurecatalog import load_catalog
@@ -1577,6 +1578,55 @@ def deps(
         typer.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
         typer.echo(render_deps_text(links, suspect_only=suspect, transitive=trans))
+
+
+@app.command()
+def entities(
+    doc_id: str | None = typer.Argument(
+        None,
+        metavar="[DOC_ID]",
+        help="Limit the report to one managed document (default: every doc).",
+    ),
+    config: Path = _CONFIG_OPTION,
+    unresolved: bool = typer.Option(
+        False,
+        "--unresolved",
+        help="Show only UNRESOLVED mentions — the graph-rot signal (a mention "
+        "whose referent no longer exists, or never did).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the per-document mention lists as JSON."
+    ),
+) -> None:
+    """Show each managed doc's entity mentions, linked or unresolved (read-only, K1).
+
+    The AGT-01 mention layer: every backticked symbol/path/env-var span and
+    markdown link in a doc's PROSE (machine regions and code fences excluded),
+    resolved against the code surface + the managed-doc set + the repo tree.
+    Deterministic, offline, no backend (K4/K10); precision-first — an ambiguous
+    span is unresolved or ignored, never guessed.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        results = corpus_entities(cfg, root, doc_id=doc_id)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        payload = [r.model_dump(mode="json") for r in results]
+        if unresolved:
+            payload = [
+                {
+                    **r,
+                    "mentions": [m for m in r["mentions"] if not m["resolved"]],
+                }
+                for r in payload
+            ]
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        typer.echo(render_entities_text(results, unresolved_only=unresolved))
 
 
 def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:

@@ -2117,3 +2117,28 @@ own implementing modules are inside the thing being gated.
   `drifted_tiers` precedent: stringly-typed field (the enum stays in `drift.py`),
   additive schema **minor bump 1.1.0→1.2.0**, regen the golden `cdx schema` artifacts
   (`docs/REVIEW_RECORD_SCHEMA.json` + `frontend/src/console/schema.review.json`).
+
+## [AGT-01] The mention layer: measured precision beats designed precision
+- **Design review with corpus measurement is worth more than the design.** Three of
+  the four load-bearing precision rules (module-stem ambiguity, ambiguous-basename-
+  mints-nothing, colon/absolute-span rejection) came from MEASURING the pinned rules
+  against the real dogfood corpus — first by the review agents (who found the
+  `app`/`coverage`/`index` misresolution trap and the ~90-row noise floor), then by
+  running the freshly-built scanner day-one (25 → 16 → 0 unresolved across four rule
+  refinements). A mention layer designed on fixtures alone would have shipped all of it.
+- **Two precision rules can conflict; reconcile them explicitly.** "A collision never
+  resolves" and "a plain word is never unresolved" meet on a plain word that collides
+  with a module stem (`alpha`): the reconciliation — blocked from resolving AND not
+  unresolved-eligible ⇒ mints nothing — only became visible when a test encoded the
+  wrong expectation. Write the conflict case down as a test the moment you see it.
+- **Pin an EMPTY expected set, not an enumerated one, for corpus-level precision
+  gates.** `test_entities_dogfood.py` asserts zero unresolved + forbidden noise shapes
+  rather than a list of expected rows: a prose edit that adds a legit unresolved
+  mention should fail as NEW SIGNAL for triage (fix prose / extend the justified
+  stoplist / accept), exactly like the wiki freshness gate — not force a mechanical
+  pin update that trains people to rubber-stamp it.
+- **A dead subagent is a recoverable event, not a blocker.** The slice subagent hit
+  the account session limit at spawn; the orchestrator carried the slice in the main
+  loop from the same spec with zero rework — because the spec, the ⟨R⟩ rules, and the
+  DoD bundle were all pinned in the repo, not in the dead agent's context. That is
+  the PROCESS.md re-dispatch clause working as designed.

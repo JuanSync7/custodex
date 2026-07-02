@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: c95aa3772b60e053
+  fingerprint: a127fbf2054d5d16
   fingerprint_tiers:
-    composite: c95aa3772b60e053
-    signature: c95aa3772b60e053
+    composite: a127fbf2054d5d16
+    signature: a127fbf2054d5d16
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -16,6 +16,7 @@ cdm:
     1d3c8aff2168435b: 7f757c94419dec88
     20f65c28671b4093: 195057ec33efc577
     24c458cfb46d9a45: 953d02f5d1ac5781
+    2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     602fda589448378a: 8afb4765b2d48e0c
     72f4be89d6ebab14: 82cdb795b1cfefb7
@@ -116,6 +117,7 @@ cdx deps                 # show the doc→doc dependency graph + suspect status 
 cdx deps --suggest       # infer edges from Markdown cross-links between managed docs → paste-ready `depends_on` config (author→approve, not author-by-hand)
 cdx deps --impact DOC    # the proactive blast radius: which documents (transitively) depend on DOC and would need re-review if you change it (read-only; an empty radius reads "safe to change")
 cdx resolve --edge DOWN UP  # re-confirm exactly one doc↔doc edge after reviewing the upstream change (re-stamps just that edge's baseline; `docdeps.gate` decides whether a suspect link fails `cdx check`)
+cdx entities [DOC] [--unresolved]  # the AGT-01 mention layer: every backticked symbol/path/env-var span + markdown link in a doc's PROSE, linked deterministically against the code surface + repo tree; --unresolved shows the graph-rot signal (a mention whose referent is gone); read-only, no LLM
 cdx monitor --ref SHA    # ...and stamp each record's source_sha provenance (else $CI_COMMIT_SHA; C-05)
 cdx sync-pr [--dry-run]  # heal docs + emit a unified-diff patch of the changed docs (the docs-PR content); --dry-run computes the same patch without touching the tree; --out FILE writes it
 cdx open-docs-pr [--dry-run]  # heal docs then open a docs MR (branch+commit+MR) via the default GitLab transport (stdlib urllib; from CI env); clean repo is a no-op; --dry-run prints the MR plan as JSON from a dry sync (no mutation, no network); --target/--ref set the target branch + provenance ref
