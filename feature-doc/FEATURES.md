@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**241 features** across 26 subsystems.
+**243 features** across 27 subsystems.
 
 ## agent
 
@@ -693,6 +693,21 @@ apply_fix accepts any ProposedFixLike (a Protocol exposing region_id / new_regio
 ### `FEAT-HEAL-009` — Pure whole-doc correction for backend FIX parity
 
 render_corrected returns the corrected full document text (regions plus fingerprint) from a document string without any I/O, reusing the same region and fingerprint logic as regenerate_regions so a backend's whole-doc FIX for a HASH drift and an in-engine heal agree byte-for-byte; preserve and modes drive the same B-02 lock and B-03 hash stamping.
+
+## kgraph
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-KGRAPH-001` | The unified knowledge-graph artifact + derived queries | kgraph | K1, K2, K8, K10 | — | — | implemented |
+| `FEAT-KGRAPH-002` | `cdx graph` + the hub snapshot mirror (`POST`/`GET /repos/{id}/graph`) | kgraph, cli, server | K1, K2, K6, K7, K10 | — | — | implemented |
+
+### `FEAT-KGRAPH-001` — The unified knowledge-graph artifact + derived queries
+
+kgraph.build_graph folds everything Custodex already knows into ONE typed graph (pure, K1/K10): DOCUMENTS (doc→symbol, the code_refs coverage join — declared), DEPENDS_ON (doc→doc, docdeps declarations — declared), OWNED_BY (doc→owner, the EPIC-OWN accountable projection — declared), MENTIONS (doc→symbol/path/env-var — resolved, the AGT-01 mention layer), LINKS_TO (doc→doc/url — resolved prose links) and PART_OF (section→doc, heading hierarchy — resolved). Node identity is the AGT-01 SCIP-style string id; a SECTION node's name is its SLUG, never raw heading text, so the artifact carries no doc-body prose (K2-safe for the hub mirror). Edges carry a provenance TIER (declared > resolved — never a float); nodes/edges are sorted and the rebuild is byte-identical (K10). The per-doc `unresolved` counts ride the artifact as the graph-rot signal — trustworthy because of the AGT-01 precision rules — and the resilient registry's `warnings` ride it too (one unparseable source file warns, never aborts). Derived queries recompute from base facts and are never stored: graph_neighbors (in+out edges to a depth, loud on an unknown id — K8) and rank_centrality — MENTIONS in-degree counted as DISTINCT mentioning docs (a doc cannot vote a symbol up twice), with undocumented_only crossing it against the absence of DOCUMENTS edges: the widely-mentioned-but-never-covered symbols are the best-justified what-to-document gaps (the one DeepWiki idea worth stealing, grounded in deterministic surfaces).
+
+### `FEAT-KGRAPH-002` — `cdx graph` + the hub snapshot mirror (`POST`/`GET /repos/{id}/graph`)
+
+`cdx graph` is the read-only CLI surface (K1/K4): the default summary view (node/edge counts by kind + the rot signal), `--focus NODE_ID` (the edges around one node), `--rank` (the mentioned-but-undocumented gap ranking, `--json`-able), `--json` (the full artifact) and `--write` (the regenerable `.cdmon/graph.json` — the sphinx-needs needs.json pattern; idempotent, prints "unchanged" on a byte-identical rewrite, K7). The hub mirror follows the coverage-snapshot pattern EXACTLY (K2: the graph is computed repo-side where the doc bodies live; the hub only stores): `POST /repos/{id}/graph` ingests the full versioned KnowledgeGraph wire dict opaquely (token-gated by the E-06 matrix — 404 unknown / 401 missing / 403 wrong / 202), `GET /repos/{id}/graph` (open read) serves the LATEST snapshot or an honest empty dict before any push; Store gains add_graph_snapshot/graph_for on BOTH stores (parity-tested over real HTTP) with the graph_snapshots table added by additive Alembic 0008 (up/down proven on temp SQLite).
 
 ## layout
 

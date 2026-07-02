@@ -60,6 +60,7 @@ __all__ = [
     "declare_edge",
     "reject_edge",
     "read_rejections",
+    "symbol_owners",
 ]
 
 # Frozen + extra="forbid": suggestions and verdicts are immutable snapshots (K8/K10).
@@ -104,7 +105,7 @@ class EdgeRejection(BaseModel):
     note: str | None = None
 
 
-def _symbol_owners(config: MonitorConfig, root: Path) -> dict[str, set[str]]:
+def symbol_owners(config: MonitorConfig, root: Path) -> dict[str, set[str]]:
     """Map a SYMBOL entity id (``symbol <path>#<name>``) → covering doc ids.
 
     Per-(doc, code_ref) extraction through the audience-agnostic
@@ -147,7 +148,7 @@ def suggest_edges(
     rejected = {(r.doc_id, r.upstream_id) for r in rejections}
     index_docs = {d.id for d in config.documents if d.index}
     doc_id_by_path = {posixpath.normpath(d.path): d.id for d in config.documents}
-    owners = _symbol_owners(config, root)
+    owners = symbol_owners(config, root)
 
     links: dict[tuple[str, str], list[str]] = {}
     symbols: dict[tuple[str, str], list[str]] = {}

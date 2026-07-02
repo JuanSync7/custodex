@@ -76,6 +76,7 @@ from .issues import (
     open_coverage_issue,
     plan_coverage_issue,
 )
+from .kgraph import build_graph, rank_centrality, render_graph_text
 from .layout import (
     config_region_states,
     lint_config,
@@ -1744,6 +1745,84 @@ def entities(
         typer.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
         typer.echo(render_entities_text(results, unresolved_only=unresolved))
+
+
+@app.command()
+def graph(
+    config: Path = _CONFIG_OPTION,
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        metavar="NODE_ID",
+        help='Show the edges around one node (e.g. "doc docs/api/drift.md" or '
+        '"symbol custodex/drift.py#detect_drift").',
+    ),
+    rank: bool = typer.Option(
+        False,
+        "--rank",
+        help="Rank symbols by MENTIONS in-degree with no covering doc — the "
+        "best-justified what-to-document gaps.",
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Write the graph artifact to .cdmon/graph.json (regenerable, "
+        "idempotent; the sphinx-needs needs.json pattern).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the whole graph as JSON."),
+) -> None:
+    """The unified knowledge graph over docs, code and owners (read-only build).
+
+    ONE deterministic fold of everything Custodex already knows: code↔doc
+    coverage (DOCUMENTS), doc↔doc dependencies (DEPENDS_ON), prose mentions
+    and links (MENTIONS/LINKS_TO — the AGT-01 layer), sections (PART_OF) and
+    accountability (OWNED_BY), with per-doc unresolved-mention counts as the
+    rot signal. Pure and offline (K1/K4/K10); `--write` touches only the
+    regenerable `.cdmon/graph.json` artifact.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        unit_owner = _unit_owner_map(config_dir)
+        g = build_graph(cfg, root, unit_owner=unit_owner)
+        if focus is not None and not as_json:
+            typer.echo(render_graph_text(g, focus=focus))
+            return
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if rank:
+        ranked = rank_centrality(g, undocumented_only=True)
+        if as_json:
+            typer.echo(
+                json.dumps(
+                    [{"node": n, "mentions": c} for n, c in ranked],
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        elif not ranked:
+            typer.echo("# no undocumented mentioned symbols — no ranked gaps")
+        else:
+            typer.echo("# mentioned-but-undocumented symbols (best gaps first):")
+            for node, count in ranked:
+                typer.echo(f"  {count:>3}x {node}")
+        return
+    if write:
+        out = config_dir / ".cdmon" / "graph.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        text = g.model_dump_json(indent=2) + "\n"
+        if out.is_file() and out.read_text(encoding="utf-8") == text:
+            typer.echo(f"{out}: unchanged")
+        else:
+            out.write_text(text, encoding="utf-8")
+            typer.echo(f"{out}: wrote")
+        return
+    if as_json:
+        typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(render_graph_text(g))
 
 
 def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:

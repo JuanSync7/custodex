@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**241 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**243 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -131,6 +131,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-HEAL-007` | integration/test_heal.py, regression/test_corpus_pipeline.py, system/test_system.py | DEMOS.md |
 | `FEAT-HEAL-008` | integration/test_apply_fix.py, integration/test_heal.py, regression/test_corpus_pipeline.py, system/test_demo_walkthrough.py, system/test_live_llm.py, system/test_system.py | DEMOS.md |
 | `FEAT-HEAL-009` | integration/test_heal.py, regression/test_corpus_pipeline.py, system/test_live_llm.py, system/test_system.py | DEMOS.md |
+| `FEAT-KGRAPH-001` | system/test_kgraph_cli.py, unit/test_kgraph.py | DEMOS.md |
+| `FEAT-KGRAPH-002` | system/test_kgraph_cli.py, unit/test_kgraph.py | DEMOS.md |
 | `FEAT-LAYOUT-001` | integration/test_layout.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_dogfood.py, system/test_example_multilang.py, system/test_system.py | DEMOS.md |
 | `FEAT-LAYOUT-002` | integration/test_layout.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_dogfood.py, system/test_example_multilang.py | DEMOS.md |
 | `FEAT-LAYOUT-003` | integration/test_layout.py, system/test_cli.py, system/test_system.py | DEMOS.md |

@@ -143,6 +143,21 @@ class CoverageSnapshotRow(Base):
     snapshot: Mapped[dict] = mapped_column(_json_type())
 
 
+class GraphSnapshotRow(Base):
+    """A knowledge-graph snapshot — an opaque JSON payload (AGT-03, K2-safe).
+
+    The exact ``coverage_snapshots`` pattern: computed repo-side (where doc
+    bodies live), mirrored here opaquely, latest-wins on read.
+    """
+
+    __tablename__ = "graph_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    repo_id: Mapped[str] = mapped_column(String, index=True)
+    captured_at: Mapped[str] = mapped_column(String, index=True)
+    snapshot: Mapped[dict] = mapped_column(_json_type())
+
+
 class ConfigDocumentRow(Base):
     """A synced config document — FULL :class:`ConfigDocument` JSON + indexed (Y-01).
 
@@ -507,6 +522,25 @@ class SqlStore:
                 .order_by(CoverageSnapshotRow.id)
             ).all()
             return [r.snapshot for r in rows]
+
+    def add_graph_snapshot(
+        self, repo_id: str, captured_at: str, snapshot: dict
+    ) -> None:
+        with self._session() as session, session.begin():
+            session.add(
+                GraphSnapshotRow(
+                    repo_id=repo_id, captured_at=captured_at, snapshot=snapshot
+                )
+            )
+
+    def graph_for(self, repo_id: str) -> dict | None:
+        with self._session() as session:
+            row = session.scalars(
+                select(GraphSnapshotRow)
+                .where(GraphSnapshotRow.repo_id == repo_id)
+                .order_by(GraphSnapshotRow.id.desc())
+            ).first()
+            return row.snapshot if row is not None else None
 
     # --- Y-01: config documents / code-refs / sync runs ---------------------
 

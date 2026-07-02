@@ -1365,3 +1365,37 @@ every comment intact and `cdx deps` shows the edge OK; re-run `--suggest` → go
 forever. Pinned by `tests/system/test_docmap_cli.py` (accept e2e incl. the
 comment-preservation byte assertion + reject durability).
 Features: FEAT-DOCMAP-003
+
+### DEMO-102 — The knowledge graph (`cdx graph`)
+**What it shows.** One deterministic fold of everything Custodex already knows
+into a typed, provenance-tiered graph: which doc DOCUMENTS which symbols (the
+code_refs join), which doc DEPENDS_ON which (declared edges), what each doc
+MENTIONS and LINKS_TO in its prose (the AGT-01 layer), each doc's sections
+(PART_OF) and accountable owner (OWNED_BY) — with the per-doc unresolved-mention
+counts riding along as the rot signal. Zero LLM: the graph is base facts; derived
+queries (neighbors, centrality) recompute from them. Section names are slugs, so
+the artifact carries no doc-body prose — safe to mirror centrally (K2).
+**How to observe.** Against the demo, `cdx graph` prints the summary (node/edge
+counts by kind); `cdx graph --focus "doc docs/getting-started.md"` shows every
+edge around that doc; `--json` emits the whole artifact; `--write` produces the
+regenerable `.cdmon/graph.json` and prints "unchanged" on an immediate re-run
+(K7). Two builds are byte-identical (K10). Pinned by `tests/unit/test_kgraph.py`
++ `tests/system/test_kgraph_cli.py`.
+Features: FEAT-KGRAPH-001
+
+### DEMO-103 — What to document next (`cdx graph --rank`) + the hub mirror
+**What it shows.** The graph turns coverage gaps into a PRIORITISED queue: a
+symbol that many docs mention but NO doc covers is the best-justified thing to
+document next — `--rank` lists exactly those (count = distinct mentioning docs,
+so one doc can't stuff the ballot). And the hub gets the same picture without
+ever seeing a doc body: the repo pushes the graph as an opaque versioned snapshot
+(`POST /repos/{id}/graph`, token-gated) and the console reads the latest
+(`GET /repos/{id}/graph`) — the coverage-snapshot pattern applied to the graph.
+**How to observe.** Against the demo, mention an uncovered symbol in two docs'
+prose and `cdx graph --rank` puts it on top; push with an authorized token → the
+GET returns the latest snapshot; an unknown repo 404s, a wrong token 403s (the
+E-06 matrix), and both stores serve identical results (parity-tested). Pinned by
+`tests/integration/test_server_store_parity.py` (graph trio) +
+`tests/integration/test_db.py` (Alembic 0008 up/down) +
+`tests/system/test_kgraph_cli.py`.
+Features: FEAT-KGRAPH-002

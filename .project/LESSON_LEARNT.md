@@ -2164,3 +2164,18 @@ own implementing modules are inside the thing being gated.
   call sites (detect + stamp) from ONE config field means a flip can never produce
   divergent stamps — the failure mode of adding the knob at only one call site would
   have been permanent suspects.
+
+## [AGT-03] Graph semantics live in the fold, not the storage
+- **Edges-as-a-set IS a semantic decision.** Deduping (source, target, kind, tier)
+  makes rank_centrality count DISTINCT mentioning docs rather than raw mention
+  occurrences — discovered when a system test expected 2 for a twice-mentioned
+  symbol. The set semantics is the better signal (one doc can't stuff the ballot);
+  write the chosen meaning into the docstring the moment a test disagrees with you.
+- **Share one scan via an additive param, not a cache.** The graph needs both the
+  registry's warnings and the mention results; `corpus_entities(registry=...)`
+  (default None = build) keeps the function pure and the call sites explicit — no
+  module-level memoization to poison determinism.
+- **The coverage-snapshot pattern generalizes cleanly.** Opaque versioned JSON +
+  token-gated POST + open GET + both-store parity + one additive Alembic table was
+  a 1:1 template for the graph mirror; the second `extra="allow"` ingest model is
+  sanctioned by the same reasoning (the payload versions itself via schema_version).

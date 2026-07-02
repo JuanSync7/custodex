@@ -80,6 +80,8 @@ coverage:
       reason: "AGT-01 entity/mention layer; documented in feature-doc/catalog/entities.yaml (api doc owned by cdx wiki)"
     - path: "custodex/docmap.py"
       reason: "AGT-02 edge suggestions + link accept/reject; documented in feature-doc/catalog/docmap.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/kgraph.py"
+      reason: "AGT-03 knowledge-graph artifact; documented in feature-doc/catalog/kgraph.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 

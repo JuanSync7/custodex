@@ -514,17 +514,23 @@ def extract_doc_entities(
 
 
 def corpus_entities(
-    config: MonitorConfig, root: Path, *, doc_id: str | None = None
+    config: MonitorConfig,
+    root: Path,
+    *,
+    doc_id: str | None = None,
+    registry: EntityRegistry | None = None,
 ) -> tuple[DocEntities, ...]:
     """Extract mentions for every managed doc (or one), sorted by doc id.
 
-    Builds the registry once. A managed doc whose FILE is missing is skipped
-    (its ``MISSING_DOC`` drift covers it — the docdeps precedent). An unknown
-    ``doc_id`` raises :class:`DriftError` (K8).
+    Builds the registry once (or reuses a caller-provided one — AGT-03's graph
+    builder shares a single scan). A managed doc whose FILE is missing is
+    skipped (its ``MISSING_DOC`` drift covers it — the docdeps precedent). An
+    unknown ``doc_id`` raises :class:`DriftError` (K8).
     """
     if doc_id is not None and all(d.id != doc_id for d in config.documents):
         raise DriftError(f"unknown document id {doc_id!r} — not a managed document")
-    registry = build_registry(config, root)
+    if registry is None:
+        registry = build_registry(config, root)
     out: list[DocEntities] = []
     for spec in sorted(config.documents, key=lambda d: d.id):
         if doc_id is not None and spec.id != doc_id:
