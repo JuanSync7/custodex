@@ -782,7 +782,7 @@ the repo on demand, syncs it, and can open a docs PR upstream. The demo proves t
 end to end with NO network by using the committed `demo/` tree as a real `file://`
 git origin (exercised by `tests/system/test_demo_gitsync_e2e.py`).
 
-### DEMO-052 — Clone-on-demand: sync a repo the server does not hold
+### DEMO-095 — Clone-on-demand: sync a repo the server does not hold
 **What it shows.** `gitfetch.cloned_repo(RemoteSpec(...), secret)` shallow-clones a
 remote into a throwaway temp tree and yields it for `run_sync(mode="local")`, then
 tears it down (the user/server tree is never mutated). The token reaches git only
@@ -797,7 +797,7 @@ a coverage snapshot. See `test_demo_gitsync_e2e.py::test_demo_clone_on_demand_sy
 and `::test_demo_add_file_to_origin_then_resync_sees_it`.
 Features: FEAT-GITSYNC-001
 
-### DEMO-053 — At-rest sealed credential: seal at register, open at sync
+### DEMO-096 — At-rest sealed credential: seal at register, open at sync
 **What it shows.** A per-repo git PAT is WRITE-ONLY at register and stored
 AES-256-GCM-sealed (`secrets.SecretBox` under `$CDMON_SECRET_KEY`) — never as
 plaintext (the payload JSON is sanitized; the store keeps opaque bytes and never
@@ -809,7 +809,7 @@ the stored payload. See `test_secrets.py` (seal/open + tamper/KEK failures) and
 `test_server_gitsync.py::test_provider_secret_sealed_then_opened_and_passed_to_cloner`.
 Features: FEAT-GITSYNC-002
 
-### DEMO-054 — Minted short-lived App/OAuth token (the hot token is never stored)
+### DEMO-097 — Minted short-lived App/OAuth token (the hot token is never stored)
 **What it shows.** For a `provider_kind` of `github-app`/`gitlab-oauth`, the sealed
 credential is a longer-lived secret (an App private key / OAuth refresh token); the
 route mints a SHORT-LIVED access token from it on each op (`gitauth`: an RS256 App
@@ -1286,3 +1286,116 @@ just that queue; `--no-include-suspect` drops the suspect items; the central
 `tests/unit/test_worklist.py` + `tests/system/test_worklist_cli.py` +
 `tests/integration/test_worklist_server.py`.
 Features: FEAT-WORKLIST-001
+
+## N. The task-agent layer (EPIC AGT — entities, mapping, graph, suggesters)
+
+### DEMO-098 — Deterministic entity mentions (`cdx entities`)
+**What it shows.** The AGT-01 mention layer: every backticked symbol / path /
+env-var span and markdown link in a managed doc's PROSE, linked against a closed
+registry built from the code surface + the managed-doc set + the full repo tree —
+deterministically, offline, with no LLM anywhere (the LazyGraphRAG split: the index
+is pure; a model only ever consumes it). Machine text never mints a mention (CDM
+regions and code fences are stripped), and the precision rules never guess: a
+backticked `Class.method` or unique snake_case name resolves to its defining file
+(`symbol <path>#<name>`), a module name resolves as a PATH mention, an HTTP route,
+glob, or CLI invocation mints nothing, and a bare word that collides with a module
+stem (the `app`/`coverage`/`index` trap) is blocked rather than misresolved.
+**How to observe.** Against the demo repo, `cdx entities` prints each doc's
+mentions with file-accurate line numbers (`L42 \`TaskFlow\` [symbol] → symbol
+src/taskflow/core/engine.py#TaskFlow`); `cdx entities getting-started` filters to
+one doc; `--json` emits the sorted structured lists. Two consecutive runs are
+byte-identical (K10). Pinned by `tests/unit/test_entities.py` +
+`tests/system/test_entities_cli.py`.
+Features: FEAT-ENTITIES-001
+
+### DEMO-099 — The clean rot signal (`cdx entities --unresolved` + the stoplist)
+**What it shows.** Unresolved mentions are first-class data — the graph-rot
+detector: a prose reference to a symbol or file that no longer exists (or never
+did) surfaces as `UNRESOLVED`, while everything ambiguous is ignored rather than
+guessed. The signal is trustworthy because it starts EMPTY: target-specific noise
+enters through config (K0) — the `entities:` block's `ignore` stoplist and
+`env_prefixes` gate — and Custodex's own dogfood corpus is pinned at ZERO
+unresolved mentions by an integration test, so any regression (or any real rot)
+fails loudly. The registry is resilient: one unparseable source file becomes a
+warning, never an abort.
+**How to observe.** `cdx entities --unresolved --config config/cdmon` on this repo
+prints `0 unresolved`; rename a public symbol that the README mentions in backticks
+(or delete a file a doc references) and the mention flips to `UNRESOLVED` on the
+next run. `CDMON_`-prefixed backticked spans resolve as env-var entities because
+`config/cdmon/index.yaml` seeds `entities.env_prefixes: [CDMON_]`; an enum-name-like
+`SOME_CONSTANT` mints nothing. Pinned by `tests/integration/test_entities_dogfood.py`
++ `tests/unit/test_entities_config.py` + `tests/smoke/test_demo_ids.py` (the
+DEMOS.md id-uniqueness lint that ships with this slice).
+Features: FEAT-ENTITIES-002, FEAT-ENTITIES-003
+
+### DEMO-100 — Entity-grounded edge suggestions (`cdx deps --suggest`, AGT-02)
+**What it shows.** Doc↔doc mapping stops being hand-authored: the suggester
+proposes `depends_on` edges with a provenance TIER and evidence — `resolved_link`
+when one doc's prose markdown-links another, `shared_symbol` when doc A's prose
+mentions a code symbol that EXACTLY ONE doc B covers via `code_refs` (so the
+direction is principled: the mentioning doc depends on the documenting doc).
+Machine text cannot suggest (CDM regions/fences are stripped by the mention
+layer); an `index: true` doc's mandated navigation links are excluded; a symbol
+covered by two docs is ambiguous and never guessed. Each code-tracked upstream
+carries a churn note warning that reheals will flip the edge SUSPECT under the
+default `body` baseline — and that `docdeps.baseline: prose` (which this repo's
+own config uses) makes machine reheals hash-invisible so only human prose changes
+trip dependents.
+**How to observe.** Against the demo, `cdx deps --suggest` prints the tiered
+suggestions with paste-ready YAML + evidence + churn notes; `--json` items carry
+`{doc_id, upstream_id, via, tier, evidence, score}` (a key-superset of the legacy
+shape). With `docdeps.infer_from_links: true`, plain `cdx deps` appends a one-line
+advisory summary. Pinned by `tests/unit/test_docmap.py` +
+`tests/unit/test_docdeps_baseline.py` + `tests/system/test_docmap_cli.py`.
+Features: FEAT-DOCMAP-001, FEAT-DOCMAP-002
+
+### DEMO-101 — Accept or reject a suggestion (`cdx link`, the K11 loop closed)
+**What it shows.** The human verbs: `cdx link DOWN UP` DECLARES the suggested edge
+in the unit YAML by a comment-preserving textual splice (hand-written YAML comments
+survive byte-for-byte — never a model re-serialization), self-validates the spliced
+config, and stamps the new edge's baseline so it arrives reviewed (`cdx check`
+stays green; the suggestion disappears from the next `--suggest` run, K7).
+`cdx link --reject DOWN UP` records a durable verdict in
+`.cdmon/edge-rejections.jsonl` so a declined suggestion NEVER re-surfaces — the
+rejection memory with an audit trail (who/when/why).
+**How to observe.** On a scratch copy of the demo: `cdx deps --suggest` → pick a
+pair → `cdx link <down> <up>` → the unit file gains the `depends_on:` entry with
+every comment intact and `cdx deps` shows the edge OK; re-run `--suggest` → gone.
+`cdx link --reject <down> <up> --by you --note "not a real dependency"` → gone
+forever. Pinned by `tests/system/test_docmap_cli.py` (accept e2e incl. the
+comment-preservation byte assertion + reject durability).
+Features: FEAT-DOCMAP-003
+
+### DEMO-102 — The knowledge graph (`cdx graph`)
+**What it shows.** One deterministic fold of everything Custodex already knows
+into a typed, provenance-tiered graph: which doc DOCUMENTS which symbols (the
+code_refs join), which doc DEPENDS_ON which (declared edges), what each doc
+MENTIONS and LINKS_TO in its prose (the AGT-01 layer), each doc's sections
+(PART_OF) and accountable owner (OWNED_BY) — with the per-doc unresolved-mention
+counts riding along as the rot signal. Zero LLM: the graph is base facts; derived
+queries (neighbors, centrality) recompute from them. Section names are slugs, so
+the artifact carries no doc-body prose — safe to mirror centrally (K2).
+**How to observe.** Against the demo, `cdx graph` prints the summary (node/edge
+counts by kind); `cdx graph --focus "doc docs/getting-started.md"` shows every
+edge around that doc; `--json` emits the whole artifact; `--write` produces the
+regenerable `.cdmon/graph.json` and prints "unchanged" on an immediate re-run
+(K7). Two builds are byte-identical (K10). Pinned by `tests/unit/test_kgraph.py`
++ `tests/system/test_kgraph_cli.py`.
+Features: FEAT-KGRAPH-001
+
+### DEMO-103 — What to document next (`cdx graph --rank`) + the hub mirror
+**What it shows.** The graph turns coverage gaps into a PRIORITISED queue: a
+symbol that many docs mention but NO doc covers is the best-justified thing to
+document next — `--rank` lists exactly those (count = distinct mentioning docs,
+so one doc can't stuff the ballot). And the hub gets the same picture without
+ever seeing a doc body: the repo pushes the graph as an opaque versioned snapshot
+(`POST /repos/{id}/graph`, token-gated) and the console reads the latest
+(`GET /repos/{id}/graph`) — the coverage-snapshot pattern applied to the graph.
+**How to observe.** Against the demo, mention an uncovered symbol in two docs'
+prose and `cdx graph --rank` puts it on top; push with an authorized token → the
+GET returns the latest snapshot; an unknown repo 404s, a wrong token 403s (the
+E-06 matrix), and both stores serve identical results (parity-tested). Pinned by
+`tests/integration/test_server_store_parity.py` (graph trio) +
+`tests/integration/test_db.py` (Alembic 0008 up/down) +
+`tests/system/test_kgraph_cli.py`.
+Features: FEAT-KGRAPH-002

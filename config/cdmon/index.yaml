@@ -76,8 +76,50 @@ coverage:
       reason: "EPIC B doc↔doc dependency / suspect-link core; documented in feature-doc/catalog/docdeps.yaml (api doc owned by cdx wiki)"
     - path: "custodex/worklist.py"
       reason: "WL-01 per-owner review worklist (accountability join); documented in feature-doc/catalog/worklist.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/entities.py"
+      reason: "AGT-01 entity/mention layer; documented in feature-doc/catalog/entities.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/docmap.py"
+      reason: "AGT-02 edge suggestions + link accept/reject; documented in feature-doc/catalog/docmap.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/kgraph.py"
+      reason: "AGT-03 knowledge-graph artifact; documented in feature-doc/catalog/kgraph.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
+
+# AGT-02: doc↔doc edges in THIS repo track human PROSE only — a machine reheal
+# of a code-tracked upstream (every docs/api doc reheals on source changes)
+# must never flip its dependents SUSPECT (the recorded DOCDEPS-01 churn).
+# Flipping baseline is a deliberate re-baseline event; set BEFORE any edges
+# are declared here, so no restamp was needed. The demo keeps the default
+# `body` baseline deliberately (it demonstrates the out-of-the-box behaviour).
+docdeps:
+  baseline: prose
+
+# AGT-01 mention layer: what `cdx entities` may treat as an entity mention.
+# `env_prefixes` gates ENV_VAR mentions to this repo's real env namespace;
+# `ignore` lists spans this repo's prose uses that are NOT code entities —
+# each entry justified by the dogfood precision test (tests/integration/
+# test_entities_dogfood.py): illustrative example paths (docs/api.md,
+# src/widget.py, X.md, X.html), external classes (TestClient, StateGraph),
+# and config-KEY / field-name mentions below symbol granularity
+# (cdm.schema_version, code_refs, context_refs, config_edit, use_persona,
+# from_repo, live_llm).
+entities:
+  env_prefixes:
+    - CDMON_
+  ignore:
+    - docs/api.md
+    - src/widget.py
+    - X.md
+    - X.html
+    - TestClient
+    - StateGraph
+    - cdm.schema_version
+    - code_refs
+    - context_refs
+    - config_edit
+    - use_persona
+    - from_repo
+    - live_llm
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
 # *.yaml unit on disk MUST be listed (run `cdx index` to regenerate). The three

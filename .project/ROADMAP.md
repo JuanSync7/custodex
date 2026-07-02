@@ -624,6 +624,111 @@ for a concrete air-gapped adopter); KMS/HSM envelope encryption (single
 
 ---
 
+## EPIC AGT — the task-agent layer  (entities → doc mapping → knowledge graph → onboarding → doc-writer → background suggesters)
+
+**North star.** Close the #1 adoption friction (mapping is 100% hand-authored
+YAML) and the open competitive axis (agentic governance) with a family of
+**task agents**: a deterministic entity/mention layer over doc prose, an
+entity-based doc↔doc mapping suggester with an approve command, a unified
+knowledge-graph artifact, a config-authoring onboarding agent, a doc-writer,
+and two background suggestion loops. Architecture is the LazyGraphRAG split
+(validated by the 2026-07 research pass, `.project/COMPETITORS.md` §13): the
+whole graph/entity index is built **deterministically at index time** (K1/K4/
+K10 — entity *linking* against the extracted code surface, never open-set NER);
+the LLM is reserved for verdict/authoring time behind the existing Backend/
+Driver seams. Every proposal is advisory-with-provenance under the new **K11**
+(agents suggest; humans apply). New modules are flat top-level
+`custodex/*.py` (the catalog names top-level modules only).
+
+- ☐ **AGT-01** `entities.py` — deterministic entity extraction + mention
+  linking over managed-doc prose. Entity kinds (closed set): DOC / SECTION /
+  SYMBOL / PATH / ENV_VAR / URL with SCIP-style human-readable string ids;
+  mentions parsed from headings, markdown links, and backticked spans
+  (CDM regions + fenced code excluded), resolved against an `EntityRegistry`
+  built from config docs + the symbol inventory (Obsidian rule: unresolved
+  mentions are first-class data, not errors). `cdx entities [DOC] [--json]`.
+  *Goal:* on a fixture corpus, a backticked qualified symbol + a relative doc
+  link + an env var each yield the right resolved mention (and an unknown
+  symbol an unresolved one), byte-deterministic across runs. *(Shipped with
+  the DEMOS.md id-uniqueness lint + dedup of DEMO-052/53/54 as hardening.)*
+- ☐ **AGT-02** `docmap.py` — entity-based doc↔doc mapping suggestions +
+  the accept path. `suggest_edges` unifies link-inference (today's
+  `infer_edges_from_links`) with the new entity rule — *doc A mentions symbol
+  S; doc B covers S via `code_refs` ⇒ suggest A `depends_on` B* — as
+  provenance-tiered `ScoredEdge`s (RESOLVED_LINK > SHARED_SYMBOL), evidence
+  attached, declared/self edges excluded. NEW `cdx link DOWN UP [--type]`
+  (dir-layout config): writes the edge via the pure unit editors + stamps the
+  baseline — the missing approve verb `resolve --edge` docstrings referenced.
+  `cdx link --reject` records a durable repo-side rejection
+  (`.cdmon/edge-rejections.jsonl`); `docdeps.baseline: prose` (opt-in) hashes
+  the region-STRIPPED upstream body so machine reheals never trip dependents;
+  `infer_from_links` becomes REAL (a one-line advisory summary in `cdx deps`).
+  *Goal:* fixture where doc A backtick-mentions a symbol covered by doc B ⇒
+  exactly one SHARED_SYMBOL suggestion with that symbol as evidence; `cdx
+  link` declares (comment-preserving textual splice) + stamps it and the
+  suggestion disappears (K7); a rejected pair never returns. (REVISED per the
+  2026-07-02 design review — see the slice spec.)
+- ☐ **AGT-03** `kgraph.py` — the unified knowledge-graph artifact. One
+  deterministic `build_graph(config, root)` folding the edges Custodex already
+  computes into typed nodes/edges with provenance tiers: DOCUMENTS (code_refs),
+  DEPENDS_ON (docdeps), MENTIONS + LINKS_TO (AGT-01, incl. unresolved counts),
+  PART_OF (doc→section), OWNED_BY (ownership). Queries: `graph_neighbors`,
+  `rank_centrality` (symbol in-degree = the what-to-document priority signal).
+  `cdx graph [--focus ID] [--rank] [--json] [--write]` (`.cdmon/graph.json`,
+  the sphinx-needs needs.json pattern). Hub: the graph snapshot is PUSHED like
+  the coverage snapshot (computed repo-side where bodies live — K2), new
+  store methods + Alembic 0008, `GET /repos/{id}/graph`. *Goal:* fixture graph
+  contains every declared/derived edge kind with the right tier; re-build is
+  byte-identical; an undocumented high-in-degree symbol tops `--rank`.
+- ☐ **AGT-04** `onboard.py` — the config-authoring onboarding agent.
+  `analyze_repo(root) -> RepoMap` (docs found + audience guesses, top-level
+  code packages, README/AGENTS.md/CLAUDE.md signals; resilient to unparseable
+  files) → `propose_config(repo_map) -> OnboardPlan` (real `UnitFile` models
+  via the pure editors, NEVER string-templated YAML) → `cdx onboard`
+  [--dry-run default: prints the Renovate-style plan — detected surfaces,
+  proposed mapping, what-to-expect] [--apply: writes config/cdmon +
+  scaffolds docs + self-validates with load_bundle/doctor/check — the
+  Mintlify arrive-green rule]. Fixes the `init --v2` DOA scaffold (doc-style
+  referencing writing templates the repo doesn't ship). *Goal:* pointed at a
+  bare 2-package fixture repo, `--apply` yields `cdx check` exit 0 with ≥1
+  unit per package and the README mapped; idempotent re-run changes nothing.
+- ☐ **AGT-05** `docwriter.py` — write-new-doc-from-code + register. `cdx
+  write-doc PATH_OR_MODULE [--unit][--id][--audience][--apply]`: registers the
+  DocumentSpec via the pure unit editors + index regen, scaffolds via
+  `scaffold_doc`, authors the purpose blockquote + an `llm`-mode overview
+  region through the Backend seam (MockBackend = deterministic audience-aware
+  prose, K4/K10), heals to green. Dashboard updates ride the normal sync.
+  *Goal:* one command takes an undocumented fixture module to a registered,
+  conformant, `cdx check`-green doc with non-TODO prose; human/locked regions
+  never touched (write path goes through heal, never raw writes).
+- ☐ **AGT-06** `workers.py` — the two background suggesters. Pure tick
+  functions (K11): `suggest_fixes_tick` (drift + suspect edges + promotion
+  candidates → FIX_DRIFT / RESOLVE_EDGE / PROMOTE_RULE suggestions) and
+  `suggest_docs_tick` (coverage gaps ranked by AGT-03 centrality → DOCUMENT_GAP
+  / ADD_EDGE suggestions); `Suggestion` carries kind/target/evidence and a
+  deterministic clock-free `key`. `cdx suggest [--kind] [--json] [--write]`
+  (`.cdmon/suggestions.jsonl`, dedup-by-key, K7). Server: `WorkerSettings`
+  (default OFF), two lifespan loops as thin leaves over the pure ticks,
+  `add_suggestions` (dedup) / `suggestions_for` / `dismiss_suggestion` on both
+  stores + Alembic 0009, `GET /repos/{id}/suggestions` +
+  `POST .../suggestions/dismiss` (token). *Goal:* a tick over a drifted fixture
+  yields the expected suggestions; a second tick adds ZERO new rows (dedup);
+  dismissed keys never resurface; loops never run unless enabled.
+- ☐ **AGT-07** frontend — Suggestions inbox (per-repo tab; accept/dismiss
+  mirrors the Mapping staged-edit lifecycle) + Graph explorer (extends the
+  Dependencies seams; focus-node in/out edge groups + top-central gaps table —
+  no heavy viz dependency) + demo fixtures (busy + empty variants) + the
+  `/guide` pages for the agent layer. *Goal:* astro check 0 errors; vitest
+  suites for both pages; demo contract test covers the new routes.
+
+> **Definition of done for the epic:** every slice carries the full evidence
+> bundle (catalog feature + Feature-tagged test + DEMOS.md case ≥ DEMO-095 +
+> coverage waiver-or-code_ref + wiki regen + dogfood reheal + gate green), per
+> the new-core-module checklist. Follow-ons (not blocking): an MCP read surface
+> (drift/ownership/staleness/graph — the 2026 table-stakes gap), LLM enrichment
+> ticks (audience classification, concept entities) behind `live_llm`, hub-side
+> cross-repo graph fusion.
+
 ## Dependency order (high level)
 
 ```

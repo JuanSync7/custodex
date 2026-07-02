@@ -2117,3 +2117,65 @@ own implementing modules are inside the thing being gated.
   `drifted_tiers` precedent: stringly-typed field (the enum stays in `drift.py`),
   additive schema **minor bump 1.1.0→1.2.0**, regen the golden `cdx schema` artifacts
   (`docs/REVIEW_RECORD_SCHEMA.json` + `frontend/src/console/schema.review.json`).
+
+## [AGT-01] The mention layer: measured precision beats designed precision
+- **Design review with corpus measurement is worth more than the design.** Three of
+  the four load-bearing precision rules (module-stem ambiguity, ambiguous-basename-
+  mints-nothing, colon/absolute-span rejection) came from MEASURING the pinned rules
+  against the real dogfood corpus — first by the review agents (who found the
+  `app`/`coverage`/`index` misresolution trap and the ~90-row noise floor), then by
+  running the freshly-built scanner day-one (25 → 16 → 0 unresolved across four rule
+  refinements). A mention layer designed on fixtures alone would have shipped all of it.
+- **Two precision rules can conflict; reconcile them explicitly.** "A collision never
+  resolves" and "a plain word is never unresolved" meet on a plain word that collides
+  with a module stem (`alpha`): the reconciliation — blocked from resolving AND not
+  unresolved-eligible ⇒ mints nothing — only became visible when a test encoded the
+  wrong expectation. Write the conflict case down as a test the moment you see it.
+- **Pin an EMPTY expected set, not an enumerated one, for corpus-level precision
+  gates.** `test_entities_dogfood.py` asserts zero unresolved + forbidden noise shapes
+  rather than a list of expected rows: a prose edit that adds a legit unresolved
+  mention should fail as NEW SIGNAL for triage (fix prose / extend the justified
+  stoplist / accept), exactly like the wiki freshness gate — not force a mechanical
+  pin update that trains people to rubber-stamp it.
+- **A dead subagent is a recoverable event, not a blocker.** The slice subagent hit
+  the account session limit at spawn; the orchestrator carried the slice in the main
+  loop from the same spec with zero rework — because the spec, the ⟨R⟩ rules, and the
+  DoD bundle were all pinned in the repo, not in the dead agent's context. That is
+  the PROCESS.md re-dispatch clause working as designed.
+
+## [AGT-02] Suggestion loops need BOTH verbs, and writers must respect hand-authored YAML
+- **A suggester without a reject verb is a nag.** `cdx deps --suggest` recomputes from
+  scratch every run, so a declined suggestion would re-surface forever; the durable
+  `.cdmon/edge-rejections.jsonl` verdict file (the resolutions-log precedent) is what
+  turns the suggester from noise into a queue. Any future suggester (workers' ADD_EDGE
+  included) must consume the same rejection memory.
+- **Never model-round-trip a hand-maintained YAML file.** `dump_unit_file` is correct
+  for FRESH files (onboarding) but destroys comments on hand-authored units — the
+  dogfood units carry 30+ load-bearing comment lines. The `declare_edge` pattern:
+  validate through the LOADED models, write through a targeted textual splice, then
+  self-validate the result and revert on failure. (The regenerate_index precedent,
+  now proven for unit files too.)
+- **The join layer must not inherit `discover_symbols`' fail-fast.** Any advisory
+  pass over arbitrary repos (suggesters, graph builders, worker ticks) needs per-file
+  try/except; the coverage resolver's abort-on-one-bad-file is for the GATE, not for
+  advice.
+- **A baseline knob that both detection AND stamping read is self-consistent by
+  construction.** Threading `docdeps.baseline` through `upstream_fingerprint`'s two
+  call sites (detect + stamp) from ONE config field means a flip can never produce
+  divergent stamps — the failure mode of adding the knob at only one call site would
+  have been permanent suspects.
+
+## [AGT-03] Graph semantics live in the fold, not the storage
+- **Edges-as-a-set IS a semantic decision.** Deduping (source, target, kind, tier)
+  makes rank_centrality count DISTINCT mentioning docs rather than raw mention
+  occurrences — discovered when a system test expected 2 for a twice-mentioned
+  symbol. The set semantics is the better signal (one doc can't stuff the ballot);
+  write the chosen meaning into the docstring the moment a test disagrees with you.
+- **Share one scan via an additive param, not a cache.** The graph needs both the
+  registry's warnings and the mention results; `corpus_entities(registry=...)`
+  (default None = build) keeps the function pure and the call sites explicit — no
+  module-level memoization to poison determinism.
+- **The coverage-snapshot pattern generalizes cleanly.** Opaque versioned JSON +
+  token-gated POST + open GET + both-store parity + one additive Alembic table was
+  a 1:1 template for the graph mirror; the second `extra="allow"` ingest model is
+  sanctioned by the same reasoning (the payload versions itself via schema_version).

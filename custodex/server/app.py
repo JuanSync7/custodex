@@ -199,6 +199,21 @@ class CoverageIngest(BaseModel):
     captured_at: str
 
 
+class GraphIngest(BaseModel):
+    """The ``POST /repos/{id}/graph`` body — a permissive graph snapshot (AGT-03).
+
+    The exact :class:`CoverageIngest` pattern (the second sanctioned
+    ``extra="allow"``): the body is the FULL ``kgraph.KnowledgeGraph`` wire dict
+    (nodes/edges/unresolved/warnings, versioned by its own ``schema_version``),
+    computed REPO-SIDE where the doc bodies live (K2) and stored OPAQUELY —
+    the hub never re-derives a graph. Only ``captured_at`` is typed.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    captured_at: str
+
+
 class GenerateRequest(BaseModel):
     """The ``POST /repos/{id}/config/generate`` body — which edits to make live (E-06).
 
@@ -1513,6 +1528,30 @@ def create_app(
         _require_known_repo(store, repo_id)
         _verify_token(store, repo_id, authorization)
         store.add_coverage_snapshot(
+            repo_id, payload.captured_at, payload.model_dump(mode="json")
+        )
+        return {"repo_id": repo_id}
+
+    @app.get("/repos/{repo_id:path}/graph")
+    def graph_for(repo_id: str, store: Store = Depends(get_store)) -> dict:
+        # AGT-03: the LATEST mirrored knowledge-graph snapshot (open read). An
+        # empty dict when the repo has never pushed one — an honest "no graph
+        # yet", not an error (the repo computes it; the hub only mirrors, K2).
+        _require_known_repo(store, repo_id)
+        return store.graph_for(repo_id) or {}
+
+    @app.post("/repos/{repo_id:path}/graph", status_code=202)
+    def post_graph(
+        repo_id: str,
+        payload: GraphIngest,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        # The graph ingest (AGT-03). Token-protected like /coverage; the FULL
+        # snapshot dict is stored opaquely through the seam (K6).
+        _require_known_repo(store, repo_id)
+        _verify_token(store, repo_id, authorization)
+        store.add_graph_snapshot(
             repo_id, payload.captured_at, payload.model_dump(mode="json")
         )
         return {"repo_id": repo_id}

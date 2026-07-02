@@ -97,7 +97,7 @@ Two layers, modelled on the existing `cdx wiki --check` generated-artifact patte
 > Produced by running the tools, not by reading docs. `cdx` = project `.venv`;
 > competitors = the py3.11 scratch venv (§4).
 
-### S1 — doc↔doc suspect link · **Doorstop ✅ vs Custodex ❌ (not built)**
+### S1 — doc↔doc suspect link · **Doorstop ✅ vs Custodex ❌ (not built)** *(STALE — see §13: EPIC B shipped the full Doorstop model + per-edge `cdx resolve --edge`, gating by default, PLUS transitive propagation (PROP-01) Doorstop lacks)*
 
 Real Doorstop run: a parent `SRD001` and child `HLT001` (linked, reviewed → clean). The child stores **two separate fingerprints** — a per-edge hash of the parent inside `links:` *and* its own `reviewed:` stamp:
 
@@ -119,7 +119,7 @@ WARNING: HLT: HLT001: suspect link: SRD001        <- exactly the downstream edge
 - **Manual-authoring index:** ~9 hand steps to the first trace (2× create, 2× add, 2× author text, 1× link, 2× review).
 - **Upkeep per change:** 2 steps (`review` parent + `clear` edge).
 - **Usability gap found:** `doorstop` exits **0** on a suspect link — it's a non-gating `WARNING`. (`cdx check` exits **1** on drift.) → *copy-lesson: per-edge ack is great; make ours CI-gating.*
-- **Custodex side:** ❌ no `depends_on`/`SUSPECT_LINK` exists. **This is the build target.**
+- **Custodex side:** ❌ no `depends_on`/`SUSPECT_LINK` exists. **This is the build target.** *(→ BUILT 2026-06: `docdeps.py` two-fingerprint model, `cdx deps`/`resolve --edge`, CI-gating by default — the §8 gap and the copy-lesson are both closed; §13 has the refreshed scorecard row.)*
 
 ### S2 — code↔doc drift · **Griffe vs `cdx check`**
 
@@ -279,3 +279,85 @@ not the model.
 - **interrogate / pydocstyle** (Python, `pip`): docstring presence % gate / PEP-257 style. *Sharpest copy: `--fail-under` ergonomics; pydocstyle's absorption into Ruff = the lesson that standalone doc linters get consolidated → be invokable from a meta-runner.*
 - **Backstage / OpenMetadata / DataHub** (Apache-2.0): catalog with git-as-truth + rebuildable relational index; owner-per-entity; typed-edge relationships **without** a graph DB. *Sharpest copy: the rebuildable-mirror pattern + the one typed-edge table; proof that relational beats graph.*
 - **Commercial ALM (Jama/Polarion/DOORS/codebeamer)**: deep suspect-link + baselines + approval workflow — the **reference design** for pillar B *and* the cautionary tale (per-seat + heavyweight setup = shelfware). Sales-gated; not trialable for a quick bake-off.
+
+## 13. 2026-07-02 re-verification — the landscape moved; so did Custodex
+
+> Produced by a 4-agent web-research pass (traceability refresh + AI-doc-agent
+> landscape + knowledge-graph design survey + onboarding-agent patterns) plus a
+> fresh-eyes adoption simulation run against THIS working tree. §8's measured
+> scorecard predates EPIC B/PROP/DIG/WL — this section supersedes its verdict
+> rows.
+
+### 13.1 What Custodex shipped since §8 (2026-06-29 → 2026-07-01)
+
+| §8/§10 gap | Now |
+|---|---|
+| Pillar B "not built" | ✅ **BUILT + gating**: `docdeps.py` (Doorstop two-fingerprint, body-only upstream hash), `cdx deps`/`deps --suggest`/`deps --impact`/`resolve --edge`, `DriftKind.SUSPECT_LINK` gates `cdx check` (the exact non-gating exit-0 flaw we measured in Doorstop, fixed) |
+| "Suspect propagates → per-owner worklist" (§10 Med) | ✅ PROP-01 (`SUSPECT_TRANSITIVE` advisory, never gates) + WL-01 (`cdx worklist`, per-owner join of orphan/stale/suspect, hub route omits suspect per K2) |
+| "Griffe breaking-change taxonomy" (§10 Med) | ✅ DIG-01: per-symbol signature digests (`cdm.symbol_sigs`) → `Drift.sigs_changed` + BREAKING/ADDITIVE/COSMETIC severity — closes the masked add+in-place-signature case |
+| Typed edges (§10 Med) | ✅ `DocEdgeType` {depends, refines, implements, verifies} (roles informational) |
+
+**Four-pillar fusion claim: SURVIVES, restated precisely.** As of 2026-07-02 no
+tool grades prose docs against an *extracted code surface* AND runs doc↔doc
+suspect links, ownership/review-SLAs, and a multi-repo hub. Nearest: Jama
+(3 pillars, requirements-world truth, heavyweight ALM); DataHub ("Continuous
+Context" manifesto — *names our category* for data assets, blog-stage).
+
+### 13.2 New threats (ranked)
+
+1. **Dosu (dosu.dev)** — the one to watch. Auto-maintains in-repo docs (incl.
+   AGENTS.md/CLAUDE.md), tracks doc↔doc relationships automatically, and
+   **remembers reviewer rejections across runs** (their headline). 200k+
+   engineers claimed. Missing: determinism, audit records, ownership/SLA. One
+   ownership feature away from the governance quadrant.
+2. **Fiberplane Drift (OSS)** — a deterministic doc-drift *linter* (tree-sitter
+   AST fingerprints, frontmatter anchors, exit-1 CI, explicitly anti-LLM).
+   Publicly validates our K1/K10 stance AND commoditizes the detection pillar
+   alone. Detection-only, single-repo, no fix/audit/ownership/hub.
+3. **Driver AI** — compiler-grade deterministic code DAG + scoped incremental
+   re-derivation, sold as agent-context infrastructure. If it ever lets humans
+   pin prose against the DAG and *grades* it, it leapfrogs with a stronger
+   extraction engine. Enterprise-priced, closed.
+4. **Jama 2606 / Polarion 2606 / IBM ELM AI Hub** — "AI suspect-link triage" is
+   now a shipped ALM marketing category; Jama shipped the first ALM MCP server.
+5. **Platform absorption** — Rovo Dev ($20/dev), Copilot agents, Amazon Q
+   `/doc`: good-enough doc-updating bundled where teams already pay.
+6. **Swimm VACATED the space** (pivoted to COBOL/mainframe modernization) — the
+   historical pillar-1 leader leaving is a market gift; its lesson: pure
+   doc-sync didn't sustain a company; the money moved to **governed context for
+   AI agents**. Frame the four-pillar fusion as agent-context infrastructure.
+
+### 13.3 Table-stakes gap
+
+**MCP.** In H1-2026 Jama, Polarion (Copilot API), GitBook, ubCode, OpenMetadata,
+Swimm and Dosu all shipped agent-context endpoints. Custodex's deterministic
+reads (drift, ownership, staleness, doc-graph, ReviewRecords) are ideal MCP
+material and none is exposed. → roadmap follow-on after EPIC AGT.
+
+### 13.4 Usability, measured (fresh-eyes adoption sim, this tree, 2026-07-02)
+
+Bare 2-module repo → first green `cdx check`: **5 commands + ONE hand-written
+YAML edit**; drift→heal loop: 3 commands, K7-idempotent live; K1/K3/K5/K10 all
+held empirically. **Verdict: alpha-ready for Python repos** with an engineer
+willing to hand-author ~30 lines of YAML; NOT yet 10-minute adoption. The gap
+is authoring/discovery, not correctness: (1) zero code↔doc mapping discovery
+(the config is 100% hand-authored placeholders), (2) `init --v2` scaffold is
+DOA in a bare repo (doc-style references writing templates only this repo
+ships), (3) the adopt-an-existing-doc dance (config → `lint --fix` →
+`monitor --apply`) is undocumented, (4) README quickstart buried/CI-oriented,
+(5) `.cdmon/` commit-vs-ignore guidance absent.
+
+### 13.5 The response — EPIC AGT (designed 2026-07-02)
+
+Every winner in 13.2 is install-and-go; Custodex demands hand-authored config —
+and every LLM-maintenance rival is auditless. EPIC AGT attacks the first
+WITHOUT surrendering the second (new **K11: agents suggest; humans apply**):
+deterministic entity/mention layer (`entities.py`, LazyGraphRAG split — LLM
+never builds the index), entity-grounded edge suggestions + `cdx link`
+(`docmap.py`), a unified knowledge-graph artifact + hub snapshot (`kgraph.py`),
+the onboarding config-author (`cdx onboard`, Renovate-PR anatomy, Mintlify
+arrive-green rule — kills gap 13.4-1/2), the doc-writer (`cdx write-doc`), and
+two background suggesters (pure ticks, default-OFF loops, dedup + dismiss —
+the Dosu-style continuous layer WITH the audit spine Dosu lacks). Positioning
+line: *the only tool that can prove its docs are right, not just claim it
+fixed them.*

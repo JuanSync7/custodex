@@ -654,3 +654,66 @@ class _FakeSurface:
         _Sym("render", True),
         _Sym("_helper", False),
     )
+
+
+# --------------------------------------------------------------------------- #
+# AGT-03: the knowledge-graph snapshot mirror (the coverage-snapshot twin)
+# --------------------------------------------------------------------------- #
+def _graph_snapshot(marker: str = "v1") -> dict:
+    return {
+        "captured_at": f"2026-07-02T10:00:00Z-{marker}",
+        "schema_version": "1.0.0",
+        "nodes": [{"id": "doc docs/a.md", "kind": "doc", "name": "a"}],
+        "edges": [
+            {
+                "source": "doc docs/a.md",
+                "target": "symbol x.py#f",
+                "kind": "mentions",
+                "tier": "resolved",
+            }
+        ],
+        "unresolved": {"a": int(marker == "v2")},
+        "warnings": [],
+    }
+
+
+def test_graph_snapshot_round_trips_latest_wins(client: TestClient) -> None:
+    """POST twice → GET returns the LATEST snapshot on both stores (K6/K10)."""
+    _register(client)
+    for marker in ("v1", "v2"):
+        resp = client.post(
+            f"/repos/{_REPO}/graph", json=_graph_snapshot(marker), headers=_auth()
+        )
+        assert resp.status_code == 202, resp.text
+    got = client.get(f"/repos/{_REPO}/graph")
+    assert got.status_code == 200
+    body = got.json()
+    assert body["unresolved"] == {"a": 1}  # the v2 (latest) snapshot
+    assert body["nodes"][0]["id"] == "doc docs/a.md"
+
+
+def test_graph_get_is_empty_dict_before_any_push(client: TestClient) -> None:
+    """No snapshot yet ⇒ an honest empty dict (the hub only mirrors — K2)."""
+    _register(client)
+    got = client.get(f"/repos/{_REPO}/graph")
+    assert got.status_code == 200
+    assert got.json() == {}
+
+
+def test_graph_auth_matrix(client: TestClient) -> None:
+    """The E-06 write matrix holds on /graph: 404 unknown / 401 / 403 / 202."""
+    _register(client)
+    unknown = client.post("/repos/ghost/graph", json=_graph_snapshot())
+    assert unknown.status_code == 404
+    missing = client.post(f"/repos/{_REPO}/graph", json=_graph_snapshot())
+    assert missing.status_code == 401
+    wrong = client.post(
+        f"/repos/{_REPO}/graph",
+        json=_graph_snapshot(),
+        headers=_auth("wrong-token"),
+    )
+    assert wrong.status_code == 403
+    ok = client.post(f"/repos/{_REPO}/graph", json=_graph_snapshot(), headers=_auth())
+    assert ok.status_code == 202
+    unknown_get = client.get("/repos/ghost/graph")
+    assert unknown_get.status_code == 404

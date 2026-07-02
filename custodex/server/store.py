@@ -315,6 +315,22 @@ class Store(Protocol):
         """
         ...
 
+    def add_graph_snapshot(
+        self, repo_id: str, captured_at: str, snapshot: dict
+    ) -> None:
+        """Append a knowledge-graph SNAPSHOT for a repo (AGT-03 ingest write).
+
+        The exact coverage-snapshot pattern: the graph is computed REPO-SIDE
+        (where the doc bodies live — K2) and mirrored here as an opaque,
+        versioned JSON dict (the :class:`custodex.kgraph.KnowledgeGraph` wire
+        shape); the hub never re-derives it.
+        """
+        ...
+
+    def graph_for(self, repo_id: str) -> dict | None:
+        """The LATEST stored graph snapshot for a repo, or ``None`` when none."""
+        ...
+
     def repo_token_hash(self, repo_id: str) -> str | None: ...
 
     def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
@@ -463,6 +479,7 @@ class InMemoryStore:
         self._records: dict[str, list[ReviewRecord]] = {}
         self._resolutions: list[ResolutionRecord] = []
         self._coverage: dict[str, list[dict]] = {}
+        self._graphs: dict[str, list[dict]] = {}  # AGT-03 graph snapshots
         self._token_hashes: dict[str, str | None] = {}
         # GIT-02: per-repo SEALED (opaque bytes) git provider credential. Kept apart
         # from token_hashes so the reversible secret never mixes with the one-way
@@ -557,6 +574,15 @@ class InMemoryStore:
         self, repo_id: str, captured_at: str, snapshot: dict
     ) -> None:
         self._coverage.setdefault(repo_id, []).append(snapshot)
+
+    def add_graph_snapshot(
+        self, repo_id: str, captured_at: str, snapshot: dict
+    ) -> None:
+        self._graphs.setdefault(repo_id, []).append(snapshot)
+
+    def graph_for(self, repo_id: str) -> dict | None:
+        snapshots = self._graphs.get(repo_id)
+        return snapshots[-1] if snapshots else None
 
     # --- Y-01: config documents / code-refs / sync runs ---------------------
 

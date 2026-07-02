@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d6e04236f40aba10
+  fingerprint: 3dbc99ae3ca1414e
   fingerprint_tiers:
-    composite: d6e04236f40aba10
-    docstring: e7f342c6f4d5e3c2
-    signature: 9ecdddf43a912161
+    composite: 3dbc99ae3ca1414e
+    docstring: b8dd29f5df0b2126
+    signature: 08c132cde369bac5
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -24,6 +24,7 @@ cdm:
     - 20f65c28671b4093
     - 24c458cfb46d9a45
     - 2a07ca57ed083879
+    - 2cc497857559ff85
     - 44575cf5b28512d7
     - 484de142f352dff3
     - 49e9627e39c92dd0
@@ -53,6 +54,7 @@ cdm:
     - a172cedcae47474b
     - a1c1adc663fbd6f0
     - b0e0fabb95a65a96
+    - b1b1bdb480c61d07
     - b6611f50a091a760
     - b9ac8d502e11101f
     - bb54068aea85faa7
@@ -71,12 +73,13 @@ cdm:
     - eafe895eb8119e6e
     - eb2554c8c13b73f9
     - edcc4b4214b84e54
+    - eef93e1d14482804
     - f4e94e73272ff576
     - f93464a48a2b9281
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: ee747d76c20f3f44
+    symbols: 1684ee755647b6aa
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -95,6 +98,7 @@ cdm:
     20f65c28671b4093: 195057ec33efc577
     24c458cfb46d9a45: 953d02f5d1ac5781
     2a07ca57ed083879: 8faa07d8fc6c7c1d
+    2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     484de142f352dff3: 1cc66be4e6718295
     49e9627e39c92dd0: b0cee0ff8f060823
@@ -124,6 +128,7 @@ cdm:
     a172cedcae47474b: c411ee4fd4d39f0a
     a1c1adc663fbd6f0: 0064962060915ac9
     b0e0fabb95a65a96: 696debc0d868ba0a
+    b1b1bdb480c61d07: f2d78d5e30858aee
     b6611f50a091a760: d58ee2994d2cfcbf
     b9ac8d502e11101f: 671891d916aa7ce5
     bb54068aea85faa7: defb9df3f00a5f13
@@ -142,6 +147,7 @@ cdm:
     eafe895eb8119e6e: 2492d10714d01761
     eb2554c8c13b73f9: 34e432f7557b73ab
     edcc4b4214b84e54: 1fc512bec079aec4
+    eef93e1d14482804: fc41992ca8cdeafb
     f4e94e73272ff576: 7160933bfccc8fda
     f93464a48a2b9281: df997f7601a0a995
     fdf09cdfc26cccf6: 09c649f44a9a9980
@@ -197,8 +203,11 @@ cdm:
 | coverage | function | def coverage(config: Path = _CONFIG_OPTION, json_out: bool = typer.Option(False, '--json', help='Emit the full CoverageReport as round-trippable JSON.'), fail_under: float \| None = typer.Option(None, '--fail-under', help='Exit 1 if public-symbol coverage is below this percent (informational — always exits 0 — when omitted).'), write: bool = typer.Option(False, '--write', help=f'Write a deterministic coverage manifest (payload + owner suggestions) to PATH (default {_DEFAULT_MANIFEST}); idempotent (K7).'), manifest_path: Path \| None = typer.Argument(None, metavar='[PATH]', help=f'Manifest destination for --write (default {_DEFAULT_MANIFEST}).')) -> None |
 | deps | function | def deps(config: Path = _CONFIG_OPTION, suspect: bool = typer.Option(False, '--suspect', help='Show only edges that need review (hide OK edges).'), suggest: bool = typer.Option(False, '--suggest', help='Infer edges from Markdown cross-links between managed docs and print paste-ready `depends_on` config (the low-tedium authoring aid). Read-only.'), impact: str \| None = typer.Option(None, '--impact', metavar='DOC', help='Show the blast radius of changing DOC — the documents that (transitively) depend on it and would need re-review. Read-only.'), transitive: bool = typer.Option(False, '--transitive', help='Also show the EAGER transitive-suspect advisory (PROP-01): documents whose upstream is itself pending review. Advisory only — never gates `cdx check`. Applies to the default suspect listing (ignored with --impact, which is already transitive, and with --suggest).'), as_json: bool = typer.Option(False, '--json', help='Emit the dependency graph / suggestions as JSON.')) -> None |
 | doctor | function | def doctor(config: Path = _CONFIG_OPTION) -> None |
+| entities | function | def entities(doc_id: str \| None = typer.Argument(None, metavar='[DOC_ID]', help='Limit the report to one managed document (default: every doc).'), config: Path = _CONFIG_OPTION, unresolved: bool = typer.Option(False, '--unresolved', help='Show only UNRESOLVED mentions — the graph-rot signal (a mention whose referent no longer exists, or never did).'), as_json: bool = typer.Option(False, '--json', help='Emit the per-document mention lists as JSON.')) -> None |
+| graph | function | def graph(config: Path = _CONFIG_OPTION, focus: str \| None = typer.Option(None, '--focus', metavar='NODE_ID', help='Show the edges around one node (e.g. "doc docs/api/drift.md" or "symbol custodex/drift.py#detect_drift").'), rank: bool = typer.Option(False, '--rank', help='Rank symbols by MENTIONS in-degree with no covering doc — the best-justified what-to-document gaps.'), write: bool = typer.Option(False, '--write', help='Write the graph artifact to .cdmon/graph.json (regenerable, idempotent; the sphinx-needs needs.json pattern).'), as_json: bool = typer.Option(False, '--json', help='Emit the whole graph as JSON.')) -> None |
 | index | function | def index(config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='The config/cdmon directory whose index.yaml to regenerate.'), check: bool = typer.Option(False, '--check', help='Read-only: exit 1 if the on-disk index differs from a freshly regenerated one (CI gate), 0 when in sync. Writes nothing.')) -> None |
 | init | function | def init(path: Path = typer.Option(Path('cdmon.yaml'), '--path', help='Where to write the config template.'), force: bool = typer.Option(False, '--force', help='Overwrite an existing config file.'), central: str \| None = typer.Option(None, '--central', metavar='URL', help='Wire `central:` for HTTP reporting to this central-server URL (sink=http). Without it, the offline template is written unchanged.'), repo_id: str \| None = typer.Option(None, '--repo-id', help='Stable repo identifier the central system keys on (required for --central; defaults to the current directory name).'), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the HTTP sink reads the central bearer token from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), repo_url: str \| None = typer.Option(None, '--repo-url', help="This repo's clone/browse URL, recorded on each reported record (only with --central)."), v2: bool = typer.Option(False, '--v2', help='Scaffold the multi-file config/cdmon/ layout (index + example unit + ignore + doc-style) instead of the single-file template.'), config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='Where to scaffold the config/cdmon/ directory (only with --v2).'), repo: str \| None = typer.Option(None, '--repo', help='Repo id/name written into the scaffolded index.yaml (only with --v2; defaults to the current directory name).')) -> None |
+| link | function | def link(downstream: str = typer.Argument(..., metavar='DOWN', help='The dependent doc.'), upstream: str = typer.Argument(..., metavar='UP', help='The doc it depends on.'), edge_type: str = typer.Option('depends', '--type', help='Edge role: depends \| refines \| implements \| verifies.'), reject: bool = typer.Option(False, '--reject', help="Record a durable REJECTION instead: the suggested edge never returns from `cdx deps --suggest` (the human 'no' — K11)."), by: str \| None = typer.Option(None, '--by', help='Who decided (audit trail).'), note: str \| None = typer.Option(None, '--note', help='Why (audit trail).'), config: Path = _CONFIG_OPTION) -> None |
 | lint | function | def lint(config: Path = _CONFIG_OPTION, fix: bool = typer.Option(False, '--fix', help='Stamp missing static front matter (schema_version/audience).'), modes: bool = typer.Option(False, '--modes', help="Also print each managed region's authority mode + lock/advisory state (informational — does NOT change lint's pass/fail).")) -> None |
 | main | function | def main() -> None |
 | monitor | function | def monitor(config: Path = _CONFIG_OPTION, apply: bool \| None = typer.Option(None, '--apply/--no-apply', help="Auto-apply FIX verdicts (defaults to the config's apply_default)."), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Source code ref/commit to stamp on every review record (provenance, C-05). Precedence: this flag, else $CI_COMMIT_SHA, else none. The same ref can flow to `open-docs-pr --ref` (one source of truth).')) -> None |

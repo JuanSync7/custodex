@@ -34,6 +34,7 @@ from . import inventory
 from .build import build as build_twins
 from .config import (
     DEFAULT_CENTRAL_TOKEN_ENV,
+    DocEdgeType,
     MonitorConfig,
     central_config_template,
     load_bundle,
@@ -49,15 +50,23 @@ from .docdeps import (
     SuspectLink,
     detect_suspect_links,
     impacted_by,
-    infer_edges_from_links,
     propagate_suspect,
     render_deps_text,
     render_impact_text,
     stamp_edges,
 )
+from .docmap import (
+    churn_note,
+    declare_edge,
+    read_rejections,
+    reject_edge,
+    render_suggestions_text,
+    suggest_edges,
+)
 from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
 from .drift import DriftKind
+from .entities import corpus_entities, render_entities_text
 from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
 from .featurecatalog import load_catalog
@@ -67,6 +76,7 @@ from .issues import (
     open_coverage_issue,
     plan_coverage_issue,
 )
+from .kgraph import build_graph, rank_centrality, render_graph_text
 from .layout import (
     config_region_states,
     lint_config,
@@ -1544,21 +1554,42 @@ def deps(
                 typer.echo(render_impact_text(impact, impacted))
             return
         if suggest:
-            inferred = infer_edges_from_links(cfg, root)
+            # AGT-02: entity-grounded, provenance-tiered suggestions (docmap) —
+            # links come from the mention layer (machine regions stripped) and
+            # SHARED_SYMBOL joins mentions to the covering doc; rejected pairs
+            # (`cdx link --reject`) are excluded forever (K11). Items keep the
+            # legacy {doc_id, upstream_id, via} keys as a superset (K6).
+            rejections = read_rejections(config_dir / ".cdmon")
+            suggested = suggest_edges(cfg, root, rejections=rejections)
             if as_json:
                 typer.echo(
                     json.dumps(
-                        [e.model_dump(mode="json") for e in inferred],
+                        [e.model_dump(mode="json") for e in suggested],
                         indent=2,
                         sort_keys=True,
                     )
                 )
             else:
-                typer.echo(_render_suggestions(inferred))
+                notes = {
+                    e.upstream_id: churn_note(cfg, e.upstream_id) for e in suggested
+                }
+                typer.echo(render_suggestions_text(suggested, notes=notes))
             return
         links = detect_suspect_links(cfg, root, include_ok=not suspect)
         # propagate_suspect ignores OK links, so the include_ok graph is a safe basis.
         trans = propagate_suspect(cfg, links) if transitive else ()
+        # AGT-02: the infer_from_links knob is REAL — a one-line advisory
+        # SUMMARY on the text report (never the full list, never gating; the
+        # full listing stays behind --suggest). JSON keeps its shape (K6).
+        advisory = ""
+        if cfg.docdeps.infer_from_links and not as_json:
+            rejections = read_rejections(config_dir / ".cdmon")
+            n = len(suggest_edges(cfg, root, rejections=rejections))
+            if n:
+                advisory = (
+                    f"\n  advisory — {n} suggested edge(s) available: run "
+                    "`cdx deps --suggest` to review (accept with `cdx link`)."
+                )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -1576,7 +1607,222 @@ def deps(
             payload = edges_json
         typer.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        typer.echo(render_deps_text(links, suspect_only=suspect, transitive=trans))
+        typer.echo(
+            render_deps_text(links, suspect_only=suspect, transitive=trans) + advisory
+        )
+
+
+@app.command()
+def link(
+    downstream: str = typer.Argument(..., metavar="DOWN", help="The dependent doc."),
+    upstream: str = typer.Argument(..., metavar="UP", help="The doc it depends on."),
+    edge_type: str = typer.Option(
+        "depends",
+        "--type",
+        help="Edge role: depends | refines | implements | verifies.",
+    ),
+    reject: bool = typer.Option(
+        False,
+        "--reject",
+        help="Record a durable REJECTION instead: the suggested edge never "
+        "returns from `cdx deps --suggest` (the human 'no' — K11).",
+    ),
+    by: str | None = typer.Option(None, "--by", help="Who decided (audit trail)."),
+    note: str | None = typer.Option(None, "--note", help="Why (audit trail)."),
+    config: Path = _CONFIG_OPTION,
+) -> None:
+    """Accept (or reject) a suggested doc↔doc edge — the human verb (K11).
+
+    Accept: DECLARES ``DOWN depends_on UP`` in the unit YAML via a
+    comment-preserving textual splice (never a model re-serialization), then
+    stamps the edge's baseline so it arrives reviewed (no UNSTAMPED noise).
+    Reject: appends a durable verdict to ``.cdmon/edge-rejections.jsonl`` so
+    the suggester never re-offers the pair. Dir-layout configs only for
+    accept (the single-file form has no unit files — add the edge by hand).
+    """
+    try:
+        cfg, config_dir = _load(config)
+        ids = {d.id for d in cfg.documents}
+        for name in (downstream, upstream):
+            if name not in ids:
+                raise SchemaError(
+                    f"unknown document id {name!r} — not a managed document"
+                )
+        if reject:
+            path = reject_edge(
+                config_dir / ".cdmon",
+                downstream,
+                upstream,
+                now=_now(),
+                by=by,
+                note=note,
+            )
+            typer.echo(
+                f"rejected {downstream!r} → {upstream!r} — recorded in {path}; "
+                "`cdx deps --suggest` will not offer it again"
+            )
+            return
+        if not (config_dir / "index.yaml").is_file():
+            raise SchemaError(
+                "`cdx link` writes the config/cdmon dir layout; this config is "
+                "a single file — add the depends_on edge by hand (or migrate "
+                "with `cdx init --v2`)"
+            )
+        try:
+            edge = DocEdgeType(edge_type)
+        except ValueError as exc:
+            raise SchemaError(
+                f"unknown edge type {edge_type!r} — expected depends | refines "
+                "| implements | verifies"
+            ) from exc
+        warning = churn_note(cfg, upstream)
+        if warning:
+            typer.echo(warning)
+        unit_path = declare_edge(
+            config_dir, downstream, upstream, type=edge, now=_now()
+        )
+        cfg2, _ = _load(config)  # reload: the splice changed the config
+        root = resolve_repo_root(config_dir, cfg2.root)
+        stamped = stamp_edges(cfg2, root, downstream, only=upstream)
+        stamp_note = (
+            "baseline stamped (edge arrives reviewed)"
+            if stamped
+            else "baseline already current"
+        )
+        typer.echo(
+            f"declared {downstream!r} → {upstream!r} [{edge.value}] in "
+            f"{unit_path.name}; {stamp_note}"
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@app.command()
+def entities(
+    doc_id: str | None = typer.Argument(
+        None,
+        metavar="[DOC_ID]",
+        help="Limit the report to one managed document (default: every doc).",
+    ),
+    config: Path = _CONFIG_OPTION,
+    unresolved: bool = typer.Option(
+        False,
+        "--unresolved",
+        help="Show only UNRESOLVED mentions — the graph-rot signal (a mention "
+        "whose referent no longer exists, or never did).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the per-document mention lists as JSON."
+    ),
+) -> None:
+    """Show each managed doc's entity mentions, linked or unresolved (read-only, K1).
+
+    The AGT-01 mention layer: every backticked symbol/path/env-var span and
+    markdown link in a doc's PROSE (machine regions and code fences excluded),
+    resolved against the code surface + the managed-doc set + the repo tree.
+    Deterministic, offline, no backend (K4/K10); precision-first — an ambiguous
+    span is unresolved or ignored, never guessed.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        results = corpus_entities(cfg, root, doc_id=doc_id)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        payload = [r.model_dump(mode="json") for r in results]
+        if unresolved:
+            payload = [
+                {
+                    **r,
+                    "mentions": [m for m in r["mentions"] if not m["resolved"]],
+                }
+                for r in payload
+            ]
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        typer.echo(render_entities_text(results, unresolved_only=unresolved))
+
+
+@app.command()
+def graph(
+    config: Path = _CONFIG_OPTION,
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        metavar="NODE_ID",
+        help='Show the edges around one node (e.g. "doc docs/api/drift.md" or '
+        '"symbol custodex/drift.py#detect_drift").',
+    ),
+    rank: bool = typer.Option(
+        False,
+        "--rank",
+        help="Rank symbols by MENTIONS in-degree with no covering doc — the "
+        "best-justified what-to-document gaps.",
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Write the graph artifact to .cdmon/graph.json (regenerable, "
+        "idempotent; the sphinx-needs needs.json pattern).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the whole graph as JSON."),
+) -> None:
+    """The unified knowledge graph over docs, code and owners (read-only build).
+
+    ONE deterministic fold of everything Custodex already knows: code↔doc
+    coverage (DOCUMENTS), doc↔doc dependencies (DEPENDS_ON), prose mentions
+    and links (MENTIONS/LINKS_TO — the AGT-01 layer), sections (PART_OF) and
+    accountability (OWNED_BY), with per-doc unresolved-mention counts as the
+    rot signal. Pure and offline (K1/K4/K10); `--write` touches only the
+    regenerable `.cdmon/graph.json` artifact.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        unit_owner = _unit_owner_map(config_dir)
+        g = build_graph(cfg, root, unit_owner=unit_owner)
+        if focus is not None and not as_json:
+            typer.echo(render_graph_text(g, focus=focus))
+            return
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if rank:
+        ranked = rank_centrality(g, undocumented_only=True)
+        if as_json:
+            typer.echo(
+                json.dumps(
+                    [{"node": n, "mentions": c} for n, c in ranked],
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        elif not ranked:
+            typer.echo("# no undocumented mentioned symbols — no ranked gaps")
+        else:
+            typer.echo("# mentioned-but-undocumented symbols (best gaps first):")
+            for node, count in ranked:
+                typer.echo(f"  {count:>3}x {node}")
+        return
+    if write:
+        out = config_dir / ".cdmon" / "graph.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        text = g.model_dump_json(indent=2) + "\n"
+        if out.is_file() and out.read_text(encoding="utf-8") == text:
+            typer.echo(f"{out}: unchanged")
+        else:
+            out.write_text(text, encoding="utf-8")
+            typer.echo(f"{out}: wrote")
+        return
+    if as_json:
+        typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(render_graph_text(g))
 
 
 def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:

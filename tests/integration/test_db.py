@@ -691,3 +691,29 @@ def test_alembic_migration_0007_doc_edges_up_then_down(tmp_path: Path) -> None:
     after = set(inspect(engine).get_table_names())
     assert "config_doc_edges" not in after
     assert {"config_documents", "roster"} <= after
+
+
+def test_alembic_migration_0008_graph_snapshots_up_then_down(tmp_path: Path) -> None:
+    """0008 (AGT-03) creates graph_snapshots; down drops it, leaving 0007 intact."""
+    from alembic import command
+
+    db = tmp_path / "migrate_0008.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0007 -> graph_snapshots does NOT exist yet (additive 0008).
+    command.upgrade(cfg, "0007_doc_edges")
+    assert "graph_snapshots" not in set(inspect(engine).get_table_names())
+
+    # upgrade head (through 0008) -> the table exists with its key columns.
+    command.upgrade(cfg, "head")
+    assert "graph_snapshots" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("graph_snapshots")}
+    assert {"id", "repo_id", "captured_at", "snapshot"} <= cols
+
+    # downgrade to 0007 -> dropped; the doc-edges table remains.
+    command.downgrade(cfg, "0007_doc_edges")
+    after = set(inspect(engine).get_table_names())
+    assert "graph_snapshots" not in after
+    assert "config_doc_edges" in after

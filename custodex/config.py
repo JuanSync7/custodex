@@ -526,12 +526,19 @@ class DocDepsConfig(BaseModel):
     by default — unlike Doorstop, which exits 0 on a suspect link — but a team that
     wants advisory-only suspect links can set it False); ``default_type`` is the
     edge role assumed when ``cdx link`` is called without one; ``infer_from_links``
-    folds edges inferred from Markdown cross-links between managed docs into the
-    graph automatically (``cdx deps --suggest`` always offers them regardless);
-    ``transitive`` opts a repo in to the EAGER transitive-suspect ADVISORY in
-    ``cdx monitor`` (PROP-01) — the blast radius of a change beyond its direct
-    dependents. It is advisory only: default OFF, never gates ``cdx check``, and
-    ``cdx deps --transitive`` shows it on demand regardless of this knob.
+    appends a one-line ADVISORY summary of the suggested edges to the ``cdx deps``
+    report (the full list stays behind ``cdx deps --suggest`` — advisory only,
+    never gating, K11); ``transitive`` opts a repo in to the EAGER
+    transitive-suspect ADVISORY in ``cdx monitor`` (PROP-01) — the blast radius of
+    a change beyond its direct dependents. It is advisory only: default OFF, never
+    gates ``cdx check``, and ``cdx deps --transitive`` shows it on demand
+    regardless of this knob. ``baseline`` (AGT-02) picks what an edge's upstream
+    fingerprint hashes: ``"body"`` (default — the whole post-front-matter body,
+    today's behaviour) or ``"prose"`` (the CDM-region-STRIPPED body, human prose
+    only — a machine reheal of a code-tracked upstream no longer trips its
+    dependents; what a mention-based dependency actually means). Flipping the knob
+    is a DELIBERATE re-baseline event: every stored stamp mismatches once and each
+    edge needs one re-confirmation (``cdx resolve --edge``).
     """
 
     model_config = _MODEL_CONFIG
@@ -541,6 +548,25 @@ class DocDepsConfig(BaseModel):
     default_type: DocEdgeType = DocEdgeType.DEPENDS
     infer_from_links: bool = False
     transitive: bool = False
+    baseline: Literal["body", "prose"] = "body"
+
+
+class EntitiesConfig(BaseModel):
+    """The ``entities:`` block — the AGT-01 mention-layer knobs (additive K6).
+
+    Target-specific noise enters through config, never the engine (K0).
+    ``ignore`` lists backticked spans that mint NO mention at all (tool names,
+    config keys — whatever a repo's prose uses that is not a code entity);
+    ``env_prefixes`` gates ENV_VAR mentions: a SCREAMING_SNAKE span becomes an
+    environment-variable entity ONLY when it starts with one of these prefixes
+    (empty ⇒ no env mentions), so enum-name-like spans never masquerade as
+    environment variables.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    ignore: tuple[str, ...] = ()
+    env_prefixes: tuple[str, ...] = ()
 
 
 class MonitorConfig(BaseModel):
@@ -559,6 +585,7 @@ class MonitorConfig(BaseModel):
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (additive)
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (additive)
+    entities: EntitiesConfig = EntitiesConfig()  # AGT-01: mention layer (additive)
     # P-01: opt-in body-AST fingerprint tier. Default OFF keeps surface_hash bytes
     # identical to the pre-P1 contract, so stored fingerprints stay valid; ON folds
     # function/method bodies into non-user-guide hashes (a deliberate re-baseline).
@@ -953,6 +980,7 @@ class IndexFile(BaseModel):
     coverage: CoverageConfig = CoverageConfig()
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (lifted in merge)
+    entities: EntitiesConfig = EntitiesConfig()  # AGT-01: mention layer (lifted)
     fingerprint_body_tier: bool = False  # P-01: mirrors MonitorConfig (lifted in merge)
     units: tuple[IndexUnitRef, ...]
     ignore: str = "ignore.yaml"
@@ -1210,6 +1238,7 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
             coverage=index.coverage,
             staleness=index.staleness,
             docdeps=index.docdeps,
+            entities=index.entities,
             fingerprint_body_tier=index.fingerprint_body_tier,
         )
     except ValidationError as exc:
