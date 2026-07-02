@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: b506318dc0d83f9b
+  fingerprint: f3282164a7a8d4c6
   fingerprint_tiers:
-    composite: b506318dc0d83f9b
-    docstring: ac9efe24430088f4
+    composite: f3282164a7a8d4c6
+    docstring: e309dbdae8bcf70b
     signature: 7b248cafb4172476
   region_anchors:
     symbols:

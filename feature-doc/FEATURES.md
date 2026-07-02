@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**238 features** across 25 subsystems.
+**241 features** across 26 subsystems.
 
 ## agent
 
@@ -473,6 +473,26 @@ docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before 
 ### `FEAT-DOCDEPS-010` — Transitive suspect-propagation advisory (HYBRID — never gates)
 
 docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the direct suspect links as an ADVISORY. Detection stays the pure Doorstop direct wavefront — only a changed-upstream edge is SUSPECT and only that gates `cdx check` — while a document whose upstream is itself pending review is reported as a SUSPECT_TRANSITIVE link, NEVER a drift: a transitive edge has no changed upstream body to stamp, so it must not gate (K1/K7). Pure over the direct verdicts + the declared graph via a shared cycle-safe reverse-reachable BFS (`_reverse_reachable`, extracted from and still backing impacted_by — characterized identical), sorted (K10). Surfaced read-only in `cdx deps --transitive` (opt-in `--json` shape) and an opt-in `cdx monitor` summary line gated by the additive `docdeps.transitive` knob (default OFF); the hub's `GET /doc-graph/reverse?transitive=true` returns the SAME closure as pure GRAPH reachability over the indexed edge table — never a suspect verdict, since the bodies needed to hash an upstream live in the repo, not the hub (K2).
+
+## docmap
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-DOCMAP-001` | Provenance-tiered doc↔doc edge suggestions from the mention layer | docmap, cli | K1, K6, K10, K11 | — | — | implemented |
+| `FEAT-DOCMAP-002` | `docdeps.baseline: body|prose` — reheals stop tripping dependents | docmap, docdeps, config | K6, K7, K10 | — | — | implemented |
+| `FEAT-DOCMAP-003` | `cdx link` — accept (comment-preserving splice) / reject (durable verdict) | docmap, cli | K7, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-DOCMAP-001` — Provenance-tiered doc↔doc edge suggestions from the mention layer
+
+docmap.suggest_edges proposes `depends_on` edges with a PRINCIPLED direction and a provenance TIER, never a bare float (pure, K1/K10/K11): RESOLVED_LINK — doc A's prose markdown-links managed doc B (derived from the AGT-01 DOC mentions, so CDM regions and code fences can no longer mint suggestions, a review-measured fix over the legacy infer_edges_from_links which stays untouched for back-compat); SHARED_SYMBOL — doc A's prose mentions code symbol S (resolved by the mention layer) and EXACTLY ONE doc B covers S via code_refs ⇒ A depends_on B. The review-hardened exclusions: declared edges, self-edges, REJECTED pairs, a symbol covered by ≥2 docs (ambiguous ownership — never guess), a doc mentioning a symbol it covers itself, and any `index: true` downstream (the index page's links are MANDATED by the INDEX_INCOMPLETE lint — measured 13/13 pure noise on the dogfood corpus). The same pair found by both rules is ONE suggestion at the stronger tier with merged sorted evidence. ScoredEdge keeps the legacy `via` key so `cdx deps --suggest --json` items stay a key-SUPERSET of the pre-AGT shape (K6, regression-guarded); every suggestion whose upstream is code-tracked renders a churn_note — the DOCDEPS-01 heal-path lesson surfaced to the human instead of re-learned. The per-doc/per-ref extraction is resilient: a missing or unparseable code_ref is skipped, never fatal.
+
+### `FEAT-DOCMAP-002` — `docdeps.baseline: body|prose` — reheals stop tripping dependents
+
+The suspect-baseline knob (additive K6, default `body` = byte-identical to the pre-AGT contract): under `prose`, upstream_fingerprint hashes the CDM-region- STRIPPED body — human prose only — so a machine reheal of a code-tracked upstream is hash-invisible to its dependents and only a real prose change flips an edge SUSPECT (what a mention-based dependency actually means; the semantic fix for the recorded DOCDEPS-01 churn where accepting suggested edges onto heal-path docs made every reheal a suspect storm). Detection (detect_suspect_links) and stamping (stamp_edges) read the SAME knob — one shared truth, so stamps and verdicts can never diverge — and flipping it is a documented, deliberate re-baseline event (every stored stamp mismatches once). This repo's own config flips to `prose` (set before any edges exist, so no restamp was needed); the demo deliberately keeps the default `body`.
+
+### `FEAT-DOCMAP-003` — `cdx link` — accept (comment-preserving splice) / reject (durable verdict)
+
+The missing human verbs for the suggestion loop (K11 — agents suggest, humans apply). ACCEPT: `cdx link DOWN UP [--type]` validates through the loaded models (unknown ids / self-edge / duplicate → loud ConfigError, K8) then declares the edge by a TARGETED TEXTUAL SPLICE of the unit YAML — inserting or extending the `depends_on:` block under the matching `- id:` entry and bumping the frontmatter `updated:` line — never a model re-serialization (dump_unit_file would destroy the 30+ load-bearing comment lines hand-maintained units carry; the regenerate_index textual-surgery precedent), self-validates the spliced config (reverting on failure), then stamps the new edge's baseline via stamp_edges(only=UP) so it arrives REVIEWED (no UNSTAMPED noise; `cdx check` stays green, K7); the churn note is echoed before writing so the decision is informed. REJECT: `cdx link --reject DOWN UP [--by][--note]` appends a durable EdgeRejection verdict to `.cdmon/edge-rejections.jsonl` (append-only, injected timestamp — the reviewlog precedent) which suggest_edges excludes forever — the repo-side rejection memory the review demanded (a declined suggestion never re-surfaces; the Dosu lesson with an audit trail). `cdx deps` gains the REAL infer_from_links behaviour: when true, ONE advisory summary line (count + how to review), never the full list — terminal-noise control; JSON shapes unchanged.
 
 ## drift
 

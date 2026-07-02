@@ -78,8 +78,19 @@ coverage:
       reason: "WL-01 per-owner review worklist (accountability join); documented in feature-doc/catalog/worklist.yaml (api doc owned by cdx wiki)"
     - path: "custodex/entities.py"
       reason: "AGT-01 entity/mention layer; documented in feature-doc/catalog/entities.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/docmap.py"
+      reason: "AGT-02 edge suggestions + link accept/reject; documented in feature-doc/catalog/docmap.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
+
+# AGT-02: doc↔doc edges in THIS repo track human PROSE only — a machine reheal
+# of a code-tracked upstream (every docs/api doc reheals on source changes)
+# must never flip its dependents SUSPECT (the recorded DOCDEPS-01 churn).
+# Flipping baseline is a deliberate re-baseline event; set BEFORE any edges
+# are declared here, so no restamp was needed. The demo keeps the default
+# `body` baseline deliberately (it demonstrates the out-of-the-box behaviour).
+docdeps:
+  baseline: prose
 
 # AGT-01 mention layer: what `cdx entities` may treat as an entity mention.
 # `env_prefixes` gates ENV_VAR mentions to this repo's real env namespace;

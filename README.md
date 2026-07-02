@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: a127fbf2054d5d16
+  fingerprint: e439307f6e535b7f
   fingerprint_tiers:
-    composite: a127fbf2054d5d16
-    signature: a127fbf2054d5d16
+    composite: e439307f6e535b7f
+    signature: e439307f6e535b7f
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -28,6 +28,7 @@ cdm:
     9185806e77b1178b: 8446552e330a2629
     a172cedcae47474b: c411ee4fd4d39f0a
     a1c1adc663fbd6f0: 0064962060915ac9
+    b1b1bdb480c61d07: f2d78d5e30858aee
     bb54068aea85faa7: defb9df3f00a5f13
     c3a3091b9d32267d: f236e1b17349fc02
     cde0fb0dec1400c5: 6602cc7d080e1dca
@@ -118,6 +119,7 @@ cdx deps --suggest       # infer edges from Markdown cross-links between managed
 cdx deps --impact DOC    # the proactive blast radius: which documents (transitively) depend on DOC and would need re-review if you change it (read-only; an empty radius reads "safe to change")
 cdx resolve --edge DOWN UP  # re-confirm exactly one doc↔doc edge after reviewing the upstream change (re-stamps just that edge's baseline; `docdeps.gate` decides whether a suspect link fails `cdx check`)
 cdx entities [DOC] [--unresolved]  # the AGT-01 mention layer: every backticked symbol/path/env-var span + markdown link in a doc's PROSE, linked deterministically against the code surface + repo tree; --unresolved shows the graph-rot signal (a mention whose referent is gone); read-only, no LLM
+cdx link DOWN UP [--type] [--reject]  # accept a suggested doc↔doc edge (declares `depends_on` via a comment-preserving splice of the unit YAML + stamps the baseline so it arrives reviewed) or --reject it durably (.cdmon/edge-rejections.jsonl — the suggester never re-offers a rejected pair)
 cdx monitor --ref SHA    # ...and stamp each record's source_sha provenance (else $CI_COMMIT_SHA; C-05)
 cdx sync-pr [--dry-run]  # heal docs + emit a unified-diff patch of the changed docs (the docs-PR content); --dry-run computes the same patch without touching the tree; --out FILE writes it
 cdx open-docs-pr [--dry-run]  # heal docs then open a docs MR (branch+commit+MR) via the default GitLab transport (stdlib urllib; from CI env); clean repo is a no-op; --dry-run prints the MR plan as JSON from a dry sync (no mutation, no network); --target/--ref set the target branch + provenance ref

@@ -526,12 +526,19 @@ class DocDepsConfig(BaseModel):
     by default — unlike Doorstop, which exits 0 on a suspect link — but a team that
     wants advisory-only suspect links can set it False); ``default_type`` is the
     edge role assumed when ``cdx link`` is called without one; ``infer_from_links``
-    folds edges inferred from Markdown cross-links between managed docs into the
-    graph automatically (``cdx deps --suggest`` always offers them regardless);
-    ``transitive`` opts a repo in to the EAGER transitive-suspect ADVISORY in
-    ``cdx monitor`` (PROP-01) — the blast radius of a change beyond its direct
-    dependents. It is advisory only: default OFF, never gates ``cdx check``, and
-    ``cdx deps --transitive`` shows it on demand regardless of this knob.
+    appends a one-line ADVISORY summary of the suggested edges to the ``cdx deps``
+    report (the full list stays behind ``cdx deps --suggest`` — advisory only,
+    never gating, K11); ``transitive`` opts a repo in to the EAGER
+    transitive-suspect ADVISORY in ``cdx monitor`` (PROP-01) — the blast radius of
+    a change beyond its direct dependents. It is advisory only: default OFF, never
+    gates ``cdx check``, and ``cdx deps --transitive`` shows it on demand
+    regardless of this knob. ``baseline`` (AGT-02) picks what an edge's upstream
+    fingerprint hashes: ``"body"`` (default — the whole post-front-matter body,
+    today's behaviour) or ``"prose"`` (the CDM-region-STRIPPED body, human prose
+    only — a machine reheal of a code-tracked upstream no longer trips its
+    dependents; what a mention-based dependency actually means). Flipping the knob
+    is a DELIBERATE re-baseline event: every stored stamp mismatches once and each
+    edge needs one re-confirmation (``cdx resolve --edge``).
     """
 
     model_config = _MODEL_CONFIG
@@ -541,6 +548,7 @@ class DocDepsConfig(BaseModel):
     default_type: DocEdgeType = DocEdgeType.DEPENDS
     infer_from_links: bool = False
     transitive: bool = False
+    baseline: Literal["body", "prose"] = "body"
 
 
 class EntitiesConfig(BaseModel):

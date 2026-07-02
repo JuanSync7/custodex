@@ -2142,3 +2142,25 @@ own implementing modules are inside the thing being gated.
   loop from the same spec with zero rework — because the spec, the ⟨R⟩ rules, and the
   DoD bundle were all pinned in the repo, not in the dead agent's context. That is
   the PROCESS.md re-dispatch clause working as designed.
+
+## [AGT-02] Suggestion loops need BOTH verbs, and writers must respect hand-authored YAML
+- **A suggester without a reject verb is a nag.** `cdx deps --suggest` recomputes from
+  scratch every run, so a declined suggestion would re-surface forever; the durable
+  `.cdmon/edge-rejections.jsonl` verdict file (the resolutions-log precedent) is what
+  turns the suggester from noise into a queue. Any future suggester (workers' ADD_EDGE
+  included) must consume the same rejection memory.
+- **Never model-round-trip a hand-maintained YAML file.** `dump_unit_file` is correct
+  for FRESH files (onboarding) but destroys comments on hand-authored units — the
+  dogfood units carry 30+ load-bearing comment lines. The `declare_edge` pattern:
+  validate through the LOADED models, write through a targeted textual splice, then
+  self-validate the result and revert on failure. (The regenerate_index precedent,
+  now proven for unit files too.)
+- **The join layer must not inherit `discover_symbols`' fail-fast.** Any advisory
+  pass over arbitrary repos (suggesters, graph builders, worker ticks) needs per-file
+  try/except; the coverage resolver's abort-on-one-bad-file is for the GATE, not for
+  advice.
+- **A baseline knob that both detection AND stamping read is self-consistent by
+  construction.** Threading `docdeps.baseline` through `upstream_fingerprint`'s two
+  call sites (detect + stamp) from ONE config field means a flip can never produce
+  divergent stamps — the failure mode of adding the knob at only one call site would
+  have been permanent suspects.

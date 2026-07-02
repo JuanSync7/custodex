@@ -97,15 +97,51 @@ class InferredEdge(BaseModel):
     via: str  # the relative link target that implied the edge
 
 
-def upstream_fingerprint(doc: Doc) -> str:
+def _prose_body(body: str) -> str:
+    """The body with every ``CDM:BEGIN/END`` region's LINES removed (AGT-02).
+
+    The ``baseline: "prose"`` view of an upstream: machine-managed regions are
+    rewritten by every heal of a code-tracked doc, so hashing them makes each
+    reheal flip every dependent SUSPECT (the recorded DOCDEPS-01 failure). The
+    human-prose remainder is what a mention-based dependency actually depends
+    on. Markers are removed WITH the region bodies so a pure region rewrite is
+    hash-invisible; malformed marker structure degrades to the raw line (the
+    strict grammar is :func:`manifest.regions`' job, not this hash's).
+    """
+    out: list[str] = []
+    in_region = False
+    for line in body.split("\n"):
+        if in_region:
+            if _END_LINE.match(line):
+                in_region = False
+            continue
+        if _BEGIN_LINE.match(line):
+            in_region = True
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+_BEGIN_LINE = re.compile(r"^<!-- CDM:BEGIN \S+ -->\s*$")
+_END_LINE = re.compile(r"^<!-- CDM:END \S+ -->\s*$")
+
+
+def upstream_fingerprint(doc: Doc, *, baseline: str = "body") -> str:
     """The hash of an upstream doc's BODY (not its front matter), sha256[:16] (K10).
 
     Body-only on purpose: the upstream's own ``cdm.fingerprint`` re-stamp (a
     code↔doc heal) churns its front matter but not its meaning, and must NOT trip a
     suspect link. Reuses :func:`manifest.region_body_hash` so the normalization
     (CRLF→LF, first 16 hex) is identical to every other content hash in the engine.
+    ``baseline="prose"`` (AGT-02, from ``DocDepsConfig.baseline``) additionally
+    strips the machine-managed CDM regions, so a mechanical reheal of a
+    code-tracked upstream is hash-invisible and only a human PROSE change trips
+    the dependents. Detection and stamping MUST use the same baseline (one shared
+    truth) — both read it from config, so a knob flip is a deliberate, visible
+    re-baseline event.
     """
-    return region_body_hash(doc.body)
+    text = _prose_body(doc.body) if baseline == "prose" else doc.body
+    return region_body_hash(text)
 
 
 def _path_to_id(config: MonitorConfig) -> dict[str, str]:
@@ -135,7 +171,11 @@ def detect_suspect_links(
             up_spec = specs_by_id[upstream_id]
             up_path = root / up_spec.path
             _cache[upstream_id] = (
-                upstream_fingerprint(parse_doc(up_path)) if up_path.is_file() else None
+                upstream_fingerprint(
+                    parse_doc(up_path), baseline=config.docdeps.baseline
+                )
+                if up_path.is_file()
+                else None
             )
         return _cache[upstream_id]
 
@@ -387,7 +427,9 @@ def stamp_edges(
         up_path = root / specs_by_id[edge.doc].path
         if not up_path.is_file():
             continue  # cannot baseline a missing upstream
-        current = upstream_fingerprint(parse_doc(up_path))
+        current = upstream_fingerprint(
+            parse_doc(up_path), baseline=config.docdeps.baseline
+        )
         if existing.get(edge.doc) != current:
             meta = set_upstream_hash(meta, edge.doc, current)
             changed.append(edge.doc)

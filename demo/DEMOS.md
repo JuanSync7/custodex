@@ -1327,3 +1327,41 @@ next run. `CDMON_`-prefixed backticked spans resolve as env-var entities because
 + `tests/unit/test_entities_config.py` + `tests/smoke/test_demo_ids.py` (the
 DEMOS.md id-uniqueness lint that ships with this slice).
 Features: FEAT-ENTITIES-002, FEAT-ENTITIES-003
+
+### DEMO-100 — Entity-grounded edge suggestions (`cdx deps --suggest`, AGT-02)
+**What it shows.** Doc↔doc mapping stops being hand-authored: the suggester
+proposes `depends_on` edges with a provenance TIER and evidence — `resolved_link`
+when one doc's prose markdown-links another, `shared_symbol` when doc A's prose
+mentions a code symbol that EXACTLY ONE doc B covers via `code_refs` (so the
+direction is principled: the mentioning doc depends on the documenting doc).
+Machine text cannot suggest (CDM regions/fences are stripped by the mention
+layer); an `index: true` doc's mandated navigation links are excluded; a symbol
+covered by two docs is ambiguous and never guessed. Each code-tracked upstream
+carries a churn note warning that reheals will flip the edge SUSPECT under the
+default `body` baseline — and that `docdeps.baseline: prose` (which this repo's
+own config uses) makes machine reheals hash-invisible so only human prose changes
+trip dependents.
+**How to observe.** Against the demo, `cdx deps --suggest` prints the tiered
+suggestions with paste-ready YAML + evidence + churn notes; `--json` items carry
+`{doc_id, upstream_id, via, tier, evidence, score}` (a key-superset of the legacy
+shape). With `docdeps.infer_from_links: true`, plain `cdx deps` appends a one-line
+advisory summary. Pinned by `tests/unit/test_docmap.py` +
+`tests/unit/test_docdeps_baseline.py` + `tests/system/test_docmap_cli.py`.
+Features: FEAT-DOCMAP-001, FEAT-DOCMAP-002
+
+### DEMO-101 — Accept or reject a suggestion (`cdx link`, the K11 loop closed)
+**What it shows.** The human verbs: `cdx link DOWN UP` DECLARES the suggested edge
+in the unit YAML by a comment-preserving textual splice (hand-written YAML comments
+survive byte-for-byte — never a model re-serialization), self-validates the spliced
+config, and stamps the new edge's baseline so it arrives reviewed (`cdx check`
+stays green; the suggestion disappears from the next `--suggest` run, K7).
+`cdx link --reject DOWN UP` records a durable verdict in
+`.cdmon/edge-rejections.jsonl` so a declined suggestion NEVER re-surfaces — the
+rejection memory with an audit trail (who/when/why).
+**How to observe.** On a scratch copy of the demo: `cdx deps --suggest` → pick a
+pair → `cdx link <down> <up>` → the unit file gains the `depends_on:` entry with
+every comment intact and `cdx deps` shows the edge OK; re-run `--suggest` → gone.
+`cdx link --reject <down> <up> --by you --note "not a real dependency"` → gone
+forever. Pinned by `tests/system/test_docmap_cli.py` (accept e2e incl. the
+comment-preservation byte assertion + reject durability).
+Features: FEAT-DOCMAP-003
