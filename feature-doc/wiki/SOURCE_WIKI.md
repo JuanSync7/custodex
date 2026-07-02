@@ -2,7 +2,7 @@
 
 Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
-**50 public modules**, 0 without a catalogued feature.
+**51 public modules**, 0 without a catalogued feature.
 
 ## `_v2base`
 
@@ -37,8 +37,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `monitor`, `new_doc`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `staleness`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`, `FEAT-WORKLIST-001`
+- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `staleness`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`, `FEAT-WORKLIST-001`
 
 ## `config`
 
@@ -178,6 +178,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Public symbols: `DEFAULT_EXEMPLAR_TOP_N`, `DEFAULT_LOG_PATH`, `HandledDrift`, `Monitor`, `MonitorResult`, `RULE_CAUSE_PREFIX`, `__all__`
 - Implemented by: `FEAT-DOCDEPS-006`, `FEAT-DRIFT-011`, `FEAT-MONITOR-001`, `FEAT-MONITOR-002`, `FEAT-MONITOR-003`, `FEAT-MONITOR-004`, `FEAT-MONITOR-005`, `FEAT-MONITOR-006`, `FEAT-MONITOR-007`, `FEAT-MONITOR-008`, `FEAT-MONITOR-009`
 
+## `onboard`
+
+- Path: `onboard.py`
+- Public symbols: `DocCandidate`, `OnboardPlan`, `PackageCandidate`, `RepoMap`, `__all__`, `analyze_repo`, `apply_plan`, `propose_config`, `render_plan_text`
+- Implemented by: `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`
+
 ## `ownership`
 
 - Path: `ownership.py`
@@ -271,8 +277,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `templates_v2`
 
 - Path: `templates_v2.py`
-- Public symbols: `DOC_STYLE_TEMPLATE`, `EXAMPLE_UNIT_STEM`, `IGNORE_TEMPLATE`, `INDEX_TEMPLATE`, `UNIT_TEMPLATE`, `V2_TEMPLATES`, `__all__`, `scaffold_config_dir`
-- Implemented by: `FEAT-CONFIGV2-011`
+- Public symbols: `DOC_STYLE_TEMPLATE`, `EXAMPLE_UNIT_STEM`, `IGNORE_TEMPLATE`, `INDEX_TEMPLATE`, `UNIT_TEMPLATE`, `V2_TEMPLATES`, `WRITING_TEMPLATE_STEMS`, `__all__`, `ensure_writing_templates`, `scaffold_config_dir`
+- Implemented by: `FEAT-CONFIGV2-011`, `FEAT-ONBOARD-002`
 
 ## `testwiki`
 

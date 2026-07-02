@@ -1,13 +1,14 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 7570448398c00b89
+  fingerprint: 7a14cb695642f6b8
   fingerprint_tiers:
-    composite: 7570448398c00b89
-    signature: 7570448398c00b89
+    composite: 7a14cb695642f6b8
+    signature: 7a14cb695642f6b8
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
+    059d49674f2e2802: 3249d9bbb9b807ae
     0c9d51b72e16a207: 468c2620ca834755
     0d6e4079e36703eb: 14346d3eb68974a0
     12a435ec8454c6d1: a2ca2be3282d0600
@@ -98,6 +99,7 @@ carries an audience:
 
 ```bash
 # --- set up ---
+cdx onboard [--apply]    # NEW: analyze the repo and AUTHOR the config for you — dry-run prints the plan (packages, docs, audience guesses, warnings); --apply writes config/cdmon/, scaffolds the docs, heals, and self-validates so `cdx check` is green immediately
 cdx init                 # write a single-file config template (offline)
 cdx init --v2            # ...scaffold the multi-file config/cdmon/ layout instead
 cdx init --central URL --repo-id ID   # ...wired for HTTP reporting to a central server (sink=http + url + repo_id + auth_env + outbox); --token-env VAR (default CDMON_CENTRAL_TOKEN), --repo-url URL; ready to `cdx register` + report (G-01)

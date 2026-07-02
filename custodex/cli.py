@@ -85,6 +85,7 @@ from .layout import (
 )
 from .manifest import parse_doc
 from .monitor import DEFAULT_LOG_PATH, Monitor
+from .onboard import analyze_repo, apply_plan, propose_config, render_plan_text
 from .ownership import (
     OwnershipStatus,
     detect_orphans,
@@ -1692,6 +1693,141 @@ def link(
         typer.echo(
             f"declared {downstream!r} → {upstream!r} [{edge.value}] in "
             f"{unit_path.name}; {stamp_note}"
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+def _git_user_name(root: Path) -> str | None:
+    """The repo's git ``user.name``, or ``None`` — the ONLY impure read the
+    onboard owner-precedence uses (module seam, monkeypatched in tests, K4)."""
+    import subprocess
+
+    try:  # pragma: no cover - exercised via the injected seam in tests
+        out = subprocess.run(  # noqa: S603,S607 - fixed argv, no shell
+            ["git", "-C", str(root), "config", "user.name"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except OSError:  # pragma: no cover - defensive
+        return None
+    name = out.stdout.strip()  # pragma: no cover
+    return name or None  # pragma: no cover
+
+
+@app.command()
+def onboard(
+    path: Path = typer.Option(
+        Path("."), "--path", help="The repo root to onboard (default: cwd)."
+    ),
+    repo: str | None = typer.Option(
+        None, "--repo", help="Repo name for the config (default: the dir name)."
+    ),
+    owner: str | None = typer.Option(
+        None,
+        "--owner",
+        help="Accountable unit owner (default: git user.name, else 'unassigned').",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="WRITE the proposed config/cdmon/, scaffold the docs, heal, and "
+        "self-validate (arrive-green). Default is a DRY-RUN plan (K11).",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="With --apply: replace an existing config/cdmon/ directory.",
+    ),
+) -> None:
+    """Analyze a repo and author its Custodex config (agents suggest; humans apply).
+
+    The AGT-04 onboarding agent: scans the tree into a reviewable PLAN
+    (detected packages/docs/signals/warnings), proposes one unit per top-level
+    package + one eng-guide doc per package (+ the README as a user-guide
+    doc), and — only on --apply — writes the bundle, scaffolds the docs,
+    heals them in-sync (mock backend, offline), and SELF-VALIDATES: the
+    result must load, pass doctor with no FAIL, and report 0 drift before
+    this command exits 0 (never emit a config the tool itself rejects, K8).
+    """
+    try:
+        root = path.resolve()
+        repo_map = analyze_repo(root)
+        if not apply and "existing_config" in repo_map.signals:
+            typer.echo(
+                f"already configured: {repo_map.signals['existing_config']} "
+                "exists — nothing to onboard (use --apply --force to replace "
+                "a config/cdmon dir)"
+            )
+            return
+        repo_name = repo or root.name
+        effective_owner = owner or _git_user_name(root)
+        plan = propose_config(
+            repo_map, repo=repo_name, now=_now(), owner=effective_owner
+        )
+        if not apply:
+            typer.echo(render_plan_text(plan))
+            typer.echo(
+                "\n# dry-run — nothing written. Re-run with --apply to write "
+                "config/cdmon/ + scaffold the docs."
+            )
+            return
+
+        config_dir = root / "config" / "cdmon"
+        if config_dir.exists() and any(config_dir.iterdir()):
+            if not force:
+                raise SchemaError(
+                    f"{config_dir} already exists — re-run with --force to replace it"
+                )
+            import shutil
+
+            shutil.rmtree(config_dir)
+        written = apply_plan(plan, config_dir, now=_now())
+        typer.echo(f"wrote {len(written)} file(s) under {config_dir} (+ templates)")
+
+        # Materialize the proposed docs in-sync, then heal to green (mock
+        # backend, offline — the arrive-green rule).
+        bundle_cfg, bundle_dir = _resolve_config(config_dir)
+        doc_root = resolve_repo_root(bundle_dir, bundle_cfg.root)
+        scaffolded = 0
+        for spec in bundle_cfg.documents:
+            target = doc_root / spec.path
+            if target.is_file():
+                continue
+            surface = build_document_surface(spec, doc_root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                scaffold_doc(
+                    spec, surface, include_body=bundle_cfg.fingerprint_body_tier
+                ),
+                encoding="utf-8",
+            )
+            scaffolded += 1
+        monitor = Monitor(bundle_cfg, bundle_dir)
+        monitor.run(apply=True)
+
+        # Self-validation evidence (arrive-green, K8).
+        checks = run_checks(bundle_cfg, bundle_dir)
+        fails = [c for c in checks if c.status is CheckStatus.FAIL]
+        drift = monitor.check()
+        typer.echo(
+            f"scaffolded {scaffolded} doc(s); self-validation: doctor "
+            f"{'PASS' if not fails else 'FAIL'} · drift {len(drift.drifts)}"
+        )
+        if fails or drift.drifts:
+            for c in fails:
+                typer.echo(f"  FAIL {c.name}: {c.detail}", err=True)
+            for d in drift.drifts:
+                typer.echo(f"  drift {d.doc_id}: {d.kind.value}", err=True)
+            raise SchemaError(
+                "onboarding self-validation failed — the generated config was "
+                "written but is not green; see the failures above"
+            )
+        typer.echo(
+            "onboarded — `cdx check` is green; next: review the plan notes, "
+            "set real owners, and commit config/cdmon/ + docs/"
         )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)

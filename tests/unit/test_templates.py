@@ -228,3 +228,40 @@ def test_templated_region_drifts_and_self_heals(tmp_path):
     assert "| -snapshot_dir | replace |" in doc
     assert "| -allowredefinition | error |" in doc
     assert result.handled  # something was handled
+
+
+# --------------------------------------------------------------------------- #
+# AGT-04: the `cdx init --v2` dead-on-arrival fix (the measured adoption
+# blocker): a FRESH scaffold must load_bundle-green in a BARE repo — the
+# doc-style map's referenced writing templates are materialized when absent,
+# and a repo's real templates are never overwritten.
+# --------------------------------------------------------------------------- #
+def test_fresh_scaffold_loads_in_bare_repo(tmp_path):
+    """Features: FEAT-ONBOARD-002"""
+    from custodex.config import load_bundle
+    from custodex.templates_v2 import scaffold_config_dir
+
+    config_dir = tmp_path / "config" / "cdmon"
+    scaffold_config_dir(config_dir, repo="bare", now="2026-07-02")
+    bundle = load_bundle(config_dir)  # would raise pre-fix: missing templates
+    assert bundle.doc_style is not None
+    for rel in (
+        "templates/writing/document-type/api-reference.md",
+        "templates/writing/tone/precise.md",
+        "templates/writing/writing-style/reference-dense.md",
+        "templates/writing/vocabulary/engine-domain.md",
+    ):
+        assert (tmp_path / rel).is_file(), rel
+
+
+def test_ensure_writing_templates_never_overwrites(tmp_path):
+    """Features: FEAT-ONBOARD-002"""
+    from custodex.templates_v2 import ensure_writing_templates
+
+    real = tmp_path / "templates" / "writing" / "tone" / "precise.md"
+    real.parent.mkdir(parents=True)
+    real.write_text("MY REAL GUIDANCE\n", encoding="utf-8")
+    written = ensure_writing_templates(tmp_path)
+    assert real.read_text(encoding="utf-8") == "MY REAL GUIDANCE\n"
+    assert real not in written and len(written) == 3  # the other three only
+    assert ensure_writing_templates(tmp_path) == ()  # idempotent (K7)

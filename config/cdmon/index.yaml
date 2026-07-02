@@ -82,6 +82,8 @@ coverage:
       reason: "AGT-02 edge suggestions + link accept/reject; documented in feature-doc/catalog/docmap.yaml (api doc owned by cdx wiki)"
     - path: "custodex/kgraph.py"
       reason: "AGT-03 knowledge-graph artifact; documented in feature-doc/catalog/kgraph.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/onboard.py"
+      reason: "AGT-04 onboarding config author; documented in feature-doc/catalog/onboard.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 

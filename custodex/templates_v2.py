@@ -36,6 +36,8 @@ __all__ = [
     "DOC_STYLE_TEMPLATE",
     "EXAMPLE_UNIT_STEM",
     "V2_TEMPLATES",
+    "WRITING_TEMPLATE_STEMS",
+    "ensure_writing_templates",
     "scaffold_config_dir",
 ]
 
@@ -236,15 +238,71 @@ def _fill(template: str, *, repo: str, now: str) -> str:
     return template.format(repo=repo, now=now)
 
 
+#: The writing-template files ``DOC_STYLE_TEMPLATE`` references — (category dir,
+#: stem) pairs under ``templates/writing/``. Kept in ONE place so the scaffold's
+#: doc-style map and the ensured files can never drift apart (K8).
+WRITING_TEMPLATE_STEMS: tuple[tuple[str, str], ...] = (
+    ("document-type", "api-reference"),
+    ("tone", "precise"),
+    ("writing-style", "reference-dense"),
+    ("vocabulary", "engine-domain"),
+)
+
+#: Minimal, generic bodies for the ensured writing templates. Deliberately
+#: target-agnostic (K0): an adopter refines them; the scaffold only guarantees
+#: the doc-style map LOADS in a bare repo.
+_WRITING_TEMPLATE_BODY = """\
+# {stem} ({category})
+
+Guidance for the `{stem}` {category} writing template. Replace this generic
+scaffold with your team's real guidance — the doc-style map in
+`config/cdmon/doc-style.yaml` selects it per document, and the authoring
+backend reads it when writing `llm`-mode prose.
+"""
+
+
+def ensure_writing_templates(repo_root: Path) -> tuple[Path, ...]:
+    """Write the doc-style map's referenced writing templates IF ABSENT (AGT-04).
+
+    The ``cdx init --v2`` DOA fix: the scaffolded ``doc-style.yaml`` references
+    four writing templates that only repos like this one already ship — in a
+    bare adopter repo the bundle then fails to LOAD (the measured
+    adoption-simulation blocker). This helper materializes a minimal generic
+    file for each referenced (category, stem) under
+    ``repo_root/templates/writing/`` — and NEVER overwrites an existing file,
+    so a repo's real templates are untouched (K7). Returns the paths actually
+    written, sorted.
+    """
+    written: list[Path] = []
+    try:
+        for category, stem in WRITING_TEMPLATE_STEMS:
+            target = repo_root / "templates" / "writing" / category / f"{stem}.md"
+            if target.is_file():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                _WRITING_TEMPLATE_BODY.format(stem=stem, category=category),
+                encoding="utf-8",
+            )
+            written.append(target)
+    except OSError as exc:
+        raise ConfigError(
+            f"Cannot write writing templates under {repo_root}: {exc}"
+        ) from exc
+    return tuple(sorted(written))
+
+
 def scaffold_config_dir(config_dir: Path, *, repo: str, now: str) -> None:
     """Materialize a complete, ``load_bundle``-valid ``config/cdmon/`` (W-02, K7/K8).
 
     Writes ``index.yaml`` + one example unit (``example.yaml``) + ``ignore.yaml``
     + ``doc-style.yaml`` from the canonical templates, substituting ``repo`` and
-    ``now``. The referenced writing templates are NOT written — they live in the
-    repo's ``templates/writing/`` already (CONFIG-V2 §2). The result passes
-    :func:`custodex.config.load_bundle` for a repo that ships those
-    writing templates.
+    ``now`` — and (AGT-04) ensures the four writing templates the doc-style map
+    references exist under the repo's ``templates/writing/``, writing a minimal
+    generic file for any that are absent (never overwriting a real one). The
+    result passes :func:`custodex.config.load_bundle` in ANY repo — a bare one
+    included (the measured ``init --v2`` dead-on-arrival fix). The repo root is
+    resolved by the canonical convention (``config_dir/../..``).
 
     Loud (K8): the directory is created if absent; an OS error wraps into a typed
     :class:`ConfigError`. Caller (``cdx init --v2``) enforces the no-clobber
@@ -268,3 +326,4 @@ def scaffold_config_dir(config_dir: Path, *, repo: str, now: str) -> None:
         raise ConfigError(
             f"Cannot scaffold config/cdmon directory at {config_dir}: {exc}"
         ) from exc
+    ensure_writing_templates((config_dir / ".." / "..").resolve())

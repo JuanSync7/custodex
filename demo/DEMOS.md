@@ -1399,3 +1399,36 @@ E-06 matrix), and both stores serve identical results (parity-tested). Pinned by
 `tests/integration/test_db.py` (Alembic 0008 up/down) +
 `tests/system/test_kgraph_cli.py`.
 Features: FEAT-KGRAPH-002
+
+### DEMO-104 — Onboard any repo in one command (`cdx onboard`)
+**What it shows.** The config-authoring agent: pointed at a bare repo, the
+default run prints a reviewable PLAN — detected packages with symbol counts,
+doc candidates with audience guesses (each carrying its evidence), repo
+signals (README/AGENTS.md/docs), and warnings (an unparseable file warns, never
+aborts) — and writes NOTHING (agents suggest; humans apply, K11). `--apply`
+then writes a complete `config/cdmon/` bundle (one unit per package, one
+eng-guide doc per package, the README as a user-guide doc, the accountable
+owner from `--owner`/git/`unassigned`), scaffolds the docs in-sync, heals with
+the offline mock backend, and SELF-VALIDATES: the very next `cdx check` and
+`cdx index --check` exit 0 — the bundle arrives GREEN, never a config the tool
+itself rejects.
+**How to observe.** In a scratch copy of any small Python repo: `cdx onboard
+--path .` (the plan), then `cdx onboard --path . --apply --owner you` →
+"onboarded — `cdx check` is green"; run `cdx check` to confirm; re-run
+`--apply` → refuses without `--force`. Pinned by
+`tests/unit/test_onboard.py` + `tests/system/test_onboard_cli.py`.
+Features: FEAT-ONBOARD-001
+
+### DEMO-105 — The `init --v2` scaffold now loads in a bare repo
+**What it shows.** The measured adoption blocker is fixed: the v2 scaffold's
+doc-style map references four writing templates that a bare repo doesn't ship,
+so every command used to die at config load. Both scaffold paths (`cdx init
+--v2` and `cdx onboard --apply`) now materialize minimal generic writing
+templates for exactly the referenced stems — only when absent (a repo's real
+templates are never overwritten; the ensure step is idempotent, K7).
+**How to observe.** In an EMPTY directory: `cdx init --v2` then `cdx doctor` —
+the config loads and the preflight runs (pre-fix: a ConfigError listing missing
+template files before any check could run). The four generic files appear under
+`templates/writing/<category>/`. Pinned by `tests/unit/test_templates.py`
+(scaffold-then-load in a bare tmp tree + never-overwrite guards).
+Features: FEAT-ONBOARD-002

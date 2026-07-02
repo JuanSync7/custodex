@@ -2179,3 +2179,18 @@ own implementing modules are inside the thing being gated.
   token-gated POST + open GET + both-store parity + one additive Alembic table was
   a 1:1 template for the graph mirror; the second `extra="allow"` ingest model is
   sanctioned by the same reasoning (the payload versions itself via schema_version).
+
+## [AGT-04] Onboarding = plan artifact + arrive-green, or it is worse than nothing
+- **The heal step belongs INSIDE the onboarding command.** A generated config that
+  needs the adopter to discover `lint --fix` → `monitor --apply` (the measured
+  3-step dance) has just moved the friction, not removed it. `cdx onboard --apply`
+  scaffolds + heals + self-validates in one invocation, so the FIRST `cdx check` an
+  adopter ever runs is green — anything less trains them to distrust the tool.
+- **Fresh files may model-dump; edited files must splice.** The same slice family
+  now holds both precedents: `apply_plan` uses `dump_unit_file` (fresh units, no
+  comments to destroy) while `cdx link` splices (hand-maintained units). The rule
+  is about the FILE's authorship history, not about which function is convenient.
+- **Keep template references and ensured files in one constant.** The init --v2 DOA
+  bug existed because DOC_STYLE_TEMPLATE named files nothing guaranteed;
+  WRITING_TEMPLATE_STEMS is now the single source both the map and
+  ensure_writing_templates read — the drift class is structurally gone.

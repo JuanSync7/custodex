@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**243 features** across 27 subsystems.
+**245 features** across 28 subsystems.
 
 ## agent
 
@@ -893,6 +893,21 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 ### `FEAT-MONITOR-009` — Region-authority-aware fix request
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
+
+## onboard
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-ONBOARD-001` | `cdx onboard` — analyze a repo, author its config, arrive green | onboard, cli | K0, K8, K10, K11 | — | — | implemented |
+| `FEAT-ONBOARD-002` | The `cdx init --v2` dead-on-arrival fix (writing templates ensured) | onboard, templates_v2, cli | K0, K7, K8 | — | — | implemented |
+
+### `FEAT-ONBOARD-001` — `cdx onboard` — analyze a repo, author its config, arrive green
+
+onboard.analyze_repo scans a repo tree into a reviewable RepoMap plan artifact (the Mintlify plan-before-config pattern): top-level packages with their .py files and extracted public-symbol counts (per-file try/except — one unparseable source becomes a plan WARNING, never an abort), doc candidates with audience GUESSES that carry their evidence (silent inference is banned; README/tutorial/ usage-style names → user-guide, else eng-guide), the repo self-description signals (README, AGENTS.md, CLAUDE.md, docs dir, an existing config), and loose-file warnings. propose_config derives the bundle DETERMINISTICALLY (no LLM in this slice — K10/K11): one unit per top-level package (dir-covered = its directory, .py sources), one eng-guide document per package covering its files, the README mapped as a user-guide narrative document, and the REQUIRED unit owner via the pinned precedence (--owner → git user.name via an injected CLI seam → "unassigned" + a plan note, because it feeds the EPIC-OWN accountability chain); reserved config stems are skipped with a note. The default `cdx onboard` run is a DRY-RUN that prints the Renovate-style plan (Detected surfaces / Proposed mapping / What to expect) and writes NOTHING — agents suggest, humans apply (K11). `--apply` writes the bundle (real UnitFile models through dump_unit_file — fresh files, so the model dump is correct here), scaffolds each proposed doc in-sync, heals with the offline mock backend, and SELF-VALIDATES: load_bundle + doctor (no FAIL) + 0 drift, or the command exits loudly (the arrive-green rule — never emit a config the tool itself rejects, K8). Refuses to clobber an existing config without --force.
+
+### `FEAT-ONBOARD-002` — The `cdx init --v2` dead-on-arrival fix (writing templates ensured)
+
+The fresh-eyes adoption simulation measured the v2 scaffold as UNUSABLE in a bare repo: the scaffolded doc-style.yaml references four writing templates under templates/writing/ that only repos like this one ship, so even `cdx doctor` died at config load. templates_v2.ensure_writing_templates(repo_root) materializes a minimal generic file for exactly the four referenced (category, stem) pairs — kept in ONE WRITING_TEMPLATE_STEMS constant so the doc-style map and the ensured files can never drift apart — writing ONLY absent files (a repo's real templates are never overwritten; re-run returns (), K7). BOTH scaffold paths call it: scaffold_config_dir (the `cdx init --v2` path, fixed for every future adopter) and onboard.apply_plan — so a fresh scaffold's load_bundle succeeds in ANY bare repo, regression-guarded by a scaffold-then-load test in an empty tmp tree.
 
 ## ownership
 

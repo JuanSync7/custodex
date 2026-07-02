@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: f3282164a7a8d4c6
+  fingerprint: 69539f1726b6a6df
   fingerprint_tiers:
-    composite: f3282164a7a8d4c6
-    docstring: e309dbdae8bcf70b
-    signature: 7b248cafb4172476
+    composite: 69539f1726b6a6df
+    docstring: d27bbbc8d85768fd
+    signature: b8e65783446e2645
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -23,6 +23,7 @@ cdm:
     - 0b390c979393f83b
     - 0d9808ab184991ce
     - 0dad8198442ebc15
+    - 13842f4e9e30fde5
     - 147fda13f62e8d29
     - 16fa33fa4ac0dc4e
     - 17019d426b379415
@@ -79,6 +80,7 @@ cdm:
     - 944fca707b7e57f5
     - 949e83f48e041117
     - 94aa6c378eb9283c
+    - 95a97460cf74f2a9
     - 980311c056ae3045
     - 98117ea616dd3e9f
     - 991d9c74dd497040
@@ -117,6 +119,7 @@ cdm:
     - d66e738995cfa86a
     - d810ee574fcee4f5
     - d97ca633fb31ebf6
+    - da81674b07e9d89c
     - dbd044032a4e2c02
     - dc6b6698decf6ed2
     - debba00cbcfe4db9
@@ -137,7 +140,7 @@ cdm:
     - fd87e7b303770609
     - ff51b2032355ac8b
   region_hashes:
-    symbols: 4c8ac4ade7b3ecf4
+    symbols: fcb13ab6a31a6ed9
   schema_version: 1.0.0
   symbol_sigs:
     00652c5f721d5ef6: 7148212130f198af
@@ -151,6 +154,7 @@ cdm:
     0b390c979393f83b: cf8b25db8c315998
     0d9808ab184991ce: 06755f5d33667bec
     0dad8198442ebc15: 7778f05ebf2516e7
+    13842f4e9e30fde5: 3b9d40cda2e687c5
     147fda13f62e8d29: 1b97c7fb6082b0ff
     16fa33fa4ac0dc4e: 18fe10a23d93b8e9
     17019d426b379415: 69a29915fab5fc8b
@@ -206,6 +210,7 @@ cdm:
     944fca707b7e57f5: db8722533f904742
     949e83f48e041117: 9289d492a0538f84
     94aa6c378eb9283c: b4e24e3840368e4a
+    95a97460cf74f2a9: 410dfea1297ef45e
     980311c056ae3045: 21df3514a17ae8b7
     98117ea616dd3e9f: c2e879514201fed3
     991d9c74dd497040: 4123caba2a7932a9
@@ -244,6 +249,7 @@ cdm:
     d66e738995cfa86a: c525344c006578cd
     d810ee574fcee4f5: 7514d61513fd8763
     d97ca633fb31ebf6: e4293a91f0fc2d3e
+    da81674b07e9d89c: a00ed1d0c076873b
     dbd044032a4e2c02: ca440b477f4edf48
     dc6b6698decf6ed2: 25610e7f44b35da5
     debba00cbcfe4db9: 08e06d270940e114
@@ -340,6 +346,7 @@ cdm:
 | UnitFrontmatter._version_must_match | method | def _version_must_match(self) -> UnitFrontmatter |
 | V2_TEMPLATES | variable | V2_TEMPLATES: dict[str, str] = ... |
 | Verdict | class | class Verdict(str, Enum) |
+| WRITING_TEMPLATE_STEMS | variable | WRITING_TEMPLATE_STEMS: tuple[tuple[str, str], ...] = ... |
 | WaiverEntry | class | class WaiverEntry(BaseModel) |
 | _DEFAULT_EXCLUDE | variable | _DEFAULT_EXCLUDE: tuple[str, ...] = ('**/.*/**', '**/__pycache__/**', '**/.venv/**') |
 | _DEFAULT_INCLUDE | variable | _DEFAULT_INCLUDE: tuple[str, ...] = ('**/*.py',) |
@@ -349,6 +356,7 @@ cdm:
 | _UNITS_BLOCK_RE | variable | _UNITS_BLOCK_RE = ... |
 | _UPDATED_LINE_RE | variable | _UPDATED_LINE_RE = re.compile('^updated:[^\\\\n]*$', re.MULTILINE) |
 | _V2_MODEL_CONFIG | variable | _V2_MODEL_CONFIG = ... |
+| _WRITING_TEMPLATE_BODY | variable | _WRITING_TEMPLATE_BODY = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
@@ -380,6 +388,7 @@ cdm:
 | dump_doc_style | function | def dump_doc_style(doc_style: DocStyleMap, *, now: str) -> str |
 | dump_unit_file | function | def dump_unit_file(unit: UnitFile, *, now: str) -> str |
 | effective_coverage | function | def effective_coverage(bundle: ConfigBundle, repo_root: Path) -> CoverageConfig |
+| ensure_writing_templates | function | def ensure_writing_templates(repo_root: Path) -> tuple[Path, ...] |
 | gitignore_to_globs | function | def gitignore_to_globs(text: str) -> tuple[str, ...] |
 | load_bundle | function | def load_bundle(config_dir: Path) -> ConfigBundle |
 | load_config | function | def load_config(path: Path) -> MonitorConfig |

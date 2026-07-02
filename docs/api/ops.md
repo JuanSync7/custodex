@@ -1,15 +1,16 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 3dbc99ae3ca1414e
+  fingerprint: fc5b54b72220521e
   fingerprint_tiers:
-    composite: 3dbc99ae3ca1414e
-    docstring: b8dd29f5df0b2126
-    signature: 08c132cde369bac5
+    composite: fc5b54b72220521e
+    docstring: d459ac8c2f499ab1
+    signature: 3d1c9d572270a0f7
   region_anchors:
     symbols:
     - 01b8016fdce455c4
     - 051af376199dec21
+    - 059d49674f2e2802
     - 09ab528f037a044d
     - 0a12e5898c92bfc6
     - 0c9d51b72e16a207
@@ -60,6 +61,7 @@ cdm:
     - bb54068aea85faa7
     - c3a3091b9d32267d
     - ca8e9a370614b71a
+    - cd5486f6f9daaa04
     - cde0fb0dec1400c5
     - d3a3ed1c7e737699
     - d42417752e8efd40
@@ -79,11 +81,12 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 1684ee755647b6aa
+    symbols: 6914e695faad8027
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
     051af376199dec21: d7a9bca79ac72d1b
+    059d49674f2e2802: 3249d9bbb9b807ae
     09ab528f037a044d: ed7f14a5d44a7718
     0a12e5898c92bfc6: 73646d29304739ea
     0c9d51b72e16a207: 468c2620ca834755
@@ -134,6 +137,7 @@ cdm:
     bb54068aea85faa7: defb9df3f00a5f13
     c3a3091b9d32267d: f236e1b17349fc02
     ca8e9a370614b71a: e54511e80c59cee7
+    cd5486f6f9daaa04: e842874cbbcf6d04
     cde0fb0dec1400c5: 6602cc7d080e1dca
     d3a3ed1c7e737699: aa2501b9d4a86c13
     d42417752e8efd40: cc09f0e5b8fffe46
@@ -181,6 +185,7 @@ cdm:
 | _coverage_manifest_text | function | def _coverage_manifest_text(report: coverage_mod.CoverageReport, config: MonitorConfig) -> str |
 | _coverage_payload | function | def _coverage_payload(report: coverage_mod.CoverageReport) -> dict[str, object] |
 | _doc_style_for | function | def _doc_style_for(config_dir: Path) -> DocStyleMap \| None |
+| _git_user_name | function | def _git_user_name(root: Path) -> str \| None |
 | _issue_transport | function | def _issue_transport(provider: str) -> GitLabIssueTransport \| GitHubIssueTransport |
 | _known_modules | function | def _known_modules() -> set[str] |
 | _load | function | def _load(config: Path) -> tuple[MonitorConfig, Path] |
@@ -212,6 +217,7 @@ cdm:
 | main | function | def main() -> None |
 | monitor | function | def monitor(config: Path = _CONFIG_OPTION, apply: bool \| None = typer.Option(None, '--apply/--no-apply', help="Auto-apply FIX verdicts (defaults to the config's apply_default)."), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Source code ref/commit to stamp on every review record (provenance, C-05). Precedence: this flag, else $CI_COMMIT_SHA, else none. The same ref can flow to `open-docs-pr --ref` (one source of truth).')) -> None |
 | new_doc | function | def new_doc(doc_id: str = typer.Argument(..., help='The document id from the config.'), config: Path = _CONFIG_OPTION, force: bool = typer.Option(False, '--force', help='Overwrite an existing doc file.')) -> None |
+| onboard | function | def onboard(path: Path = typer.Option(Path('.'), '--path', help='The repo root to onboard (default: cwd).'), repo: str \| None = typer.Option(None, '--repo', help='Repo name for the config (default: the dir name).'), owner: str \| None = typer.Option(None, '--owner', help="Accountable unit owner (default: git user.name, else 'unassigned')."), apply: bool = typer.Option(False, '--apply', help='WRITE the proposed config/cdmon/, scaffold the docs, heal, and self-validate (arrive-green). Default is a DRY-RUN plan (K11).'), force: bool = typer.Option(False, '--force', help='With --apply: replace an existing config/cdmon/ directory.')) -> None |
 | open_docs_pr_cmd | function | def open_docs_pr_cmd(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the MR plan WITHOUT mutating the tree or opening an MR (uses a dry sync, so NOTHING is written, and never builds a transport).'), target: str = typer.Option('main', '--target', help="The MR target branch (default 'main')."), ref: str \| None = typer.Option(None, '--ref', help='Source ref to record in the MR title/description (provenance).')) -> None |
 | ownership | function | def ownership(config: Path = _CONFIG_OPTION, roster: Path \| None = typer.Option(None, '--roster', help='An offline roster YAML (identities: [...]) to cross-check owners against; without it the command just lists assignments.'), as_json: bool = typer.Option(False, '--json', help='Emit {owners, findings} as round-trippable JSON.'), fail_on_orphan: bool = typer.Option(False, '--fail-on-orphan', help='Exit 1 if any document is an orphan (its accountable owner has departed). Requires --roster; UNOWNED docs do NOT trip it (that is a coverage gap, not a departure).')) -> None |
 | promotions | function | def promotions(config: Path = _CONFIG_OPTION, min_count: int = typer.Option(3, '--min-count', help='How many resolved records of one shape must unanimously share a decision before it is a promotion candidate.'), as_json: bool = typer.Option(False, '--json', help='Emit the candidates as machine-readable JSON.')) -> None |
