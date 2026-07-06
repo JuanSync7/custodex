@@ -710,6 +710,113 @@ def test_graph_latest_means_last_pushed_not_captured_at(client: TestClient) -> N
     assert got["unresolved"] == {"a": 0}
 
 
+def _suggestion(key: str, kind: str = "add_edge", severity: str = "low", **kw):
+    from custodex.workers import Suggestion, SuggestionKind
+    from custodex.worklist import WorkSeverity
+
+    return Suggestion(
+        key=key,
+        kind=SuggestionKind(kind),
+        doc_id="guide",
+        target="api",
+        detail=kw.get("detail", f"do the thing for {key}"),
+        evidence=tuple(kw.get("evidence", ("fact",))),
+        severity=WorkSeverity(severity),
+    )
+
+
+@pytest.fixture(params=["memory", "sql"])
+def store_client(request: pytest.FixtureRequest) -> Iterator[tuple[Store, TestClient]]:
+    """The suggestions tests need BOTH the store (to drive the worker-side
+    ``sync_suggestions`` seam directly) and the client (to read the routes)."""
+    store = _make_store(request.param)
+    with TestClient(create_app(store)) as test_client:
+        yield store, test_client
+
+
+def test_suggestions_sync_read_dismiss_lifecycle(
+    store_client: tuple[Store, TestClient],
+) -> None:
+    """AGT-06 reconcile semantics over BOTH stores.
+
+    pending → resolved when a key vanishes from the tick; a resolved key that
+    reappears REOPENS; a dismissed key is NEVER resurrected; the default read
+    is pending-only and severity-then-key ordered.
+    """
+    store, client = store_client
+    _register(client)
+    now1, now2, now3 = (
+        "2026-07-06T10:00:00Z",
+        "2026-07-06T11:00:00Z",
+        "2026-07-06T12:00:00Z",
+    )
+
+    high = _suggestion("bbbbbbbbbbbbbbbb", kind="fix_drift", severity="high")
+    low = _suggestion("aaaaaaaaaaaaaaaa", kind="add_edge", severity="low")
+    store.sync_suggestions(_REPO, [high, low], now=now1)
+
+    got = client.get(f"/repos/{_REPO}/suggestions")
+    assert got.status_code == 200
+    body = got.json()
+    keys = [s["key"] for s in body["suggestions"]]
+    assert keys == ["bbbbbbbbbbbbbbbb", "aaaaaaaaaaaaaaaa"]  # severity first
+    assert all(s["status"] == "pending" for s in body["suggestions"])
+    assert all(s["source"] == "worker" for s in body["suggestions"])
+    assert body["suggestions"][0]["recorded_at"] == now1
+
+    # The high one vanishes from the next tick → resolved (audit-kept).
+    store.sync_suggestions(_REPO, [low], now=now2)
+    pending = client.get(f"/repos/{_REPO}/suggestions").json()["suggestions"]
+    assert [s["key"] for s in pending] == ["aaaaaaaaaaaaaaaa"]
+    closed = client.get(
+        f"/repos/{_REPO}/suggestions", params={"include_closed": "true"}
+    ).json()["suggestions"]
+    by_key = {s["key"]: s for s in closed}
+    assert by_key["bbbbbbbbbbbbbbbb"]["status"] == "resolved"
+    assert by_key["bbbbbbbbbbbbbbbb"]["updated_at"] == now2
+
+    # It reappears → REOPENS (current reality again), prose refreshed.
+    high2 = _suggestion(
+        "bbbbbbbbbbbbbbbb", kind="fix_drift", severity="high", detail="reworded"
+    )
+    store.sync_suggestions(_REPO, [high2, low], now=now3)
+    pending = client.get(f"/repos/{_REPO}/suggestions").json()["suggestions"]
+    by_key = {s["key"]: s for s in pending}
+    assert by_key["bbbbbbbbbbbbbbbb"]["status"] == "pending"
+    assert by_key["bbbbbbbbbbbbbbbb"]["detail"] == "reworded"
+    assert by_key["bbbbbbbbbbbbbbbb"]["recorded_at"] == now1  # first-seen kept
+
+    # Dismiss is token-gated + durable: later ticks never resurrect it.
+    no_token = client.post(f"/repos/{_REPO}/suggestions/aaaaaaaaaaaaaaaa/dismiss")
+    assert no_token.status_code == 401
+    wrong = client.post(
+        f"/repos/{_REPO}/suggestions/aaaaaaaaaaaaaaaa/dismiss",
+        headers=_auth("wrong-token"),
+    )
+    assert wrong.status_code == 403
+    ok = client.post(
+        f"/repos/{_REPO}/suggestions/aaaaaaaaaaaaaaaa/dismiss", headers=_auth()
+    )
+    assert ok.status_code == 200 and ok.json()["status"] == "dismissed"
+    ghost = client.post(
+        f"/repos/{_REPO}/suggestions/ffffffffffffffff/dismiss", headers=_auth()
+    )
+    assert ghost.status_code == 404
+
+    store.sync_suggestions(_REPO, [high2, low], now=now3)
+    pending = client.get(f"/repos/{_REPO}/suggestions").json()["suggestions"]
+    assert [s["key"] for s in pending] == ["bbbbbbbbbbbbbbbb"]  # low stays out
+    closed = client.get(
+        f"/repos/{_REPO}/suggestions", params={"include_closed": "true"}
+    ).json()["suggestions"]
+    assert {s["key"]: s["status"] for s in closed}["aaaaaaaaaaaaaaaa"] == "dismissed"
+
+
+def test_suggestions_unknown_repo_404s(client: TestClient) -> None:
+    assert client.get("/repos/ghost/suggestions").status_code == 404
+    assert client.post("/repos/ghost/suggestions/somekey/dismiss").status_code == 404
+
+
 def test_graph_get_is_empty_dict_before_any_push(client: TestClient) -> None:
     """No snapshot yet ⇒ an honest empty dict (the hub only mirrors — K2)."""
     _register(client)

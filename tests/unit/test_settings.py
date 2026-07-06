@@ -222,3 +222,36 @@ def test_env_degenerate_csv_is_loud() -> None:
     # empty list (an empty trusted_hosts would reject every Host) (K8).
     with pytest.raises(ConfigError, match="CDMON_TRUSTED_HOSTS has no values"):
         settings_from_env(Settings(), {"CDMON_TRUSTED_HOSTS": " , , "})
+
+
+# ── AGT-06 worker settings ───────────────────────────────────────────────────
+
+
+def test_worker_defaults_are_off() -> None:
+    """K4: an un-tuned deployment runs NO background work."""
+    w = Settings().server.workers
+    assert w.enabled is False
+    assert w.interval_seconds == 900
+    assert w.kinds == ("fixes", "docs")
+
+
+def test_worker_env_overlay() -> None:
+    s = settings_from_env(
+        Settings(),
+        {
+            "CDMON_WORKER_ENABLED": "true",
+            "CDMON_WORKER_INTERVAL": "60",
+            "CDMON_WORKER_KINDS": "fixes",
+        },
+    )
+    w = s.server.workers
+    assert w.enabled is True and w.interval_seconds == 60 and w.kinds == ("fixes",)
+    off = settings_from_env(Settings(), {"CDMON_WORKER_ENABLED": "0"})
+    assert off.server.workers.enabled is False
+
+
+def test_worker_bad_values_are_loud() -> None:
+    with pytest.raises(ConfigError, match="Invalid settings from environment"):
+        settings_from_env(Settings(), {"CDMON_WORKER_INTERVAL": "-5"})
+    with pytest.raises(ConfigError, match="Invalid settings from environment"):
+        settings_from_env(Settings(), {"CDMON_WORKER_KINDS": "fixes,ghosts"})

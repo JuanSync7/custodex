@@ -14,7 +14,8 @@ future non-HTTP consumer (or a test) can use the store directly.
 from __future__ import annotations
 
 import hashlib
-from typing import Protocol, runtime_checkable
+from collections.abc import Sequence
+from typing import Any, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
@@ -252,6 +253,40 @@ class SyncRun(BaseModel):
     finished_at: str
 
 
+class StoredSuggestion(BaseModel):
+    """One persisted worker suggestion + its lifecycle envelope (AGT-06).
+
+    The server-side projection of a :class:`custodex.workers.Suggestion`
+    (kind/severity stored as plain strings, the mirror convention) plus the
+    reconciliation state: ``pending`` (in the latest tick), ``resolved``
+    (disappeared from a later tick — kept for audit, excluded from the default
+    read) or ``dismissed`` (a durable human 'no' — NEVER resurrected by a
+    later tick). ``source`` is the K5/K11 provenance line (``"worker"``).
+    """
+
+    model_config = _MODEL_CONFIG
+
+    key: str
+    kind: str
+    doc_id: str | None = None
+    target: str
+    detail: str
+    evidence: tuple[str, ...] = ()
+    severity: str
+    status: str = "pending"  # pending | resolved | dismissed
+    source: str = "worker"
+    recorded_at: str  # first seen (injected server clock, K10)
+    updated_at: str  # last lifecycle transition
+
+
+#: Deterministic inbox ordering: severity first (high → low), then key (K10).
+_SUGGESTION_SEVERITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+
+def _suggestion_sort_key(s: StoredSuggestion) -> tuple[int, str]:
+    return (_SUGGESTION_SEVERITY_RANK.get(s.severity, 1), s.key)
+
+
 @runtime_checkable
 class Store(Protocol):
     """The persistence boundary the routes depend on (the E-04 seam).
@@ -329,6 +364,37 @@ class Store(Protocol):
 
     def graph_for(self, repo_id: str) -> dict | None:
         """The LATEST stored graph snapshot for a repo, or ``None`` when none."""
+        ...
+
+    def sync_suggestions(
+        self, repo_id: str, suggestions: Sequence[Any], *, now: str
+    ) -> None:
+        """RECONCILE (never insert-only) a repo's worker suggestions (AGT-06).
+
+        ``suggestions`` are :class:`custodex.workers.Suggestion` items — the
+        CURRENT tick output. New keys insert as ``pending``; an existing
+        ``pending`` key refreshes its prose (detail/evidence — the key never
+        hashes them); a ``resolved`` key that reappears REOPENS to pending
+        (it is current reality again); a non-dismissed key ABSENT from the
+        tick becomes ``resolved`` (kept for audit, excluded from the default
+        read); a ``dismissed`` key is NEVER resurrected — the durable human
+        opt-out. The inbox therefore always equals current reality (the
+        read-time staleness/orphan precedent).
+        """
+        ...
+
+    def suggestions_for(
+        self, repo_id: str, *, include_closed: bool = False
+    ) -> list[StoredSuggestion]:
+        """The repo's suggestion inbox, severity-then-key ordered (K10).
+
+        Default = ``pending`` only; ``include_closed`` adds the resolved +
+        dismissed audit trail.
+        """
+        ...
+
+    def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool:
+        """Mark one suggestion ``dismissed`` (the human 'no'); False if unknown."""
         ...
 
     def repo_token_hash(self, repo_id: str) -> str | None: ...
@@ -480,6 +546,8 @@ class InMemoryStore:
         self._resolutions: list[ResolutionRecord] = []
         self._coverage: dict[str, list[dict]] = {}
         self._graphs: dict[str, list[dict]] = {}  # AGT-03 graph snapshots
+        # AGT-06: per-repo suggestion inbox, keyed by suggestion key.
+        self._suggestions: dict[str, dict[str, StoredSuggestion]] = {}
         self._token_hashes: dict[str, str | None] = {}
         # GIT-02: per-repo SEALED (opaque bytes) git provider credential. Kept apart
         # from token_hashes so the reversible secret never mixes with the one-way
@@ -585,6 +653,69 @@ class InMemoryStore:
         # provenance, not an ordering key (parity with SqlStore, pinned).
         snapshots = self._graphs.get(repo_id)
         return snapshots[-1] if snapshots else None
+
+    # --- AGT-06: the worker suggestion inbox (reconcile, never insert-only) --
+
+    def sync_suggestions(
+        self, repo_id: str, suggestions: Sequence[Any], *, now: str
+    ) -> None:
+        inbox = self._suggestions.setdefault(repo_id, {})
+        tick_keys = set()
+        for s in suggestions:
+            tick_keys.add(s.key)
+            existing = inbox.get(s.key)
+            if existing is None:
+                inbox[s.key] = StoredSuggestion(
+                    key=s.key,
+                    kind=s.kind.value,
+                    doc_id=s.doc_id,
+                    target=s.target,
+                    detail=s.detail,
+                    evidence=tuple(s.evidence),
+                    severity=s.severity.value,
+                    status="pending",
+                    source="worker",
+                    recorded_at=now,
+                    updated_at=now,
+                )
+            elif existing.status == "resolved":
+                # Current reality again — REOPEN (a dismissed key never is).
+                inbox[s.key] = existing.model_copy(
+                    update={
+                        "status": "pending",
+                        "detail": s.detail,
+                        "evidence": tuple(s.evidence),
+                        "updated_at": now,
+                    }
+                )
+            elif existing.status == "pending":
+                # The key never hashes prose: refresh detail/evidence in place.
+                inbox[s.key] = existing.model_copy(
+                    update={"detail": s.detail, "evidence": tuple(s.evidence)}
+                )
+        for key, stored in inbox.items():
+            if key not in tick_keys and stored.status == "pending":
+                inbox[key] = stored.model_copy(
+                    update={"status": "resolved", "updated_at": now}
+                )
+
+    def suggestions_for(
+        self, repo_id: str, *, include_closed: bool = False
+    ) -> list[StoredSuggestion]:
+        items = list(self._suggestions.get(repo_id, {}).values())
+        if not include_closed:
+            items = [s for s in items if s.status == "pending"]
+        return sorted(items, key=_suggestion_sort_key)
+
+    def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool:
+        inbox = self._suggestions.get(repo_id, {})
+        stored = inbox.get(key)
+        if stored is None:
+            return False
+        inbox[key] = stored.model_copy(
+            update={"status": "dismissed", "updated_at": now}
+        )
+        return True
 
     # --- Y-01: config documents / code-refs / sync runs ---------------------
 

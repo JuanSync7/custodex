@@ -725,3 +725,38 @@ def test_alembic_migration_0008_graph_snapshots_up_then_down(tmp_path: Path) -> 
     after = set(inspect(engine).get_table_names())
     assert "graph_snapshots" not in after
     assert "config_doc_edges" in after
+
+
+def test_alembic_migration_0009_suggestions_up_then_down(tmp_path: Path) -> None:
+    """0009 (AGT-06) creates suggestions; down drops it, leaving 0008 intact."""
+    from alembic import command
+
+    db = tmp_path / "migrate_0009.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0008 -> suggestions does NOT exist yet (additive 0009).
+    command.upgrade(cfg, "0008_graph_snapshots")
+    assert "suggestions" not in set(inspect(engine).get_table_names())
+
+    # upgrade head -> the table exists with its key columns, indexes AND the
+    # (repo_id, key) uniqueness the reconcile upsert relies on.
+    command.upgrade(cfg, "head")
+    assert "suggestions" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("suggestions")}
+    assert {"id", "repo_id", "key", "status", "suggestion"} <= cols
+    indexed = {
+        col
+        for ix in inspect(engine).get_indexes("suggestions")
+        for col in ix["column_names"]
+    }
+    assert {"repo_id", "key", "status"} <= indexed
+    uniques = inspect(engine).get_unique_constraints("suggestions")
+    assert any(set(u["column_names"]) == {"repo_id", "key"} for u in uniques)
+
+    # downgrade to 0008 -> dropped; the graph table remains.
+    command.downgrade(cfg, "0008_graph_snapshots")
+    after = set(inspect(engine).get_table_names())
+    assert "suggestions" not in after
+    assert "graph_snapshots" in after

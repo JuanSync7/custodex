@@ -1457,3 +1457,41 @@ check` flags the doc, `cdx monitor --apply` heals it and the overview prose now
 names the new symbols. Pinned by `tests/unit/test_docwriter.py` +
 `tests/system/test_docwriter_cli.py` (the full write→drift→re-author lifecycle).
 Features: FEAT-DOCWRITER-001
+
+### DEMO-107 — The suggestion inbox (`cdx suggest`)
+**What it shows.** The two background suggesters run once, in the foreground:
+the FIXES tick (what needs a human NOW — drifted docs, suspect edges,
+promotable review shapes) and the DOCS tick (what to document and map next —
+mentioned-but-undocumented symbols from the knowledge graph, suggested
+`depends_on` edges honoring your durable rejections). Every item is ADVISORY
+(K11) with a deterministic sha256 key over structured fields — a reworded
+detail keeps its key; a drift that recurs AFTER a heal is a NEW key — and
+every detail embeds the exact next human command (`cdx monitor --apply`,
+`cdx resolve --edge`, `cdx write-doc`, `cdx link`).
+**How to observe.** On a scratch copy of the demo, edit a covered source file
+and a depended-on doc's prose, then `cdx suggest` — the inbox lists a
+`fix_drift`, a `resolve_edge`, plus any standing `document_gap`/`add_edge`
+items, severity-first; `--kind fixes|docs` filters; `--json` emits the
+structured list; `--write` appends only NEW keys to `.cdmon/suggestions.jsonl`
+(an audit log — a re-run with no change appends nothing, K7). Pinned by
+`tests/unit/test_workers.py` + `tests/system/test_suggest_cli.py`.
+Features: FEAT-WORKERS-001
+
+### DEMO-108 — The background loop + the central inbox (workers on the hub)
+**What it shows.** The same two suggesters running UNATTENDED on the central
+server — default OFF (an un-tuned deployment does no background work, K4),
+armed by `settings.yaml` (`server.workers.enabled` + interval + kinds, or the
+`CDMON_WORKER_*` env overlays). Each pass sweeps every repo the hub can read
+locally, runs the pure ticks, and RECONCILES the stored inbox: new keys arrive
+pending, items that stop being true auto-resolve (kept for audit), reappearing
+items reopen, and a human DISMISS is durable — no later tick resurrects it.
+One repo's failure logs and continues; the loop never dies.
+**How to observe.** Set `CDMON_WORKER_ENABLED=1 CDMON_WORKER_INTERVAL=60` on a
+server with a locally-registered repo; within a minute `GET
+/repos/{id}/suggestions` fills with `source: "worker"` items;
+`?include_closed=true` shows the resolved/dismissed audit trail; `POST
+/repos/{id}/suggestions/{key}/dismiss` (repo token) silences one durably.
+Pinned by `tests/integration/test_worker_loop.py` +
+`tests/integration/test_server_store_parity.py` (both stores) +
+`tests/integration/test_db.py` (Alembic 0009 up/down).
+Features: FEAT-WORKERS-002

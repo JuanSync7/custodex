@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**246 features** across 29 subsystems.
+**248 features** across 30 subsystems.
 
 ## agent
 
@@ -1368,6 +1368,21 @@ configsync._build_rows projects each document's `reviewed` plus the audience-res
 ### `FEAT-STALENESS-006` — Read-time GET /staleness view
 
 GET /repos/{id}/staleness grades the synced docs' `reviewed` + `sla_days` against the app clock at READ time (deduped by doc_id, FRESH omitted unless include_fresh), so a doc goes stale on the NEXT read with no re-sync — mirroring the ownership read-time cascade. Open read, deterministic.
+
+## workers
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-WORKERS-001` | `cdx suggest` — the two pure suggester ticks + the keyed inbox | workers, cli | K1, K4, K7, K10, K11 | — | — | implemented |
+| `FEAT-WORKERS-002` | the default-OFF server worker loop + the reconciled suggestion inbox | workers, settings, server | K4, K5, K6, K10, K11 | — | — | implemented |
+
+### `FEAT-WORKERS-001` — `cdx suggest` — the two pure suggester ticks + the keyed inbox
+
+workers.suggest_fixes_tick (FIX_DRIFT per drifted doc via drift.detect — SUSPECT_LINK excluded because RESOLVE_EDGE owns edges; RESOLVE_EDGE per non-OK suspect link; PROMOTE_RULE per detect_promotions candidate over the local logs) and workers.suggest_docs_tick (DOCUMENT_GAP per mentioned-but-undocumented symbol from the AGT-03 rank_centrality feed; ADD_EDGE per docmap.suggest_edges suggestion, honoring the repo-side EdgeRejection verdicts) — both pure in the K1 sense (read-only FS, no clock in any key), deterministic and sorted by key (K10). The pinned key discipline: Suggestion.key = sha256[:16] over STRUCTURED fields per kind (detail/evidence/severity/now never hashed — a reworded detail keeps the key), with EVENT kinds (FIX_DRIFT, RESOLVE_EDGE) embedding the current surface hash / upstream fingerprint so a recurrence after a heal is a NEW key, and STANDING kinds (ADD_EDGE, DOCUMENT_GAP, PROMOTE_RULE) occurrence-free so a dismiss is a durable opt-out. Every detail embeds the exact next HUMAN command (`cdx monitor --apply`, `cdx resolve --edge`, `cdx write-doc`, `cdx link`) — K11. `cdx suggest [--kind fixes|docs|all] [--json] [--write]` runs the ticks once in the foreground; `--write` appends NEW keys to `.cdmon/suggestions.jsonl`, an append-only audit LOG (reviewlog precedent) never read back as pending state — a re-run with no change appends nothing (K7).
+
+### `FEAT-WORKERS-002` — the default-OFF server worker loop + the reconciled suggestion inbox
+
+settings.WorkerSettings (enabled=False, interval_seconds=900, kinds) under ServerSettings.workers with CDMON_WORKER_ENABLED/INTERVAL/KINDS env overlays — an un-tuned deployment runs NO background work (K4). When enabled, create_app's lifespan arms ONE daemon thread that runs _run_worker_pass every interval: for each registered repo with a readable local_path working tree carrying config/cdmon/index.yaml, run the enabled pure ticks and RECONCILE via Store.sync_suggestions — per-repo error isolation (one repo's failure logs and continues; the loop never dies), threading.Event.wait shutdown (never a bare sleep), and an injected worker_pass seam so tests count invocations offline. Reconciliation is never insert-only: new keys insert as pending, a pending key refreshes its prose in place, a resolved key that reappears REOPENS, a non-dismissed key absent from the tick becomes resolved (kept for audit, excluded from the default read), and a dismissed key — the durable human 'no' — is NEVER resurrected. Stored envelopes carry source: "worker" provenance + recorded_at/updated_at from the injected server clock (K5/K10/K11). Both stores implement the seam (parity) over Alembic 0009's suggestions table (unique (repo_id, key); indexed repo_id/key/status). Routes: GET /repos/{id}/suggestions (open read, ?include_closed adds the audit trail) + POST /repos/{id}/suggestions/{key}/dismiss (repo token, the E-06 matrix).
 
 ## worklist
 

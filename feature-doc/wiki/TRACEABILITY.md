@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**246 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**248 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -251,6 +251,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-STALENESS-004` | system/test_staleness_cli.py | DEMOS.md |
 | `FEAT-STALENESS-005` | integration/test_staleness_server.py | DEMOS.md |
 | `FEAT-STALENESS-006` | integration/test_staleness_server.py, system/test_demo_e2e.py | DEMOS.md |
+| `FEAT-WORKERS-001` | system/test_suggest_cli.py, unit/test_workers.py | DEMOS.md |
+| `FEAT-WORKERS-002` | integration/test_worker_loop.py | DEMOS.md |
 | `FEAT-WORKLIST-001` | integration/test_worklist_server.py, system/test_worklist_cli.py, unit/test_worklist.py | DEMOS.md |
 
 ## Gaps

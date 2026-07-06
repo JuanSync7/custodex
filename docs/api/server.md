@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 73c63f3242461364
+  fingerprint: eb91164c9094a893
   fingerprint_tiers:
-    composite: 73c63f3242461364
-    docstring: c835df58b05e270f
-    signature: 640de7f85ab6c845
+    composite: eb91164c9094a893
+    docstring: e71efbe4d8377d1c
+    signature: a9b597157d954a3c
   region_anchors:
     symbols:
     - 01235c35a6ca9c5a
@@ -27,10 +27,12 @@ cdm:
     - 11192a3ac2c801a0
     - 11c8b69ce1ef8fa5
     - 11eece7cb3f29969
+    - 13737d87bc5f0b74
     - 14bee4e49a9e3aac
     - 14ea6d742c6ebcf6
     - 1749c6d35103f236
     - 1849f8779eeb8a48
+    - 1ccda8ae976a8106
     - 1dd91e025bf15c39
     - 1e5bf2178ac0dcee
     - 1f69bc8b615da116
@@ -43,9 +45,11 @@ cdm:
     - 2fd1b3982610ecaa
     - 2fe3c356023e3752
     - 300741ad0adeb325
+    - 31186d3da757cb26
     - 318817d3d5c32a67
     - 31926744a2b193eb
     - 31a3e50b8f5221db
+    - 32aa871159b17db7
     - 331fcb711b55798f
     - 337ab9db6bad7258
     - 34a2555fd4d71104
@@ -58,6 +62,7 @@ cdm:
     - 3e373817e4dd55ad
     - 3ff4b656757aa5ad
     - 413803e6bb0f7787
+    - 437de41673a592c6
     - 44162d384b47b10d
     - 4507f4be9071d9ac
     - 4664661bb8b74e6e
@@ -75,6 +80,7 @@ cdm:
     - 4e6a0be38bfb2e03
     - 4e7c579155b8c53d
     - 4e8617b2d6609600
+    - 51995f529993169b
     - 536d95baa30f412c
     - 5469690a8bc40782
     - 550988527d9b6ea0
@@ -94,10 +100,13 @@ cdm:
     - 691a3bef6d4d3657
     - 69695ff6396b76d1
     - 6a9fbf6b5fa6d8b8
+    - 6bcabb74f946f3a8
+    - 6bed31c31184969a
     - 6d1ab62755fa6460
     - 6d3f69617a6b1d78
     - 6ef2f6eec3cd16ae
     - 6f9b25f7411f15c2
+    - 6fce7837f5053296
     - 71613e3abdfdcdb1
     - 726858785015ad76
     - 736fec7b60519ee0
@@ -105,6 +114,7 @@ cdm:
     - 76dafbeb7152f48e
     - 7718c1f874b600bf
     - 77a49c9a8c63382b
+    - 7882122864e73f70
     - 7a8eda9f0a5f3bf7
     - 7b47361aad19bb48
     - 7ca05ecd14ba0bc8
@@ -121,6 +131,7 @@ cdm:
     - 9226de5c220d98ef
     - 932c919339ac3a6d
     - 93b85db9aae2db64
+    - 941de5e475660c6e
     - 95027cf1e5bce55b
     - 9877e4d3ed2473bb
     - 99acad598cfc3747
@@ -137,6 +148,7 @@ cdm:
     - a2b2bac5098995ec
     - a2bc0adb27fe1fc9
     - a56f31e61f8741ce
+    - aa17eba8a81232d1
     - abb903669fd3f39a
     - aeb16220de90518c
     - b0621470d5ce4290
@@ -153,6 +165,7 @@ cdm:
     - c275ae37d742123c
     - c36455b6a4d33158
     - c3981046dd7878b3
+    - c45fa0016f6ba582
     - c6a7a34908783b74
     - c843a2a6e5815d67
     - ca6c89214a079f51
@@ -164,6 +177,7 @@ cdm:
     - d085aef79729a8a1
     - d098dc649eb707a0
     - d1301a344a55bfa7
+    - d20b5feb98ef008e
     - d402bd229d320919
     - d51df2124b2d643d
     - d5eaad792e2d0e52
@@ -189,7 +203,7 @@ cdm:
     - fa2f6597462ddabd
     - fad62d8f3d74a07f
   region_hashes:
-    symbols: 5433108e45b50b0f
+    symbols: 6176335003609e39
   schema_version: 1.0.0
   symbol_sigs:
     01235c35a6ca9c5a: dc750ffbb2bb8d52
@@ -207,10 +221,12 @@ cdm:
     11192a3ac2c801a0: f50f42412c64a3f3
     11c8b69ce1ef8fa5: 2f19073fc3e17495
     11eece7cb3f29969: 2e9b4055ab1946e4
+    13737d87bc5f0b74: 00a2f466af164bc1
     14bee4e49a9e3aac: 0513db9717444596
     14ea6d742c6ebcf6: 8f80ea133817af2d
     1749c6d35103f236: 58ddc6784e82cca5
     1849f8779eeb8a48: e4c045c2332b357f
+    1ccda8ae976a8106: c8e2923d129f70c6
     1dd91e025bf15c39: 43c1c378eb7d7a20
     1e5bf2178ac0dcee: 725ad51889e7feed
     1f69bc8b615da116: dc2c66a14e1da8c0
@@ -223,9 +239,11 @@ cdm:
     2fd1b3982610ecaa: aaf2920459d96706
     2fe3c356023e3752: 5797ebf085e96a34
     300741ad0adeb325: fc6e4b43fb9fb30b
+    31186d3da757cb26: 5e477c3de689425f
     318817d3d5c32a67: 8311812deb5cf258
     31926744a2b193eb: 2f73e3af51744c07
     31a3e50b8f5221db: 80c3e076b85f7e5f
+    32aa871159b17db7: 65e2aa1513809ab4
     331fcb711b55798f: 3e595a623f629a58
     337ab9db6bad7258: 933f7642c3a1f817
     34a2555fd4d71104: 6e8d5a89eb4e4f2d
@@ -238,6 +256,7 @@ cdm:
     3e373817e4dd55ad: 7ab99b1d42b71389
     3ff4b656757aa5ad: 718b3cfa8af1a87f
     413803e6bb0f7787: 9e54ad093670dfb9
+    437de41673a592c6: eca872cb1b210f49
     44162d384b47b10d: 10f6c074a7185a23
     4507f4be9071d9ac: 85609eb788cb90c9
     4664661bb8b74e6e: 31974c0fd5021168
@@ -255,6 +274,7 @@ cdm:
     4e6a0be38bfb2e03: 02e4a120cee2e874
     4e7c579155b8c53d: 95400ffd6311fb0c
     4e8617b2d6609600: 3d7e48890cbed4e5
+    51995f529993169b: 206777c423344021
     536d95baa30f412c: 8d73c6b83e0ff585
     5469690a8bc40782: 896457fa8f1905de
     550988527d9b6ea0: a8ec59cbcadc35eb
@@ -274,10 +294,13 @@ cdm:
     691a3bef6d4d3657: b4d2033a200c6f93
     69695ff6396b76d1: 32091cc7e9c71846
     6a9fbf6b5fa6d8b8: db1c80e8ae576842
+    6bcabb74f946f3a8: b5534537d79ababc
+    6bed31c31184969a: 1486a669546a77d2
     6d1ab62755fa6460: d752081574f2511d
     6d3f69617a6b1d78: f83d7ff69e72c08a
     6ef2f6eec3cd16ae: cdea2871ad73e9d9
     6f9b25f7411f15c2: 59613d816d0423b2
+    6fce7837f5053296: d5a3a8d8907a89da
     71613e3abdfdcdb1: 1bd63632370b4085
     726858785015ad76: a8ef977fd046a81b
     736fec7b60519ee0: 0363d4bf1a73680e
@@ -285,6 +308,7 @@ cdm:
     76dafbeb7152f48e: 1a8dbfe16f7cb2dd
     7718c1f874b600bf: ceb6124ea3de203b
     77a49c9a8c63382b: f1a967940380520f
+    7882122864e73f70: 0f005f543f1afab8
     7a8eda9f0a5f3bf7: a8bfb3218861ce10
     7b47361aad19bb48: 8ea9166cb2a43c5d
     7ca05ecd14ba0bc8: 8b9daa9b01d033c8
@@ -293,7 +317,7 @@ cdm:
     849814ce45119715: 44554178041fb685
     84e8159b6a779562: bdc554b96a42a214
     85300682e54b5ea1: f8f4e2796021dbdb
-    89e835f3c782a294: 15a26c79a90a137d
+    89e835f3c782a294: cfa096c1b32bf7a0
     8a290d89bd71388a: 681805b1c2b1b500
     8ec561f784d973c0: 1aca9d7f6734b026
     8f071a0ee4ad3809: e01fb03fc3c04387
@@ -301,6 +325,7 @@ cdm:
     9226de5c220d98ef: 384e77bf3fbcb236
     932c919339ac3a6d: 18076d8a07f03d88
     93b85db9aae2db64: 760d62e83b51e2bf
+    941de5e475660c6e: 6ccdeea518f6cae1
     95027cf1e5bce55b: df30725d408b3fbd
     9877e4d3ed2473bb: 9524e81fdb896cb1
     99acad598cfc3747: 476b335540ff28cb
@@ -317,6 +342,7 @@ cdm:
     a2b2bac5098995ec: 84c4f838b0c84752
     a2bc0adb27fe1fc9: 867d7225c9da1369
     a56f31e61f8741ce: 0ac012293b536519
+    aa17eba8a81232d1: 1e4f73b704cb68a6
     abb903669fd3f39a: bc6a4f6c01d65a72
     aeb16220de90518c: f48ec1dcec39e2ae
     b0621470d5ce4290: d3cbf8d7d4a88fb2
@@ -333,6 +359,7 @@ cdm:
     c275ae37d742123c: 77733b99e6c5640d
     c36455b6a4d33158: f4e575613d4334cf
     c3981046dd7878b3: 9f9af77f69a306de
+    c45fa0016f6ba582: 9561c7679d036b2c
     c6a7a34908783b74: 919bcf862884fc99
     c843a2a6e5815d67: c1559fff6e948d70
     ca6c89214a079f51: 540acd2cfb242591
@@ -344,6 +371,7 @@ cdm:
     d085aef79729a8a1: f0148e2af4872be8
     d098dc649eb707a0: 668b3705b4075650
     d1301a344a55bfa7: 9b38f43d5ebce24e
+    d20b5feb98ef008e: 7aaaf9a0c96ef1ca
     d402bd229d320919: 8ece426c6f5ec13a
     d51df2124b2d643d: 555f1db5a9d171f3
     d5eaad792e2d0e52: 410ae57b9f85b191
@@ -418,6 +446,7 @@ cdm:
 | InMemoryStore.config_documents_for | method | def config_documents_for(self, repo_id: str, sync_kind: str \| None = None) -> list[ConfigDocument] |
 | InMemoryStore.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | InMemoryStore.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
+| InMemoryStore.dismiss_suggestion | method | def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool |
 | InMemoryStore.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | InMemoryStore.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | InMemoryStore.graph_for | method | def graph_for(self, repo_id: str) -> dict \| None |
@@ -432,7 +461,9 @@ cdm:
 | InMemoryStore.repo_token_hash | method | def repo_token_hash(self, repo_id: str) -> str \| None |
 | InMemoryStore.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | InMemoryStore.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| InMemoryStore.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | InMemoryStore.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
+| InMemoryStore.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
 | InMemoryStore.upsert_identity | method | def upsert_identity(self, identity: Identity) -> None |
 | ReassignOwnerEdit | class | class ReassignOwnerEdit(BaseModel) |
 | RecordRow | class | class RecordRow(Base) |
@@ -462,6 +493,7 @@ cdm:
 | SqlStore.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | SqlStore.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
 | SqlStore.coverage_snapshots_for | method | def coverage_snapshots_for(self, repo_id: str) -> list[dict] |
+| SqlStore.dismiss_suggestion | method | def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool |
 | SqlStore.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | SqlStore.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | SqlStore.graph_for | method | def graph_for(self, repo_id: str) -> dict \| None |
@@ -477,7 +509,9 @@ cdm:
 | SqlStore.resolutions_for | method | def resolutions_for(self, record_id: str) -> list[ResolutionRecord] |
 | SqlStore.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | SqlStore.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| SqlStore.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | SqlStore.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
+| SqlStore.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
 | SqlStore.upsert_identity | method | def upsert_identity(self, identity: Identity) -> None |
 | Store | class | class Store(Protocol) |
 | Store.add_config_edit | method | def add_config_edit(self, repo_id: str, edit: ConfigEdit, *, edit_id: str, created_at: str) -> None |
@@ -491,6 +525,7 @@ cdm:
 | Store.config_documents_for | method | def config_documents_for(self, repo_id: str, sync_kind: str \| None = None) -> list[ConfigDocument] |
 | Store.config_edits_for | method | def config_edits_for(self, repo_id: str, status: str \| None = None) -> list[StoredConfigEdit] |
 | Store.coverage_for | method | def coverage_for(self, repo_id: str) -> list[dict] |
+| Store.dismiss_suggestion | method | def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool |
 | Store.doc_edges_for | method | def doc_edges_for(self, repo_id: str, *, sync_kind: str \| None = None, upstream_id: str \| None = None) -> list[StoredDocEdge] |
 | Store.get_repo | method | def get_repo(self, repo_id: str) -> RegisteredRepo \| None |
 | Store.graph_for | method | def graph_for(self, repo_id: str) -> dict \| None |
@@ -505,10 +540,14 @@ cdm:
 | Store.repo_token_hash | method | def repo_token_hash(self, repo_id: str) -> str \| None |
 | Store.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | Store.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| Store.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | Store.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
+| Store.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
 | Store.upsert_identity | method | def upsert_identity(self, identity: Identity) -> None |
 | StoredConfigEdit | class | class StoredConfigEdit(BaseModel) |
 | StoredDocEdge | class | class StoredDocEdge(BaseModel) |
+| StoredSuggestion | class | class StoredSuggestion(BaseModel) |
+| SuggestionRow | class | class SuggestionRow(Base) |
 | SyncRequest | class | class SyncRequest(BaseModel) |
 | SyncRun | class | class SyncRun(BaseModel) |
 | SyncRunRow | class | class SyncRunRow(Base) |
@@ -523,6 +562,7 @@ cdm:
 | _RateLimitMiddleware | class | class _RateLimitMiddleware(BaseHTTPMiddleware) |
 | _RateLimitMiddleware.__init__ | method | def __init__(self, app: Any, *, limit: int, now_epoch: Callable[[], int]) -> None |
 | _RateLimitMiddleware.dispatch | method | async def dispatch(self, request: Request, call_next: Callable[[Request], Any]) -> Response |
+| _SUGGESTION_SEVERITY_RANK | variable | _SUGGESTION_SEVERITY_RANK = {'high': 0, 'medium': 1, 'low': 2} |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
 | __all__ | variable | __all__ = ... |
@@ -546,12 +586,14 @@ cdm:
 | _registered_repo | function | def _registered_repo(row: RepoRow) -> RegisteredRepo |
 | _resolve_provider_token | function | def _resolve_provider_token(store: Store, repo: RegisteredRepo, *, now: str, token_exchange_http: Any) -> str \| None |
 | _run_migrations | function | def _run_migrations(url: str) -> None |
+| _run_worker_pass | function | def _run_worker_pass(store: Store, now: str, kinds: tuple[str, ...]) -> None |
 | _scan_doc_styles | function | def _scan_doc_styles(templates_root: Path) -> DocStyleOptions |
+| _suggestion_sort_key | function | def _suggestion_sort_key(s: StoredSuggestion) -> tuple[int, str] |
 | _wiki_dir | function | def _wiki_dir() -> Path \| None |
 | build_standalone_app | function | def build_standalone_app(repo_root: Path, *, repo_id: str \| None = None, now: str) -> object |
 | build_standalone_store | function | def build_standalone_store(repo_root: Path, *, repo_id: str \| None = None, now: str) -> InMemoryStore |
 | create_all | function | def create_all(engine: Engine) -> None |
-| create_app | function | def create_app(store: Store \| None = None, *, static_dir: Path \| None = None, wiki_dir: Path \| None = None, clock: Callable[[], str] = _default_now, cloner: Any = None, pr_transport_factory: Callable[[str, str, str \| None], Any] \| None = None, token_exchange_http: Any = None, admin_token: str \| None = None, settings: Settings \| None = None) -> FastAPI |
+| create_app | function | def create_app(store: Store \| None = None, *, static_dir: Path \| None = None, wiki_dir: Path \| None = None, clock: Callable[[], str] = _default_now, cloner: Any = None, pr_transport_factory: Callable[[str, str, str \| None], Any] \| None = None, token_exchange_http: Any = None, admin_token: str \| None = None, settings: Settings \| None = None, worker_pass: Callable[[], None] \| None = None) -> FastAPI |
 | effective_identity | function | def effective_identity(payload: RegistrationPayload) -> RepoIdentity |
 | engine_from_url | function | def engine_from_url(url: str) -> Engine |
 | hash_token | function | def hash_token(token: str) -> str |

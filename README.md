@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 5f512493514c7fd4
+  fingerprint: d9bce011ab4d4636
   fingerprint_tiers:
-    composite: 5f512493514c7fd4
-    signature: 5f512493514c7fd4
+    composite: d9bce011ab4d4636
+    signature: d9bce011ab4d4636
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -36,6 +36,7 @@ cdm:
     cde0fb0dec1400c5: 6602cc7d080e1dca
     d3a3ed1c7e737699: aa2501b9d4a86c13
     da966368ea663ea5: f39ba256826afdf5
+    dc726d0a525fdaf7: 894e9d00b0e3d086
     df0ad6e43880f09c: 3019fb39391d3113
     eafe895eb8119e6e: 2492d10714d01761
     eb2554c8c13b73f9: 34e432f7557b73ab
@@ -110,6 +111,7 @@ cdx doctor               # offline, read-only preflight: PASS/WARN/FAIL on confi
 # --- author / inspect docs ---
 cdx new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
 cdx write-doc TARGET [--apply]  # NEW: author + REGISTER a doc for a source file in one verb — dry-run prints the draft + unit snippet; --apply splices the entry into the unit YAML (comments preserved), writes the doc with backend-authored `overview` prose (mode: llm — re-authors when the code moves), born check-green
+cdx suggest [--kind fixes|docs] [--write]  # NEW: the two background suggesters, run once in the foreground — an advisory inbox (drifted docs, suspect edges, promotable shapes; coverage gaps, mapping suggestions), every item keyed + embedding the exact next human command; --write appends new keys to the .cdmon audit log (the server can run the same ticks on a loop — settings.yaml `server.workers`)
 cdx surface              # dump the extracted per-document surface (debug)
 cdx build                # render every `html: true` doc to its derived `.html` twin (keeps the Layout Standard's HTML pairing fresh)
 cdx lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter

@@ -86,6 +86,8 @@ coverage:
       reason: "AGT-04 onboarding config author; documented in feature-doc/catalog/onboard.yaml (api doc owned by cdx wiki)"
     - path: "custodex/docwriter.py"
       reason: "AGT-05 doc-writer agent; documented in feature-doc/catalog/docwriter.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/workers.py"
+      reason: "AGT-06 background suggesters; documented in feature-doc/catalog/workers.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 

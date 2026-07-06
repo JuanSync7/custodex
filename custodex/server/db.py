@@ -22,6 +22,9 @@ the server subpackage / tests), so the core dependency surface is unchanged (K0)
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 from pydantic import TypeAdapter
 from sqlalchemy import (
     JSON,
@@ -30,6 +33,7 @@ from sqlalchemy import (
     LargeBinary,
     StaticPool,
     String,
+    UniqueConstraint,
     create_engine,
     delete,
     select,
@@ -54,8 +58,10 @@ from .store import (
     ConfigDocument,
     RegisteredRepo,
     StoredDocEdge,
+    StoredSuggestion,
     SyncRun,
     _doc_edges_of,
+    _suggestion_sort_key,
     effective_identity,
     hash_token,
 )
@@ -156,6 +162,25 @@ class GraphSnapshotRow(Base):
     repo_id: Mapped[str] = mapped_column(String, index=True)
     captured_at: Mapped[str] = mapped_column(String, index=True)
     snapshot: Mapped[dict] = mapped_column(_json_type())
+
+
+class SuggestionRow(Base):
+    """One worker suggestion + its lifecycle envelope (AGT-06).
+
+    ``suggestion`` holds the FULL :class:`~custodex.server.store.StoredSuggestion`
+    JSON (re-validated on read, K6); ``repo_id``/``key``/``status`` are the
+    indexed projection the reconcile + inbox reads use. One row per
+    ``(repo_id, key)`` — reconciliation updates in place, never duplicates.
+    """
+
+    __tablename__ = "suggestions"
+    __table_args__ = (UniqueConstraint("repo_id", "key", name="uq_suggestion_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    repo_id: Mapped[str] = mapped_column(String, index=True)
+    key: Mapped[str] = mapped_column(String, index=True)
+    status: Mapped[str] = mapped_column(String, index=True)
+    suggestion: Mapped[dict] = mapped_column(_json_type())
 
 
 class ConfigDocumentRow(Base):
@@ -543,6 +568,101 @@ class SqlStore:
                 .order_by(GraphSnapshotRow.id.desc())
             ).first()
             return row.snapshot if row is not None else None
+
+    # --- AGT-06: the worker suggestion inbox (reconcile, never insert-only) --
+
+    def sync_suggestions(
+        self, repo_id: str, suggestions: Sequence[Any], *, now: str
+    ) -> None:
+        with self._session() as session, session.begin():
+            rows = {
+                row.key: row
+                for row in session.scalars(
+                    select(SuggestionRow).where(SuggestionRow.repo_id == repo_id)
+                ).all()
+            }
+            tick_keys = set()
+            for s in suggestions:
+                tick_keys.add(s.key)
+                row = rows.get(s.key)
+                if row is None:
+                    stored = StoredSuggestion(
+                        key=s.key,
+                        kind=s.kind.value,
+                        doc_id=s.doc_id,
+                        target=s.target,
+                        detail=s.detail,
+                        evidence=tuple(s.evidence),
+                        severity=s.severity.value,
+                        status="pending",
+                        source="worker",
+                        recorded_at=now,
+                        updated_at=now,
+                    )
+                    session.add(
+                        SuggestionRow(
+                            repo_id=repo_id,
+                            key=s.key,
+                            status="pending",
+                            suggestion=stored.model_dump(mode="json"),
+                        )
+                    )
+                    continue
+                stored = StoredSuggestion(**row.suggestion)
+                if stored.status == "resolved":
+                    updated = stored.model_copy(
+                        update={
+                            "status": "pending",
+                            "detail": s.detail,
+                            "evidence": tuple(s.evidence),
+                            "updated_at": now,
+                        }
+                    )
+                elif stored.status == "pending":
+                    updated = stored.model_copy(
+                        update={"detail": s.detail, "evidence": tuple(s.evidence)}
+                    )
+                else:  # dismissed: the durable human 'no' — never resurrect
+                    continue
+                row.status = updated.status
+                row.suggestion = updated.model_dump(mode="json")
+            for key, row in rows.items():
+                if key not in tick_keys and row.status == "pending":
+                    stored = StoredSuggestion(**row.suggestion)
+                    updated = stored.model_copy(
+                        update={"status": "resolved", "updated_at": now}
+                    )
+                    row.status = updated.status
+                    row.suggestion = updated.model_dump(mode="json")
+
+    def suggestions_for(
+        self, repo_id: str, *, include_closed: bool = False
+    ) -> list[StoredSuggestion]:
+        with self._session() as session:
+            stmt = select(SuggestionRow).where(SuggestionRow.repo_id == repo_id)
+            if not include_closed:
+                stmt = stmt.where(SuggestionRow.status == "pending")
+            items = [
+                StoredSuggestion(**row.suggestion)
+                for row in session.scalars(stmt).all()
+            ]
+        return sorted(items, key=_suggestion_sort_key)
+
+    def dismiss_suggestion(self, repo_id: str, key: str, *, now: str) -> bool:
+        with self._session() as session, session.begin():
+            row = session.scalars(
+                select(SuggestionRow)
+                .where(SuggestionRow.repo_id == repo_id)
+                .where(SuggestionRow.key == key)
+            ).first()
+            if row is None:
+                return False
+            stored = StoredSuggestion(**row.suggestion).model_copy(
+                update={"status": "dismissed", "updated_at": now}
+            )
+            row.status = stored.status
+            row.suggestion = stored.model_dump(mode="json")
+            return True
 
     # --- Y-01: config documents / code-refs / sync runs ---------------------
 

@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 596b7927ee053f1d
+  fingerprint: 9df6d13de2640ced
   fingerprint_tiers:
-    composite: 596b7927ee053f1d
-    docstring: 473283061d92ee56
-    signature: 536882a4dd5d7d57
+    composite: 9df6d13de2640ced
+    docstring: 1c6a8925d4997174
+    signature: 88db6ae27b0e9050
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -68,6 +68,7 @@ cdm:
     - d42417752e8efd40
     - d734efde26c583c9
     - da966368ea663ea5
+    - dc726d0a525fdaf7
     - df0ad6e43880f09c
     - df2a20195d34af2d
     - e31271f86c854de9
@@ -81,7 +82,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: ccb8b7f0aa11eb17
+    symbols: 8a9b17bf5ecc8298
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -144,6 +145,7 @@ cdm:
     d42417752e8efd40: cc09f0e5b8fffe46
     d734efde26c583c9: ade7c8da67ef271b
     da966368ea663ea5: f39ba256826afdf5
+    dc726d0a525fdaf7: 894e9d00b0e3d086
     df0ad6e43880f09c: 3019fb39391d3113
     df2a20195d34af2d: e7547f090ffd00e5
     e31271f86c854de9: aabc8b4ca7ed96f6
@@ -230,6 +232,7 @@ cdm:
 | settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
 | should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdx should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
 | staleness | function | def staleness(config: Path = _CONFIG_OPTION, now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade freshness against (default: the current time).'), as_json: bool = typer.Option(False, '--json', help='Emit {findings} as JSON (includes fresh docs).'), fail_on_stale: bool = typer.Option(False, '--fail-on-stale', help='Exit 1 if any document is stale or never reviewed (a review gate).')) -> None |
+| suggest | function | def suggest(kind: str = typer.Option('all', '--kind', help='Which suggester runs: fixes (drift/suspect/promotable) \| docs (gaps/mappings) \| all.'), config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help='Emit the suggestion list as JSON.'), write: bool = typer.Option(False, '--write', help='Append NEW suggestion keys to .cdmon/suggestions.jsonl — an append-only audit LOG (never read back as pending state).')) -> None |
 | surface | function | def surface(config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help="Dump each document's surface as a JSON list.")) -> None |
 | surface_gaps | function | def surface_gaps(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the issue plan WITHOUT opening an issue (never builds a transport, so no provider env is required).'), provider: str = typer.Option('gitlab', '--provider', help='Issue tracker to open the coverage-gap issue on (gitlab \| github).')) -> None |
 | sync | function | def sync(mode: str = typer.Option('local', '--mode', help="Which sync to run: 'local' (the working tree / feature branch) or 'git' (the default branch baseline)."), remote: str \| None = typer.Option(None, '--remote', metavar='URL', help='Central-server URL to POST the sync to. Without it the sync runs locally and prints the summary (no central access required).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Stable repo id. REQUIRED with --remote; for a local sync it defaults to the bundle's index `repo` field (else the directory name)."), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the remote bearer token is read from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), default_branch: str = typer.Option('main', '--default-branch', help='The default branch the local sync compares against (commits_ahead).'), as_json: bool = typer.Option(False, '--json', help='Emit the SyncRun as JSON instead of the human summary.')) -> None |

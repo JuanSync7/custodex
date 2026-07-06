@@ -130,6 +130,13 @@ from .staleness import (
 from .syncpr import should_sync, sync_pr
 from .templates_v2 import scaffold_config_dir
 from .traceability import TraceMatrix, build_matrix
+from .workers import (
+    render_suggestions_text as render_workers_text,
+)
+from .workers import (
+    suggest_docs_tick,
+    suggest_fixes_tick,
+)
 from .worklist import render_worklist_text, worklist_from_repo
 
 app = typer.Typer(
@@ -2105,6 +2112,83 @@ def graph(
         typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
     else:
         typer.echo(render_graph_text(g))
+
+
+@app.command()
+def suggest(
+    kind: str = typer.Option(
+        "all",
+        "--kind",
+        help="Which suggester runs: fixes (drift/suspect/promotable) | docs "
+        "(gaps/mappings) | all.",
+    ),
+    config: Path = _CONFIG_OPTION,
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the suggestion list as JSON."
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Append NEW suggestion keys to .cdmon/suggestions.jsonl — an "
+        "append-only audit LOG (never read back as pending state).",
+    ),
+) -> None:
+    """Run the background suggesters ONCE, in the foreground (read-only, K11).
+
+    The AGT-06 inbox: FIX_DRIFT / RESOLVE_EDGE / PROMOTE_RULE (the fixes
+    suggester) and DOCUMENT_GAP / ADD_EDGE (the docs suggester) — every item
+    advisory, every detail embedding the exact next human command. The output
+    IS current reality (recomputed each run, never cached); `--write` only
+    appends an audit line per NEW key, so a re-run with no change appends
+    nothing (K7).
+    """
+    if kind not in ("fixes", "docs", "all"):
+        typer.echo(
+            f"error: unknown --kind {kind!r} — expected fixes | docs | all",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    try:
+        cfg, config_dir = _load(config)
+        suggestions: list = []
+        if kind in ("fixes", "all"):
+            suggestions.extend(suggest_fixes_tick(cfg, config_dir, now=_now()))
+        if kind in ("docs", "all"):
+            suggestions.extend(suggest_docs_tick(cfg, config_dir, now=_now()))
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if write:
+        log = config_dir / ".cdmon" / "suggestions.jsonl"
+        seen: set[str] = set()
+        if log.is_file():
+            for line in log.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    seen.add(json.loads(line).get("key", ""))
+        fresh = [s for s in suggestions if s.key not in seen]
+        if fresh:
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open("a", encoding="utf-8") as fh:
+                for s in fresh:
+                    envelope = {
+                        **s.model_dump(mode="json"),
+                        "recorded_at": _now(),
+                        "source": "cli",
+                    }
+                    fh.write(json.dumps(envelope, sort_keys=True) + "\n")
+        typer.echo(f"{log}: {len(fresh)} new suggestion(s) appended")
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [s.model_dump(mode="json") for s in suggestions],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        typer.echo(render_workers_text(tuple(suggestions)))
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:

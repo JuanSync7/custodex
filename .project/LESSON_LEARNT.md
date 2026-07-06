@@ -2237,3 +2237,24 @@ own implementing modules are inside the thing being gated.
   memory.** DEMO-098 cited a symbol (`TaskFlow`) that never existed and DEMO-102's
   command exited 1 as written. Run every quoted command against the demo tree
   before committing the prose.
+
+## [AGT-06] Background agents = pure ticks + a reconciled inbox, never a daemon that "knows things"
+- **The worker computes NOTHING new.** Both suggesters are thin folds over
+  detectors the engine already ships (drift, suspect links, promotions, the
+  graph rank, edge suggestions). The moment a background agent grows its own
+  detection logic, its output can disagree with the CLI's and the inbox stops
+  being trustworthy. One problem = one owner: SUSPECT_LINK drifts are excluded
+  from FIX_DRIFT because RESOLVE_EDGE owns edges (mutation-verified).
+- **Key discipline is the whole design.** Hash ONLY structured identity fields —
+  never prose, never the clock. Event kinds embed the occurrence (surface hash /
+  upstream fingerprint) so recurrence-after-heal is new work; standing kinds are
+  occurrence-free so one dismiss silences the suggestion forever. Get this wrong
+  and either dismissed items resurrect or healed items stay silenced.
+- **Reconcile, don't append.** sync_suggestions makes the stored inbox EQUAL
+  current reality: vanished items auto-resolve (audit-kept), reappearing items
+  reopen with their first-seen stamp, dismissed items never return. An
+  insert-only inbox rots into noise within days.
+- **A test fixture that edits a healed doc must edit the BODY in place.** A
+  whole-file `_write` drops the cdm frontmatter the heal stamped, minting a
+  spurious fingerprint-None drift that made api look drifted — the fixture bug
+  masqueraded as an engine bug for one red run.
