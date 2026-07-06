@@ -179,6 +179,52 @@ describe("ApiClient", () => {
     expect(result.includes_suspect).toBe(false);
   });
 
+  it("builds GET /graph for a repo (AGT-03 mirror; open read)", async () => {
+    const { fetchImpl, calls } = fakeFetch({});
+    const client = new ApiClient({ baseUrl: "/api", fetchImpl });
+
+    const result = await client.graphFor("acme/widget");
+
+    expect(calls[0].url).toBe("/api/repos/acme/widget/graph");
+    expect(calls[0].init?.method).toBe("GET");
+    expect(result).toEqual({}); // an honest "no graph yet" pre-push
+  });
+
+  it("builds GET /suggestions with the include_closed param (AGT-06)", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      repo_id: "acme/widget",
+      include_closed: true,
+      suggestions: [],
+    });
+    const client = new ApiClient({ baseUrl: "/api", fetchImpl });
+
+    await client.suggestionsFor("acme/widget");
+    expect(calls[0].url).toBe("/api/repos/acme/widget/suggestions");
+
+    await client.suggestionsFor("acme/widget", true);
+    expect(calls[1].url).toBe(
+      "/api/repos/acme/widget/suggestions?include_closed=true",
+    );
+  });
+
+  it("POSTs /suggestions/{key}/dismiss with the bearer token (AGT-06)", async () => {
+    const { fetchImpl, calls } = fakeFetch({
+      repo_id: "acme/widget",
+      key: "abc",
+      status: "dismissed",
+    });
+    const client = new ApiClient({ baseUrl: "/api", fetchImpl });
+
+    await client.dismissSuggestion("acme/widget", "abc", "s3cret");
+
+    expect(calls[0].url).toBe(
+      "/api/repos/acme/widget/suggestions/abc/dismiss",
+    );
+    expect(calls[0].init?.method).toBe("POST");
+    const headers = calls[0].init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer s3cret");
+  });
+
   it("builds GET /documents with the sync_kind param (default git)", async () => {
     const { fetchImpl, calls } = fakeFetch([]);
     const client = new ApiClient({ baseUrl: "/api", fetchImpl });

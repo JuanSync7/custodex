@@ -657,3 +657,66 @@ export interface Worklist {
   doc_count: number;
   includes_suspect: boolean;
 }
+
+// ── AGT-03 — the knowledge-graph snapshot mirror (GET /repos/:id/graph) ──────
+// The repo computes the graph (`cdx graph`) and pushes it as an opaque
+// versioned snapshot; the hub only mirrors (K2 — section names are slugs, no
+// doc-body prose rides in). The GET returns `{}` before any push — an honest
+// "no graph yet", so EVERY field here is optional.
+
+/** One typed graph node (kgraph.GraphNode). `kind` is the closed NodeKind
+ * vocabulary: doc | section | symbol | path | env_var | url | owner. */
+export interface GraphNode {
+  id: string;
+  kind: string;
+  name: string;
+}
+
+/** One provenance-tiered edge (kgraph.GraphEdge). `kind`: documents |
+ * depends_on | mentions | links_to | part_of | owned_by; `tier`: declared |
+ * resolved. */
+export interface GraphEdge {
+  source: string;
+  target: string;
+  kind: string;
+  tier: string;
+}
+
+// server: GET /repos/:id/graph → the latest pushed snapshot, or {} pre-push.
+export interface GraphSnapshot {
+  schema_version?: string;
+  captured_at?: string;
+  nodes?: GraphNode[];
+  edges?: GraphEdge[];
+  /** doc_id → unresolved-mention count — the graph-rot signal. */
+  unresolved?: Record<string, number>;
+  warnings?: string[];
+}
+
+// ── AGT-06 — the worker suggestion inbox (GET /repos/:id/suggestions) ────────
+/** A stored suggestion's lifecycle: `pending` (current reality), `resolved`
+ * (stopped being true — audit trail), `dismissed` (the durable human 'no'). */
+export type SuggestionStatus = "pending" | "resolved" | "dismissed";
+
+/** One advisory work item from the background suggesters (server
+ * StoredSuggestion). `detail` embeds the exact next human command (K11). */
+export interface StoredSuggestion {
+  key: string;
+  kind: string; // fix_drift | resolve_edge | promote_rule | document_gap | add_edge
+  doc_id: string | null;
+  target: string;
+  detail: string;
+  evidence: string[];
+  severity: WorkSeverity;
+  status: SuggestionStatus;
+  source: string;
+  recorded_at: string;
+  updated_at: string;
+}
+
+// server: GET /repos/:id/suggestions[?include_closed=true] → the inbox.
+export interface SuggestionsData {
+  repo_id: string;
+  include_closed: boolean;
+  suggestions: StoredSuggestion[];
+}

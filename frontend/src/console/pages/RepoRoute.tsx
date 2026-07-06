@@ -8,10 +8,12 @@ import RepoNav from "../components/RepoNav";
 import Coverage from "./Coverage";
 import Dependencies from "./Dependencies";
 import Documents from "./Documents";
+import Graph from "./Graph";
 import Health from "./Health";
 import Mapping from "./Mapping";
 import Ownership from "./Ownership";
 import RepoDetail from "./RepoDetail";
+import Suggestions from "./Suggestions";
 import Worklist from "./Worklist";
 
 function decodePath(tail: string): string {
@@ -47,6 +49,14 @@ function dispatch(tail: string): { repoId: string; page: ReactNode } {
   if (tail.endsWith("/worklist")) {
     const repoId = decodePath(tail.slice(0, -"/worklist".length));
     return { repoId, page: <Worklist repoId={repoId} /> };
+  }
+  if (tail.endsWith("/graph")) {
+    const repoId = decodePath(tail.slice(0, -"/graph".length));
+    return { repoId, page: <Graph repoId={repoId} /> };
+  }
+  if (tail.endsWith("/suggestions")) {
+    const repoId = decodePath(tail.slice(0, -"/suggestions".length));
+    return { repoId, page: <Suggestions repoId={repoId} /> };
   }
   if (tail.endsWith("/mapping")) {
     const repoId = decodePath(tail.slice(0, -"/mapping".length));

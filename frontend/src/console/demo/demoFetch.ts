@@ -25,7 +25,9 @@ const REPO_SUBS = [
   "health",
   "documents",
   "doc-graph",
+  "graph",
   "worklist",
+  "suggestions",
   "sync",
   "sync-state",
   "config/editable",
@@ -66,8 +68,14 @@ export function makeDemoFetch(): typeof fetch {
     // ── per-repo routes: /repos/{repo_id}/{sub} ─────────────────────────────
     if (path.startsWith("/repos/")) {
       const rest = path.slice("/repos/".length);
-      // apply-fix is the one deeper route (.../records/{id}/apply-fix).
+      // apply-fix is one deeper route (.../records/{id}/apply-fix)...
       if (rest.endsWith("/apply-fix")) return json(applyFixResponse);
+      // ...and the AGT-06 dismiss is the other (.../suggestions/{key}/dismiss):
+      // a benign success so the demo UI walks the whole flow token-free.
+      if (rest.endsWith("/dismiss")) {
+        const key = rest.split("/").slice(-2, -1)[0] ?? "";
+        return json({ repo_id: "demo", key, status: "dismissed" });
+      }
       // Longest sub first so `config/editable` wins over a bare `editable` tail.
       const sub = [...REPO_SUBS]
         .sort((a, b) => b.length - a.length)
@@ -100,6 +108,10 @@ export function makeDemoFetch(): typeof fetch {
             return json(data.docGraph);
           case "worklist":
             return json(data.worklist);
+          case "graph":
+            return json(data.graph);
+          case "suggestions":
+            return json(data.suggestions);
           case "sync":
             return json(syncRunGit);
           case "sync-state":
