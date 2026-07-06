@@ -28,7 +28,9 @@ function pageLabel(pathname: string): string {
   if (pathname.endsWith("/documents")) return "Documents";
   if (pathname.endsWith("/dependencies")) return "Dependencies";
   if (pathname.endsWith("/ownership")) return "Ownership";
+  if (pathname.endsWith("/graph")) return "Knowledge Graph";
   if (pathname.endsWith("/worklist")) return "Worklist";
+  if (pathname.endsWith("/suggestions")) return "Suggestions";
   if (pathname.endsWith("/mapping")) return "Mapping";
   if (pathname === "/config") return "Config Format";
   if (pathname === "/settings") return "Settings";

@@ -22,7 +22,9 @@ import hashlib
 import hmac
 import logging
 import os
-from collections.abc import Callable
+import threading
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -192,6 +194,21 @@ class CoverageIngest(BaseModel):
     ``schema_version``, so the server stores it OPAQUELY rather than re-declaring every
     field here. Only ``captured_at`` (the client-injected ISO timestamp, K10) is typed;
     the route persists ``model_dump(mode="json")`` verbatim via the store seam.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    captured_at: str
+
+
+class GraphIngest(BaseModel):
+    """The ``POST /repos/{id}/graph`` body — a permissive graph snapshot (AGT-03).
+
+    The exact :class:`CoverageIngest` pattern (the second sanctioned
+    ``extra="allow"``): the body is the FULL ``kgraph.KnowledgeGraph`` wire dict
+    (nodes/edges/unresolved/warnings, versioned by its own ``schema_version``),
+    computed REPO-SIDE where the doc bodies live (K2) and stored OPAQUELY —
+    the hub never re-derives a graph. Only ``captured_at`` is typed.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -820,6 +837,47 @@ def _resolve_provider_token(
     return material
 
 
+def _run_worker_pass(store: Store, now: str, kinds: tuple[str, ...]) -> None:
+    """ONE synchronous suggester pass over every locally-readable repo (AGT-06).
+
+    For each registered repo with a readable ``local_path`` working tree that
+    carries a ``config/cdmon/index.yaml``, run the enabled pure ticks
+    (:func:`custodex.workers.suggest_fixes_tick` /
+    :func:`~custodex.workers.suggest_docs_tick`) and RECONCILE the result via
+    :meth:`Store.sync_suggestions`. Per-repo error isolation: one repo's tick
+    failure logs and continues — the pass (and the loop above it) never dies.
+    A repo without a local tree is skipped (the GIT sync route materializes
+    those; a background clone-on-demand tick is out of scope by design).
+    Heavy core imports are lazy (K0: the server module stays importable
+    without walking the engine at import time).
+    """
+    from ..config import load_bundle
+    from ..workers import Suggestion, suggest_docs_tick, suggest_fixes_tick
+
+    for repo in store.list_repos():
+        repo_id = repo.repo.repo_id
+        try:
+            local = repo.repo.local_path
+            if not local:
+                continue
+            config_dir = Path(local) / "config" / "cdmon"
+            if not (config_dir / "index.yaml").is_file():
+                continue
+            bundle = load_bundle(config_dir)
+            suggestions: list[Suggestion] = []
+            if "fixes" in kinds:
+                suggestions.extend(
+                    suggest_fixes_tick(bundle.config, config_dir, now=now)
+                )
+            if "docs" in kinds:
+                suggestions.extend(
+                    suggest_docs_tick(bundle.config, config_dir, now=now)
+                )
+            store.sync_suggestions(repo_id, suggestions, now=now)
+        except Exception:  # noqa: BLE001 - per-repo isolation (pinned)
+            _LOG.exception("suggestion tick failed for repo %r — continuing", repo_id)
+
+
 def create_app(
     store: Store | None = None,
     *,
@@ -831,6 +889,7 @@ def create_app(
     token_exchange_http: Any = None,
     admin_token: str | None = None,
     settings: Settings | None = None,
+    worker_pass: Callable[[], None] | None = None,
 ) -> FastAPI:
     """Build the central FastAPI app over ``store`` (DI; defaults to in-memory).
 
@@ -902,7 +961,55 @@ def create_app(
                 "repo, so an unauthenticated caller can poison ownership "
                 "server-wide. Set CDMON_ADMIN_TOKEN in any shared/prod deployment."
             )
-    app = FastAPI(title="custodex central server", version=_app_version())
+    # AGT-06: the background-suggester loop (DEFAULT OFF — K4). One PASS runs
+    # both pure ticks over every repo with a readable local working tree and
+    # reconciles the result into the store; the LOOP is a daemon thread armed
+    # by the lifespan only when `settings.server.workers.enabled`, shut down
+    # via `threading.Event.wait(timeout)` (never a bare sleep). `worker_pass`
+    # is the injected seam — tests count invocations without real ticks.
+    worker_stop = threading.Event()
+
+    def _default_worker_pass() -> None:
+        _run_worker_pass(resolved, clock(), srv.workers.kinds)
+
+    effective_pass: Callable[[], None] = (
+        worker_pass if worker_pass is not None else _default_worker_pass
+    )
+
+    def _worker_loop() -> None:  # pragma: no cover - the thread leaf; the
+        # pass itself is covered directly (tests call it synchronously) and
+        # the arm/stop lifecycle is covered via an injected counting pass.
+        while True:
+            try:
+                effective_pass()
+            except Exception:  # noqa: BLE001 - the loop must never die
+                _LOG.exception("worker pass failed — continuing")
+            if worker_stop.wait(srv.workers.interval_seconds):
+                return
+
+    @asynccontextmanager
+    async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        thread: threading.Thread | None = None
+        if srv.workers.enabled:
+            thread = threading.Thread(
+                target=_worker_loop, name="cdx-suggestion-workers", daemon=True
+            )
+            thread.start()
+            _LOG.info(
+                "suggestion workers armed: kinds=%s interval=%ss",
+                ",".join(srv.workers.kinds),
+                srv.workers.interval_seconds,
+            )
+        yield
+        if thread is not None:
+            worker_stop.set()
+            thread.join(timeout=5)
+
+    app = FastAPI(
+        title="custodex central server",
+        version=_app_version(),
+        lifespan=_lifespan,
+    )
 
     # EPIC SVR hardening middleware — each added ONLY when the operator configures it,
     # so an un-tuned deployment is byte-identical to the pre-SVR app (back-compat).
@@ -1516,6 +1623,65 @@ def create_app(
             repo_id, payload.captured_at, payload.model_dump(mode="json")
         )
         return {"repo_id": repo_id}
+
+    @app.get("/repos/{repo_id:path}/graph")
+    def graph_for(repo_id: str, store: Store = Depends(get_store)) -> dict:
+        # AGT-03: the LATEST mirrored knowledge-graph snapshot (open read). An
+        # empty dict when the repo has never pushed one — an honest "no graph
+        # yet", not an error (the repo computes it; the hub only mirrors, K2).
+        _require_known_repo(store, repo_id)
+        return store.graph_for(repo_id) or {}
+
+    @app.post("/repos/{repo_id:path}/graph", status_code=202)
+    def post_graph(
+        repo_id: str,
+        payload: GraphIngest,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        # The graph ingest (AGT-03). Token-protected like /coverage; the FULL
+        # snapshot dict is stored opaquely through the seam (K6).
+        _require_known_repo(store, repo_id)
+        _verify_token(store, repo_id, authorization)
+        store.add_graph_snapshot(
+            repo_id, payload.captured_at, payload.model_dump(mode="json")
+        )
+        return {"repo_id": repo_id}
+
+    @app.get("/repos/{repo_id:path}/suggestions")
+    def suggestions_for_repo(
+        repo_id: str,
+        include_closed: bool = False,
+        store: Store = Depends(get_store),
+    ) -> dict:
+        # AGT-06: the worker suggestion inbox (open read, E-06). Default =
+        # pending only (current reality); ?include_closed=true adds the
+        # resolved + dismissed audit trail, visibly separated by `status`.
+        _require_known_repo(store, repo_id)
+        items = store.suggestions_for(repo_id, include_closed=include_closed)
+        return {
+            "repo_id": repo_id,
+            "include_closed": include_closed,
+            "suggestions": [s.model_dump(mode="json") for s in items],
+        }
+
+    @app.post("/repos/{repo_id:path}/suggestions/{key}/dismiss")
+    def dismiss_suggestion(
+        repo_id: str,
+        key: str,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, str]:
+        # The durable human 'no' (K11): token-protected like every write
+        # (E-06 matrix); a dismissed key is NEVER resurrected by later ticks.
+        _require_known_repo(store, repo_id)
+        _verify_token(store, repo_id, authorization)
+        if not store.dismiss_suggestion(repo_id, key, now=clock()):
+            raise HTTPException(
+                status_code=404,
+                detail=f"unknown suggestion key {key!r} for repo {repo_id!r}",
+            )
+        return {"repo_id": repo_id, "key": key, "status": "dismissed"}
 
     @app.get("/repos/{repo_id:path}/status")
     def status_for(repo_id: str, store: Store = Depends(get_store)) -> RepoStatus:

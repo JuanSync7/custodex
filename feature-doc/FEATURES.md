@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**235 features** across 24 subsystems.
+**248 features** across 30 subsystems.
 
 ## agent
 
@@ -474,6 +474,36 @@ docdeps.impacted_by is the PROACTIVE complement to detect_suspect_links: before 
 
 docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the direct suspect links as an ADVISORY. Detection stays the pure Doorstop direct wavefront — only a changed-upstream edge is SUSPECT and only that gates `cdx check` — while a document whose upstream is itself pending review is reported as a SUSPECT_TRANSITIVE link, NEVER a drift: a transitive edge has no changed upstream body to stamp, so it must not gate (K1/K7). Pure over the direct verdicts + the declared graph via a shared cycle-safe reverse-reachable BFS (`_reverse_reachable`, extracted from and still backing impacted_by — characterized identical), sorted (K10). Surfaced read-only in `cdx deps --transitive` (opt-in `--json` shape) and an opt-in `cdx monitor` summary line gated by the additive `docdeps.transitive` knob (default OFF); the hub's `GET /doc-graph/reverse?transitive=true` returns the SAME closure as pure GRAPH reachability over the indexed edge table — never a suspect verdict, since the bodies needed to hash an upstream live in the repo, not the hub (K2).
 
+## docmap
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-DOCMAP-001` | Provenance-tiered doc↔doc edge suggestions from the mention layer | docmap, cli | K1, K6, K10, K11 | — | — | implemented |
+| `FEAT-DOCMAP-002` | `docdeps.baseline: body|prose` — reheals stop tripping dependents | docmap, docdeps, config | K6, K7, K10 | — | — | implemented |
+| `FEAT-DOCMAP-003` | `cdx link` — accept (comment-preserving splice) / reject (durable verdict) | docmap, cli | K7, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-DOCMAP-001` — Provenance-tiered doc↔doc edge suggestions from the mention layer
+
+docmap.suggest_edges proposes `depends_on` edges with a PRINCIPLED direction and a provenance TIER, never a bare float (pure, K1/K10/K11): RESOLVED_LINK — doc A's prose markdown-links managed doc B (derived from the AGT-01 DOC mentions, so CDM regions and code fences can no longer mint suggestions, a review-measured fix over the legacy infer_edges_from_links which stays untouched for back-compat); SHARED_SYMBOL — doc A's prose mentions code symbol S (resolved by the mention layer) and EXACTLY ONE doc B covers S via code_refs ⇒ A depends_on B. The review-hardened exclusions: declared edges, self-edges, REJECTED pairs, a symbol covered by ≥2 docs (ambiguous ownership — never guess), a doc mentioning a symbol it covers itself, and any `index: true` downstream (the index page's links are MANDATED by the INDEX_INCOMPLETE lint — measured 13/13 pure noise on the dogfood corpus). The same pair found by both rules is ONE suggestion at the stronger tier with merged sorted evidence. ScoredEdge keeps the legacy `via` key so `cdx deps --suggest --json` items stay a key-SUPERSET of the pre-AGT shape (K6, regression-guarded); every suggestion whose upstream is code-tracked renders a churn_note — the DOCDEPS-01 heal-path lesson surfaced to the human instead of re-learned. The per-doc/per-ref extraction is resilient: a missing or unparseable code_ref is skipped, never fatal.
+
+### `FEAT-DOCMAP-002` — `docdeps.baseline: body|prose` — reheals stop tripping dependents
+
+The suspect-baseline knob (additive K6, default `body` = byte-identical to the pre-AGT contract): under `prose`, upstream_fingerprint hashes the CDM-region- STRIPPED body — human prose only — so a machine reheal of a code-tracked upstream is hash-invisible to its dependents and only a real prose change flips an edge SUSPECT (what a mention-based dependency actually means; the semantic fix for the recorded DOCDEPS-01 churn where accepting suggested edges onto heal-path docs made every reheal a suspect storm). Detection (detect_suspect_links) and stamping (stamp_edges) read the SAME knob — one shared truth, so stamps and verdicts can never diverge — and flipping it is a documented, deliberate re-baseline event (every stored stamp mismatches once). This repo's own config flips to `prose` (set before any edges exist, so no restamp was needed); the demo deliberately keeps the default `body`.
+
+### `FEAT-DOCMAP-003` — `cdx link` — accept (comment-preserving splice) / reject (durable verdict)
+
+The missing human verbs for the suggestion loop (K11 — agents suggest, humans apply). ACCEPT: `cdx link DOWN UP [--type]` validates through the loaded models (unknown ids / self-edge / duplicate → loud ConfigError, K8) then declares the edge by a TARGETED TEXTUAL SPLICE of the unit YAML — inserting or extending the `depends_on:` block under the matching `- id:` entry and bumping the frontmatter `updated:` line — never a model re-serialization (dump_unit_file would destroy the 30+ load-bearing comment lines hand-maintained units carry; the regenerate_index textual-surgery precedent), self-validates the spliced config (reverting on failure), then stamps the new edge's baseline via stamp_edges(only=UP) so it arrives REVIEWED (no UNSTAMPED noise; `cdx check` stays green, K7); the churn note is echoed before writing so the decision is informed. REJECT: `cdx link --reject DOWN UP [--by][--note]` appends a durable EdgeRejection verdict to `.cdmon/edge-rejections.jsonl` (append-only, injected timestamp — the reviewlog precedent) which suggest_edges excludes forever — the repo-side rejection memory the review demanded (a declined suggestion never re-surfaces; the Dosu lesson with an audit trail). `cdx deps` gains the REAL infer_from_links behaviour: when true, ONE advisory summary line (count + how to review), never the full list — terminal-noise control; JSON shapes unchanged.
+
+## docwriter
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-DOCWRITER-001` | `cdx write-doc` — author + register a new doc, born in sync | docwriter, cli | K4, K7, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-DOCWRITER-001` — `cdx write-doc` — author + register a new doc, born in sync
+
+docwriter.draft_document renders the full written document: the mechanical scaffold_doc skeleton (fingerprint + symbol_sigs stamped from the SAME surface, so the doc is born in-sync — the very next `cdx check` is green with no separate heal step), an authored purpose blockquote (a pure function of the spec/surface — deterministic, and explicitly marked as the human's line to refine), and an `overview` region declared `mode: llm` whose body is AUTHORED through the standing Backend seam via a synthetic B-06 no-renderer REGION request — the offline MockBackend writes its deterministic audience-aware stand-in (K4/K10), a real backend writes real prose through the exact same contract, and a non-FIX verdict or bodyless fix DEGRADES to the scaffold placeholder (visible TODO, never a crash). Because the region is `mode: llm`, the B-06 machinery owns its future: the prose RE-AUTHORS when the code surface moves and no-ops when it doesn't (K7) — proven e2e by mutating the source, seeing the doc flagged, and watching `monitor --apply` re-author the overview with the new symbols. write_and_register follows the AGT-04 authorship rule: the new document entry is APPENDED to the hand-maintained unit YAML by a bounded textual splice (comments byte-preserved; reload-validated and reverted on failure — never dump_unit_file), the frontmatter `updated:` bumps, and the authored file is written. `cdx write-doc TARGET [--unit][--id][--audience] [--apply]` is dry-run by default (prints the draft + the exact unit snippet — K11); unit attribution defaults to the deepest-wins dir-covered owner of TARGET; unknown unit / duplicate id / existing file / single-file config / bad audience are all loud (K8); `--apply` self-checks the new doc for zero drift and fails loudly otherwise.
+
 ## drift
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -538,6 +568,26 @@ On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from the
 ### `FEAT-DRIFT-012` — Per-symbol signature digests close the masked breaking-change case
 
 DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive, survives later heals via the cdm-map copy, K7), with manifest stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes `sigs_changed` — the SURVIVING documented symbols whose signature digest moved (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a non-empty sigs_changed ABOVE the addition rule, closing the former masked false-negative where an in-place signature change was hidden as ADDITIVE whenever a symbol was also added in the same edit. A pure addition (no survivor moved) stays ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
+
+## entities
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-ENTITIES-001` | Deterministic entity extraction + mention linking over doc prose | entities | K0, K1, K10, K11 | — | — | implemented |
+| `FEAT-ENTITIES-002` | Registry resilience + the `entities:` config block (target noise via config) | entities, config | K0, K6, K8, K10 | — | — | implemented |
+| `FEAT-ENTITIES-003` | `cdx entities` — the mention report + the dogfood precision budget | entities, cli | K1, K4, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-ENTITIES-001` — Deterministic entity extraction + mention linking over doc prose
+
+entities.extract_doc_entities parses one managed doc's PROSE deterministically (pure, no clock, no I/O — K1/K10): fenced code blocks and CDM:BEGIN/END machine regions are stripped first (machine text never mints a mention; blank-line replacement keeps Mention.line FILE-accurate, front-matter height included), then headings become the doc's own SECTION entities (GitHub-style slugs, repeated slugs deduplicated -2/-3), inline markdown links classify as URL / DOC (managed) / PATH (full repo tree, files AND directories), and inline backtick spans classify by the pinned precision rules: spans with whitespace, braces, glob metachars or colons mint nothing (HTTP routes, CLI invocations, CDM markers); path-shaped spans resolve exact-path-then-unique-basename (an AMBIGUOUS basename mints nothing — existing- but-ambiguous is not rot); SCREAMING_SNAKE spans resolve registry-first then the configured env-prefix gate (else ignored, so enum names never masquerade as env vars); identifier spans resolve by exact registry match, where only dotted, snake_case, or multi-hump CamelCase spans may surface UNRESOLVED — a plain word resolves or is ignored, never noise. Symbol resolution is exact-match only: qualified Class.method, module-qualified stem.name (registered only while the stem is unique) and full-dotted pkg.mod.name forms; a bare name needs GLOBAL uniqueness AND no module-stem collision (the measured app/coverage/index cli.py trap is blocked); a bare name matching only a unique module stem resolves as a PATH mention to that file, and a dotted package mention (custodex.server) resolves as a PATH to the directory/module. Unresolved mentions are first-class data (the Obsidian rule) — the graph-rot signal downstream slices consume. Every entity has a SCIP-style deterministic string id ("symbol custodex/drift.py#detect_drift").
+
+### `FEAT-ENTITIES-002` — Registry resilience + the `entities:` config block (target noise via config)
+
+entities.build_registry constructs the closed resolution universe — managed-doc paths/ids, per-file public symbols via the LANGUAGE-GUARDED extractor registry (a file's suffix picks its extractor; shell functions ride along for free), and the FULL repo file+dir tree for PATH resolution (independent of the coverage inventory, so prose mentions of non-code files and directories resolve). It is RESILIENT by design: an unparseable source file or an unregistered suffix becomes a warnings entry with zero symbols — a read-only advisory scan never aborts on one bad file, so background ticks survive arbitrary adopter repos. Target-specific noise enters through config, never the engine (K0): the additive `entities:` block (EntitiesConfig, default-empty so every pre-AGT config loads unchanged, K6) carries `ignore` (spans that mint no mention — tool names, config keys, illustrative example paths) and `env_prefixes` (a SCREAMING_SNAKE span becomes an ENV_VAR entity only under a configured prefix). Wired through BOTH config forms (single-file and the config/cdmon dir layout's index.yaml globals lift).
+
+### `FEAT-ENTITIES-003` — `cdx entities` — the mention report + the dogfood precision budget
+
+`cdx entities [DOC_ID] [--json] [--unresolved]` is the read-only CLI surface (K1/K4): per-document mention lists with file-accurate line numbers, `--unresolved` filtering to the graph-rot view, `--json` emitting the sorted DocEntities dumps, and a loud typed error on an unknown doc id (K8). The PRECISION BUDGET is part of the contract, not an aspiration: the dogfood integration test runs the scanner over THIS repo's real managed corpus and pins (a) an EMPTY day-one unresolved set (the rot signal starts clean — the seeded config/cdmon `entities:` stoplist is justified entry-by-entry), (b) no mention text matching a noise shape (routes, globs, colon markers, whitespace fragments), and (c) the measured misresolution traps (app/coverage/index) staying blocked — so a precision regression fails the suite the same way a stale wiki fails the freshness gate. The DEMOS.md header-id uniqueness smoke lint ships with this slice (the review found DEMO-052/053/054 duplicated; the traceability engine scans only Features: tags, so collisions were silent).
 
 ## extract
 
@@ -653,6 +703,21 @@ apply_fix accepts any ProposedFixLike (a Protocol exposing region_id / new_regio
 ### `FEAT-HEAL-009` — Pure whole-doc correction for backend FIX parity
 
 render_corrected returns the corrected full document text (regions plus fingerprint) from a document string without any I/O, reusing the same region and fingerprint logic as regenerate_regions so a backend's whole-doc FIX for a HASH drift and an in-engine heal agree byte-for-byte; preserve and modes drive the same B-02 lock and B-03 hash stamping.
+
+## kgraph
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-KGRAPH-001` | The unified knowledge-graph artifact + derived queries | kgraph | K1, K2, K8, K10 | — | — | implemented |
+| `FEAT-KGRAPH-002` | `cdx graph` + the hub snapshot mirror (`POST`/`GET /repos/{id}/graph`) | kgraph, cli, server | K1, K2, K6, K7, K10 | — | — | implemented |
+
+### `FEAT-KGRAPH-001` — The unified knowledge-graph artifact + derived queries
+
+kgraph.build_graph folds everything Custodex already knows into ONE typed graph (pure, K1/K10): DOCUMENTS (doc→symbol, the code_refs coverage join — declared), DEPENDS_ON (doc→doc, docdeps declarations — declared), OWNED_BY (doc→owner, the EPIC-OWN accountable projection — declared), MENTIONS (doc→symbol/path/env-var — resolved, the AGT-01 mention layer), LINKS_TO (doc→doc/url — resolved prose links) and PART_OF (section→doc, heading hierarchy — resolved). Node identity is the AGT-01 SCIP-style string id; a SECTION node's name is its SLUG, never raw heading text, so the artifact carries no doc-body prose (K2-safe for the hub mirror). Edges carry a provenance TIER (declared > resolved — never a float); nodes/edges are sorted and the rebuild is byte-identical (K10). The per-doc `unresolved` counts ride the artifact as the graph-rot signal — trustworthy because of the AGT-01 precision rules — and the resilient registry's `warnings` ride it too (one unparseable source file warns, never aborts). Derived queries recompute from base facts and are never stored: graph_neighbors (in+out edges to a depth, loud on an unknown id — K8) and rank_centrality — MENTIONS in-degree counted as DISTINCT mentioning docs (a doc cannot vote a symbol up twice), with undocumented_only crossing it against the absence of DOCUMENTS edges: the widely-mentioned-but-never-covered symbols are the best-justified what-to-document gaps (the one DeepWiki idea worth stealing, grounded in deterministic surfaces).
+
+### `FEAT-KGRAPH-002` — `cdx graph` + the hub snapshot mirror (`POST`/`GET /repos/{id}/graph`)
+
+`cdx graph` is the read-only CLI surface (K1/K4): the default summary view (node/edge counts by kind + the rot signal), `--focus NODE_ID` (the edges around one node), `--rank` (the mentioned-but-undocumented gap ranking, `--json`-able), `--json` (the full artifact) and `--write` (the regenerable `.cdmon/graph.json` — the sphinx-needs needs.json pattern; idempotent, prints "unchanged" on a byte-identical rewrite, K7). The hub mirror follows the coverage-snapshot pattern EXACTLY (K2: the graph is computed repo-side where the doc bodies live; the hub only stores): `POST /repos/{id}/graph` ingests the full versioned KnowledgeGraph wire dict opaquely (token-gated by the E-06 matrix — 404 unknown / 401 missing / 403 wrong / 202), `GET /repos/{id}/graph` (open read) serves the LATEST snapshot or an honest empty dict before any push; Store gains add_graph_snapshot/graph_for on BOTH stores (parity-tested over real HTTP) with the graph_snapshots table added by additive Alembic 0008 (up/down proven on temp SQLite).
 
 ## layout
 
@@ -838,6 +903,21 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 ### `FEAT-MONITOR-009` — Region-authority-aware fix request
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
+
+## onboard
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-ONBOARD-001` | `cdx onboard` — analyze a repo, author its config, arrive green | onboard, cli | K0, K8, K10, K11 | — | — | implemented |
+| `FEAT-ONBOARD-002` | The `cdx init --v2` dead-on-arrival fix (writing templates ensured) | onboard, templates_v2, cli | K0, K7, K8 | — | — | implemented |
+
+### `FEAT-ONBOARD-001` — `cdx onboard` — analyze a repo, author its config, arrive green
+
+onboard.analyze_repo scans a repo tree into a reviewable RepoMap plan artifact (the Mintlify plan-before-config pattern): top-level packages with their .py files and extracted public-symbol counts (per-file try/except — one unparseable source becomes a plan WARNING, never an abort), doc candidates with audience GUESSES that carry their evidence (silent inference is banned; README/tutorial/ usage-style names → user-guide, else eng-guide), the repo self-description signals (README, AGENTS.md, CLAUDE.md, docs dir, an existing config), and loose-file warnings. propose_config derives the bundle DETERMINISTICALLY (no LLM in this slice — K10/K11): one unit per top-level package (dir-covered = its directory, .py sources), one eng-guide document per package covering its files, the README mapped as a user-guide narrative document, and the REQUIRED unit owner via the pinned precedence (--owner → git user.name via an injected CLI seam → "unassigned" + a plan note, because it feeds the EPIC-OWN accountability chain); reserved config stems are skipped with a note. The default `cdx onboard` run is a DRY-RUN that prints the Renovate-style plan (Detected surfaces / Proposed mapping / What to expect) and writes NOTHING — agents suggest, humans apply (K11). `--apply` writes the bundle (real UnitFile models through dump_unit_file — fresh files, so the model dump is correct here), scaffolds each proposed doc in-sync, heals with the offline mock backend, and SELF-VALIDATES: load_bundle + doctor (no FAIL) + 0 drift, or the command exits loudly (the arrive-green rule — never emit a config the tool itself rejects, K8). Refuses to clobber an existing config without --force.
+
+### `FEAT-ONBOARD-002` — The `cdx init --v2` dead-on-arrival fix (writing templates ensured)
+
+The fresh-eyes adoption simulation measured the v2 scaffold as UNUSABLE in a bare repo: the scaffolded doc-style.yaml references four writing templates under templates/writing/ that only repos like this one ship, so even `cdx doctor` died at config load. templates_v2.ensure_writing_templates(repo_root) materializes a minimal generic file for exactly the four referenced (category, stem) pairs — kept in ONE WRITING_TEMPLATE_STEMS constant so the doc-style map and the ensured files can never drift apart — writing ONLY absent files (a repo's real templates are never overwritten; re-run returns (), K7). BOTH scaffold paths call it: scaffold_config_dir (the `cdx init --v2` path, fixed for every future adopter) and onboard.apply_plan — so a fresh scaffold's load_bundle succeeds in ANY bare repo, regression-guarded by a scaffold-then-load test in an empty tmp tree.
 
 ## ownership
 
@@ -1288,6 +1368,21 @@ configsync._build_rows projects each document's `reviewed` plus the audience-res
 ### `FEAT-STALENESS-006` — Read-time GET /staleness view
 
 GET /repos/{id}/staleness grades the synced docs' `reviewed` + `sla_days` against the app clock at READ time (deduped by doc_id, FRESH omitted unless include_fresh), so a doc goes stale on the NEXT read with no re-sync — mirroring the ownership read-time cascade. Open read, deterministic.
+
+## workers
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-WORKERS-001` | `cdx suggest` — the two pure suggester ticks + the keyed inbox | workers, cli | K1, K4, K7, K10, K11 | — | — | implemented |
+| `FEAT-WORKERS-002` | the default-OFF server worker loop + the reconciled suggestion inbox | workers, settings, server | K4, K5, K6, K10, K11 | — | — | implemented |
+
+### `FEAT-WORKERS-001` — `cdx suggest` — the two pure suggester ticks + the keyed inbox
+
+workers.suggest_fixes_tick (FIX_DRIFT per drifted doc via drift.detect — SUSPECT_LINK excluded because RESOLVE_EDGE owns edges; RESOLVE_EDGE per non-OK suspect link; PROMOTE_RULE per detect_promotions candidate over the local logs) and workers.suggest_docs_tick (DOCUMENT_GAP per mentioned-but-undocumented symbol from the AGT-03 rank_centrality feed; ADD_EDGE per docmap.suggest_edges suggestion, honoring the repo-side EdgeRejection verdicts) — both pure in the K1 sense (read-only FS, no clock in any key), deterministic and sorted by key (K10). The pinned key discipline: Suggestion.key = sha256[:16] over STRUCTURED fields per kind (detail/evidence/severity/now never hashed — a reworded detail keeps the key), with EVENT kinds (FIX_DRIFT, RESOLVE_EDGE) embedding the current surface hash / upstream fingerprint so a recurrence after a heal is a NEW key, and STANDING kinds (ADD_EDGE, DOCUMENT_GAP, PROMOTE_RULE) occurrence-free so a dismiss is a durable opt-out. Every detail embeds the exact next HUMAN command (`cdx monitor --apply`, `cdx resolve --edge`, `cdx write-doc`, `cdx link`) — K11. `cdx suggest [--kind fixes|docs|all] [--json] [--write]` runs the ticks once in the foreground; `--write` appends NEW keys to `.cdmon/suggestions.jsonl`, an append-only audit LOG (reviewlog precedent) never read back as pending state — a re-run with no change appends nothing (K7).
+
+### `FEAT-WORKERS-002` — the default-OFF server worker loop + the reconciled suggestion inbox
+
+settings.WorkerSettings (enabled=False, interval_seconds=900, kinds) under ServerSettings.workers with CDMON_WORKER_ENABLED/INTERVAL/KINDS env overlays — an un-tuned deployment runs NO background work (K4). When enabled, create_app's lifespan arms ONE daemon thread that runs _run_worker_pass every interval: for each registered repo with a readable local_path working tree carrying config/cdmon/index.yaml, run the enabled pure ticks and RECONCILE via Store.sync_suggestions — per-repo error isolation (one repo's failure logs and continues; the loop never dies), threading.Event.wait shutdown (never a bare sleep), and an injected worker_pass seam so tests count invocations offline. Reconciliation is never insert-only: new keys insert as pending, a pending key refreshes its prose in place, a resolved key that reappears REOPENS, a non-dismissed key absent from the tick becomes resolved (kept for audit, excluded from the default read), and a dismissed key — the durable human 'no' — is NEVER resurrected. Stored envelopes carry source: "worker" provenance + recorded_at/updated_at from the injected server clock (K5/K10/K11). Both stores implement the seam (parity) over Alembic 0009's suggestions table (unique (repo_id, key); indexed repo_id/key/status). Routes: GET /repos/{id}/suggestions (open read, ?include_closed adds the audit trail) + POST /repos/{id}/suggestions/{key}/dismiss (repo token, the E-06 matrix).
 
 ## worklist
 

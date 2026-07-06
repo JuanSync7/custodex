@@ -60,3 +60,13 @@ export function linkToDependencies(repoId: string): string {
 export function linkToWorklist(repoId: string): string {
   return `/repos/${encodePath(repoId)}/worklist`;
 }
+
+/** Build the knowledge-graph href for a repo id (AGT-03 — the mirror view). */
+export function linkToGraph(repoId: string): string {
+  return `/repos/${encodePath(repoId)}/graph`;
+}
+
+/** Build the suggestions href for a repo id (AGT-06 — the worker inbox). */
+export function linkToSuggestions(repoId: string): string {
+  return `/repos/${encodePath(repoId)}/suggestions`;
+}

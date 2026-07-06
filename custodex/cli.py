@@ -20,9 +20,9 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import posixpath
 import re
 import sys
-from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -31,9 +31,12 @@ import typer
 
 from . import coverage as coverage_mod
 from . import inventory
+from .backends import make_backend
 from .build import build as build_twins
 from .config import (
     DEFAULT_CENTRAL_TOKEN_ENV,
+    Audience,
+    DocEdgeType,
     MonitorConfig,
     central_config_template,
     load_bundle,
@@ -45,19 +48,33 @@ from .config import (
     write_template,
 )
 from .docdeps import (
-    InferredEdge,
     SuspectLink,
     detect_suspect_links,
     impacted_by,
-    infer_edges_from_links,
     propagate_suspect,
     render_deps_text,
     render_impact_text,
     stamp_edges,
 )
+from .docmap import (
+    churn_note,
+    declare_edge,
+    read_rejections,
+    reject_edge,
+    render_suggestions_text,
+    suggest_edges,
+)
 from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
+from .docwriter import (
+    build_doc_spec,
+    draft_document,
+    proposed_doc_id,
+    unit_snippet,
+    write_and_register,
+)
 from .drift import DriftKind
+from .entities import corpus_entities, render_entities_text
 from .errors import CodeDocMonitorError, SchemaError
 from .extract import build_document_surface
 from .featurecatalog import load_catalog
@@ -67,6 +84,7 @@ from .issues import (
     open_coverage_issue,
     plan_coverage_issue,
 )
+from .kgraph import build_graph, graph_neighbors, rank_centrality, render_graph_text
 from .layout import (
     config_region_states,
     lint_config,
@@ -75,6 +93,7 @@ from .layout import (
 )
 from .manifest import parse_doc
 from .monitor import DEFAULT_LOG_PATH, Monitor
+from .onboard import analyze_repo, apply_plan, propose_config, render_plan_text
 from .ownership import (
     OwnershipStatus,
     detect_orphans,
@@ -111,6 +130,13 @@ from .staleness import (
 from .syncpr import should_sync, sync_pr
 from .templates_v2 import scaffold_config_dir
 from .traceability import TraceMatrix, build_matrix
+from .workers import (
+    render_suggestions_text as render_workers_text,
+)
+from .workers import (
+    suggest_docs_tick,
+    suggest_fixes_tick,
+)
 from .worklist import render_worklist_text, worklist_from_repo
 
 app = typer.Typer(
@@ -1544,21 +1570,42 @@ def deps(
                 typer.echo(render_impact_text(impact, impacted))
             return
         if suggest:
-            inferred = infer_edges_from_links(cfg, root)
+            # AGT-02: entity-grounded, provenance-tiered suggestions (docmap) —
+            # links come from the mention layer (machine regions stripped) and
+            # SHARED_SYMBOL joins mentions to the covering doc; rejected pairs
+            # (`cdx link --reject`) are excluded forever (K11). Items keep the
+            # legacy {doc_id, upstream_id, via} keys as a superset (K6).
+            rejections = read_rejections(config_dir / ".cdmon")
+            suggested = suggest_edges(cfg, root, rejections=rejections)
             if as_json:
                 typer.echo(
                     json.dumps(
-                        [e.model_dump(mode="json") for e in inferred],
+                        [e.model_dump(mode="json") for e in suggested],
                         indent=2,
                         sort_keys=True,
                     )
                 )
             else:
-                typer.echo(_render_suggestions(inferred))
+                notes = {
+                    e.upstream_id: churn_note(cfg, e.upstream_id) for e in suggested
+                }
+                typer.echo(render_suggestions_text(suggested, notes=notes))
             return
         links = detect_suspect_links(cfg, root, include_ok=not suspect)
         # propagate_suspect ignores OK links, so the include_ok graph is a safe basis.
         trans = propagate_suspect(cfg, links) if transitive else ()
+        # AGT-02: the infer_from_links knob is REAL — a one-line advisory
+        # SUMMARY on the text report (never the full list, never gating; the
+        # full listing stays behind --suggest). JSON keeps its shape (K6).
+        advisory = ""
+        if cfg.docdeps.infer_from_links and not as_json:
+            rejections = read_rejections(config_dir / ".cdmon")
+            n = len(suggest_edges(cfg, root, rejections=rejections))
+            if n:
+                advisory = (
+                    f"\n  advisory — {n} suggested edge(s) available: run "
+                    "`cdx deps --suggest` to review (accept with `cdx link`)."
+                )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -1576,23 +1623,572 @@ def deps(
             payload = edges_json
         typer.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        typer.echo(render_deps_text(links, suspect_only=suspect, transitive=trans))
+        typer.echo(
+            render_deps_text(links, suspect_only=suspect, transitive=trans) + advisory
+        )
 
 
-def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:
-    """Render inferred edges as paste-ready ``depends_on`` config (EPIC B B-05)."""
-    if not inferred:
-        return "# no new doc↔doc edges inferred from Markdown links"
-    by_doc: dict[str, list[str]] = {}
-    for e in inferred:
-        by_doc.setdefault(e.doc_id, []).append(e.upstream_id)
-    lines = [f"# {len(inferred)} inferred edge(s) — add to the relevant documents:"]
-    for doc_id in sorted(by_doc):
-        lines.append(f"# document {doc_id!r}:")
-        lines.append("    depends_on:")
-        for up in sorted(by_doc[doc_id]):
-            lines.append(f"      - doc: {up}")
-    return "\n".join(lines)
+@app.command()
+def link(
+    downstream: str = typer.Argument(..., metavar="DOWN", help="The dependent doc."),
+    upstream: str = typer.Argument(..., metavar="UP", help="The doc it depends on."),
+    edge_type: str = typer.Option(
+        "depends",
+        "--type",
+        help="Edge role: depends | refines | implements | verifies.",
+    ),
+    reject: bool = typer.Option(
+        False,
+        "--reject",
+        help="Record a durable REJECTION instead: the suggested edge never "
+        "returns from `cdx deps --suggest` (the human 'no' — K11).",
+    ),
+    by: str | None = typer.Option(None, "--by", help="Who decided (audit trail)."),
+    note: str | None = typer.Option(None, "--note", help="Why (audit trail)."),
+    config: Path = _CONFIG_OPTION,
+) -> None:
+    """Accept (or reject) a suggested doc↔doc edge — the human verb (K11).
+
+    Accept: DECLARES ``DOWN depends_on UP`` in the unit YAML via a
+    comment-preserving textual splice (never a model re-serialization), then
+    stamps the edge's baseline so it arrives reviewed (no UNSTAMPED noise).
+    Reject: appends a durable verdict to ``.cdmon/edge-rejections.jsonl`` so
+    the suggester never re-offers the pair. Dir-layout configs only for
+    accept (the single-file form has no unit files — add the edge by hand).
+    """
+    try:
+        cfg, config_dir = _load(config)
+        ids = {d.id for d in cfg.documents}
+        for name in (downstream, upstream):
+            if name not in ids:
+                raise SchemaError(
+                    f"unknown document id {name!r} — not a managed document"
+                )
+        if reject:
+            path = reject_edge(
+                config_dir / ".cdmon",
+                downstream,
+                upstream,
+                now=_now(),
+                by=by,
+                note=note,
+            )
+            typer.echo(
+                f"rejected {downstream!r} → {upstream!r} — recorded in {path}; "
+                "`cdx deps --suggest` will not offer it again"
+            )
+            return
+        if not (config_dir / "index.yaml").is_file():
+            raise SchemaError(
+                "`cdx link` writes the config/cdmon dir layout; this config is "
+                "a single file — add the depends_on edge by hand (or migrate "
+                "with `cdx init --v2`)"
+            )
+        try:
+            edge = DocEdgeType(edge_type)
+        except ValueError as exc:
+            raise SchemaError(
+                f"unknown edge type {edge_type!r} — expected depends | refines "
+                "| implements | verifies"
+            ) from exc
+        warning = churn_note(cfg, upstream)
+        if warning:
+            typer.echo(warning)
+        unit_path = declare_edge(
+            config_dir, downstream, upstream, type=edge, now=_now()
+        )
+        cfg2, _ = _load(config)  # reload: the splice changed the config
+        root = resolve_repo_root(config_dir, cfg2.root)
+        try:
+            stamped = stamp_edges(cfg2, root, downstream, only=upstream)
+        except CodeDocMonitorError as exc:
+            # Honest partial state (PR #20 review): the declare succeeded —
+            # never let the stamp failure read as "nothing happened".
+            raise SchemaError(
+                f"edge {downstream!r} → {upstream!r} WAS declared in "
+                f"{unit_path.name} but its baseline could NOT be stamped "
+                f"({exc}); fix the doc file, then stamp with "
+                f"`cdx resolve --edge {downstream} {upstream}`"
+            ) from exc
+        stamp_note = (
+            "baseline stamped (edge arrives reviewed)"
+            if stamped
+            else "baseline already current"
+        )
+        typer.echo(
+            f"declared {downstream!r} → {upstream!r} [{edge.value}] in "
+            f"{unit_path.name}; {stamp_note}"
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+def _git_user_name(root: Path) -> str | None:
+    """The repo's git ``user.name``, or ``None`` — the ONLY impure read the
+    onboard owner-precedence uses (module seam, monkeypatched in tests, K4)."""
+    import subprocess
+
+    try:  # pragma: no cover - exercised via the injected seam in tests
+        out = subprocess.run(  # noqa: S603,S607 - fixed argv, no shell
+            ["git", "-C", str(root), "config", "user.name"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except OSError:  # pragma: no cover - defensive
+        return None
+    name = out.stdout.strip()  # pragma: no cover
+    return name or None  # pragma: no cover
+
+
+@app.command()
+def onboard(
+    path: Path = typer.Option(
+        Path("."), "--path", help="The repo root to onboard (default: cwd)."
+    ),
+    repo: str | None = typer.Option(
+        None, "--repo", help="Repo name for the config (default: the dir name)."
+    ),
+    owner: str | None = typer.Option(
+        None,
+        "--owner",
+        help="Accountable unit owner (default: git user.name, else 'unassigned').",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="WRITE the proposed config/cdmon/, scaffold the docs, heal, and "
+        "self-validate (arrive-green). Default is a DRY-RUN plan (K11).",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="With --apply: replace an existing config/cdmon/ directory.",
+    ),
+) -> None:
+    """Analyze a repo and author its Custodex config (agents suggest; humans apply).
+
+    The AGT-04 onboarding agent: scans the tree into a reviewable PLAN
+    (detected packages/docs/signals/warnings), proposes one unit per top-level
+    package + one eng-guide doc per package (+ the README as a user-guide
+    doc), and — only on --apply — writes the bundle, scaffolds the docs,
+    heals them in-sync (mock backend, offline), and SELF-VALIDATES: the
+    result must load, pass doctor with no FAIL, and report 0 drift before
+    this command exits 0 (never emit a config the tool itself rejects, K8).
+    """
+    try:
+        root = path.resolve()
+        repo_map = analyze_repo(root)
+        if not apply and "existing_config" in repo_map.signals:
+            typer.echo(
+                f"already configured: {repo_map.signals['existing_config']} "
+                "exists — nothing to onboard (use --apply --force to replace "
+                "a config/cdmon dir)"
+            )
+            return
+        repo_name = repo or root.name
+        effective_owner = owner or _git_user_name(root)
+        plan = propose_config(
+            repo_map, repo=repo_name, now=_now(), owner=effective_owner
+        )
+        if not apply:
+            typer.echo(render_plan_text(plan))
+            typer.echo(
+                "\n# dry-run — nothing written. Re-run with --apply to write "
+                "config/cdmon/ + scaffold the docs."
+            )
+            return
+
+        config_dir = root / "config" / "cdmon"
+        if config_dir.exists() and any(config_dir.iterdir()):
+            if not force:
+                raise SchemaError(
+                    f"{config_dir} already exists — re-run with --force to replace it"
+                )
+            import shutil
+
+            shutil.rmtree(config_dir)
+        written = apply_plan(plan, config_dir, now=_now())
+        typer.echo(f"wrote {len(written)} file(s) under {config_dir} (+ templates)")
+
+        # Materialize the proposed docs in-sync, then heal to green (mock
+        # backend, offline — the arrive-green rule).
+        bundle_cfg, bundle_dir = _resolve_config(config_dir)
+        doc_root = resolve_repo_root(bundle_dir, bundle_cfg.root)
+        scaffolded = 0
+        for spec in bundle_cfg.documents:
+            target = doc_root / spec.path
+            if target.is_file():
+                continue
+            surface = build_document_surface(spec, doc_root)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                scaffold_doc(
+                    spec, surface, include_body=bundle_cfg.fingerprint_body_tier
+                ),
+                encoding="utf-8",
+            )
+            scaffolded += 1
+        monitor = Monitor(bundle_cfg, bundle_dir)
+        monitor.run(apply=True)
+
+        # Self-validation evidence (arrive-green, K8).
+        checks = run_checks(bundle_cfg, bundle_dir)
+        fails = [c for c in checks if c.status is CheckStatus.FAIL]
+        drift = monitor.check()
+        typer.echo(
+            f"scaffolded {scaffolded} doc(s); self-validation: doctor "
+            f"{'PASS' if not fails else 'FAIL'} · drift {len(drift.drifts)}"
+        )
+        if fails or drift.drifts:
+            for c in fails:
+                typer.echo(f"  FAIL {c.name}: {c.detail}", err=True)
+            for d in drift.drifts:
+                typer.echo(f"  drift {d.doc_id}: {d.kind.value}", err=True)
+            raise SchemaError(
+                "onboarding self-validation failed — the generated config was "
+                "written but is not green; see the failures above"
+            )
+        typer.echo(
+            "onboarded — `cdx check` is green; next: review the plan notes, "
+            "set real owners, and commit config/cdmon/ + docs/"
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("write-doc")
+def write_doc(
+    target: str = typer.Argument(
+        ..., metavar="TARGET", help="Repo-relative source file to document."
+    ),
+    unit: str | None = typer.Option(
+        None,
+        "--unit",
+        help="Unit file to register in (default: the unit whose dir-covered "
+        "owns TARGET, by deepest-wins attribution).",
+    ),
+    doc_id: str | None = typer.Option(
+        None, "--id", help="Doc id (default: derived from TARGET, pkg-sub-mod)."
+    ),
+    audience: str = typer.Option(
+        "eng-guide", "--audience", help="user-guide | eng-guide."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Register the doc in the unit YAML (comment-preserving splice) "
+        "and WRITE the authored file. Default is a DRY-RUN draft (K11).",
+    ),
+    config: Path = _CONFIG_OPTION,
+) -> None:
+    """Write a new document from code and register it (agents suggest; humans apply).
+
+    The AGT-05 doc-writer: the skeleton is the mechanical scaffold (born
+    in-sync — the fingerprint stamps from the same surface), the purpose line
+    and an `overview` region (mode: llm) are AUTHORED through the backend
+    seam (the offline mock writes a deterministic stand-in; a real backend
+    writes real prose through the same contract), and the B-06 machinery
+    keeps the prose fresh afterwards. Dir-layout configs only.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        if not (config_dir / "index.yaml").is_file():
+            raise SchemaError(
+                "`cdx write-doc` registers into the config/cdmon dir layout; "
+                "this config is a single file — add the document by hand (or "
+                "migrate with `cdx init --v2`)"
+            )
+        root = resolve_repo_root(config_dir, cfg.root)
+        norm_target = target.strip("/")
+        if not (root / norm_target).is_file():
+            raise SchemaError(f"TARGET {norm_target!r} is not a file under {root}")
+        try:
+            aud = Audience(audience)
+        except ValueError as exc:
+            raise SchemaError(
+                f"unknown audience {audience!r} — expected user-guide | eng-guide"
+            ) from exc
+        final_id = doc_id or proposed_doc_id(norm_target)
+        spec = build_doc_spec(
+            doc_id=final_id,
+            path=f"docs/{final_id}.md",
+            audience=aud,
+            code_refs=(norm_target,),
+        )
+        bundle = load_bundle(config_dir)
+        owning = bundle.unit_for_path(norm_target)
+        final_unit = unit or (owning.frontmatter.unit if owning else None)
+        if final_unit is None:
+            raise SchemaError(
+                f"no unit's dir-covered owns {norm_target!r} — pass --unit explicitly"
+            )
+        backend = make_backend(cfg.backend, cfg.agent)
+        if not apply:
+            surface = build_document_surface(spec, root)
+            typer.echo(f"# would register {final_id!r} in {final_unit}.yaml as:")
+            typer.echo(unit_snippet(spec))
+            typer.echo(f"\n# and write docs/{final_id}.md:\n")
+            typer.echo(
+                draft_document(
+                    spec,
+                    surface,
+                    backend=backend,
+                    include_body=cfg.fingerprint_body_tier,
+                )
+            )
+            typer.echo("\n# dry-run — nothing written. Re-run with --apply.")
+            return
+        written = write_and_register(
+            config_dir,
+            unit=final_unit,
+            spec=spec,
+            backend=backend,
+            now=_now(),
+        )
+        cfg2, _ = _load(config)
+        drift = Monitor(cfg2, config_dir).check()
+        mine = [d for d in drift.drifts if d.doc_id == final_id]
+        typer.echo(
+            f"wrote {written} and registered {final_id!r} in {final_unit}.yaml; "
+            f"self-check: {len(mine)} drift(s) on the new doc"
+        )
+        if mine:
+            for d in mine:
+                typer.echo(f"  drift: {d.kind.value} — {d.detail}", err=True)
+            raise SchemaError(
+                "the written document is not in sync — see the drifts above"
+            )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@app.command()
+def entities(
+    doc_id: str | None = typer.Argument(
+        None,
+        metavar="[DOC_ID]",
+        help="Limit the report to one managed document (default: every doc).",
+    ),
+    config: Path = _CONFIG_OPTION,
+    unresolved: bool = typer.Option(
+        False,
+        "--unresolved",
+        help="Show only UNRESOLVED mentions — the graph-rot signal (a mention "
+        "whose referent no longer exists, or never did).",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the per-document mention lists as JSON."
+    ),
+) -> None:
+    """Show each managed doc's entity mentions, linked or unresolved (read-only, K1).
+
+    The AGT-01 mention layer: every backticked symbol/path/env-var span and
+    markdown link in a doc's PROSE (machine regions and code fences excluded),
+    resolved against the code surface + the managed-doc set + the repo tree.
+    Deterministic, offline, no backend (K4/K10); precision-first — an ambiguous
+    span is unresolved or ignored, never guessed.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        results = corpus_entities(cfg, root, doc_id=doc_id)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        payload = [r.model_dump(mode="json") for r in results]
+        if unresolved:
+            payload = [
+                {
+                    **r,
+                    "mentions": [m for m in r["mentions"] if not m["resolved"]],
+                }
+                for r in payload
+            ]
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        typer.echo(render_entities_text(results, unresolved_only=unresolved))
+
+
+@app.command()
+def graph(
+    config: Path = _CONFIG_OPTION,
+    focus: str | None = typer.Option(
+        None,
+        "--focus",
+        metavar="NODE_ID",
+        help='Show the edges around one node (e.g. "doc docs/api/drift.md" or '
+        '"symbol custodex/drift.py#detect_drift").',
+    ),
+    rank: bool = typer.Option(
+        False,
+        "--rank",
+        help="Rank symbols by MENTIONS in-degree with no covering doc — the "
+        "best-justified what-to-document gaps.",
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Write the graph artifact to .cdmon/graph.json (regenerable, "
+        "idempotent; the sphinx-needs needs.json pattern).",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the whole graph as JSON."),
+) -> None:
+    """The unified knowledge graph over docs, code and owners (read-only build).
+
+    ONE deterministic fold of everything Custodex already knows: code↔doc
+    coverage (DOCUMENTS), doc↔doc dependencies (DEPENDS_ON), prose mentions
+    and links (MENTIONS/LINKS_TO — the AGT-01 layer), sections (PART_OF) and
+    accountability (OWNED_BY), with per-doc unresolved-mention counts as the
+    rot signal. Pure and offline (K1/K4/K10); `--write` touches only the
+    regenerable `.cdmon/graph.json` artifact.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        unit_owner = _unit_owner_map(config_dir)
+        g = build_graph(cfg, root, unit_owner=unit_owner)
+        if focus is not None:
+            # Discoverability: a bare managed-doc ID is shorthand for its
+            # `doc <path>` node — every other cdx command addresses docs by
+            # id (PR #20 review).
+            if " " not in focus:
+                by_id = {
+                    d.id: f"doc {posixpath.normpath(d.path)}" for d in cfg.documents
+                }
+                focus = by_id.get(focus, focus)
+            if as_json:
+                # --focus composes with --json: the focused edge set, still
+                # loud on an unknown node (K8 — PR #20 must-fix: this cell
+                # used to silently dump the whole graph).
+                edges = graph_neighbors(g, focus)
+                typer.echo(
+                    json.dumps(
+                        [e.model_dump(mode="json") for e in edges],
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                typer.echo(render_graph_text(g, focus=focus))
+            return
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if rank:
+        ranked = rank_centrality(g, undocumented_only=True)
+        if as_json:
+            typer.echo(
+                json.dumps(
+                    [{"node": n, "mentions": c} for n, c in ranked],
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        elif not ranked:
+            typer.echo("# no undocumented mentioned symbols — no ranked gaps")
+        else:
+            typer.echo("# mentioned-but-undocumented symbols (best gaps first):")
+            for node, count in ranked:
+                typer.echo(f"  {count:>3}x {node}")
+        return
+    if write:
+        out = config_dir / ".cdmon" / "graph.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        text = g.model_dump_json(indent=2) + "\n"
+        if out.is_file() and out.read_text(encoding="utf-8") == text:
+            typer.echo(f"{out}: unchanged")
+        else:
+            out.write_text(text, encoding="utf-8")
+            typer.echo(f"{out}: wrote")
+        return
+    if as_json:
+        typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(render_graph_text(g))
+
+
+@app.command()
+def suggest(
+    kind: str = typer.Option(
+        "all",
+        "--kind",
+        help="Which suggester runs: fixes (drift/suspect/promotable) | docs "
+        "(gaps/mappings) | all.",
+    ),
+    config: Path = _CONFIG_OPTION,
+    as_json: bool = typer.Option(
+        False, "--json", help="Emit the suggestion list as JSON."
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Append NEW suggestion keys to .cdmon/suggestions.jsonl — an "
+        "append-only audit LOG (never read back as pending state).",
+    ),
+) -> None:
+    """Run the background suggesters ONCE, in the foreground (read-only, K11).
+
+    The AGT-06 inbox: FIX_DRIFT / RESOLVE_EDGE / PROMOTE_RULE (the fixes
+    suggester) and DOCUMENT_GAP / ADD_EDGE (the docs suggester) — every item
+    advisory, every detail embedding the exact next human command. The output
+    IS current reality (recomputed each run, never cached); `--write` only
+    appends an audit line per NEW key, so a re-run with no change appends
+    nothing (K7).
+    """
+    if kind not in ("fixes", "docs", "all"):
+        typer.echo(
+            f"error: unknown --kind {kind!r} — expected fixes | docs | all",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    try:
+        cfg, config_dir = _load(config)
+        suggestions: list = []
+        if kind in ("fixes", "all"):
+            suggestions.extend(suggest_fixes_tick(cfg, config_dir, now=_now()))
+        if kind in ("docs", "all"):
+            suggestions.extend(suggest_docs_tick(cfg, config_dir, now=_now()))
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if write:
+        log = config_dir / ".cdmon" / "suggestions.jsonl"
+        seen: set[str] = set()
+        if log.is_file():
+            for line in log.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    seen.add(json.loads(line).get("key", ""))
+        fresh = [s for s in suggestions if s.key not in seen]
+        if fresh:
+            log.parent.mkdir(parents=True, exist_ok=True)
+            with log.open("a", encoding="utf-8") as fh:
+                for s in fresh:
+                    envelope = {
+                        **s.model_dump(mode="json"),
+                        "recorded_at": _now(),
+                        "source": "cli",
+                    }
+                    fh.write(json.dumps(envelope, sort_keys=True) + "\n")
+        typer.echo(f"{log}: {len(fresh)} new suggestion(s) appended")
+
+    if as_json:
+        typer.echo(
+            json.dumps(
+                [s.model_dump(mode="json") for s in suggestions],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        typer.echo(render_workers_text(tuple(suggestions)))
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:

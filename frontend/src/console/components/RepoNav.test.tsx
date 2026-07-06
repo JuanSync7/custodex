@@ -72,8 +72,10 @@ describe("RepoNav", () => {
       "Mapping",
       "Documents",
       "Dependencies",
+      "Graph",
       "Ownership",
       "Worklist",
+      "Suggestions",
       "Coverage",
       "Health",
     ]);

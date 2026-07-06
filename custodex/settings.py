@@ -31,6 +31,7 @@ __all__ = [
     "CorsSettings",
     "RateLimitSettings",
     "GitSettings",
+    "WorkerSettings",
     "ServerSettings",
     "Settings",
     "DEFAULT_SETTINGS_PATH",
@@ -92,6 +93,29 @@ class GitSettings(BaseModel):
         return self
 
 
+class WorkerSettings(BaseModel):
+    """The AGT-06 background-suggester loop knobs. DEFAULT OFF (K4: an
+    un-tuned deployment runs no background work); ``kinds`` picks which of the
+    two suggesters run (``fixes`` / ``docs``)."""
+
+    model_config = _MODEL_CONFIG
+
+    enabled: bool = False
+    interval_seconds: int = 900
+    kinds: tuple[str, ...] = ("fixes", "docs")
+
+    @model_validator(mode="after")
+    def _valid(self) -> WorkerSettings:
+        if self.interval_seconds <= 0:
+            raise ValueError("interval_seconds must be a positive integer")
+        unknown = set(self.kinds) - {"fixes", "docs"}
+        if unknown:
+            raise ValueError(
+                f"unknown worker kind(s) {sorted(unknown)} — expected fixes|docs"
+            )
+        return self
+
+
 class ServerSettings(BaseModel):
     """The uvicorn launch + HTTP hardening knobs (defaults == the central server today:
     bind 0.0.0.0:33333, no CORS, TrustedHost off via ``["*"]``, no rate limit)."""
@@ -105,6 +129,7 @@ class ServerSettings(BaseModel):
     cors: CorsSettings = CorsSettings()
     rate_limit: RateLimitSettings = RateLimitSettings()
     git: GitSettings = GitSettings()
+    workers: WorkerSettings = WorkerSettings()  # AGT-06 (additive, K6)
 
     @model_validator(mode="after")
     def _host_port_valid(self) -> ServerSettings:
@@ -201,6 +226,12 @@ def settings_from_env(base: Settings, env: Mapping[str, str] | None = None) -> S
         srv["git"]["extra_allowed_hosts"] = _csv(value, "CDMON_ALLOWED_GIT_HOSTS")
     if value := source.get("CDMON_GIT_CLONE_TIMEOUT"):
         srv["git"]["clone_timeout_seconds"] = _int(value, "CDMON_GIT_CLONE_TIMEOUT")
+    if value := source.get("CDMON_WORKER_ENABLED"):
+        srv["workers"]["enabled"] = value.strip().lower() in ("1", "true", "yes", "on")
+    if value := source.get("CDMON_WORKER_INTERVAL"):
+        srv["workers"]["interval_seconds"] = _int(value, "CDMON_WORKER_INTERVAL")
+    if value := source.get("CDMON_WORKER_KINDS"):
+        srv["workers"]["kinds"] = _csv(value, "CDMON_WORKER_KINDS")
 
     try:
         return Settings(**data)

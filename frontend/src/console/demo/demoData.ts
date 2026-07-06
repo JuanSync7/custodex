@@ -26,9 +26,11 @@ import {
   storedConfigEdits,
 } from "../test/fixtures";
 import type {
+  GraphSnapshot,
   OwnershipData,
   RepoHealth,
   StalenessData,
+  SuggestionsData,
   Worklist,
 } from "../types";
 
@@ -191,6 +193,141 @@ const EMPTY_WORKLIST: Worklist = {
   includes_suspect: true,
 };
 
+// AGT-03/AGT-07: the busy repo's mirrored knowledge-graph snapshot — small but
+// exercising every table on the Graph page: kind counts, a rot signal, one
+// mentioned-but-undocumented symbol, and focusable in/out edges.
+const WIDGET_GRAPH: GraphSnapshot = {
+  schema_version: "1.0.0",
+  captured_at: "2026-06-20T09:00:00Z",
+  nodes: [
+    { id: "doc docs/api/core-api.md", kind: "doc", name: "core-api" },
+    { id: "doc docs/guide.md", kind: "doc", name: "guide" },
+    { id: "symbol src/widget/engine.py#Engine", kind: "symbol", name: "Engine" },
+    { id: "symbol src/widget/queue.py#drain_queue", kind: "symbol", name: "drain_queue" },
+    { id: "section docs/guide.md#usage", kind: "section", name: "usage" },
+    { id: "owner mei", kind: "owner", name: "mei" },
+  ],
+  edges: [
+    {
+      source: "doc docs/api/core-api.md",
+      target: "symbol src/widget/engine.py#Engine",
+      kind: "documents",
+      tier: "declared",
+    },
+    {
+      source: "doc docs/guide.md",
+      target: "doc docs/api/core-api.md",
+      kind: "depends_on",
+      tier: "declared",
+    },
+    {
+      source: "doc docs/guide.md",
+      target: "symbol src/widget/engine.py#Engine",
+      kind: "mentions",
+      tier: "resolved",
+    },
+    {
+      source: "doc docs/guide.md",
+      target: "symbol src/widget/queue.py#drain_queue",
+      kind: "mentions",
+      tier: "resolved",
+    },
+    {
+      source: "doc docs/api/core-api.md",
+      target: "symbol src/widget/queue.py#drain_queue",
+      kind: "mentions",
+      tier: "resolved",
+    },
+    {
+      source: "section docs/guide.md#usage",
+      target: "doc docs/guide.md",
+      kind: "part_of",
+      tier: "resolved",
+    },
+    {
+      source: "doc docs/guide.md",
+      target: "owner mei",
+      kind: "owned_by",
+      tier: "declared",
+    },
+  ],
+  unresolved: { guide: 1, "core-api": 0 },
+  warnings: [],
+};
+
+const EMPTY_GRAPH: GraphSnapshot = {};
+
+// AGT-06/AGT-07: the busy repo's suggestion inbox — one of each lifecycle
+// state so the pending/closed separation renders.
+const WIDGET_SUGGESTIONS: SuggestionsData = {
+  repo_id: "acme/widget",
+  include_closed: true,
+  suggestions: [
+    {
+      key: "a1b2c3d4e5f60718",
+      kind: "fix_drift",
+      doc_id: "core-api",
+      target: "docs/api/core-api.md",
+      detail:
+        "1 drift(s) [HASH] on docs/api/core-api.md — review and heal with `cdx monitor --apply`",
+      evidence: ["HASH:signature moved"],
+      severity: "high",
+      status: "pending",
+      source: "worker",
+      recorded_at: "2026-06-20T09:00:00Z",
+      updated_at: "2026-06-20T09:00:00Z",
+    },
+    {
+      key: "b2c3d4e5f6071829",
+      kind: "document_gap",
+      doc_id: null,
+      target: "symbol src/widget/queue.py#drain_queue",
+      detail:
+        "symbol src/widget/queue.py#drain_queue is mentioned by 2 doc(s) but covered by none — draft a doc with `cdx write-doc src/widget/queue.py`",
+      evidence: ["2 mentioning doc(s)"],
+      severity: "low",
+      status: "pending",
+      source: "worker",
+      recorded_at: "2026-06-20T09:00:00Z",
+      updated_at: "2026-06-20T09:00:00Z",
+    },
+    {
+      key: "c3d4e5f607182930",
+      kind: "resolve_edge",
+      doc_id: "guide",
+      target: "core-api",
+      detail:
+        "edge guide → core-api is suspect — review the upstream change, then `cdx resolve --edge guide core-api`",
+      evidence: ["suspect: upstream changed since last review"],
+      severity: "medium",
+      status: "resolved",
+      source: "worker",
+      recorded_at: "2026-06-18T09:00:00Z",
+      updated_at: "2026-06-20T09:00:00Z",
+    },
+    {
+      key: "d4e5f60718293041",
+      kind: "add_edge",
+      doc_id: "guide",
+      target: "io-api",
+      detail:
+        "shared_symbol evidence links guide → io-api — accept with `cdx link guide io-api` or silence with `cdx link --reject guide io-api`",
+      evidence: ["symbol src/widget/io.py#read_frame"],
+      severity: "low",
+      status: "dismissed",
+      source: "worker",
+      recorded_at: "2026-06-15T09:00:00Z",
+      updated_at: "2026-06-16T09:00:00Z",
+    },
+  ],
+};
+
+const EMPTY_SUGGESTIONS = (repoId: string): SuggestionsData => ({
+  repo_id: repoId,
+  include_closed: true,
+  suggestions: [],
+});
+
 const BUSY = "acme/widget";
 
 /** Per-repo demo data. The busy repo carries the full story; the quiet repo is
@@ -207,6 +344,9 @@ export const DEMO = {
     coverage: repoId === BUSY ? coverage : [],
     ownership: repoId === BUSY ? WIDGET_OWNERSHIP : EMPTY_OWNERSHIP,
     worklist: repoId === BUSY ? WIDGET_WORKLIST : EMPTY_WORKLIST,
+    graph: repoId === BUSY ? WIDGET_GRAPH : EMPTY_GRAPH,
+    suggestions:
+      repoId === BUSY ? WIDGET_SUGGESTIONS : EMPTY_SUGGESTIONS(repoId),
     staleness: repoId === BUSY ? staleness : EMPTY_STALENESS,
     health: repoId === BUSY ? health : EMPTY_HEALTH(repoId),
     documents: repoId === BUSY ? configDocuments : [],

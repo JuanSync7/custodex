@@ -1,0 +1,7 @@
+# Design notes for the taskflow core (NOT a coverage target).
+# This .log file lives under a dir-covered directory (src/taskflow/core)
+# but its extension is not in source-files-format ['.py'], so cdmon
+# coverage must NOT count it. It also matches the *.log ignore pattern.
+
+- engine.run() skips dependents of a failed task (fail-fast per branch).
+- topological_order() is Kahn's algorithm; ties break by insertion order.

@@ -691,3 +691,72 @@ def test_alembic_migration_0007_doc_edges_up_then_down(tmp_path: Path) -> None:
     after = set(inspect(engine).get_table_names())
     assert "config_doc_edges" not in after
     assert {"config_documents", "roster"} <= after
+
+
+def test_alembic_migration_0008_graph_snapshots_up_then_down(tmp_path: Path) -> None:
+    """0008 (AGT-03) creates graph_snapshots; down drops it, leaving 0007 intact."""
+    from alembic import command
+
+    db = tmp_path / "migrate_0008.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0007 -> graph_snapshots does NOT exist yet (additive 0008).
+    command.upgrade(cfg, "0007_doc_edges")
+    assert "graph_snapshots" not in set(inspect(engine).get_table_names())
+
+    # upgrade head (through 0008) -> the table exists with its key columns.
+    command.upgrade(cfg, "head")
+    assert "graph_snapshots" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("graph_snapshots")}
+    assert {"id", "repo_id", "captured_at", "snapshot"} <= cols
+    # ...and BOTH declared indexes (index-parity with GraphSnapshotRow —
+    # PR #20 review: columns alone don't prove the indexed projection).
+    indexed = {
+        col
+        for ix in inspect(engine).get_indexes("graph_snapshots")
+        for col in ix["column_names"]
+    }
+    assert {"repo_id", "captured_at"} <= indexed
+
+    # downgrade to 0007 -> dropped; the doc-edges table remains.
+    command.downgrade(cfg, "0007_doc_edges")
+    after = set(inspect(engine).get_table_names())
+    assert "graph_snapshots" not in after
+    assert "config_doc_edges" in after
+
+
+def test_alembic_migration_0009_suggestions_up_then_down(tmp_path: Path) -> None:
+    """0009 (AGT-06) creates suggestions; down drops it, leaving 0008 intact."""
+    from alembic import command
+
+    db = tmp_path / "migrate_0009.db"
+    url = f"sqlite:///{db}"
+    cfg = _alembic_config(url)
+    engine = engine_from_url(url)
+
+    # upgrade to 0008 -> suggestions does NOT exist yet (additive 0009).
+    command.upgrade(cfg, "0008_graph_snapshots")
+    assert "suggestions" not in set(inspect(engine).get_table_names())
+
+    # upgrade head -> the table exists with its key columns, indexes AND the
+    # (repo_id, key) uniqueness the reconcile upsert relies on.
+    command.upgrade(cfg, "head")
+    assert "suggestions" in set(inspect(engine).get_table_names())
+    cols = {c["name"] for c in inspect(engine).get_columns("suggestions")}
+    assert {"id", "repo_id", "key", "status", "suggestion"} <= cols
+    indexed = {
+        col
+        for ix in inspect(engine).get_indexes("suggestions")
+        for col in ix["column_names"]
+    }
+    assert {"repo_id", "key", "status"} <= indexed
+    uniques = inspect(engine).get_unique_constraints("suggestions")
+    assert any(set(u["column_names"]) == {"repo_id", "key"} for u in uniques)
+
+    # downgrade to 0008 -> dropped; the graph table remains.
+    command.downgrade(cfg, "0008_graph_snapshots")
+    after = set(inspect(engine).get_table_names())
+    assert "suggestions" not in after
+    assert "graph_snapshots" in after

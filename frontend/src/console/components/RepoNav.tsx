@@ -9,10 +9,12 @@ import {
   linkToCoverage,
   linkToDependencies,
   linkToDocuments,
+  linkToGraph,
   linkToHealth,
   linkToMapping,
   linkToOwnership,
   linkToRepo,
+  linkToSuggestions,
   linkToWorklist,
 } from "../routing";
 
@@ -27,8 +29,10 @@ type View =
   | "mapping"
   | "documents"
   | "dependencies"
+  | "graph"
   | "ownership"
   | "worklist"
+  | "suggestions"
   | "coverage"
   | "health";
 
@@ -37,8 +41,10 @@ function activeView(pathname: string): View {
   if (pathname.endsWith("/health")) return "health";
   if (pathname.endsWith("/documents")) return "documents";
   if (pathname.endsWith("/dependencies")) return "dependencies";
+  if (pathname.endsWith("/graph")) return "graph";
   if (pathname.endsWith("/ownership")) return "ownership";
   if (pathname.endsWith("/worklist")) return "worklist";
+  if (pathname.endsWith("/suggestions")) return "suggestions";
   if (pathname.endsWith("/mapping")) return "mapping";
   return "drift";
 }
@@ -58,8 +64,14 @@ export function RepoNav({ repoId }: RepoNavProps) {
       label: "Dependencies",
       to: linkToDependencies(repoId),
     },
+    { view: "graph", label: "Graph", to: linkToGraph(repoId) },
     { view: "ownership", label: "Ownership", to: linkToOwnership(repoId) },
     { view: "worklist", label: "Worklist", to: linkToWorklist(repoId) },
+    {
+      view: "suggestions",
+      label: "Suggestions",
+      to: linkToSuggestions(repoId),
+    },
     { view: "coverage", label: "Coverage", to: linkToCoverage(repoId) },
     { view: "health", label: "Health", to: linkToHealth(repoId) },
   ];

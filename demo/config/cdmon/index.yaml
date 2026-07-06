@@ -38,6 +38,38 @@ coverage:
     - path: "tests/__init__.py"
       reason: "docstring-only test-package marker; no documentable surface (the test-doc mirror covers the test modules themselves)"
 
+# AGT-01 mention layer: the curated stoplist that keeps the demo's rot signal
+# EMPTY out of the box (DEMO-099) — the same triage the parent repo dogfoods.
+# Groups, each justified:
+#   * config-schema KEYS quoted in prose, below symbol granularity:
+#     code_refs, context_refs, local_path, suggested_unit
+#   * toolchain conventions / runtime artifacts, not committed tree entries:
+#     __pycache__, core/notes.log (written by the tutorial's own task run)
+#   * PARENT-repo paths & engine symbols: this fixture doubles as the parent
+#     repo's live-demo seed, and the README documents that role — those
+#     referents live outside this standalone tree:
+#     demo/, demo/config/cdmon, scripts/seed_demo.py, seed_demo.py,
+#     tests/system/test_gitrepo_sync_e2e.py, generate.apply_record_fix,
+#     generate.apply_edits_to_disk, add_code_ref
+#   * external library classes: TestClient
+entities:
+  ignore:
+    - code_refs
+    - context_refs
+    - local_path
+    - suggested_unit
+    - __pycache__
+    - core/notes.log
+    - demo/
+    - demo/config/cdmon
+    - scripts/seed_demo.py
+    - seed_demo.py
+    - tests/system/test_gitrepo_sync_e2e.py
+    - generate.apply_record_fix
+    - generate.apply_edits_to_disk
+    - add_code_ref
+    - TestClient
+
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
 # *.yaml unit on disk MUST be listed (run `cdx index` to regenerate).
 units:

@@ -9,6 +9,7 @@ import type {
   EditableConfigTree,
   GenerateRequest,
   GenerateResponse,
+  GraphSnapshot,
   OwnershipData,
   RegisteredRepo,
   RepoHealth,
@@ -18,6 +19,7 @@ import type {
   SettingsData,
   StalenessData,
   StoredConfigEdit,
+  SuggestionsData,
   SyncMode,
   SyncRun,
   Worklist,
@@ -202,6 +204,38 @@ export class ApiClient {
    *  triage). The HUB view omits suspect items (repo-local, K2). */
   worklistFor(repoId: string): Promise<Worklist> {
     return this.getJson<Worklist>(`/repos/${encodeRepoId(repoId)}/worklist`);
+  }
+
+  /** GET {base}/repos/{repoId}/graph → GraphSnapshot (AGT-03 mirror). `{}`
+   *  before the repo has pushed a snapshot — an honest "no graph yet". */
+  graphFor(repoId: string): Promise<GraphSnapshot> {
+    return this.getJson<GraphSnapshot>(`/repos/${encodeRepoId(repoId)}/graph`);
+  }
+
+  /** GET {base}/repos/{repoId}/suggestions?include_closed=… → SuggestionsData
+   *  (AGT-06). `includeClosed` adds the resolved/dismissed audit trail. */
+  suggestionsFor(repoId: string, includeClosed = false): Promise<SuggestionsData> {
+    const qs = includeClosed ? "?include_closed=true" : "";
+    return this.getJson<SuggestionsData>(
+      `/repos/${encodeRepoId(repoId)}/suggestions${qs}`,
+    );
+  }
+
+  /**
+   * POST {base}/repos/{repoId}/suggestions/{key}/dismiss — the durable human
+   * 'no' (K11): the key never resurfaces from later worker ticks. Bearer
+   * token like every write; non-2xx → a thrown `ApiError`.
+   */
+  dismissSuggestion(
+    repoId: string,
+    key: string,
+    token: string,
+  ): Promise<{ repo_id: string; key: string; status: string }> {
+    return this.postJson<{ repo_id: string; key: string; status: string }>(
+      `/repos/${encodeRepoId(repoId)}/suggestions/${encodeURIComponent(key)}/dismiss`,
+      {},
+      token,
+    );
   }
 
   /**

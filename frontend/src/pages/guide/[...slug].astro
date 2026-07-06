@@ -31,6 +31,8 @@ export async function getStaticPaths() {
       };
     if (u.includes("worklist"))
       return { slug: "review-worklist", title: "Review worklist", order: 3 };
+    if (u.includes("agent"))
+      return { slug: "agent-layer", title: "Agent layer", order: 4 };
     return null;
   }
   const entries = await getCollection("guides");

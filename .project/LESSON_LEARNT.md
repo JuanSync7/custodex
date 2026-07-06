@@ -2117,3 +2117,167 @@ own implementing modules are inside the thing being gated.
   `drifted_tiers` precedent: stringly-typed field (the enum stays in `drift.py`),
   additive schema **minor bump 1.1.0→1.2.0**, regen the golden `cdx schema` artifacts
   (`docs/REVIEW_RECORD_SCHEMA.json` + `frontend/src/console/schema.review.json`).
+
+## [AGT-01] The mention layer: measured precision beats designed precision
+- **Design review with corpus measurement is worth more than the design.** Three of
+  the four load-bearing precision rules (module-stem ambiguity, ambiguous-basename-
+  mints-nothing, colon/absolute-span rejection) came from MEASURING the pinned rules
+  against the real dogfood corpus — first by the review agents (who found the
+  `app`/`coverage`/`index` misresolution trap and the ~90-row noise floor), then by
+  running the freshly-built scanner day-one (25 → 16 → 0 unresolved across four rule
+  refinements). A mention layer designed on fixtures alone would have shipped all of it.
+- **Two precision rules can conflict; reconcile them explicitly.** "A collision never
+  resolves" and "a plain word is never unresolved" meet on a plain word that collides
+  with a module stem (`alpha`): the reconciliation — blocked from resolving AND not
+  unresolved-eligible ⇒ mints nothing — only became visible when a test encoded the
+  wrong expectation. Write the conflict case down as a test the moment you see it.
+- **Pin an EMPTY expected set, not an enumerated one, for corpus-level precision
+  gates.** `test_entities_dogfood.py` asserts zero unresolved + forbidden noise shapes
+  rather than a list of expected rows: a prose edit that adds a legit unresolved
+  mention should fail as NEW SIGNAL for triage (fix prose / extend the justified
+  stoplist / accept), exactly like the wiki freshness gate — not force a mechanical
+  pin update that trains people to rubber-stamp it.
+- **A dead subagent is a recoverable event, not a blocker.** The slice subagent hit
+  the account session limit at spawn; the orchestrator carried the slice in the main
+  loop from the same spec with zero rework — because the spec, the ⟨R⟩ rules, and the
+  DoD bundle were all pinned in the repo, not in the dead agent's context. That is
+  the PROCESS.md re-dispatch clause working as designed.
+
+## [AGT-02] Suggestion loops need BOTH verbs, and writers must respect hand-authored YAML
+- **A suggester without a reject verb is a nag.** `cdx deps --suggest` recomputes from
+  scratch every run, so a declined suggestion would re-surface forever; the durable
+  `.cdmon/edge-rejections.jsonl` verdict file (the resolutions-log precedent) is what
+  turns the suggester from noise into a queue. Any future suggester (workers' ADD_EDGE
+  included) must consume the same rejection memory.
+- **Never model-round-trip a hand-maintained YAML file.** `dump_unit_file` is correct
+  for FRESH files (onboarding) but destroys comments on hand-authored units — the
+  dogfood units carry 30+ load-bearing comment lines. The `declare_edge` pattern:
+  validate through the LOADED models, write through a targeted textual splice, then
+  self-validate the result and revert on failure. (The regenerate_index precedent,
+  now proven for unit files too.)
+- **The join layer must not inherit `discover_symbols`' fail-fast.** Any advisory
+  pass over arbitrary repos (suggesters, graph builders, worker ticks) needs per-file
+  try/except; the coverage resolver's abort-on-one-bad-file is for the GATE, not for
+  advice.
+- **A baseline knob that both detection AND stamping read is self-consistent by
+  construction.** Threading `docdeps.baseline` through `upstream_fingerprint`'s two
+  call sites (detect + stamp) from ONE config field means a flip can never produce
+  divergent stamps — the failure mode of adding the knob at only one call site would
+  have been permanent suspects.
+
+## [AGT-03] Graph semantics live in the fold, not the storage
+- **Edges-as-a-set IS a semantic decision.** Deduping (source, target, kind, tier)
+  makes rank_centrality count DISTINCT mentioning docs rather than raw mention
+  occurrences — discovered when a system test expected 2 for a twice-mentioned
+  symbol. The set semantics is the better signal (one doc can't stuff the ballot);
+  write the chosen meaning into the docstring the moment a test disagrees with you.
+- **Share one scan via an additive param, not a cache.** The graph needs both the
+  registry's warnings and the mention results; `corpus_entities(registry=...)`
+  (default None = build) keeps the function pure and the call sites explicit — no
+  module-level memoization to poison determinism.
+- **The coverage-snapshot pattern generalizes cleanly.** Opaque versioned JSON +
+  token-gated POST + open GET + both-store parity + one additive Alembic table was
+  a 1:1 template for the graph mirror; the second `extra="allow"` ingest model is
+  sanctioned by the same reasoning (the payload versions itself via schema_version).
+
+## [AGT-04] Onboarding = plan artifact + arrive-green, or it is worse than nothing
+- **The heal step belongs INSIDE the onboarding command.** A generated config that
+  needs the adopter to discover `lint --fix` → `monitor --apply` (the measured
+  3-step dance) has just moved the friction, not removed it. `cdx onboard --apply`
+  scaffolds + heals + self-validates in one invocation, so the FIRST `cdx check` an
+  adopter ever runs is green — anything less trains them to distrust the tool.
+- **Fresh files may model-dump; edited files must splice.** The same slice family
+  now holds both precedents: `apply_plan` uses `dump_unit_file` (fresh units, no
+  comments to destroy) while `cdx link` splices (hand-maintained units). The rule
+  is about the FILE's authorship history, not about which function is convenient.
+- **Keep template references and ensured files in one constant.** The init --v2 DOA
+  bug existed because DOC_STYLE_TEMPLATE named files nothing guaranteed;
+  WRITING_TEMPLATE_STEMS is now the single source both the map and
+  ensure_writing_templates read — the drift class is structurally gone.
+
+## [AGT-05] Author through the heal seam, and treat a dead verifier's tree as a crime scene
+- **New-doc authoring must ride the SAME region-mode path the healer uses.** The
+  doc-writer births a document whose `overview` region is authored via a synthetic
+  B-06 FixRequest through `make_backend` — so when the source later drifts,
+  `monitor --apply` re-authors that region through the identical seam. A bespoke
+  authoring path would produce docs the maintenance loop can't re-author (rot by
+  construction). The lifecycle test (write → edit source → drift → heal re-authors)
+  is the guard.
+- **Replace whole placeholder LINES, not prefixes.** `scaffold_doc`'s purpose line
+  is `> TODO: content for 'overview'`; a prefix `.replace("> TODO", prose)` glues
+  the scaffold tail onto the authored sentence. Placeholder substitution must span
+  the full line.
+- **A killed subagent can leave the repo booby-trapped.** A review verifier died
+  mid-mutation-experiment: working tree stashed (with ALL uncommitted slice work in
+  it), HEAD detached onto an older commit, and a deliberate bug injected into
+  `entities.py`. Recovery protocol: read the reflog BEFORE touching anything,
+  discard injected diffs, re-attach the branch, `git stash pop`. Never run the gate
+  or commit from a tree a dead agent last touched without auditing
+  status+reflog+stash first.
+
+## [AGT-RF1] Review-fix round: the universe must be checkout-invariant, and a parameter nobody exercises is already broken
+- **Any resolution universe built from the live filesystem MUST honor the ignore
+  config.** The dogfood precision test was green on the dev tree and red on every
+  clean checkout because an untracked build artifact (`frontend/dist`) resolved a
+  mention. Same-commit-same-output (K10) extends to *what exists*: filter the walk
+  by the loaded `coverage.exclude` (which already folds in .gitignore) and stoplist
+  prose references to excluded trees. Two corpora now pin 0-unresolved WITH a
+  positive floor so the pin can't pass vacuously.
+- **A keyword parameter with no exercising test is indistinguishable from a bug —
+  and here it WAS one.** `rank_centrality(kind=...)` hardcoded SYMBOL; every test
+  used the default, so both the review's deleted-filter mutant and the real
+  dead-parameter bug survived. When a review reports "mutation-survivable", check
+  whether the untested knob even works before adding the killing fixture.
+- **Splice self-validation must be SEMANTIC, not just parse-clean.** Flow-style
+  `depends_on: [...]` + a spliced block-style key = legal YAML that loads fine
+  with the old edges silently gone (PyYAML last-wins). "It loads" told us nothing;
+  now the reloaded edge set must equal old ∪ {new} or the file reverts. Guard
+  duplicate-key classes with a semantic post-condition, not a reload.
+- **Demo output quoted in DEMOS.md is a tested contract — never write it from
+  memory.** DEMO-098 cited a symbol (`TaskFlow`) that never existed and DEMO-102's
+  command exited 1 as written. Run every quoted command against the demo tree
+  before committing the prose.
+
+## [AGT-06] Background agents = pure ticks + a reconciled inbox, never a daemon that "knows things"
+- **The worker computes NOTHING new.** Both suggesters are thin folds over
+  detectors the engine already ships (drift, suspect links, promotions, the
+  graph rank, edge suggestions). The moment a background agent grows its own
+  detection logic, its output can disagree with the CLI's and the inbox stops
+  being trustworthy. One problem = one owner: SUSPECT_LINK drifts are excluded
+  from FIX_DRIFT because RESOLVE_EDGE owns edges (mutation-verified).
+- **Key discipline is the whole design.** Hash ONLY structured identity fields —
+  never prose, never the clock. Event kinds embed the occurrence (surface hash /
+  upstream fingerprint) so recurrence-after-heal is new work; standing kinds are
+  occurrence-free so one dismiss silences the suggestion forever. Get this wrong
+  and either dismissed items resurrect or healed items stay silenced.
+- **Reconcile, don't append.** sync_suggestions makes the stored inbox EQUAL
+  current reality: vanished items auto-resolve (audit-kept), reappearing items
+  reopen with their first-seen stamp, dismissed items never return. An
+  insert-only inbox rots into noise within days.
+- **A test fixture that edits a healed doc must edit the BODY in place.** A
+  whole-file `_write` drops the cdm frontmatter the heal stamped, minting a
+  spurious fingerprint-None drift that made api look drifted — the fixture bug
+  masqueraded as an engine bug for one red run.
+
+## [AGT-RF2] Two green slices can be one dead feature — test the COMPOSITION
+- **Every agent that WRITES what another agent READS needs a composition e2e.**
+  `cdx onboard --apply` (0-indent dump_unit_file YAML) and `cdx write-doc
+  --apply` (2-space-assuming splice) each passed their own full DoD — and were
+  dead TOGETHER on every onboarded repo. The fix is indent-adaptive splicing,
+  but the durable lesson is the test shape: onboard a scratch repo, then run
+  every write-verb against it (write-doc has one now; link already worked
+  because docmap's splice measured real indentation from day one).
+- **"Regression-guarded" is a claim to PROVE per field, not per function.** The
+  key tests guarded 2 of 5 hashed fields; the other 3 dropped silently (and a
+  reversed tick return survived a 2-item sorted assertion by coin-flip). Golden
+  vectors that recompute the hash INDEPENDENTLY from the pinned fields kill
+  every drop/reorder/separator mutant at once — then RUN the mutants to prove
+  it (all 5 re-run and killed).
+- **The checkout-variance class has a git shape too.** After fixing
+  build-artifact variance (frontend/dist), the suite still depended on an
+  UNTRACKED fixture a .gitignore swallowed (demo notes.log) — green locally,
+  red on every clone. New smoke lint: every load-bearing ignore-matched fixture
+  must be in `git ls-files`.
+- **Display order is a documented claim.** DEMO-107 said "severity-first"; the
+  renderer printed hash order. Sort at the DISPLAY layer (severity, then key)
+  and keep the data layer key-sorted for reconciliation — both deterministic.
