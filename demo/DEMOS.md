@@ -1432,3 +1432,22 @@ template files before any check could run). The four generic files appear under
 `templates/writing/<category>/`. Pinned by `tests/unit/test_templates.py`
 (scaffold-then-load in a bare tmp tree + never-overwrite guards).
 Features: FEAT-ONBOARD-002
+
+### DEMO-106 — Write a doc from code in one verb (`cdx write-doc`)
+**What it shows.** The doc-writer agent: one command takes an undocumented
+source file to a REGISTERED, conformant, check-green document. The skeleton is
+mechanical (scaffolded symbol table + fingerprints from the same surface — born
+in sync); the prose is AUTHORED through the backend seam (the offline mock
+writes a deterministic audience-aware overview; a real LLM backend writes real
+prose through the same contract); registration appends the document entry to
+the unit YAML by a comment-preserving splice (your hand-written comments
+survive byte-for-byte). And the prose stays alive: the `overview` region is
+`mode: llm`, so when the code surface moves the standing heal loop re-authors
+it — documentation that keeps itself current, with every re-author recorded.
+**How to observe.** On a scratch dir-layout repo: `cdx write-doc src/mod.py`
+prints the draft + the exact unit snippet (dry-run, K11); `--apply` registers +
+writes and reports "0 drift(s) on the new doc"; then change the source — `cdx
+check` flags the doc, `cdx monitor --apply` heals it and the overview prose now
+names the new symbols. Pinned by `tests/unit/test_docwriter.py` +
+`tests/system/test_docwriter_cli.py` (the full write→drift→re-author lifecycle).
+Features: FEAT-DOCWRITER-001

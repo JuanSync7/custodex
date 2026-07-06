@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 7a14cb695642f6b8
+  fingerprint: 5f512493514c7fd4
   fingerprint_tiers:
-    composite: 7a14cb695642f6b8
-    signature: 7a14cb695642f6b8
+    composite: 5f512493514c7fd4
+    signature: 5f512493514c7fd4
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -17,6 +17,7 @@ cdm:
     1d3c8aff2168435b: 7f757c94419dec88
     20f65c28671b4093: 195057ec33efc577
     24c458cfb46d9a45: 953d02f5d1ac5781
+    2c6c03ca07d1b881: 5a4a02b022bccca2
     2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     602fda589448378a: 8afb4765b2d48e0c
@@ -108,6 +109,7 @@ cdx doctor               # offline, read-only preflight: PASS/WARN/FAIL on confi
 
 # --- author / inspect docs ---
 cdx new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
+cdx write-doc TARGET [--apply]  # NEW: author + REGISTER a doc for a source file in one verb — dry-run prints the draft + unit snippet; --apply splices the entry into the unit YAML (comments preserved), writes the doc with backend-authored `overview` prose (mode: llm — re-authors when the code moves), born check-green
 cdx surface              # dump the extracted per-document surface (debug)
 cdx build                # render every `html: true` doc to its derived `.html` twin (keeps the Layout Standard's HTML pairing fresh)
 cdx lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter

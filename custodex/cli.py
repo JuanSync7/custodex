@@ -31,9 +31,11 @@ import typer
 
 from . import coverage as coverage_mod
 from . import inventory
+from .backends import make_backend
 from .build import build as build_twins
 from .config import (
     DEFAULT_CENTRAL_TOKEN_ENV,
+    Audience,
     DocEdgeType,
     MonitorConfig,
     central_config_template,
@@ -65,6 +67,13 @@ from .docmap import (
 )
 from .docstyle import DocStyleMap
 from .doctor import CheckStatus, run_checks
+from .docwriter import (
+    build_doc_spec,
+    draft_document,
+    proposed_doc_id,
+    unit_snippet,
+    write_and_register,
+)
 from .drift import DriftKind
 from .entities import corpus_entities, render_entities_text
 from .errors import CodeDocMonitorError, SchemaError
@@ -1829,6 +1838,113 @@ def onboard(
             "onboarded — `cdx check` is green; next: review the plan notes, "
             "set real owners, and commit config/cdmon/ + docs/"
         )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("write-doc")
+def write_doc(
+    target: str = typer.Argument(
+        ..., metavar="TARGET", help="Repo-relative source file to document."
+    ),
+    unit: str | None = typer.Option(
+        None,
+        "--unit",
+        help="Unit file to register in (default: the unit whose dir-covered "
+        "owns TARGET, by deepest-wins attribution).",
+    ),
+    doc_id: str | None = typer.Option(
+        None, "--id", help="Doc id (default: derived from TARGET, pkg-sub-mod)."
+    ),
+    audience: str = typer.Option(
+        "eng-guide", "--audience", help="user-guide | eng-guide."
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Register the doc in the unit YAML (comment-preserving splice) "
+        "and WRITE the authored file. Default is a DRY-RUN draft (K11).",
+    ),
+    config: Path = _CONFIG_OPTION,
+) -> None:
+    """Write a new document from code and register it (agents suggest; humans apply).
+
+    The AGT-05 doc-writer: the skeleton is the mechanical scaffold (born
+    in-sync — the fingerprint stamps from the same surface), the purpose line
+    and an `overview` region (mode: llm) are AUTHORED through the backend
+    seam (the offline mock writes a deterministic stand-in; a real backend
+    writes real prose through the same contract), and the B-06 machinery
+    keeps the prose fresh afterwards. Dir-layout configs only.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        if not (config_dir / "index.yaml").is_file():
+            raise SchemaError(
+                "`cdx write-doc` registers into the config/cdmon dir layout; "
+                "this config is a single file — add the document by hand (or "
+                "migrate with `cdx init --v2`)"
+            )
+        root = resolve_repo_root(config_dir, cfg.root)
+        norm_target = target.strip("/")
+        if not (root / norm_target).is_file():
+            raise SchemaError(f"TARGET {norm_target!r} is not a file under {root}")
+        try:
+            aud = Audience(audience)
+        except ValueError as exc:
+            raise SchemaError(
+                f"unknown audience {audience!r} — expected user-guide | eng-guide"
+            ) from exc
+        final_id = doc_id or proposed_doc_id(norm_target)
+        spec = build_doc_spec(
+            doc_id=final_id,
+            path=f"docs/{final_id}.md",
+            audience=aud,
+            code_refs=(norm_target,),
+        )
+        bundle = load_bundle(config_dir)
+        owning = bundle.unit_for_path(norm_target)
+        final_unit = unit or (owning.frontmatter.unit if owning else None)
+        if final_unit is None:
+            raise SchemaError(
+                f"no unit's dir-covered owns {norm_target!r} — pass --unit explicitly"
+            )
+        backend = make_backend(cfg.backend, cfg.agent)
+        if not apply:
+            surface = build_document_surface(spec, root)
+            typer.echo(f"# would register {final_id!r} in {final_unit}.yaml as:")
+            typer.echo(unit_snippet(spec))
+            typer.echo(f"\n# and write docs/{final_id}.md:\n")
+            typer.echo(
+                draft_document(
+                    spec,
+                    surface,
+                    backend=backend,
+                    include_body=cfg.fingerprint_body_tier,
+                )
+            )
+            typer.echo("\n# dry-run — nothing written. Re-run with --apply.")
+            return
+        written = write_and_register(
+            config_dir,
+            unit=final_unit,
+            spec=spec,
+            backend=backend,
+            now=_now(),
+        )
+        cfg2, _ = _load(config)
+        drift = Monitor(cfg2, config_dir).check()
+        mine = [d for d in drift.drifts if d.doc_id == final_id]
+        typer.echo(
+            f"wrote {written} and registered {final_id!r} in {final_unit}.yaml; "
+            f"self-check: {len(mine)} drift(s) on the new doc"
+        )
+        if mine:
+            for d in mine:
+                typer.echo(f"  drift: {d.kind.value} — {d.detail}", err=True)
+            raise SchemaError(
+                "the written document is not in sync — see the drifts above"
+            )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

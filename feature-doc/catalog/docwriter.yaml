@@ -1,0 +1,37 @@
+# Feature catalog — `docwriter` subsystem (AGT-05: write-new-doc-from-code).
+# One verb from an undocumented source file to a registered, conformant,
+# check-green document with authored prose — mechanical where the machine is
+# right (scaffold, fingerprints), backend-authored where prose is needed, and
+# advisory until the human applies (K11). Golden source of truth (EPIC R).
+features:
+  - id: FEAT-DOCWRITER-001
+    title: "`cdx write-doc` — author + register a new doc, born in sync"
+    summary: >-
+      docwriter.draft_document renders the full written document: the mechanical
+      scaffold_doc skeleton (fingerprint + symbol_sigs stamped from the SAME surface,
+      so the doc is born in-sync — the very next `cdx check` is green with no
+      separate heal step), an authored purpose blockquote (a pure function of the
+      spec/surface — deterministic, and explicitly marked as the human's line to
+      refine), and an `overview` region declared `mode: llm` whose body is AUTHORED
+      through the standing Backend seam via a synthetic B-06 no-renderer REGION
+      request — the offline MockBackend writes its deterministic audience-aware
+      stand-in (K4/K10), a real backend writes real prose through the exact same
+      contract, and a non-FIX verdict or bodyless fix DEGRADES to the scaffold
+      placeholder (visible TODO, never a crash). Because the region is `mode: llm`,
+      the B-06 machinery owns its future: the prose RE-AUTHORS when the code surface
+      moves and no-ops when it doesn't (K7) — proven e2e by mutating the source,
+      seeing the doc flagged, and watching `monitor --apply` re-author the overview
+      with the new symbols. write_and_register follows the AGT-04 authorship rule:
+      the new document entry is APPENDED to the hand-maintained unit YAML by a
+      bounded textual splice (comments byte-preserved; reload-validated and reverted
+      on failure — never dump_unit_file), the frontmatter `updated:` bumps, and the
+      authored file is written. `cdx write-doc TARGET [--unit][--id][--audience]
+      [--apply]` is dry-run by default (prints the draft + the exact unit snippet —
+      K11); unit attribution defaults to the deepest-wins dir-covered owner of
+      TARGET; unknown unit / duplicate id / existing file / single-file config /
+      bad audience are all loud (K8); `--apply` self-checks the new doc for zero
+      drift and fails loudly otherwise.
+    subsystem: docwriter
+    modules: [docwriter, cli]
+    constraints: [K4, K7, K8, K10, K11]
+    status: implemented

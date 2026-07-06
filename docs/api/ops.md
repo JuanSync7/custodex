@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: fc5b54b72220521e
+  fingerprint: f43079354c8c04ef
   fingerprint_tiers:
-    composite: fc5b54b72220521e
-    docstring: d459ac8c2f499ab1
-    signature: 3d1c9d572270a0f7
+    composite: f43079354c8c04ef
+    docstring: 3b3d75c913c8f7d2
+    signature: 2221d1ac42155a69
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -25,6 +25,7 @@ cdm:
     - 20f65c28671b4093
     - 24c458cfb46d9a45
     - 2a07ca57ed083879
+    - 2c6c03ca07d1b881
     - 2cc497857559ff85
     - 44575cf5b28512d7
     - 484de142f352dff3
@@ -81,7 +82,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 6914e695faad8027
+    symbols: f88d646d45d9d4c6
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -101,6 +102,7 @@ cdm:
     20f65c28671b4093: 195057ec33efc577
     24c458cfb46d9a45: 953d02f5d1ac5781
     2a07ca57ed083879: 8faa07d8fc6c7c1d
+    2c6c03ca07d1b881: 5a4a02b022bccca2
     2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     484de142f352dff3: 1cc66be4e6718295
@@ -238,4 +240,5 @@ cdm:
 | trace | function | def trace(catalog: Path = typer.Option(Path('feature-doc') / 'catalog', '--catalog', help='The feature-doc/catalog directory of golden feature *.yaml files.'), tests_root: Path = typer.Option(Path('tests'), '--tests-root', help='Directory scanned for TEST evidence (inline `Feature:` tags).'), demo_root: Path = typer.Option(Path('demo'), '--demo-root', help='Directory scanned for DEMO evidence (inline `Feature:` tags).'), as_json: bool = typer.Option(False, '--json', help='Emit the traceability matrix as JSON instead of the human summary.'), fail_on_gap: bool = typer.Option(False, '--fail-on-gap', help='Exit nonzero if ANY feature lacks a test or demo, or any unknown ref exists (the CI gate, K8). Without it the command is informational (always exits 0).')) -> None |
 | wiki | function | def wiki(check: bool = typer.Option(False, '--check', help='Verify the wikis are fresh; exit nonzero if any is stale (no write).')) -> None |
 | worklist | function | def worklist(config: Path = _CONFIG_OPTION, owner: str \| None = typer.Option(None, '--owner', help="Show only this accountable owner's queue."), roster: Path \| None = typer.Option(None, '--roster', help='Offline roster YAML (identities: [...]) to classify ownership orphans. Without it, orphan items are skipped (no departure data).'), now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade staleness against (default: the current time).'), include_suspect: bool = typer.Option(True, '--include-suspect/--no-include-suspect', help='Include doc↔doc suspect-link items (repo-local).'), as_json: bool = typer.Option(False, '--json', help='Emit the worklist as JSON.'), fail_on_work: bool = typer.Option(False, '--fail-on-work', help='Exit 1 if ANY work item exists (a review gate). Default exits 0.')) -> None |
+| write_doc | function | def write_doc(target: str = typer.Argument(..., metavar='TARGET', help='Repo-relative source file to document.'), unit: str \| None = typer.Option(None, '--unit', help='Unit file to register in (default: the unit whose dir-covered owns TARGET, by deepest-wins attribution).'), doc_id: str \| None = typer.Option(None, '--id', help='Doc id (default: derived from TARGET, pkg-sub-mod).'), audience: str = typer.Option('eng-guide', '--audience', help='user-guide \| eng-guide.'), apply: bool = typer.Option(False, '--apply', help='Register the doc in the unit YAML (comment-preserving splice) and WRITE the authored file. Default is a DRY-RUN draft (K11).'), config: Path = _CONFIG_OPTION) -> None |
 <!-- CDM:END symbols -->

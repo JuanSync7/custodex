@@ -2194,3 +2194,23 @@ own implementing modules are inside the thing being gated.
   bug existed because DOC_STYLE_TEMPLATE named files nothing guaranteed;
   WRITING_TEMPLATE_STEMS is now the single source both the map and
   ensure_writing_templates read — the drift class is structurally gone.
+
+## [AGT-05] Author through the heal seam, and treat a dead verifier's tree as a crime scene
+- **New-doc authoring must ride the SAME region-mode path the healer uses.** The
+  doc-writer births a document whose `overview` region is authored via a synthetic
+  B-06 FixRequest through `make_backend` — so when the source later drifts,
+  `monitor --apply` re-authors that region through the identical seam. A bespoke
+  authoring path would produce docs the maintenance loop can't re-author (rot by
+  construction). The lifecycle test (write → edit source → drift → heal re-authors)
+  is the guard.
+- **Replace whole placeholder LINES, not prefixes.** `scaffold_doc`'s purpose line
+  is `> TODO: content for 'overview'`; a prefix `.replace("> TODO", prose)` glues
+  the scaffold tail onto the authored sentence. Placeholder substitution must span
+  the full line.
+- **A killed subagent can leave the repo booby-trapped.** A review verifier died
+  mid-mutation-experiment: working tree stashed (with ALL uncommitted slice work in
+  it), HEAD detached onto an older commit, and a deliberate bug injected into
+  `entities.py`. Recovery protocol: read the reflog BEFORE touching anything,
+  discard injected diffs, re-attach the branch, `git stash pop`. Never run the gate
+  or commit from a tree a dead agent last touched without auditing
+  status+reflog+stash first.

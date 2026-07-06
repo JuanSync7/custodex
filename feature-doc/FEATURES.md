@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**245 features** across 28 subsystems.
+**246 features** across 29 subsystems.
 
 ## agent
 
@@ -493,6 +493,16 @@ The suspect-baseline knob (additive K6, default `body` = byte-identical to the p
 ### `FEAT-DOCMAP-003` — `cdx link` — accept (comment-preserving splice) / reject (durable verdict)
 
 The missing human verbs for the suggestion loop (K11 — agents suggest, humans apply). ACCEPT: `cdx link DOWN UP [--type]` validates through the loaded models (unknown ids / self-edge / duplicate → loud ConfigError, K8) then declares the edge by a TARGETED TEXTUAL SPLICE of the unit YAML — inserting or extending the `depends_on:` block under the matching `- id:` entry and bumping the frontmatter `updated:` line — never a model re-serialization (dump_unit_file would destroy the 30+ load-bearing comment lines hand-maintained units carry; the regenerate_index textual-surgery precedent), self-validates the spliced config (reverting on failure), then stamps the new edge's baseline via stamp_edges(only=UP) so it arrives REVIEWED (no UNSTAMPED noise; `cdx check` stays green, K7); the churn note is echoed before writing so the decision is informed. REJECT: `cdx link --reject DOWN UP [--by][--note]` appends a durable EdgeRejection verdict to `.cdmon/edge-rejections.jsonl` (append-only, injected timestamp — the reviewlog precedent) which suggest_edges excludes forever — the repo-side rejection memory the review demanded (a declined suggestion never re-surfaces; the Dosu lesson with an audit trail). `cdx deps` gains the REAL infer_from_links behaviour: when true, ONE advisory summary line (count + how to review), never the full list — terminal-noise control; JSON shapes unchanged.
+
+## docwriter
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-DOCWRITER-001` | `cdx write-doc` — author + register a new doc, born in sync | docwriter, cli | K4, K7, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-DOCWRITER-001` — `cdx write-doc` — author + register a new doc, born in sync
+
+docwriter.draft_document renders the full written document: the mechanical scaffold_doc skeleton (fingerprint + symbol_sigs stamped from the SAME surface, so the doc is born in-sync — the very next `cdx check` is green with no separate heal step), an authored purpose blockquote (a pure function of the spec/surface — deterministic, and explicitly marked as the human's line to refine), and an `overview` region declared `mode: llm` whose body is AUTHORED through the standing Backend seam via a synthetic B-06 no-renderer REGION request — the offline MockBackend writes its deterministic audience-aware stand-in (K4/K10), a real backend writes real prose through the exact same contract, and a non-FIX verdict or bodyless fix DEGRADES to the scaffold placeholder (visible TODO, never a crash). Because the region is `mode: llm`, the B-06 machinery owns its future: the prose RE-AUTHORS when the code surface moves and no-ops when it doesn't (K7) — proven e2e by mutating the source, seeing the doc flagged, and watching `monitor --apply` re-author the overview with the new symbols. write_and_register follows the AGT-04 authorship rule: the new document entry is APPENDED to the hand-maintained unit YAML by a bounded textual splice (comments byte-preserved; reload-validated and reverted on failure — never dump_unit_file), the frontmatter `updated:` bumps, and the authored file is written. `cdx write-doc TARGET [--unit][--id][--audience] [--apply]` is dry-run by default (prints the draft + the exact unit snippet — K11); unit attribution defaults to the deepest-wins dir-covered owner of TARGET; unknown unit / duplicate id / existing file / single-file config / bad audience are all loud (K8); `--apply` self-checks the new doc for zero drift and fails loudly otherwise.
 
 ## drift
 
