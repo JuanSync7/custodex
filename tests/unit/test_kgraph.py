@@ -21,6 +21,7 @@ from custodex.config import (
     CoverageConfig,
     DocEdge,
     DocumentSpec,
+    EntitiesConfig,
     MonitorConfig,
 )
 from custodex.errors import DriftError
@@ -104,9 +105,15 @@ class TestBuildGraph:
             g, EdgeKind.PART_OF
         )
         assert ("doc docs/guide.md", "owner mei") in _edge_set(g, EdgeKind.OWNED_BY)
+        # ALL SIX kinds carry the right tier (PR #20 review: asserting only
+        # two lets a saboteur flip the other four unnoticed).
         tiers = {e.kind: e.tier for e in g.edges}
         assert tiers[EdgeKind.DEPENDS_ON] is EdgeTier.DECLARED
+        assert tiers[EdgeKind.DOCUMENTS] is EdgeTier.DECLARED
+        assert tiers[EdgeKind.OWNED_BY] is EdgeTier.DECLARED
         assert tiers[EdgeKind.MENTIONS] is EdgeTier.RESOLVED
+        assert tiers[EdgeKind.LINKS_TO] is EdgeTier.RESOLVED
+        assert tiers[EdgeKind.PART_OF] is EdgeTier.RESOLVED
 
     def test_unresolved_counts_are_the_rot_signal(self, tmp_path: Path) -> None:
         cfg, root = _fixture(tmp_path)
@@ -157,6 +164,37 @@ class TestDerivedQueries:
         g = build_graph(cfg, root)
         with pytest.raises(DriftError, match="ghost"):
             graph_neighbors(g, "ghost")
+
+    def test_rank_centrality_kind_filter_excludes_other_kinds(
+        self, tmp_path: Path
+    ) -> None:
+        # PR #20 must-fix: no fixture exercised the kind filter, so both a
+        # deleted filter AND the hardcoded-SYMBOL bug survived every test.
+        # A PATH mention and an ENV_VAR mention must NOT rank as symbols —
+        # and MUST rank under their own kind.
+        cfg, root = _fixture(tmp_path)
+        cfg = cfg.model_copy(
+            update={"entities": EntitiesConfig(env_prefixes=("APP_",))}
+        )
+        _write(root, "notes.txt", "plain\n")
+        _write(
+            root,
+            "docs/guide.md",
+            "# Guide\n\nCall `helper_fn`; see `notes.txt` and set `APP_TOKEN`.\n",
+        )
+        g = build_graph(cfg, root)
+        assert ("doc docs/guide.md", "path notes.txt") in _edge_set(
+            g, EdgeKind.MENTIONS
+        )
+        assert ("doc docs/guide.md", "env APP_TOKEN") in _edge_set(g, EdgeKind.MENTIONS)
+        symbol_ranked = [node for node, _ in rank_centrality(g)]
+        assert "symbol beta.py#helper_fn" in symbol_ranked
+        assert "path notes.txt" not in symbol_ranked
+        assert "env APP_TOKEN" not in symbol_ranked
+        path_ranked = [node for node, _ in rank_centrality(g, kind=NodeKind.PATH)]
+        assert path_ranked == ["path notes.txt"]
+        env_ranked = [node for node, _ in rank_centrality(g, kind=NodeKind.ENV_VAR)]
+        assert env_ranked == ["env APP_TOKEN"]
 
     def test_rank_centrality_undocumented_gap_tops(self, tmp_path: Path) -> None:
         cfg, root = _fixture(tmp_path)

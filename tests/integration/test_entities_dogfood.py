@@ -39,6 +39,20 @@ def test_dogfood_unresolved_set_is_empty() -> None:
     assert unresolved == []
 
 
+def test_dogfood_extraction_has_a_positive_floor() -> None:
+    """empty-unresolved must not pass VACUOUSLY (PR #20 review).
+
+    A regression that silently kills extraction keeps ``unresolved == []``
+    alive; the floor pins that the corpus genuinely yields mentions (65 at
+    the last curation — the README carries most of them).
+    """
+    results = _results()
+    total = sum(len(r.mentions) for r in results)
+    by_doc = {r.doc_id: len(r.mentions) for r in results}
+    assert total >= 50
+    assert by_doc.get("readme", 0) >= 40
+
+
 def test_dogfood_mentions_contain_no_noise_shapes() -> None:
     """No mention text is a route/glob/colon-marker/whitespace fragment."""
     for r in _results():
@@ -66,3 +80,18 @@ def test_dogfood_known_resolutions_hold() -> None:
                     m.line,
                     m.entity_id,
                 )
+
+
+def test_dogfood_mentions_are_checkout_invariant() -> None:
+    """PR #20 must-fix regression: gitignored artifacts never mint mentions.
+
+    ``frontend/dist`` (untracked Astro build output) resolved on a BUILT dev
+    tree and rotted on a clean checkout — the same commit gave two different
+    rot signals. The universe now honors the config ignore set and the span
+    is stoplisted; neither it nor the dot-dir-excluded ``.project/`` tree may
+    ever mint a mention again, resolved OR unresolved, on any tree state.
+    """
+    for r in _results():
+        for m in r.mentions:
+            assert not m.text.startswith("frontend/dist"), (r.doc_id, m.line)
+            assert not m.text.startswith(".project/"), (r.doc_id, m.line)

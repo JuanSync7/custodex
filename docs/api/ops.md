@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: f43079354c8c04ef
+  fingerprint: 596b7927ee053f1d
   fingerprint_tiers:
-    composite: f43079354c8c04ef
-    docstring: 3b3d75c913c8f7d2
-    signature: 2221d1ac42155a69
+    composite: 596b7927ee053f1d
+    docstring: 473283061d92ee56
+    signature: 536882a4dd5d7d57
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -71,7 +71,6 @@ cdm:
     - df0ad6e43880f09c
     - df2a20195d34af2d
     - e31271f86c854de9
-    - e4d92308184e72ca
     - e62f7af7ce023782
     - eafe895eb8119e6e
     - eb2554c8c13b73f9
@@ -82,7 +81,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: f88d646d45d9d4c6
+    symbols: ccb8b7f0aa11eb17
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -148,7 +147,6 @@ cdm:
     df0ad6e43880f09c: 3019fb39391d3113
     df2a20195d34af2d: e7547f090ffd00e5
     e31271f86c854de9: aabc8b4ca7ed96f6
-    e4d92308184e72ca: 08074d894c8444ae
     e62f7af7ce023782: d6db45284c125e58
     eafe895eb8119e6e: 2492d10714d01761
     eb2554c8c13b73f9: 34e432f7557b73ab
@@ -195,7 +193,6 @@ cdm:
 | _parse_resolution | function | def _parse_resolution(value: str) -> Resolution |
 | _parse_verdict | function | def _parse_verdict(value: str) -> Verdict |
 | _region_mode_lines | function | def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str] |
-| _render_suggestions | function | def _render_suggestions(inferred: Sequence[InferredEdge]) -> str |
 | _resolve_config | function | def _resolve_config(config: Path) -> tuple[MonitorConfig, Path] |
 | _resolve_edge | function | def _resolve_edge(downstream: str, upstream: str, config: Path) -> None |
 | _run_uvicorn | function | def _run_uvicorn(app_obj: Any, *, host: str, port: int) -> None |

@@ -69,6 +69,35 @@ def test_graph_focus_view_and_loud_unknown(tmp_path: Path) -> None:
     assert result.exit_code == 1 and "error:" in result.output
 
 
+def test_graph_focus_with_json_emits_focused_edges(tmp_path: Path) -> None:
+    # PR #20 must-fix: `--focus X --json` used to silently ignore --focus and
+    # dump the WHOLE graph, skipping the K8 unknown-node check.
+    cfg = _setup(tmp_path)
+    result = runner.invoke(
+        app, ["graph", "--focus", "doc docs/api.md", "--json", "--config", str(cfg)]
+    )
+    assert result.exit_code == 0
+    edges = json.loads(result.output)
+    assert isinstance(edges, list) and edges
+    assert all(
+        e["source"] == "doc docs/api.md" or e["target"] == "doc docs/api.md"
+        for e in edges
+    )
+    ghost = runner.invoke(
+        app, ["graph", "--focus", "ghost-node", "--json", "--config", str(cfg)]
+    )
+    assert ghost.exit_code == 1 and "error:" in ghost.output
+
+
+def test_graph_focus_accepts_managed_doc_id(tmp_path: Path) -> None:
+    # Discoverability (PR #20 review): every other cdx command addresses docs
+    # by ID — a bare managed-doc id is shorthand for its `doc <path>` node.
+    cfg = _setup(tmp_path)
+    result = runner.invoke(app, ["graph", "--focus", "api", "--config", str(cfg)])
+    assert result.exit_code == 0
+    assert "doc docs/api.md" in result.output
+
+
 def test_graph_rank_surfaces_undocumented_gap(tmp_path: Path) -> None:
     cfg = _setup(tmp_path)
     result = runner.invoke(app, ["graph", "--rank", "--config", str(cfg)])

@@ -85,9 +85,10 @@ class ScoredEdge(BaseModel):
     doc_id: str  # the suggested DOWNSTREAM (the mentioning doc)
     upstream_id: str
     # K6: the legacy `deps --suggest --json` items carried {doc_id, upstream_id,
-    # via} — `via` is kept (the link target for RESOLVED_LINK; None for
-    # SHARED_SYMBOL) so the new items stay a key-SUPERSET of the old shape.
-    via: str | None
+    # via} with `via` ALWAYS a string — kept both ways: the link target for
+    # RESOLVED_LINK, the first evidence entry for SHARED_SYMBOL (a legacy
+    # consumer doing string ops on `via` must never meet a null — PR #20).
+    via: str
     tier: SuggestionTier
     evidence: tuple[str, ...]  # entity ids / link targets justifying the edge
     score: int  # count of independent evidence items (int — K10)
@@ -186,7 +187,7 @@ def suggest_edges(
             ScoredEdge(
                 doc_id=pair[0],
                 upstream_id=pair[1],
-                via=link_ev[0] if link_ev else None,
+                via=link_ev[0] if link_ev else sym_ev[0],
                 tier=tier,
                 evidence=evidence,
                 score=len(evidence),
@@ -333,9 +334,20 @@ def declare_edge(
 
     dep_line = None
     for j in range(start + 1, end):
-        if lines[j].strip() == "depends_on:":
+        stripped = lines[j].strip()
+        if stripped == "depends_on:":
             dep_line = j
             break
+        if stripped.startswith("depends_on:"):
+            # Flow-style `depends_on: [...]` (PR #20 must-fix): splicing a
+            # SECOND block-style key would let PyYAML's last-wins silently
+            # DROP the existing edges — refuse loudly, never guess.
+            raise ConfigError(
+                f"document {downstream_id!r} in {unit_path.name} declares "
+                "depends_on in flow-style (`depends_on: [...]`) — convert it "
+                "to block style (one `- doc:` per line) or add the edge by "
+                "hand; splicing next to it would silently drop edges"
+            )
     if dep_line is not None:
         insert_at = dep_line + 1
         for j in range(dep_line + 1, end):
@@ -361,13 +373,25 @@ def declare_edge(
             break
 
     unit_path.write_text("\n".join(lines), encoding="utf-8")
+    # Self-validate SEMANTICALLY: the reloaded downstream must carry exactly
+    # the old edge set plus the new edge — a config that merely LOADS is not
+    # enough (a silent edge drop loads fine; PR #20 must-fix). Any failure
+    # restores the original bytes (K8: never leave a broken config).
+    expected = {(e.doc, e.type) for e in spec.depends_on} | {(upstream_id, type)}
     try:
-        load_bundle(config_dir)  # self-validate: never leave a broken config (K8)
-    except ConfigError as exc:  # pragma: no cover - splice bug guard
+        reloaded = load_bundle(config_dir)
+        after = next(d for d in reloaded.config.documents if d.id == downstream_id)
+        got = {(e.doc, e.type) for e in after.depends_on}
+        if got != expected:
+            raise ConfigError(
+                f"post-splice edge set {sorted(e[0] for e in got)} != expected "
+                f"{sorted(e[0] for e in expected)}"
+            )
+    except ConfigError as exc:
         unit_path.write_text(text, encoding="utf-8")
         raise ConfigError(
-            f"edge splice produced an invalid config ({exc}); {unit_path.name} "
-            "restored — add the edge by hand"
+            f"edge splice produced a wrong or invalid config ({exc}); "
+            f"{unit_path.name} restored — add the edge by hand"
         ) from exc
     return unit_path
 
@@ -384,8 +408,19 @@ def reject_edge(
     by: str | None = None,
     note: str | None = None,
 ) -> Path:
-    """Append a durable rejection; the suggester excludes the pair forever."""
+    """Append a durable rejection; the suggester excludes the pair forever.
+
+    Loud on an already-rejected pair (K8, the AGT-02 contract): a second
+    verdict for the same edge is a re-litigation, not new data.
+    """
     path = cdmon_dir / REJECTIONS_PATH.name
+    if any(
+        r.doc_id == downstream_id and r.upstream_id == upstream_id
+        for r in read_rejections(cdmon_dir)
+    ):
+        raise ConfigError(
+            f"edge {downstream_id!r} → {upstream_id!r} is already rejected (see {path})"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     rejection = EdgeRejection(
         doc_id=downstream_id,

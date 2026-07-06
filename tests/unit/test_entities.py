@@ -145,6 +145,51 @@ class TestRegistry:
         reg = _registry(tmp_path)
         assert reg.resolve_symbol("_private_helper") is None
 
+    def test_walk_honors_config_ignore_set(self, tmp_path: Path) -> None:
+        # PR #20 must-fix: a gitignored artifact tree excluded via the config
+        # ignore set (merged into coverage.exclude at load) must never enter
+        # the resolution universe — otherwise mention resolution flips with
+        # local build state across checkouts of the SAME commit (K10).
+        _write(tmp_path, "frontend/dist/bundle.js", "x\n")
+        _write(tmp_path, "frontend/src/app.txt", "x\n")
+        cfg = _config(tmp_path).model_copy(
+            update={
+                "coverage": CoverageConfig(
+                    include=("**/*.py",), exclude=("frontend/dist/**",)
+                )
+            }
+        )
+        reg = build_registry(cfg, _fixture_repo(tmp_path))
+        assert "frontend/dist/bundle.js" not in reg.file_set
+        assert "frontend/dist" not in reg.dir_set
+        assert "frontend/src/app.txt" in reg.file_set  # sibling tree survives
+
+    def test_walk_honors_file_level_excludes(self, tmp_path: Path) -> None:
+        _write(tmp_path, "out/coverage.rpt", "x\n")
+        cfg = _config(tmp_path).model_copy(
+            update={
+                "coverage": CoverageConfig(include=("**/*.py",), exclude=("**/*.rpt",))
+            }
+        )
+        reg = build_registry(cfg, _fixture_repo(tmp_path))
+        assert "out/coverage.rpt" not in reg.file_set
+        assert "out" in reg.dir_set  # only the file is excluded, not its dir
+
+    def test_unregistered_suffix_warns_and_scan_continues(self, tmp_path: Path) -> None:
+        # A covered file whose suffix has no registered extractor becomes a
+        # warnings entry and contributes no symbols (resilience, not a crash).
+        _write(tmp_path, "script.tcl", "puts hi\n")
+        cfg = _config(tmp_path).model_copy(
+            update={
+                "coverage": CoverageConfig(include=("**/*.py", "**/*.tcl"), exclude=())
+            }
+        )
+        reg = build_registry(cfg, _fixture_repo(tmp_path))
+        assert any(
+            "script.tcl" in w and "no symbol extractor" in w for w in reg.warnings
+        )
+        assert reg.resolve_symbol("solve_widget") is not None
+
 
 # ---------------------------------------------------------------------------
 # Symbol resolution rules
@@ -207,6 +252,38 @@ class TestSymbolResolution:
         result = _extract(_registry(tmp_path), "See `unique_mod` for details.\n")
         (m,) = _mentions(result, EntityKind.PATH)
         assert m.resolved and m.entity_id == "path beta/unique_mod.py"
+
+    def test_plain_word_matching_unique_stem_mints_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        # PR #20 must-fix (the measured demo trap): prose task names `fetch`
+        # and `report` — plain English words — must NOT resolve to
+        # io/report.py by stem coincidence. Only snake/multi-hump names may
+        # resolve by stem alone; a plain word needs path-shape evidence.
+        _write(tmp_path, "io/report.py", "def render_report():\n    return 1\n")
+        reg = _registry(tmp_path)
+        result = _extract(reg, "so `fetch` always runs before `report`.\n")
+        assert result.mentions == ()
+
+    def test_plain_word_with_colliding_stems_mints_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        # PR #20 must-fix: `utils` names TWO module stems and no symbol — a
+        # plain word is never surfaced as unresolved rot (the pinned rule:
+        # only dotted/snake/multi-hump spans may be UNRESOLVED).
+        result = _extract(_registry(tmp_path), "The `utils` layer does it.\n")
+        assert result.mentions == ()
+
+    def test_snake_name_with_colliding_stems_is_unresolved(
+        self, tmp_path: Path
+    ) -> None:
+        # The same collision on an unresolved-ELIGIBLE shape stays rot signal.
+        _write(tmp_path, "beta/data_utils.py", "A = 1\n")
+        _write(tmp_path, "gamma/data_utils.py", "B = 2\n")
+        reg = _registry(tmp_path)
+        result = _extract(reg, "The `data_utils` layer does it.\n")
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert not m.resolved and m.entity_id is None
 
     def test_unknown_snake_identifier_is_unresolved_symbol(
         self, tmp_path: Path
@@ -345,6 +422,43 @@ class TestPathsAndLinks:
         (m,) = _mentions(result, EntityKind.PATH)
         assert not m.resolved
 
+    def test_site_absolute_and_out_of_tree_links_mint_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        # PR #20 review: link targets get the SAME precision guards backtick
+        # spans have — a site-absolute route or an out-of-tree traversal is
+        # not a repo path and must not mint unresolved rot.
+        raw = "[status](/api/status) and [up](../../../etc/passwd) here.\n"
+        result = _extract(_registry(tmp_path), raw)
+        assert result.mentions == ()
+
+    def test_protocol_relative_link_is_url(self, tmp_path: Path) -> None:
+        result = _extract(_registry(tmp_path), "See [cdn](//cdn.example.com/x.js).\n")
+        (m,) = _mentions(result, EntityKind.URL)
+        assert m.resolved and m.entity_id == "url //cdn.example.com/x.js"
+
+    def test_generated_report_suffix_is_path_shaped(self, tmp_path: Path) -> None:
+        # `.rpt`/`.log` are Custodex's OWN artifact conventions — a span like
+        # `coverage.rpt` is path-shaped, never a dotted-symbol misread.
+        _write(tmp_path, "config/coverage.rpt", "x\n")
+        result = _extract(_registry(tmp_path), "Read `coverage.rpt` after runs.\n")
+        (m,) = _mentions(result, EntityKind.PATH)
+        assert m.resolved and m.entity_id == "path config/coverage.rpt"
+
+    def test_unique_path_suffix_resolves(self, tmp_path: Path) -> None:
+        # More precise prose must not be punished: `core/notes.log` resolves
+        # when exactly ONE tree file ends with that suffix.
+        _write(tmp_path, "src/task/core/notes.log", "x\n")
+        result = _extract(_registry(tmp_path), "Watch `core/notes.log` grow.\n")
+        (m,) = _mentions(result, EntityKind.PATH)
+        assert m.resolved and m.entity_id == "path src/task/core/notes.log"
+
+    def test_ambiguous_path_suffix_mints_nothing(self, tmp_path: Path) -> None:
+        _write(tmp_path, "a/core/notes.log", "x\n")
+        _write(tmp_path, "b/core/notes.log", "x\n")
+        result = _extract(_registry(tmp_path), "Watch `core/notes.log` grow.\n")
+        assert result.mentions == ()
+
     def test_absolute_link_is_url_mention(self, tmp_path: Path) -> None:
         result = _extract(_registry(tmp_path), "See [site](https://x.example/a#b).\n")
         (m,) = _mentions(result, EntityKind.URL)
@@ -360,30 +474,79 @@ class TestPathsAndLinks:
 # Exclusions: fences, CDM regions, ignore list
 # ---------------------------------------------------------------------------
 class TestExclusions:
-    def test_fenced_code_mints_nothing(self, tmp_path: Path) -> None:
-        raw = "```python\nsolve_widget(1)\n`solve_widget`\n```\nProse.\n"
+    def test_fenced_code_mints_nothing_and_extraction_resumes(
+        self, tmp_path: Path
+    ) -> None:
+        # Two-sided (PR #20 review): the fence excludes its content AND
+        # extraction RESUMES after the close — a never-closing state machine
+        # would blank the trailing mention (the mutation the review ran).
+        raw = "```python\nsolve_widget(1)\n`solve_widget`\n```\nUse `solve_widget`.\n"
         result = _extract(_registry(tmp_path), raw)
-        assert result.mentions == ()
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 5
 
-    def test_cdm_region_mints_nothing(self, tmp_path: Path) -> None:
+    def test_cdm_region_mints_nothing_and_extraction_resumes(
+        self, tmp_path: Path
+    ) -> None:
         raw = (
             "<!-- CDM:BEGIN symbols -->\n"
             "| `solve_widget` | [other](other.md) |\n"
             "<!-- CDM:END symbols -->\n"
-            "Prose.\n"
+            "Use `solve_widget`.\n"
         )
         result = _extract(_registry(tmp_path), raw)
-        assert result.mentions == ()
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 4
+
+    def test_fence_line_inside_cdm_region_does_not_hijack_state(
+        self, tmp_path: Path
+    ) -> None:
+        # A ``` line INSIDE a CDM region is region content, not a fence open —
+        # the CDM:END must still close the region (state-machine ordering).
+        raw = (
+            "<!-- CDM:BEGIN example -->\n"
+            "```\n"
+            "<!-- CDM:END example -->\n"
+            "Use `solve_widget`.\n"
+        )
+        result = _extract(_registry(tmp_path), raw)
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 4
+
+    def test_cdm_marker_inside_fence_does_not_open_region(self, tmp_path: Path) -> None:
+        raw = "```\n<!-- CDM:BEGIN example -->\n```\nUse `solve_widget`.\n"
+        result = _extract(_registry(tmp_path), raw)
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 4
+
+    def test_longer_fence_swallows_shorter_fence_lines(self, tmp_path: Path) -> None:
+        # CommonMark: inside a ```` fence, a ``` line (or ```info) is CONTENT;
+        # only a bare fence of >= the opening length closes it.
+        raw = (
+            "````markdown\n```python\n`solve_widget`\n```\n````\nUse `solve_widget`.\n"
+        )
+        result = _extract(_registry(tmp_path), raw)
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 6
 
     def test_ignore_list_mints_nothing(self, tmp_path: Path) -> None:
         cfg = EntitiesConfig(ignore=("solve_widget",))
         result = _extract(_registry(tmp_path), "Use `solve_widget` here.\n", cfg)
         assert result.mentions == ()
 
-    def test_tilde_fence_also_excluded(self, tmp_path: Path) -> None:
-        raw = "~~~\n`solve_widget`\n~~~\nProse.\n"
-        result = _extract(_registry(tmp_path), raw)
+    def test_ignore_list_gates_link_targets_too(self, tmp_path: Path) -> None:
+        # The stoplist applies to EVERY mention source: a stoplisted span
+        # reached via a markdown link target must also mint nothing.
+        cfg = EntitiesConfig(ignore=(".project/STATUS.md",))
+        raw = "See [`.project/STATUS.md`](.project/STATUS.md) for status.\n"
+        result = _extract(_registry(tmp_path), raw, cfg)
         assert result.mentions == ()
+
+    def test_tilde_fence_also_excluded(self, tmp_path: Path) -> None:
+        raw = "~~~\n`solve_widget`\n~~~\nUse `solve_widget`.\n"
+        result = _extract(_registry(tmp_path), raw)
+        (m,) = _mentions(result, EntityKind.SYMBOL)
+        assert m.resolved and m.line == 4
 
 
 # ---------------------------------------------------------------------------
@@ -400,6 +563,14 @@ class TestSectionsAndShape:
             "section docs/guide.md#usage-2",
         ]
         assert [s.name for s in result.sections] == ["guide", "usage", "usage-2"]
+
+    def test_slug_dedup_never_collides_with_natural_slug(self, tmp_path: Path) -> None:
+        # PR #20 review: 'Foo', 'Foo', 'Foo 2' must not emit `foo-2` twice —
+        # duplicate SECTION ids silently merge into one kgraph node.
+        raw = "# Foo\n\n## Foo\n\n## Foo 2\n"
+        result = _extract(_registry(tmp_path), raw)
+        names = [s.name for s in result.sections]
+        assert len(names) == 3 and len(set(names)) == 3
 
     def test_mention_line_is_file_accurate_with_front_matter(
         self, tmp_path: Path

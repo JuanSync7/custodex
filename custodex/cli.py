@@ -20,9 +20,9 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import posixpath
 import re
 import sys
-from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -48,7 +48,6 @@ from .config import (
     write_template,
 )
 from .docdeps import (
-    InferredEdge,
     SuspectLink,
     detect_suspect_links,
     impacted_by,
@@ -85,7 +84,7 @@ from .issues import (
     open_coverage_issue,
     plan_coverage_issue,
 )
-from .kgraph import build_graph, rank_centrality, render_graph_text
+from .kgraph import build_graph, graph_neighbors, rank_centrality, render_graph_text
 from .layout import (
     config_region_states,
     lint_config,
@@ -1693,7 +1692,17 @@ def link(
         )
         cfg2, _ = _load(config)  # reload: the splice changed the config
         root = resolve_repo_root(config_dir, cfg2.root)
-        stamped = stamp_edges(cfg2, root, downstream, only=upstream)
+        try:
+            stamped = stamp_edges(cfg2, root, downstream, only=upstream)
+        except CodeDocMonitorError as exc:
+            # Honest partial state (PR #20 review): the declare succeeded —
+            # never let the stamp failure read as "nothing happened".
+            raise SchemaError(
+                f"edge {downstream!r} → {upstream!r} WAS declared in "
+                f"{unit_path.name} but its baseline could NOT be stamped "
+                f"({exc}); fix the doc file, then stamp with "
+                f"`cdx resolve --edge {downstream} {upstream}`"
+            ) from exc
         stamp_note = (
             "baseline stamped (edge arrives reviewed)"
             if stamped
@@ -2037,8 +2046,29 @@ def graph(
         root = resolve_repo_root(config_dir, cfg.root)
         unit_owner = _unit_owner_map(config_dir)
         g = build_graph(cfg, root, unit_owner=unit_owner)
-        if focus is not None and not as_json:
-            typer.echo(render_graph_text(g, focus=focus))
+        if focus is not None:
+            # Discoverability: a bare managed-doc ID is shorthand for its
+            # `doc <path>` node — every other cdx command addresses docs by
+            # id (PR #20 review).
+            if " " not in focus:
+                by_id = {
+                    d.id: f"doc {posixpath.normpath(d.path)}" for d in cfg.documents
+                }
+                focus = by_id.get(focus, focus)
+            if as_json:
+                # --focus composes with --json: the focused edge set, still
+                # loud on an unknown node (K8 — PR #20 must-fix: this cell
+                # used to silently dump the whole graph).
+                edges = graph_neighbors(g, focus)
+                typer.echo(
+                    json.dumps(
+                        [e.model_dump(mode="json") for e in edges],
+                        indent=2,
+                        sort_keys=True,
+                    )
+                )
+            else:
+                typer.echo(render_graph_text(g, focus=focus))
             return
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -2075,22 +2105,6 @@ def graph(
         typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
     else:
         typer.echo(render_graph_text(g))
-
-
-def _render_suggestions(inferred: Sequence[InferredEdge]) -> str:
-    """Render inferred edges as paste-ready ``depends_on`` config (EPIC B B-05)."""
-    if not inferred:
-        return "# no new doc↔doc edges inferred from Markdown links"
-    by_doc: dict[str, list[str]] = {}
-    for e in inferred:
-        by_doc.setdefault(e.doc_id, []).append(e.upstream_id)
-    lines = [f"# {len(inferred)} inferred edge(s) — add to the relevant documents:"]
-    for doc_id in sorted(by_doc):
-        lines.append(f"# document {doc_id!r}:")
-        lines.append("    depends_on:")
-        for up in sorted(by_doc[doc_id]):
-            lines.append(f"      - doc: {up}")
-    return "\n".join(lines)
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:

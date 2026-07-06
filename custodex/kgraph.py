@@ -315,7 +315,7 @@ def rank_centrality(
     for e in g.edges:
         if e.kind is not EdgeKind.MENTIONS:
             continue
-        if kinds.get(e.target) is not NodeKind.SYMBOL:
+        if kinds.get(e.target) is not kind:
             continue
         if undocumented_only and e.target in documented:
             continue

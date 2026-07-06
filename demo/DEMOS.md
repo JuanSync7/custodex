@@ -1301,8 +1301,8 @@ backticked `Class.method` or unique snake_case name resolves to its defining fil
 glob, or CLI invocation mints nothing, and a bare word that collides with a module
 stem (the `app`/`coverage`/`index` trap) is blocked rather than misresolved.
 **How to observe.** Against the demo repo, `cdx entities` prints each doc's
-mentions with file-accurate line numbers (`L42 \`TaskFlow\` [symbol] → symbol
-src/taskflow/core/engine.py#TaskFlow`); `cdx entities getting-started` filters to
+mentions with file-accurate line numbers (`L24 \`Engine\` [symbol] → symbol
+src/taskflow/core/engine.py#Engine`); `cdx entities getting-started` filters to
 one doc; `--json` emits the sorted structured lists. Two consecutive runs are
 byte-identical (K10). Pinned by `tests/unit/test_entities.py` +
 `tests/system/test_entities_cli.py`.
@@ -1319,11 +1319,15 @@ unresolved mentions by an integration test, so any regression (or any real rot)
 fails loudly. The registry is resilient: one unparseable source file becomes a
 warning, never an abort.
 **How to observe.** `cdx entities --unresolved --config config/cdmon` on this repo
-prints `0 unresolved`; rename a public symbol that the README mentions in backticks
-(or delete a file a doc references) and the mention flips to `UNRESOLVED` on the
-next run. `CDMON_`-prefixed backticked spans resolve as env-var entities because
-`config/cdmon/index.yaml` seeds `entities.env_prefixes: [CDMON_]`; an enum-name-like
-`SOME_CONSTANT` mints nothing. Pinned by `tests/integration/test_entities_dogfood.py`
+prints `0 unresolved` — the demo ships its own curated `entities:` stoplist in
+`config/cdmon/index.yaml` (each entry justified in a comment: config keys quoted
+in prose, parent-repo paths, runtime artifacts), the same triage the parent
+dogfood pins. Rename a public symbol that the README mentions in backticks (or
+delete a file a doc references) and the mention flips to `UNRESOLVED` on the
+next run. On the parent repo, `CDMON_`-prefixed backticked spans resolve as
+env-var entities because its `config/cdmon/index.yaml` seeds
+`entities.env_prefixes: [CDMON_]`; an enum-name-like `SOME_CONSTANT` mints
+nothing. Pinned by `tests/integration/test_entities_dogfood.py`
 + `tests/unit/test_entities_config.py` + `tests/smoke/test_demo_ids.py` (the
 DEMOS.md id-uniqueness lint that ships with this slice).
 Features: FEAT-ENTITIES-002, FEAT-ENTITIES-003
@@ -1376,10 +1380,12 @@ counts riding along as the rot signal. Zero LLM: the graph is base facts; derive
 queries (neighbors, centrality) recompute from them. Section names are slugs, so
 the artifact carries no doc-body prose — safe to mirror centrally (K2).
 **How to observe.** Against the demo, `cdx graph` prints the summary (node/edge
-counts by kind); `cdx graph --focus "doc docs/getting-started.md"` shows every
-edge around that doc; `--json` emits the whole artifact; `--write` produces the
-regenerable `.cdmon/graph.json` and prints "unchanged" on an immediate re-run
-(K7). Two builds are byte-identical (K10). Pinned by `tests/unit/test_kgraph.py`
+counts by kind); `cdx graph --focus "doc docs/guide/getting-started.md"` (or the
+doc-id shorthand `cdx graph --focus getting-started`) shows every edge around
+that doc; `--focus X --json` emits just the focused edge set; `--json` alone
+emits the whole artifact; `--write` produces the regenerable `.cdmon/graph.json`
+and prints "unchanged" on an immediate re-run (K7). Two builds are
+byte-identical (K10). Pinned by `tests/unit/test_kgraph.py`
 + `tests/system/test_kgraph_cli.py`.
 Features: FEAT-KGRAPH-001
 

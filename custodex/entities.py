@@ -17,26 +17,35 @@ blank lines keep ``Mention.line`` file-accurate, front-matter height included):
 
 * **headings** — the doc's own SECTION entities (GitHub-style slugs, repeated
   slugs deduplicated ``-2``/``-3``);
-* **inline markdown links** (images and ``mailto:`` skipped) — absolute ⇒ URL;
-  relative ⇒ DOC when it resolves to a managed doc, else PATH against the full
-  repo tree (files and directories), unresolved when nothing matches;
+* **inline markdown links** (images and ``mailto:`` skipped) — absolute and
+  protocol-relative (``//host/…``) ⇒ URL; site-absolute (``/route``) and
+  out-of-tree (``../…`` past the root) mint nothing; relative ⇒ DOC when it
+  resolves to a managed doc, else PATH against the full repo tree (files and
+  directories), unresolved when nothing matches;
 * **inline backtick spans** — classified by the pinned rules: spans with
   whitespace/braces/glob metachars mint nothing; path-shaped spans resolve
-  against the full tree; SCREAMING_SNAKE spans resolve registry-first, then
-  the configured ``entities.env_prefixes`` gate (else ignored); identifier
-  spans resolve by exact registry match, where only *dotted*, *snake_case*,
-  or *multi-hump CamelCase* spans may mint an UNRESOLVED mention — a plain
-  word resolves or is ignored, never unresolved.
+  against the full tree (exact, then unique basename, then unique
+  path-suffix); SCREAMING_SNAKE spans resolve registry-first, then the
+  configured ``entities.env_prefixes`` gate (else ignored); identifier spans
+  resolve by exact registry match, where only *dotted*, *snake_case*, or
+  *multi-hump CamelCase* spans may mint an UNRESOLVED mention — a plain word
+  resolves only with path-shape evidence and is ignored when unknown, never
+  unresolved (and never linked by stem coincidence: the measured
+  ``report``-task demo trap).
 
 Symbol resolution is exact-match only: qualified ``Class.method``,
 module-qualified ``stem.name`` (registered only while the stem is unique),
 and full-dotted ``pkg.mod.name`` forms; a bare name needs GLOBAL uniqueness
 *and* no module-stem collision (a bare name that is also a file stem — the
 measured ``app``/``coverage``/``index`` cli.py trap — is ambiguous ⇒
-unresolved). The registry is RESILIENT: an unparseable or unextractable
-source file becomes a ``warnings`` entry and contributes no symbols — a
-read-only advisory scan never aborts on one bad file (K8 stays for *config*
-errors; a target repo's broken file is data, not a crash).
+unresolved for snake/multi-hump shapes, ignored for plain words). The PATH
+universe honors the config ignore set (``coverage.exclude``, which folds in
+``ignore.yaml`` + the translated ``.gitignore``), so untracked build
+artifacts cannot flip resolution between checkouts (K10). The registry is
+RESILIENT: an unparseable or unextractable source file becomes a
+``warnings`` entry and contributes no symbols — a read-only advisory scan
+never aborts on one bad file (K8 stays for *config* errors; a target repo's
+broken file is data, not a crash).
 """
 
 from __future__ import annotations
@@ -51,7 +60,7 @@ from pydantic import BaseModel, ConfigDict
 from .config import EntitiesConfig, MonitorConfig
 from .errors import DriftError, ExtractionError
 from .extract import _SYMBOL_LANG_BY_SUFFIX, get_extractor
-from .inventory import discover_files
+from .inventory import _matches_any, _translate, discover_files
 from .manifest import parse_text
 
 __all__ = [
@@ -93,6 +102,10 @@ _KNOWN_SUFFIXES = frozenset(
         ".tsx",
         ".css",
         ".html",
+        # Custodex's OWN artifact conventions: a `coverage.rpt` / `notes.log`
+        # span is path-shaped prose, never a dotted-symbol misread (PR #20).
+        ".rpt",
+        ".log",
     }
 )
 
@@ -105,7 +118,10 @@ _LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 _BACKTICK = re.compile(r"`([^`\n]+)`")
 
 _HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-_FENCE = re.compile(r"^\s*(```|~~~)")
+# A fence line: the fence run (3+ backticks or tildes) and whatever follows.
+# An OPENING fence may carry an info string; a CLOSING fence is a bare run of
+# the same character, at least as long as the opener (CommonMark).
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
 _CDM_BEGIN = re.compile(r"^<!-- CDM:BEGIN \S+ -->\s*$")
 _CDM_END = re.compile(r"^<!-- CDM:END \S+ -->\s*$")
 
@@ -187,27 +203,50 @@ class EntityRegistry(BaseModel):
         return ids[0]
 
 
-def _walk_tree(root: Path) -> tuple[frozenset[str], frozenset[str]]:
+def _walk_tree(
+    root: Path, exclude: tuple[str, ...] = ()
+) -> tuple[frozenset[str], frozenset[str]]:
     """The full repo file+dir universe for PATH resolution (deterministic).
 
-    Uses :func:`Path.rglob` breadth via ``os.walk`` semantics with the
-    standard skip set (VCS/venv/cache). Independent of the coverage inventory
-    — prose mentions non-code files and directories, and the design review
-    measured a .py-only universe drowning the rot signal in false positives.
+    ``os.walk`` with the standard skip set (VCS/venv/cache) PLUS the config
+    ignore set (``exclude`` — the loaded bundle's ``coverage.exclude``, which
+    merges ``ignore.yaml`` patterns and the translated ``.gitignore``). A
+    file or directory matching an exclude glob never enters the resolution
+    universe, so a gitignored build artifact cannot flip mention resolution
+    between checkouts of the same commit (PR #20 must-fix — K10). Glob
+    semantics are the ONE inventory translation (``**`` crosses segments).
+
+    Independent of the coverage *include* set — prose mentions non-code files
+    and directories, and the design review measured a .py-only universe
+    drowning the rot signal in false positives.
     """
     import os
 
+    excludes = tuple(_translate(p) for p in exclude)
     files: set[str] = set()
     dirs: set[str] = set()
     resolved = root.resolve()
     for dirpath, dirnames, filenames in os.walk(resolved):
-        dirnames[:] = sorted(d for d in dirnames if d not in _SKIP_DIRS)
         base = Path(dirpath)
-        rel_dir = base.relative_to(resolved).as_posix()
-        if rel_dir != ".":
-            dirs.add(rel_dir)
+        rel_base = base.relative_to(resolved).as_posix()
+        kept: list[str] = []
+        for d in sorted(dirnames):
+            if d in _SKIP_DIRS:
+                continue
+            rel_d = d if rel_base == "." else f"{rel_base}/{d}"
+            # `dir/**` matches `dir/` (the `**` may be empty), so the slashed
+            # form catches directory-tree excludes; the bare form catches
+            # exact-path patterns.
+            if _matches_any(rel_d, excludes) or _matches_any(f"{rel_d}/", excludes):
+                continue
+            kept.append(d)
+            dirs.add(rel_d)
+        dirnames[:] = kept
         for name in filenames:
-            files.add((base / name).relative_to(resolved).as_posix())
+            rel = name if rel_base == "." else f"{rel_base}/{name}"
+            if _matches_any(rel, excludes):
+                continue
+            files.add(rel)
     return frozenset(files), frozenset(dirs)
 
 
@@ -224,7 +263,7 @@ def build_registry(config: MonitorConfig, root: Path) -> EntityRegistry:
     and the full-dotted ``pkg.mod.name``.
     """
     doc_by_path = {posixpath.normpath(doc.path): doc.id for doc in config.documents}
-    file_set, dir_set = _walk_tree(root)
+    file_set, dir_set = _walk_tree(root, exclude=config.coverage.exclude)
 
     inventory = discover_files(
         root, include=config.coverage.include, exclude=config.coverage.exclude
@@ -277,25 +316,38 @@ def build_registry(config: MonitorConfig, root: Path) -> EntityRegistry:
 
 
 def _strip_machine_text(body: str) -> list[str]:
-    """Blank out fenced code + CDM regions, preserving the line count (K10)."""
+    """Blank out fenced code + CDM regions, preserving the line count (K10).
+
+    Ordering matters (PR #20 review): the CDM-region state is checked FIRST,
+    so a fence line inside a machine region is region content (it cannot
+    hijack fence state), and a CDM marker inside a fence is fence content (it
+    cannot open a region). A fence closes only on a BARE run of the same
+    character at least as long as the opener (CommonMark) — a ``` line inside
+    a ```` fence, or a ```info line, is content.
+    """
     out: list[str] = []
-    in_fence: str | None = None
+    in_fence: tuple[str, int] | None = None  # (fence char, opening length)
     in_region = False
     for line in body.split("\n"):
-        fence = _FENCE.match(line)
-        if in_fence is not None:
-            out.append("")
-            if fence is not None and fence.group(1) == in_fence:
-                in_fence = None
-            continue
-        if fence is not None:
-            in_fence = fence.group(1)
-            out.append("")
-            continue
         if in_region:
             out.append("")
             if _CDM_END.match(line):
                 in_region = False
+            continue
+        fence = _FENCE.match(line)
+        if in_fence is not None:
+            out.append("")
+            if (
+                fence is not None
+                and fence.group(1)[0] == in_fence[0]
+                and len(fence.group(1)) >= in_fence[1]
+                and not fence.group(2).strip()
+            ):
+                in_fence = None
+            continue
+        if fence is not None:
+            in_fence = (fence.group(1)[0], len(fence.group(1)))
+            out.append("")
             continue
         if _CDM_BEGIN.match(line):
             in_region = True
@@ -321,8 +373,11 @@ def _resolve_path(
     """Resolve a path-shaped span against the full tree.
 
     Exact repo-relative path first (files, then directories with the trailing
-    slash normalized), then a UNIQUE-basename match. An AMBIGUOUS basename
-    (≥2 files bear it) mints NOTHING — the referent exists, we just cannot
+    slash normalized), then a UNIQUE-basename match, then — for multi-segment
+    spans — a UNIQUE path-suffix match (``core/notes.log`` resolves to
+    ``src/pkg/core/notes.log`` when exactly one tree entry ends with it: more
+    precise prose is never punished, PR #20 review). An AMBIGUOUS basename or
+    suffix (≥2 matches) mints NOTHING — the referent exists, we just cannot
     pick one, and existing-but-ambiguous is not rot (precision rule). Only a
     span matching ZERO tree entries is an unresolved PATH mention. A
     site-absolute (`/x`) or degenerate (`/`, `.`) span mints nothing.
@@ -339,6 +394,18 @@ def _resolve_path(
         if len(candidates) == 1:
             return (EntityKind.PATH, f"path {candidates[0]}")
         return None  # ambiguous basename: exists, never guess, never rot
+    if "/" in norm:
+        tail = f"/{norm}"
+        suffixed = sorted(
+            p
+            for universe in (registry.file_set, registry.dir_set)
+            for p in universe
+            if p.endswith(tail)
+        )
+        if len(suffixed) == 1:
+            return (EntityKind.PATH, f"path {suffixed[0]}")
+        if suffixed:
+            return None  # ambiguous suffix: exists, never guess, never rot
     return (EntityKind.PATH, None)
 
 
@@ -388,21 +455,24 @@ def _classify_backtick(
         if f"{as_path}.py" in registry.file_set:
             return (EntityKind.PATH, f"path {as_path}.py")
         return (EntityKind.SYMBOL, None)
-    if not span.isidentifier():
-        return None
 
     resolved = registry.resolve_symbol(span)
     if resolved is not None:
         return (EntityKind.SYMBOL, resolved)
-    # A bare name matching ONLY a unique module stem is a PATH mention.
+    # Only dotted/snake/multi-hump spans carry symbol-shaped EVIDENCE: they
+    # alone may resolve by module stem or surface as UNRESOLVED. A plain word
+    # (single lowercase/Capitalized token — the measured `report`/`utils`
+    # traps, PR #20 must-fixes) resolves only with path-shape evidence and is
+    # ignored when unknown — never guessed, never rot.
+    evidenced = "_" in span or _is_multi_hump(span)
     stem_files = registry.stems.get(span)
     if span not in registry.symbol_keys and stem_files is not None:
+        if not evidenced:
+            return None
         if len(stem_files) == 1:
             return (EntityKind.PATH, f"path {stem_files[0]}")
-        return (EntityKind.SYMBOL, None)  # colliding stems: unresolved
-    # Only dotted/snake/multi-hump spans may be UNRESOLVED; a plain word
-    # (single lowercase/Capitalized/ALL-CAPS token) is ignored when unknown.
-    if "_" in span or _is_multi_hump(span):
+        return (EntityKind.SYMBOL, None)  # colliding stems on evidence: rot
+    if evidenced:
         return (EntityKind.SYMBOL, None)
     return None
 
@@ -411,16 +481,32 @@ def _link_mention(
     target: str,
     doc_dir: str,
     registry: EntityRegistry,
+    entities_cfg: EntitiesConfig,
 ) -> tuple[EntityKind, str | None] | None:
-    """Classify one markdown link target, or ``None`` to skip it."""
+    """Classify one markdown link target, or ``None`` to skip it.
+
+    Link targets get the SAME precision guards backtick spans have (PR #20
+    review): the ``entities.ignore`` stoplist gates every mention source, a
+    protocol-relative ``//host/...`` target is a genuine URL, a
+    site-absolute ``/route`` is not a repo path, and a target that escapes
+    the repo root mints nothing.
+    """
     link = target.split("#", 1)[0].strip()
+    if target in entities_cfg.ignore or link in entities_cfg.ignore:
+        return None
     if target.startswith("mailto:"):
         return None
     if "://" in target:
         return (EntityKind.URL, f"url {link}") if link else None
+    if link.startswith("//"):
+        return (EntityKind.URL, f"url {link}")  # protocol-relative URL
+    if link.startswith("/"):
+        return None  # site-absolute route, not a repo path
     if not link:
         return None  # pure in-page anchor
     resolved = posixpath.normpath(posixpath.join(doc_dir, link))
+    if resolved.startswith(".."):
+        return None  # escapes the repo root — not a repo path
     doc_id = registry.doc_by_path.get(resolved)
     if doc_id is not None:
         return (EntityKind.DOC, f"doc {resolved}")
@@ -451,6 +537,7 @@ def extract_doc_entities(
 
     sections: list[Entity] = []
     slug_counts: dict[str, int] = {}
+    emitted_slugs: set[str] = set()
     mentions: list[Mention] = []
 
     for idx, line in enumerate(lines):
@@ -459,9 +546,16 @@ def extract_doc_entities(
         heading = _HEADING.match(line)
         if heading is not None:
             slug = _slugify(heading.group(2))
+            # Dedup against EMITTED finals, not just counts: 'Foo', 'Foo',
+            # 'Foo 2' must not mint `foo-2` twice (PR #20 review — duplicate
+            # SECTION ids silently merge into one kgraph node).
             n = slug_counts.get(slug, 0) + 1
-            slug_counts[slug] = n
             final = slug if n == 1 else f"{slug}-{n}"
+            while final in emitted_slugs:
+                n += 1
+                final = f"{slug}-{n}"
+            slug_counts[slug] = n
+            emitted_slugs.add(final)
             sections.append(
                 Entity(
                     id=f"section {doc_path}#{final}",
@@ -472,7 +566,7 @@ def extract_doc_entities(
             continue
 
         for match in _LINK.finditer(line):
-            verdict = _link_mention(match.group(1), doc_dir, registry)
+            verdict = _link_mention(match.group(1), doc_dir, registry, entities_cfg)
             if verdict is None:
                 continue
             kind, entity_id = verdict

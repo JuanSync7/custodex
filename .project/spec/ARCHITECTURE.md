@@ -3167,7 +3167,10 @@ only), so machine reheals of a code-tracked upstream no longer trip its dependen
 which is what a mention-based dependency means. Flipping the knob is a deliberate
 re-baseline event (every stamp mismatches once; re-confirm via `cdx resolve --edge`
 or `cdx monitor --apply` restamps on UNSTAMPED-equivalent terms — document it). The
-dogfood + demo flip to `"prose"` in AGT-02 and restamp their few edges.
+dogfood flips to `"prose"` in AGT-02 (pre-edges, so no restamp was needed); the
+demo DELIBERATELY keeps the default `"body"` — it demonstrates the out-of-the-box
+behaviour, and its `getting-started → io-api` edge sits off the heal path
+(reconciled with the shipped configs in the PR #20 review fixes).
 
 CLI: `cdx deps --suggest` prints `suggest_edges` (+ churn notes); `--json` items are
 a key-superset of today's (K6 guard). `cdx deps` report: when
@@ -3188,7 +3191,10 @@ class EdgeKind(str, Enum):             # closed vocabulary; directional pairs im
     LINKS_TO = "links_to"              # doc → doc/url (resolved links; unresolved = counts)
     PART_OF = "part_of"                # section → doc
     OWNED_BY = "owned_by"              # doc → owner (accountable projection)
-class EdgeTier(str, Enum): DECLARED = "declared"; RESOLVED = "resolved"; INFERRED = "inferred"
+class EdgeTier(str, Enum): DECLARED = "declared"; RESOLVED = "resolved"
+# (An INFERRED tier was pinned pre-implementation but no fold emits one, so it
+#  was NOT shipped — reserved as the K6-additive value a future inference layer
+#  mints. Reconciled with the code in the PR #20 review fixes.)
 
 class GraphNode(BaseModel): id: str; kind: NodeKind; name: str   # SECTION name = slug (⟨R⟩)
 class GraphEdge(BaseModel): source: str; target: str; kind: EdgeKind; tier: EdgeTier

@@ -106,7 +106,11 @@ docdeps:
 # src/widget.py, X.md, X.html), external classes (TestClient, StateGraph),
 # and config-KEY / field-name mentions below symbol granularity
 # (cdm.schema_version, code_refs, context_refs, config_edit, use_persona,
-# from_repo, live_llm).
+# from_repo, live_llm), and prose references to trees OUTSIDE the resolution
+# universe — the universe honors this ignore set + .gitignore (PR #20
+# checkout-invariance fix), so the gitignored frontend/dist build output and
+# the dot-dir-excluded .project/ planning substrate are navigational prose,
+# not rot (frontend/dist, .project/STATUS.md, .project/).
 entities:
   env_prefixes:
     - CDMON_
@@ -124,6 +128,9 @@ entities:
     - use_persona
     - from_repo
     - live_llm
+    - frontend/dist
+    - .project/STATUS.md
+    - .project/
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
 # *.yaml unit on disk MUST be listed (run `cdx index` to regenerate). The three

@@ -180,3 +180,29 @@ def test_link_is_loud_on_unknowns_and_single_file(tmp_path: Path) -> None:
     assert "single file" in result.output
     result = runner.invoke(app, ["link", "--reject", "a", "b", "--config", str(cfg)])
     assert result.exit_code == 0
+
+
+def test_link_reports_partial_state_when_stamp_fails(tmp_path: Path) -> None:
+    # PR #20 review: the splice mutates the config BEFORE stamping — if the
+    # downstream doc file is missing the command must say the edge WAS
+    # declared (and how to finish), never read as "nothing happened".
+    cfg_dir = _setup(tmp_path)
+    (tmp_path / "docs" / "guide.md").unlink()
+    result = runner.invoke(app, ["link", "guide", "api", "--config", str(cfg_dir)])
+    assert result.exit_code == 1
+    assert "WAS declared" in result.output
+    assert "resolve --edge" in result.output
+    unit_text = (cfg_dir / "core.yaml").read_text(encoding="utf-8")
+    assert "- doc: api" in unit_text  # the declare half really happened
+
+
+def test_link_duplicate_rejection_is_loud(tmp_path: Path) -> None:
+    cfg_dir = _setup(tmp_path)
+    first = runner.invoke(
+        app, ["link", "--reject", "guide", "api", "--config", str(cfg_dir)]
+    )
+    assert first.exit_code == 0
+    second = runner.invoke(
+        app, ["link", "--reject", "guide", "api", "--config", str(cfg_dir)]
+    )
+    assert second.exit_code == 1 and "already rejected" in second.output

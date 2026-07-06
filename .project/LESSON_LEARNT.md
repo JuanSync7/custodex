@@ -2214,3 +2214,26 @@ own implementing modules are inside the thing being gated.
   discard injected diffs, re-attach the branch, `git stash pop`. Never run the gate
   or commit from a tree a dead agent last touched without auditing
   status+reflog+stash first.
+
+## [AGT-RF1] Review-fix round: the universe must be checkout-invariant, and a parameter nobody exercises is already broken
+- **Any resolution universe built from the live filesystem MUST honor the ignore
+  config.** The dogfood precision test was green on the dev tree and red on every
+  clean checkout because an untracked build artifact (`frontend/dist`) resolved a
+  mention. Same-commit-same-output (K10) extends to *what exists*: filter the walk
+  by the loaded `coverage.exclude` (which already folds in .gitignore) and stoplist
+  prose references to excluded trees. Two corpora now pin 0-unresolved WITH a
+  positive floor so the pin can't pass vacuously.
+- **A keyword parameter with no exercising test is indistinguishable from a bug —
+  and here it WAS one.** `rank_centrality(kind=...)` hardcoded SYMBOL; every test
+  used the default, so both the review's deleted-filter mutant and the real
+  dead-parameter bug survived. When a review reports "mutation-survivable", check
+  whether the untested knob even works before adding the killing fixture.
+- **Splice self-validation must be SEMANTIC, not just parse-clean.** Flow-style
+  `depends_on: [...]` + a spliced block-style key = legal YAML that loads fine
+  with the old edges silently gone (PyYAML last-wins). "It loads" told us nothing;
+  now the reloaded edge set must equal old ∪ {new} or the file reverts. Guard
+  duplicate-key classes with a semantic post-condition, not a reload.
+- **Demo output quoted in DEMOS.md is a tested contract — never write it from
+  memory.** DEMO-098 cited a symbol (`TaskFlow`) that never existed and DEMO-102's
+  command exited 1 as written. Run every quoted command against the demo tree
+  before committing the prose.

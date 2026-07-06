@@ -711,6 +711,14 @@ def test_alembic_migration_0008_graph_snapshots_up_then_down(tmp_path: Path) -> 
     assert "graph_snapshots" in set(inspect(engine).get_table_names())
     cols = {c["name"] for c in inspect(engine).get_columns("graph_snapshots")}
     assert {"id", "repo_id", "captured_at", "snapshot"} <= cols
+    # ...and BOTH declared indexes (index-parity with GraphSnapshotRow —
+    # PR #20 review: columns alone don't prove the indexed projection).
+    indexed = {
+        col
+        for ix in inspect(engine).get_indexes("graph_snapshots")
+        for col in ix["column_names"]
+    }
+    assert {"repo_id", "captured_at"} <= indexed
 
     # downgrade to 0007 -> dropped; the doc-edges table remains.
     command.downgrade(cfg, "0007_doc_edges")

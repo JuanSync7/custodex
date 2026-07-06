@@ -692,6 +692,24 @@ def test_graph_snapshot_round_trips_latest_wins(client: TestClient) -> None:
     assert body["nodes"][0]["id"] == "doc docs/a.md"
 
 
+def test_graph_latest_means_last_pushed_not_captured_at(client: TestClient) -> None:
+    """'Latest wins' is INSERTION order, captured_at is provenance only (PR #20).
+
+    A retry/backfill that pushes an older ``captured_at`` last still becomes
+    the served snapshot — the same last-write-wins semantic the coverage
+    mirror has. Pinned on both stores so neither drifts to timestamp-order.
+    """
+    _register(client)
+    newer = dict(_graph_snapshot("v2"), captured_at="2026-07-09T10:00:00Z")
+    older = dict(_graph_snapshot("v1"), captured_at="2026-07-01T10:00:00Z")
+    for snap in (newer, older):
+        resp = client.post(f"/repos/{_REPO}/graph", json=snap, headers=_auth())
+        assert resp.status_code == 202, resp.text
+    got = client.get(f"/repos/{_REPO}/graph").json()
+    assert got["captured_at"] == "2026-07-01T10:00:00Z"  # last-pushed wins
+    assert got["unresolved"] == {"a": 0}
+
+
 def test_graph_get_is_empty_dict_before_any_push(client: TestClient) -> None:
     """No snapshot yet ⇒ an honest empty dict (the hub only mirrors — K2)."""
     _register(client)

@@ -534,6 +534,8 @@ class SqlStore:
             )
 
     def graph_for(self, repo_id: str) -> dict | None:
+        # "Latest" = last PUSHED (insertion order, id desc) — captured_at is
+        # provenance, not an ordering key (pinned by the parity suite).
         with self._session() as session:
             row = session.scalars(
                 select(GraphSnapshotRow)

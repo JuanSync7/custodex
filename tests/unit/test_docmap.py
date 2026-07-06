@@ -86,7 +86,9 @@ class TestSuggestEdges:
             ("c", "b", SuggestionTier.RESOLVED_LINK),
         ]
         shared, linked = edges
-        assert shared.via is None
+        # K6: `via` stays ALWAYS-str (the legacy value type) — a shared_symbol
+        # row carries its first evidence entry, never null (PR #20 review).
+        assert shared.via == "symbol alpha.py#solve_widget"
         assert shared.evidence == ("symbol alpha.py#solve_widget",)
         assert shared.score == 1
         assert linked.via == "b.md"
@@ -291,6 +293,164 @@ class TestDeclareEdge:
         with pytest.raises(ConfigError, match="already declared"):
             declare_edge(cfg_dir, "b", "a", now="2026-07-02")
 
+    def test_splice_byte_compares_everything_except_the_insert(
+        self, tmp_path: Path
+    ) -> None:
+        # The slice spec demands byte-parity: the spliced file is EXACTLY the
+        # original + the inserted lines + the bumped `updated:` stamp — no
+        # reflowed blanks, no requoting, no reindented untouched entries.
+        cfg_dir = _bundle_dir(tmp_path)
+        original = (cfg_dir / "core.yaml").read_text(encoding="utf-8")
+        declare_edge(cfg_dir, "a", "c", now="2026-07-02T10:00:00Z")
+        spliced = (cfg_dir / "core.yaml").read_text(encoding="utf-8")
+        lines = original.split("\n")
+        anchor = lines.index("  - id: b")  # a's block ends where b's starts
+        lines[anchor:anchor] = ["    depends_on:", "      - doc: c"]
+        expected = "\n".join(lines).replace(
+            'updated: "2026-07-01"', 'updated: "2026-07-02"', 1
+        )
+        assert spliced == expected
+
+    def test_flow_style_depends_on_is_loud_and_untouched(self, tmp_path: Path) -> None:
+        # PR #20 must-fix: an entry carrying flow-style `depends_on: [...]`
+        # would receive a SECOND block-style key — PyYAML last-wins silently
+        # DROPS the existing edges and self-validation passes. The splice
+        # must refuse loudly and leave the file byte-identical.
+        cfg_dir = _bundle_dir(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        text = unit.read_text(encoding="utf-8").replace(
+            "    # Comment inside b's entry: preserved.\n"
+            "    depends_on:\n"
+            "      - doc: a\n",
+            "    depends_on: [{doc: a}]\n",
+        )
+        unit.write_text(text, encoding="utf-8")
+        bundle = load_bundle(cfg_dir)  # flow style is legal YAML and loads fine
+        b = next(d for d in bundle.config.documents if d.id == "b")
+        assert b.depends_on == (DocEdge(doc="a"),)
+        with pytest.raises(ConfigError, match="flow-style"):
+            declare_edge(cfg_dir, "b", "c", now="2026-07-02T10:00:00Z")
+        assert unit.read_text(encoding="utf-8") == text  # untouched
+        reloaded = load_bundle(cfg_dir).config
+        b2 = next(d for d in reloaded.documents if d.id == "b")
+        assert b2.depends_on == (DocEdge(doc="a"),)  # nothing dropped
+
+    def test_quoted_id_entry_is_loud_and_untouched(self, tmp_path: Path) -> None:
+        # `- id: "a"` is legal YAML the locator does not model — the splice
+        # must refuse loudly rather than guess, and leave the file alone.
+        cfg_dir = _bundle_dir(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        text = unit.read_text(encoding="utf-8").replace("  - id: a\n", '  - id: "a"\n')
+        unit.write_text(text, encoding="utf-8")
+        with pytest.raises(ConfigError, match="could not locate"):
+            declare_edge(cfg_dir, "a", "c", now="2026-07-02T10:00:00Z")
+        assert unit.read_text(encoding="utf-8") == text
+
+    def test_self_validation_reverts_on_silent_edge_drop(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Defense-in-depth: if a future splice bug ever produces a config
+        # that LOADS but lost (or failed to gain) an edge, the semantic
+        # post-splice check must revert the file and raise (K8) — the
+        # validate-then-revert path the review found untestable before.
+        import custodex.docmap as docmap_mod
+
+        cfg_dir = _bundle_dir(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        original = unit.read_text(encoding="utf-8")
+        real_load = docmap_mod.load_bundle
+        first = real_load(cfg_dir)
+        calls = {"n": 0}
+
+        def fake_load(path):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return first  # the pre-splice validation pass
+            return first  # post-splice reload "lost" the new edge
+
+        monkeypatch.setattr(docmap_mod, "load_bundle", fake_load)
+        with pytest.raises(ConfigError, match="restored"):
+            declare_edge(cfg_dir, "a", "c", now="2026-07-02T10:00:00Z")
+        assert unit.read_text(encoding="utf-8") == original
+
+    def test_splice_when_documents_is_not_the_last_key(self, tmp_path: Path) -> None:
+        # YAML key order is free: with `dir-covered:` AFTER `documents:`, the
+        # last entry's block is dedent-terminated (not EOF-terminated).
+        cfg_dir = _bundle_dir(tmp_path)
+        reordered = """\
+---
+cdmon-config-version: "2.0.0"
+unit: core
+title: "core docs"
+owner: eng
+created: "2026-07-01"
+updated: "2026-07-01"
+---
+documents:
+  - id: a
+    path: docs/a.md
+    audience: eng-guide
+  - id: b
+    path: docs/b.md
+    audience: eng-guide
+  - id: c
+    path: docs/c.md
+    audience: eng-guide
+dir-covered:
+  - src
+source-files-format:
+  - .py
+"""
+        (cfg_dir / "core.yaml").write_text(reordered, encoding="utf-8")
+        declare_edge(cfg_dir, "c", "a", now="2026-07-02T10:00:00Z")
+        reloaded = load_bundle(cfg_dir).config
+        c = next(d for d in reloaded.documents if d.id == "c")
+        assert c.depends_on == (DocEdge(doc="a"),)
+        # the trailing top-level keys survived below the spliced entry
+        text = (cfg_dir / "core.yaml").read_text(encoding="utf-8")
+        assert text.index("depends_on:") < text.index("dir-covered:")
+
+    def test_splice_extends_depends_on_before_sibling_field(
+        self, tmp_path: Path
+    ) -> None:
+        # A field AFTER `depends_on:` (legal — key order is free): the new
+        # item lands inside the depends_on block, before the sibling field.
+        cfg_dir = _bundle_dir(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        text = unit.read_text(encoding="utf-8").replace(
+            "  - id: b\n"
+            "    path: docs/b.md\n"
+            "    audience: eng-guide\n"
+            "    # Comment inside b's entry: preserved.\n"
+            "    depends_on:\n"
+            "      - doc: a\n",
+            "  - id: b\n"
+            "    path: docs/b.md\n"
+            "    depends_on:\n"
+            "      - doc: a\n"
+            "    audience: eng-guide\n",
+        )
+        unit.write_text(text, encoding="utf-8")
+        declare_edge(cfg_dir, "b", "c", now="2026-07-02T10:00:00Z")
+        reloaded = load_bundle(cfg_dir).config
+        b = next(d for d in reloaded.documents if d.id == "b")
+        assert b.depends_on == (DocEdge(doc="a"), DocEdge(doc="c"))
+
+    def test_splice_extends_depends_on_before_blank_line(self, tmp_path: Path) -> None:
+        # A blank line between entries: the extension scan must stop at it
+        # and land the new item inside the depends_on block.
+        cfg_dir = _bundle_dir(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        text = unit.read_text(encoding="utf-8").replace(
+            "      - doc: a\n  - id: c",
+            "      - doc: a\n\n  - id: c",
+        )
+        unit.write_text(text, encoding="utf-8")
+        declare_edge(cfg_dir, "b", "c", now="2026-07-02T10:00:00Z")
+        reloaded = load_bundle(cfg_dir).config
+        b = next(d for d in reloaded.documents if d.id == "b")
+        assert b.depends_on == (DocEdge(doc="a"), DocEdge(doc="c"))
+
 
 class TestRejections:
     def test_reject_round_trips_and_appends(self, tmp_path: Path) -> None:
@@ -314,6 +474,15 @@ class TestRejections:
         with pytest.raises(SchemaError, match="line 1"):
             read_rejections(cdmon)
 
+    def test_duplicate_rejection_is_loud(self, tmp_path: Path) -> None:
+        # The AGT-02 spec pins 'loud on already-rejected' (K8): a second
+        # verdict for the same pair is a no-op re-litigation, not new data.
+        cdmon = tmp_path / ".cdmon"
+        reject_edge(cdmon, "a", "b", now="2026-07-02T10:00:00Z")
+        with pytest.raises(ConfigError, match="already rejected"):
+            reject_edge(cdmon, "a", "b", now="2026-07-03T10:00:00Z")
+        assert len(read_rejections(cdmon)) == 1
+
 
 class TestJsonShapeGuard:
     def test_scorededge_keys_are_superset_of_legacy(self) -> None:
@@ -321,12 +490,15 @@ class TestJsonShapeGuard:
         edge = ScoredEdge(
             doc_id="a",
             upstream_id="b",
-            via=None,
+            via="symbol x.py#f",
             tier=SuggestionTier.SHARED_SYMBOL,
             evidence=("symbol x.py#f",),
             score=1,
         )
-        assert {"doc_id", "upstream_id", "via"} <= set(edge.model_dump(mode="json"))
+        dumped = edge.model_dump(mode="json")
+        assert {"doc_id", "upstream_id", "via"} <= set(dumped)
+        # `via` keeps the legacy ALWAYS-str value type (PR #20 K6 finding).
+        assert isinstance(dumped["via"], str)
 
 
 class TestResilienceAndSpliceEdges:

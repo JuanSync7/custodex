@@ -581,6 +581,8 @@ class InMemoryStore:
         self._graphs.setdefault(repo_id, []).append(snapshot)
 
     def graph_for(self, repo_id: str) -> dict | None:
+        # "Latest" = last PUSHED (insertion order) — captured_at is
+        # provenance, not an ordering key (parity with SqlStore, pinned).
         snapshots = self._graphs.get(repo_id)
         return snapshots[-1] if snapshots else None
 
