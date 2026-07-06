@@ -2258,3 +2258,26 @@ own implementing modules are inside the thing being gated.
   whole-file `_write` drops the cdm frontmatter the heal stamped, minting a
   spurious fingerprint-None drift that made api look drifted — the fixture bug
   masqueraded as an engine bug for one red run.
+
+## [AGT-RF2] Two green slices can be one dead feature — test the COMPOSITION
+- **Every agent that WRITES what another agent READS needs a composition e2e.**
+  `cdx onboard --apply` (0-indent dump_unit_file YAML) and `cdx write-doc
+  --apply` (2-space-assuming splice) each passed their own full DoD — and were
+  dead TOGETHER on every onboarded repo. The fix is indent-adaptive splicing,
+  but the durable lesson is the test shape: onboard a scratch repo, then run
+  every write-verb against it (write-doc has one now; link already worked
+  because docmap's splice measured real indentation from day one).
+- **"Regression-guarded" is a claim to PROVE per field, not per function.** The
+  key tests guarded 2 of 5 hashed fields; the other 3 dropped silently (and a
+  reversed tick return survived a 2-item sorted assertion by coin-flip). Golden
+  vectors that recompute the hash INDEPENDENTLY from the pinned fields kill
+  every drop/reorder/separator mutant at once — then RUN the mutants to prove
+  it (all 5 re-run and killed).
+- **The checkout-variance class has a git shape too.** After fixing
+  build-artifact variance (frontend/dist), the suite still depended on an
+  UNTRACKED fixture a .gitignore swallowed (demo notes.log) — green locally,
+  red on every clone. New smoke lint: every load-bearing ignore-matched fixture
+  must be in `git ls-files`.
+- **Display order is a documented claim.** DEMO-107 said "severity-first"; the
+  renderer printed hash order. Sort at the DISPLAY layer (severity, then key)
+  and keep the data layer key-sorted for reconciliation — both deterministic.

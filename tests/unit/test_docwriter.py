@@ -200,3 +200,37 @@ def test_unit_snippet_shape() -> None:
     assert snippet.startswith("  - id: src-gamma")
     assert "      overview: llm" in snippet
     assert "      - path: src/gamma.py" in snippet
+    # Indent-adaptive rendering (the composition fix): 0-indent entries for
+    # dump_unit_file-style units.
+    flat = unit_snippet(_spec(), indent=0)
+    assert flat.startswith("- id: src-gamma")
+    assert "\n  path: docs/src-gamma.md" in flat
+    assert "\n    overview: llm" in flat
+
+
+def test_register_into_zero_indent_unit(tmp_path: Path) -> None:
+    """PR #20 fresh-review must-fix: `cdx onboard --apply` emits units via
+    dump_unit_file (0-indent block sequences) and the registration splice used
+    to produce INVALID YAML there — AGT-04 → AGT-05 composition was dead. The
+    splice is now indentation-adaptive."""
+    from custodex.config import dump_unit_file
+
+    cfg_dir = _setup(tmp_path)
+    bundle = load_bundle(cfg_dir)
+    # Re-dump the unit in the generated (0-indent) style — the exact bytes an
+    # onboarded repo carries.
+    (unit,) = bundle.units
+    flat = dump_unit_file(unit, now="2026-07-06")
+    (cfg_dir / "core.yaml").write_text(flat, encoding="utf-8")
+    assert "\n- id: existing" in flat  # proves the 0-indent premise
+
+    doc_path = write_and_register(cfg_dir, unit="core", spec=_spec(), now="2026-07-06")
+    assert doc_path.is_file()
+    reloaded = load_bundle(cfg_dir).config
+    assert {d.id for d in reloaded.documents} == {"existing", "src-gamma"}
+    # The NEW doc is born in sync (the fixture's pre-existing doc was never
+    # healed — its drift is not this test's subject).
+    new_drifts = [
+        d for d in detect_drift(reloaded, cfg_dir).drifts if d.doc_id == "src-gamma"
+    ]
+    assert new_drifts == []

@@ -145,6 +145,42 @@ def _ticks(cfg_dir: Path) -> tuple[tuple[Suggestion, ...], tuple[Suggestion, ...
     return fixes, docs
 
 
+def _write_promote_log(cfg_dir: Path) -> None:
+    """Three unanimous INVALIDATED resolutions on one shape → a candidate."""
+    log = cfg_dir / DEFAULT_LOG_PATH
+    res = cfg_dir / DEFAULT_RESOLUTIONS_PATH
+    log.parent.mkdir(parents=True, exist_ok=True)
+    for i in range(3):
+        rid = f"r-{i}"
+        append(
+            log,
+            ReviewRecord(
+                record_id=rid,
+                doc_id="guide",
+                doc_path="docs/guide.md",
+                audience="eng-guide",
+                drift_kind="hash",
+                drift_detail="d",
+                cause="c",
+                verdict=Verdict.INVALIDATE,
+                fix=None,
+                surface_hash=f"h{i}",
+                backend_kind="mock",
+                detected_at=_NOW,
+                resolved_at=_NOW,
+                config_snapshot={},
+            ),
+        )
+        append_resolution(
+            res,
+            ResolutionRecord(
+                record_id=rid,
+                resolution=Resolution.INVALIDATED,
+                resolved_at=_NOW,
+            ),
+        )
+
+
 def _by_kind(suggestions: tuple[Suggestion, ...], kind: SuggestionKind):
     return [s for s in suggestions if s.kind is kind]
 
@@ -181,38 +217,7 @@ class TestFixesTick:
 
     def test_promote_rule_fires_on_unanimous_shape(self, tmp_path: Path) -> None:
         cfg_dir = _setup(tmp_path)
-        log = cfg_dir / DEFAULT_LOG_PATH
-        res = cfg_dir / DEFAULT_RESOLUTIONS_PATH
-        log.parent.mkdir(parents=True, exist_ok=True)
-        for i in range(3):
-            rid = f"r-{i}"
-            append(
-                log,
-                ReviewRecord(
-                    record_id=rid,
-                    doc_id="guide",
-                    doc_path="docs/guide.md",
-                    audience="eng-guide",
-                    drift_kind="hash",
-                    drift_detail="d",
-                    cause="c",
-                    verdict=Verdict.INVALIDATE,
-                    fix=None,
-                    surface_hash=f"h{i}",
-                    backend_kind="mock",
-                    detected_at=_NOW,
-                    resolved_at=_NOW,
-                    config_snapshot={},
-                ),
-            )
-            append_resolution(
-                res,
-                ResolutionRecord(
-                    record_id=rid,
-                    resolution=Resolution.INVALIDATED,
-                    resolved_at=_NOW,
-                ),
-            )
+        _write_promote_log(cfg_dir)
         fixes, _ = _ticks(cfg_dir)
         (promo,) = _by_kind(fixes, SuggestionKind.PROMOTE_RULE)
         assert promo.doc_id == "guide"
@@ -289,12 +294,164 @@ class TestDocsTick:
         assert edge1.key == edge2.key
 
 
+class TestKeyVectors:
+    """PR #20 fresh-review must-fix: the ⟨R⟩-pinned hashed fields were only
+    HALF-guarded — dropping the FIX_DRIFT kinds field, the RESOLVE_EDGE
+    upstream_id, or the ADD_EDGE tier survived the whole suite. Golden
+    vectors recompute every kind's key INDEPENDENTLY from the pinned fields,
+    so ANY field drop / reorder / separator change now fails loudly."""
+
+    @staticmethod
+    def _key(kind: SuggestionKind, *fields: str) -> str:
+        import hashlib
+
+        payload = "\x1f".join((kind.value, *fields))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+    def test_golden_key_vectors_pin_every_hashed_field(self, tmp_path: Path) -> None:
+        from custodex.docdeps import upstream_fingerprint
+        from custodex.drift import DriftKind, detect
+        from custodex.extract import build_document_surface
+        from custodex.manifest import parse_text
+
+        cfg_dir = _setup(tmp_path)
+        _write_promote_log(cfg_dir)
+        cfg = load_bundle(cfg_dir).config
+        fixes = suggest_fixes_tick(cfg, cfg_dir, now=_NOW)
+        docs = suggest_docs_tick(cfg, cfg_dir, now=_NOW)
+
+        # FIX_DRIFT = (kind, doc_id, sorted drift-kinds, current surface hash)
+        drift_kinds = sorted(
+            {
+                d.kind.value
+                for d in detect(cfg, cfg_dir).drifts
+                if d.doc_id == "guide" and d.kind is not DriftKind.SUSPECT_LINK
+            }
+        )
+        spec = next(d for d in cfg.documents if d.id == "guide")
+        surface_hash = build_document_surface(spec, tmp_path).fingerprint().composite
+        (fix,) = _by_kind(fixes, SuggestionKind.FIX_DRIFT)
+        assert fix.key == self._key(
+            SuggestionKind.FIX_DRIFT, "guide", ",".join(drift_kinds), surface_hash
+        )
+
+        # RESOLVE_EDGE = (kind, downstream, upstream, CURRENT upstream fp)
+        api = tmp_path / "docs" / "api.md"
+        fingerprint = upstream_fingerprint(
+            parse_text(api.read_text(encoding="utf-8"), api),
+            baseline=cfg.docdeps.baseline,
+        )
+        (edge,) = _by_kind(fixes, SuggestionKind.RESOLVE_EDGE)
+        assert edge.key == self._key(
+            SuggestionKind.RESOLVE_EDGE, "notes", "api", fingerprint
+        )
+
+        # PROMOTE_RULE = (kind, doc_id, drift_kind, audience, resolution)
+        (promo,) = _by_kind(fixes, SuggestionKind.PROMOTE_RULE)
+        assert promo.key == self._key(
+            SuggestionKind.PROMOTE_RULE, "guide", "hash", "eng-guide", "invalidated"
+        )
+
+        # DOCUMENT_GAP = (kind, entity node id)
+        (gap,) = _by_kind(docs, SuggestionKind.DOCUMENT_GAP)
+        assert gap.key == self._key(
+            SuggestionKind.DOCUMENT_GAP, "symbol src/gamma.py#hot_gap"
+        )
+
+        # ADD_EDGE = (kind, downstream, upstream, tier)
+        (add,) = _by_kind(docs, SuggestionKind.ADD_EDGE)
+        assert add.key == self._key(
+            SuggestionKind.ADD_EDGE, "notes", "guide", "shared_symbol"
+        )
+
+    def test_fix_drift_key_changes_when_drift_kinds_change(
+        self, tmp_path: Path
+    ) -> None:
+        # Same surface, a DIFFERENT drift-kind set (the doc file vanishes:
+        # HASH → MISSING_DOC): the kinds field must move the key — a
+        # dismissed suggestion must not swallow a structurally different
+        # problem just because the code surface did not move.
+        from custodex.drift import DriftKind
+
+        cfg_dir = _setup(tmp_path)
+        fixes1, _ = _ticks(cfg_dir)
+        (fix1,) = _by_kind(fixes1, SuggestionKind.FIX_DRIFT)
+        (tmp_path / "docs" / "guide.md").unlink()
+        fixes2, _ = _ticks(cfg_dir)
+        fix2 = next(
+            s for s in _by_kind(fixes2, SuggestionKind.FIX_DRIFT) if s.doc_id == "guide"
+        )
+        assert DriftKind.MISSING_DOC.value in fix2.detail
+        assert fix1.key != fix2.key
+
+    def test_two_missing_upstreams_get_distinct_keys(self, tmp_path: Path) -> None:
+        # Two suspect edges from ONE doc to TWO missing upstreams must be TWO
+        # inbox keys (dropping upstream_id from the key collapsed them — one
+        # dismiss silenced both). Also covers the fingerprint='missing' path.
+        cfg_dir = _setup(tmp_path)
+        unit = cfg_dir / "core.yaml"
+        text = unit.read_text(encoding="utf-8")
+        text = text.replace(
+            "    depends_on:\n      - doc: api\n",
+            "    depends_on:\n      - doc: phantom-a\n      - doc: phantom-b\n",
+        )
+        text = text.replace(
+            "  - id: notes",
+            "  - id: phantom-a\n"
+            "    path: docs/phantom-a.md\n"
+            "    audience: eng-guide\n"
+            "    region_keys: []\n"
+            "  - id: phantom-b\n"
+            "    path: docs/phantom-b.md\n"
+            "    audience: eng-guide\n"
+            "    region_keys: []\n"
+            "  - id: notes",
+        )
+        unit.write_text(text, encoding="utf-8")
+        fixes, _ = _ticks(cfg_dir)
+        edges = sorted(
+            _by_kind(fixes, SuggestionKind.RESOLVE_EDGE), key=lambda s: s.target
+        )
+        assert [(e.doc_id, e.target) for e in edges] == [
+            ("notes", "phantom-a"),
+            ("notes", "phantom-b"),
+        ]
+        assert len({e.key for e in edges}) == 2
+
+    def test_add_edge_key_tracks_tier(self, tmp_path: Path) -> None:
+        # The SAME pair at a different provenance tier is a different key
+        # (a markdown link upgrades shared_symbol → resolved_link).
+        cfg_dir = _setup(tmp_path)
+        _, docs1 = _ticks(cfg_dir)
+        (edge1,) = _by_kind(docs1, SuggestionKind.ADD_EDGE)
+        _edit_body(
+            tmp_path / "docs" / "notes.md",
+            "Uses `solve_widget` too.",
+            "Uses `solve_widget` too — see [the guide](guide.md).",
+        )
+        _, docs2 = _ticks(cfg_dir)
+        (edge2,) = _by_kind(docs2, SuggestionKind.ADD_EDGE)
+        assert (edge1.doc_id, edge1.target) == (edge2.doc_id, edge2.target)
+        assert edge1.key != edge2.key
+
+
 class TestShape:
     def test_ticks_are_deterministic_and_sorted_by_key(self, tmp_path: Path) -> None:
+        # ≥3 items PER TICK with distinct keys (PR #20 fresh-review: the old
+        # 2-item fixture satisfied 'sorted' by coin-flip — a reversed return
+        # survived the suite; the richer fixture makes the pin a real guard).
         cfg_dir = _setup(tmp_path)
+        _write_promote_log(cfg_dir)  # fixes tick item #3
+        _write(tmp_path, "src/delta.py", "def cold_gap(q):\n    return q\n")
+        _edit_body(  # docs tick item #3: a second uncovered mentioned symbol
+            tmp_path / "docs" / "guide.md",
+            "Call `hot_gap` before `solve_widget`.",
+            "Call `hot_gap` and `cold_gap` before `solve_widget`.",
+        )
         fixes_a, docs_a = _ticks(cfg_dir)
         fixes_b, docs_b = _ticks(cfg_dir)
         assert fixes_a == fixes_b and docs_a == docs_b
+        assert len(fixes_a) >= 3 and len(docs_a) >= 3
         assert [s.key for s in fixes_a] == sorted(s.key for s in fixes_a)
         assert [s.key for s in docs_a] == sorted(s.key for s in docs_a)
 
@@ -310,3 +467,17 @@ class TestShape:
         assert "fix_drift" in text and "document_gap" in text
         assert "cdx monitor --apply" in text
         assert render_suggestions_text(()) == "# no suggestions — all clear"
+
+    def test_render_text_is_severity_first(self, tmp_path: Path) -> None:
+        # DEMO-107's claim, made true (PR #20 fresh-review): the DISPLAY is
+        # triage order — every high line above every medium above every low —
+        # regardless of the ticks' key-sorted return order.
+        fixes, docs = _ticks(_setup(tmp_path))
+        text = render_suggestions_text((*fixes, *docs))
+        ranks = []
+        for line in text.split("\n"):
+            token = line.strip().split(" ", 1)[0]
+            if token in ("high", "medium", "low"):
+                ranks.append({"high": 0, "medium": 1, "low": 2}[token])
+        assert len(ranks) >= 3  # the fixture spans all three severities
+        assert ranks == sorted(ranks)

@@ -72,7 +72,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-CONFIGV2-014` | unit/test_unit_serializer.py | DEMOS.md |
 | `FEAT-CONFIGV2-015` | unit/test_index.py | DEMOS.md |
 | `FEAT-CONFIGV2-016` | system/test_dogfood.py | DEMOS.md |
-| `FEAT-CONFIGV2-017` | system/test_testdoc_mirror.py | DEMOS.md |
+| `FEAT-CONFIGV2-017` | smoke/test_demo_fixture_tracked.py, system/test_testdoc_mirror.py | DEMOS.md |
 | `FEAT-COVERAGE-001` | integration/test_config_ignore.py, integration/test_editable_tree.py, integration/test_generate.py, integration/test_report.py, regression/test_corpus_selfcoverage.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-002` | integration/test_config_ignore.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-003` | unit/test_inventory.py | DEMOS.md |

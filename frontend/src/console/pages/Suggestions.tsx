@@ -30,6 +30,22 @@ const SEVERITY_CHIP: Record<WorkSeverity, string> = {
   low: "chip--sync",
 };
 
+/** Triage order: high first, then key (mirrors the CLI renderer + the
+ * server's inbox ordering — DEMO-107's severity-first claim). */
+const SEVERITY_RANK: Record<WorkSeverity, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+function bySeverityThenKey(
+  a: { severity: WorkSeverity; key: string },
+  b: { severity: WorkSeverity; key: string },
+): number {
+  const rank = (SEVERITY_RANK[a.severity] ?? 1) - (SEVERITY_RANK[b.severity] ?? 1);
+  return rank !== 0 ? rank : a.key.localeCompare(b.key);
+}
+
 /**
  * AGT-06/AGT-07 — the worker suggestion inbox. Pending items are CURRENT
  * reality (the server reconciles every tick: vanished items auto-resolve,
@@ -101,12 +117,12 @@ export function Suggestions({
   }
 
   const all = state.data.suggestions;
-  const pending = all.filter(
-    (s) => s.status === "pending" && !dismissedKeys.has(s.key),
-  );
-  const closed = all.filter(
-    (s) => s.status !== "pending" || dismissedKeys.has(s.key),
-  );
+  const pending = all
+    .filter((s) => s.status === "pending" && !dismissedKeys.has(s.key))
+    .sort(bySeverityThenKey);
+  const closed = all
+    .filter((s) => s.status !== "pending" || dismissedKeys.has(s.key))
+    .sort(bySeverityThenKey);
 
   if (all.length === 0) {
     return (

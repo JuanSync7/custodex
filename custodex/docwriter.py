@@ -158,28 +158,41 @@ def draft_document(
     )
 
 
-def unit_snippet(spec: DocumentSpec) -> str:
-    """The YAML block ``write_and_register`` splices under ``documents:``."""
+def unit_snippet(spec: DocumentSpec, *, indent: int = 2) -> str:
+    """The YAML block ``write_and_register`` splices under ``documents:``.
+
+    ``indent`` is the ENTRY indent (the column of ``- id:``): 2 for the
+    hand-maintained/template style, 0 for ``dump_unit_file`` output (the
+    ``cdx onboard --apply`` / editor-generated style — the PR #20 fresh-review
+    composition fix: the splice must match the unit's real indentation or the
+    result is invalid YAML).
+    """
+    pad = " " * indent
     lines = [
-        f"  - id: {spec.id}",
-        f"    path: {spec.path}",
-        f"    audience: {spec.audience.value}",
-        '    region_keys: ["symbols", "overview"]',
-        "    region_modes:",
-        "      overview: llm",
-        "    code_refs:",
+        f"{pad}- id: {spec.id}",
+        f"{pad}  path: {spec.path}",
+        f"{pad}  audience: {spec.audience.value}",
+        f'{pad}  region_keys: ["symbols", "overview"]',
+        f"{pad}  region_modes:",
+        f"{pad}    overview: llm",
+        f"{pad}  code_refs:",
     ]
-    lines.extend(f"      - path: {ref.path}" for ref in spec.code_refs)
+    lines.extend(f"{pad}    - path: {ref.path}" for ref in spec.code_refs)
     return "\n".join(lines)
 
 
-def _append_document_block(text: str, snippet: str) -> str:
+def _append_document_block(text: str, spec: DocumentSpec) -> str:
     """Append a document entry at the END of the unit's ``documents:`` block.
 
     A bounded textual splice (the AGT-04 authorship rule: hand-maintained YAML
-    is never model-round-tripped). The block ends at the first subsequent line
-    that is non-blank and not indented — trailing blank lines stay after the
-    new entry. Loud when the unit has no ``documents:`` key (K8).
+    is never model-round-tripped), INDENTATION-ADAPTIVE (the docmap locate
+    precedent): the first existing ``- id:`` entry's indent decides both where
+    the block ends and how the new entry is rendered — a ``dump_unit_file``
+    unit (0-indent sequences) and a template unit (2-space) both splice
+    validly. The block ends at the first subsequent non-blank line that is
+    neither another entry at that indent nor deeper content — trailing blank
+    lines stay after the new entry. Loud when the unit has no ``documents:``
+    key (K8).
     """
     lines = text.split("\n")
     try:
@@ -188,14 +201,29 @@ def _append_document_block(text: str, snippet: str) -> str:
         raise ConfigError(
             "unit file has no `documents:` block — add the document by hand"
         ) from None
+    entry_indent = 2  # the template default, used only if the block is empty
+    for j in range(start + 1, len(lines)):
+        stripped = lines[j].strip()
+        if not stripped:
+            continue
+        if stripped.startswith("- "):
+            entry_indent = len(lines[j]) - len(lines[j].lstrip())
+        break
     end = len(lines)
     for j in range(start + 1, len(lines)):
-        if lines[j].strip() and not lines[j].startswith(" "):
-            end = j
-            break
+        line = lines[j]
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent > entry_indent:
+            continue  # a field/nested item of an entry
+        if indent == entry_indent and line.lstrip().startswith("- "):
+            continue  # another entry
+        end = j  # a dedented or sibling key: the block is over
+        break
     while end > start + 1 and not lines[end - 1].strip():
         end -= 1
-    lines[end:end] = snippet.split("\n")
+    lines[end:end] = unit_snippet(spec, indent=entry_indent).split("\n")
     return "\n".join(lines)
 
 
@@ -236,7 +264,7 @@ def write_and_register(
 
     unit_path = config_dir / f"{unit}.yaml"
     original = unit_path.read_text(encoding="utf-8")
-    spliced = _append_document_block(original, unit_snippet(spec))
+    spliced = _append_document_block(original, spec)
     date = now.split("T", 1)[0]
     spliced = "\n".join(
         f'updated: "{date}"' if line.startswith("updated:") else line

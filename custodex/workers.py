@@ -288,14 +288,30 @@ def suggest_docs_tick(
     return tuple(sorted(out, key=lambda s: s.key))
 
 
+#: Display rank: high first (mirrors the worklist and the stored inbox).
+_SEVERITY_RANK = {
+    WorkSeverity.HIGH: 0,
+    WorkSeverity.MEDIUM: 1,
+    WorkSeverity.LOW: 2,
+}
+
+
 def render_suggestions_text(
     suggestions: tuple[Suggestion, ...] | list[Suggestion],
 ) -> str:
-    """A deterministic plain-text inbox (K10) — the ``cdx suggest`` view."""
+    """A deterministic plain-text inbox (K10) — the ``cdx suggest`` view.
+
+    Rendered SEVERITY-FIRST (high → medium → low, then key) — the reading
+    order a human triages in (DEMO-107's claim, PR #20 fresh-review fix). The
+    tick outputs themselves stay key-sorted; only the display reorders.
+    """
     if not suggestions:
         return "# no suggestions — all clear"
-    lines = [f"# {len(suggestions)} suggestion(s) — advisory; humans apply (K11):"]
-    for s in suggestions:
+    ordered = sorted(
+        suggestions, key=lambda s: (_SEVERITY_RANK.get(s.severity, 1), s.key)
+    )
+    lines = [f"# {len(ordered)} suggestion(s) — advisory; humans apply (K11):"]
+    for s in ordered:
         who = f" [{s.doc_id}]" if s.doc_id else ""
         lines.append(f"  {s.severity.value:<6} {s.kind.value}{who} {s.key}")
         lines.append(f"         {s.detail}")

@@ -143,3 +143,45 @@ def test_write_doc_loud_paths(tmp_path: Path) -> None:
         app, ["write-doc", "a.py", "--config", str(single / "cdmon.yaml")]
     )
     assert sf.exit_code == 1 and "single file" in sf.output
+
+
+def test_onboard_then_write_doc_composes(
+    tmp_path: Path,
+    monkeypatch,  # noqa: ANN001 - pytest fixture
+) -> None:
+    """PR #20 fresh-review must-fix: the epic's flagship flow must COMPOSE.
+
+    `cdx onboard --apply` emits dump_unit_file-style unit YAML (0-indent block
+    sequences); `cdx write-doc --apply` must register into that exact style —
+    it used to splice invalid YAML and abort on every onboarded repo (the very
+    command the AGT-06 DOCUMENT_GAP suggestion embeds).
+    """
+    import custodex.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod, "_git_user_name", lambda root: "you")
+    repo = tmp_path / "adopter"
+    pkg = repo / "mypkg"
+    pkg.mkdir(parents=True)
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "alpha.py").write_text(
+        'def start(x):\n    """Start."""\n    return x\n', encoding="utf-8"
+    )
+    (repo / "README.md").write_text("# Adopter\n\nHello.\n", encoding="utf-8")
+
+    onboarded = runner.invoke(
+        app, ["onboard", "--path", str(repo), "--apply", "--owner", "you"]
+    )
+    assert onboarded.exit_code == 0, onboarded.output
+
+    (pkg / "gamma.py").write_text(
+        'def turbo_boost(x):\n    """Boost."""\n    return x * 2\n', encoding="utf-8"
+    )
+    cfg_dir = repo / "config" / "cdmon"
+    written = runner.invoke(
+        app,
+        ["write-doc", "mypkg/gamma.py", "--apply", "--config", str(cfg_dir)],
+    )
+    assert written.exit_code == 0, written.output
+
+    check = runner.invoke(app, ["check", "--config", str(cfg_dir)])
+    assert check.exit_code == 0, check.output
