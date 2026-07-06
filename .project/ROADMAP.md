@@ -640,7 +640,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
 (agents suggest; humans apply). New modules are flat top-level
 `custodex/*.py` (the catalog names top-level modules only).
 
-- ☐ **AGT-01** `entities.py` — deterministic entity extraction + mention
+- ☑ **AGT-01** `entities.py` — deterministic entity extraction + mention
   linking over managed-doc prose. Entity kinds (closed set): DOC / SECTION /
   SYMBOL / PATH / ENV_VAR / URL with SCIP-style human-readable string ids;
   mentions parsed from headings, markdown links, and backticked spans
@@ -651,7 +651,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   link + an env var each yield the right resolved mention (and an unknown
   symbol an unresolved one), byte-deterministic across runs. *(Shipped with
   the DEMOS.md id-uniqueness lint + dedup of DEMO-052/53/54 as hardening.)*
-- ☐ **AGT-02** `docmap.py` — entity-based doc↔doc mapping suggestions +
+- ☑ **AGT-02** `docmap.py` — entity-based doc↔doc mapping suggestions +
   the accept path. `suggest_edges` unifies link-inference (today's
   `infer_edges_from_links`) with the new entity rule — *doc A mentions symbol
   S; doc B covers S via `code_refs` ⇒ suggest A `depends_on` B* — as
@@ -668,7 +668,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   link` declares (comment-preserving textual splice) + stamps it and the
   suggestion disappears (K7); a rejected pair never returns. (REVISED per the
   2026-07-02 design review — see the slice spec.)
-- ☐ **AGT-03** `kgraph.py` — the unified knowledge-graph artifact. One
+- ☑ **AGT-03** `kgraph.py` — the unified knowledge-graph artifact. One
   deterministic `build_graph(config, root)` folding the edges Custodex already
   computes into typed nodes/edges with provenance tiers: DOCUMENTS (code_refs),
   DEPENDS_ON (docdeps), MENTIONS + LINKS_TO (AGT-01, incl. unresolved counts),
@@ -680,7 +680,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   store methods + Alembic 0008, `GET /repos/{id}/graph`. *Goal:* fixture graph
   contains every declared/derived edge kind with the right tier; re-build is
   byte-identical; an undocumented high-in-degree symbol tops `--rank`.
-- ☐ **AGT-04** `onboard.py` — the config-authoring onboarding agent.
+- ☑ **AGT-04** `onboard.py` — the config-authoring onboarding agent.
   `analyze_repo(root) -> RepoMap` (docs found + audience guesses, top-level
   code packages, README/AGENTS.md/CLAUDE.md signals; resilient to unparseable
   files) → `propose_config(repo_map) -> OnboardPlan` (real `UnitFile` models
@@ -692,7 +692,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   referencing writing templates the repo doesn't ship). *Goal:* pointed at a
   bare 2-package fixture repo, `--apply` yields `cdx check` exit 0 with ≥1
   unit per package and the README mapped; idempotent re-run changes nothing.
-- ☐ **AGT-05** `docwriter.py` — write-new-doc-from-code + register. `cdx
+- ☑ **AGT-05** `docwriter.py` — write-new-doc-from-code + register. `cdx
   write-doc PATH_OR_MODULE [--unit][--id][--audience][--apply]`: registers the
   DocumentSpec via the pure unit editors + index regen, scaffolds via
   `scaffold_doc`, authors the purpose blockquote + an `llm`-mode overview
@@ -701,7 +701,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   *Goal:* one command takes an undocumented fixture module to a registered,
   conformant, `cdx check`-green doc with non-TODO prose; human/locked regions
   never touched (write path goes through heal, never raw writes).
-- ☐ **AGT-06** `workers.py` — the two background suggesters. Pure tick
+- ☑ **AGT-06** `workers.py` — the two background suggesters. Pure tick
   functions (K11): `suggest_fixes_tick` (drift + suspect edges + promotion
   candidates → FIX_DRIFT / RESOLVE_EDGE / PROMOTE_RULE suggestions) and
   `suggest_docs_tick` (coverage gaps ranked by AGT-03 centrality → DOCUMENT_GAP
@@ -714,7 +714,7 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
   `POST .../suggestions/dismiss` (token). *Goal:* a tick over a drifted fixture
   yields the expected suggestions; a second tick adds ZERO new rows (dedup);
   dismissed keys never resurface; loops never run unless enabled.
-- ☐ **AGT-07** frontend — Suggestions inbox (per-repo tab; accept/dismiss
+- ☑ **AGT-07** frontend — Suggestions inbox (per-repo tab; accept/dismiss
   mirrors the Mapping staged-edit lifecycle) + Graph explorer (extends the
   Dependencies seams; focus-node in/out edge groups + top-central gaps table —
   no heavy viz dependency) + demo fixtures (busy + empty variants) + the
