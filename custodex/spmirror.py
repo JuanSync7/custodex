@@ -447,7 +447,17 @@ def _mirror_rel(cfg: SpMirrorConfig, doc_path: str, converter_id: str) -> str:
     ``specs/Design.docx.md``): collision-free against a sibling
     ``Design.md`` and the provenance is visible in the filename.
     ``passthrough`` keeps the name.
+
+    A listed path that is absolute or climbs (``..``) would let a
+    compromised source write OUTSIDE ``dest`` — refused loudly (K8; the
+    listing is remote input, not trusted config).
     """
+    pure = PurePosixPath(doc_path)
+    if pure.is_absolute() or ".." in pure.parts or "\\" in doc_path:
+        raise SpMirrorError(
+            f"spmirror source listed an unsafe path {doc_path!r} "
+            "(absolute, parent-escaping, or backslashed) — refusing to mirror it"
+        )
     rel = doc_path if converter_id == "passthrough" else doc_path + ".md"
     return (PurePosixPath(cfg.dest) / rel).as_posix()
 

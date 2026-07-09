@@ -336,6 +336,21 @@ class TestSyncCore:
         )
         assert set(manifest["files"]) == {"a.md"}
 
+    def test_traversal_paths_from_the_source_are_refused(self, tmp_path: Path) -> None:
+        """A compromised source must not write outside dest (K8).
+
+        DirSource paths come from rglob (repo-shaped by construction), but
+        ProxySource paths are REMOTE INPUT — an absolute, parent-escaping,
+        or backslashed listing entry is an attack shape, not a document.
+        """
+        for evil in ("../../escape.md", "/etc/owned.md", "a\\..\\b.md"):
+            src = FakeSource({evil: (b"# x\n", "2026-07-01T00:00:00Z")})
+            cfg = load_spmirror_config(_config(tmp_path, include=["**"]), env={})
+            with pytest.raises(SpMirrorError) as exc:
+                sync_mirror(cfg, tmp_path / "repo", source=src)
+            assert "unsafe path" in str(exc.value)
+        assert not (tmp_path / "escape.md").exists()
+
     def test_dry_run_fetches_nothing_and_writes_nothing(self, tmp_path: Path) -> None:
         src = FakeSource({"a.md": (b"# a\n", "2026-07-01T00:00:00Z")})
         report = _sync(tmp_path, src, dry_run=True)
