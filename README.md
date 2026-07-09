@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: d9bce011ab4d4636
+  fingerprint: d7b275bbd13013d3
   fingerprint_tiers:
-    composite: d9bce011ab4d4636
-    signature: d9bce011ab4d4636
+    composite: d7b275bbd13013d3
+    signature: d7b275bbd13013d3
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -24,6 +24,7 @@ cdm:
     72f4be89d6ebab14: 82cdb795b1cfefb7
     75c75efe327a8ef3: 41b3443a5133331f
     763cdc62a869262b: 3209114b9963834b
+    79e1ad65cf059761: 6a59abba4660c68f
     7de97367c9cdc3c6: 44bb81b499473b41
     845e91831319e89c: 9b02c4079bd0db59
     87780fa5de684e87: 1f59070663e4290f
@@ -112,6 +113,7 @@ cdx doctor               # offline, read-only preflight: PASS/WARN/FAIL on confi
 cdx new-doc <doc-id>     # scaffold a conformant, in-sync doc from config + code
 cdx write-doc TARGET [--apply]  # NEW: author + REGISTER a doc for a source file in one verb — dry-run prints the draft + unit snippet; --apply splices the entry into the unit YAML (comments preserved), writes the doc with backend-authored `overview` prose (mode: llm — re-authors when the code moves), born check-green
 cdx suggest [--kind fixes|docs] [--write]  # NEW: the two background suggesters, run once in the foreground — an advisory inbox (drifted docs, suspect edges, promotable shapes; coverage gaps, mapping suggestions), every item keyed + embedding the exact next human command; --write appends new keys to the .cdmon audit log (the server can run the same ticks on a loop — settings.yaml `server.workers`)
+cdx sp-sync [--force] [--dry-run] [--json]  # NEW: mirror a SharePoint library into the repo as governable text (config/spmirror.yaml: a local pull dir or the rag-sharepoint-api proxy; docx→text container-churn-invariant, cdm baselines preserved across re-syncs) — declare the mirrored docs + depends_on in config/cdmon and a SharePoint edit flips your dependents SUSPECT on the next check (examples/sharepoint-mirror)
 cdx surface              # dump the extracted per-document surface (debug)
 cdx build                # render every `html: true` doc to its derived `.html` twin (keeps the Layout Standard's HTML pairing fresh)
 cdx lint [--fix]         # validate doc *structure* (Layout Standard); --fix stamps front matter

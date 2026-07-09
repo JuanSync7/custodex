@@ -1495,3 +1495,55 @@ Pinned by `tests/integration/test_worker_loop.py` +
 `tests/integration/test_server_store_parity.py` (both stores) +
 `tests/integration/test_db.py` (Alembic 0009 up/down).
 Features: FEAT-WORKERS-002
+
+### DEMO-109 — Convert a SharePoint library deterministically (sources + converters)
+**What it shows.** The two seams that make SharePoint governable with zero
+engine change: a `Source` (a local `pull_sharepoint.py` mirror directory, or
+the `rag-sharepoint-api` proxy over in-process urllib) and a `Converter`
+(`docx-text` / `passthrough`; a lossless doc2md drops into the same registry).
+The load-bearing property is CONTAINER-CHURN INVARIANCE: a `.docx` is a zip
+whose re-save rewrites timestamps and member order without changing a word —
+`docx-text` reads only `word/document.xml`, so the converted text (and
+therefore the engine fingerprint) moves only when the WORDS move. A DTD
+smuggled into `document.xml` (the XXE/billion-laughs shape Word never writes)
+is refused loudly before any XML parse.
+**How to observe.** Point `config/spmirror.yaml` at any folder holding a
+`.docx` and run `cdx sp-sync --repo-root .`; open the mirrored
+`<dest>/<name>.docx.md`. Re-save the docx unchanged (or rebuild it with
+different zip timestamps) and re-run — `written` stays empty. Pinned by
+`tests/unit/test_spmirror.py` (golden docx vector, churn-invariance,
+DTD refusal, loud non-UTF-8 passthrough).
+Features: FEAT-SPMIRROR-001
+
+### DEMO-110 — The idempotent mirror sync (manifest skip + baseline preservation)
+**What it shows.** `sync_mirror` is safe to run forever: a file whose listed
+size + last_modified match the manifest is not even fetched; a fetched file
+whose converted text is unchanged writes nothing (K7); and a mirror file the
+engine has already stamped keeps its `cdm:` front matter byte-for-byte across
+every re-sync — fingerprint baselines and `upstream_hashes` edge stamps
+survive the connector. A file deleted in SharePoint is pruned from the
+manifest but its mirror stays on disk, reported as a stale candidate for a
+HUMAN to delete (K5).
+**How to observe.** Run `cdx sp-sync` twice — the second report says
+`pulled 0, unchanged N` and `.cdmon/sp-manifest.json` is byte-identical.
+Heal the mirrored doc (`cdx monitor --apply`), edit the SharePoint side,
+re-sync: the body updates, the `cdm:` block survives. Pinned by
+`tests/unit/test_spmirror.py` (manifest skip / force / no-op / front-matter
+preservation / prune / dry-run / determinism-across-roots).
+Features: FEAT-SPMIRROR-002
+
+### DEMO-111 — SharePoint change → SUSPECT dependents (`cdx sp-sync` e2e)
+**What it shows.** The whole reason for EPIC SP, on one screen: a git-native
+engineering doc declares `depends_on: [{doc: sp-design}]` where `sp-design`
+is a mirrored SharePoint spec. Someone edits the spec in SharePoint; the next
+`cdx sp-sync` moves the mirror body; `cdx check` exits 1 with a SUSPECT_LINK
+naming exactly which of YOUR docs is now stale because of THEIR edit; the
+accountable owner reviews and `cdx resolve --edge guide sp-design` clears it.
+Detection stays pure (K1: `check` never fetches); the connector is the only
+writer.
+**How to observe.** `cdx sp-sync --config config/spmirror.yaml` → declare the
+doc + edge in `config/cdmon` → `cdx monitor --apply` → edit the library file →
+`cdx sp-sync` → `cdx check` (exit 1, SUSPECT_LINK) → `cdx resolve --edge` →
+green. Pinned by `tests/system/test_spmirror_cli.py`
+(test_sp_sync_then_suspect_then_resolve_end_to_end + dry-run/json/loud-config).
+Features: FEAT-SPMIRROR-003

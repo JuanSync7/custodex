@@ -3347,3 +3347,69 @@ Both follow the WL-01 6-point chain + demo fixtures (busy + empty variants) +
 demoFetch routes + vitest suites + ConsoleChrome parity + a `/guide` page per
 feature. ⟨R⟩ DEMO id allocation: the DEMOS.md duplicate-id rider renumbers the
 section-M trio to DEMO-095/096/097; new AGT demos start at DEMO-098.
+
+## EPIC SP — SharePoint mirror governance  (`spmirror.py` — K0/K4/K7/K8/K10)
+
+The connector that lets Custodex govern documents whose SOURCE OF EDIT is
+SharePoint: mirror the library into the repo tree as deterministic text, then
+let the UNCHANGED engine fingerprint / edge / staleness them like any other
+managed doc. ⟨R⟩ **The engine never converts and never fetches** — `extract.py`,
+`drift.py`, `manifest.py`, `docdeps.py` are not touched by this epic
+(`gitfetch.py`/`pr.py` precedent: provider-specific modules live at the edge).
+Stdlib-only (`urllib`, `zipfile`, `xml.etree`, `fnmatch`) — no new core deps
+(K0), no `[sharepoint]` extra needed for v1.
+
+### `custodex/spmirror.py`  (SP-01)
+
+- `class SpMirrorError(CodeDocMonitorError)` — every malformed input is loud (K8).
+- `class SpDocument(BaseModel)`: `path: str` (library-relative, POSIX), `size_bytes:
+  int`, `last_modified: str` — ⟨R⟩ the timestamp comes from the SOURCE LISTING,
+  never the clock (K10); it is a skip-key, not provenance.
+- ⟨R⟩ `class Source(Protocol)`: `list_documents() -> tuple[SpDocument, ...]` +
+  `fetch(path: str) -> bytes` — the ONE fetch seam (the `_Cloner` precedent).
+  - `class DirSource(root: Path)` — a library already mirrored to disk (the
+    `pull_sharepoint.py` output on ai03; also every offline test fixture, K4).
+    Listing = sorted rglob; `last_modified` = `st_mtime` formatted ISO-UTC.
+  - `class ProxySource(api_url, site_url, folder, timeout)` — the
+    `rag-sharepoint-api` service via stdlib urllib (in-process HTTP: EDR-safe):
+    `POST /documents/list` → entries; `POST /documents/fetch`
+    `include_content=true` → base64 bytes. Network failure → `SpMirrorError`.
+- `class Converter(Protocol)`: `convert(raw: bytes, *, source_name: str) -> str`.
+  Built-ins: ⟨R⟩ `"passthrough"` (UTF-8 decode, loud on undecodable — K8) and
+  `"docx-text"` (stdlib zipfile + ElementTree over `word/document.xml`:
+  paragraphs, `pStyle` Heading1..6 → `#`..`######`, `numPr` → `- ` items;
+  ⟨R⟩ CONTAINER-CHURN-INVARIANT: output depends only on document.xml content,
+  never zip mtimes/ordering — a Word re-save with unchanged text is
+  hash-invisible). `converter_for(name)` — unknown name is loud (K8).
+  `doc2md` (lossless converter) plugs in later as a registry entry; conversion
+  fidelity is the converter's concern, HASHING STAYS IN CUSTODEX (the baseline
+  is a property of governance, not of the document).
+- `class SpMirrorConfig(BaseModel)` loaded by `load_spmirror_config(path)` from
+  `config/spmirror.yaml` (the `settings.py` file precedent — NOT a config/cdmon
+  unit; governance declarations stay in config/cdmon): `source:
+  Literal["proxy","dir"]`, `api_url` (+ `CDMON_SP_API` env override), `site_url`,
+  `folder: str | None`, `source_dir: str | None`, `dest: str`
+  (repo-relative mirror root), `include/exclude: tuple[str, ...]` (fnmatch
+  globs), `max_bytes: int | None`, `converters: dict[str, str]` (suffix →
+  converter id; ⟨R⟩ a listed file with an UNMAPPED suffix is skipped +
+  reported, not loud — libraries hold noise).
+- ⟨R⟩ `sync_mirror(cfg, repo_root, source, *, force=False, dry_run=False) ->
+  SpSyncReport` — per listed file: filter (include/exclude/max_bytes) →
+  manifest skip (`size_bytes` + `last_modified` equal → no fetch) → fetch →
+  convert → ⟨R⟩ write ONLY if the body changed (K7), PRESERVING any existing
+  `cdm:` front matter via `manifest.parse_text` + `render_doc` (the baseline
+  survives every re-sync); a NEW file is written bare (heal stamps it).
+  Manifest: `.cdmon/sp-manifest.json` under the CONFIG DIR (`.cdmon/`
+  runtime-state precedent), sorted keys (K10); entries for files gone from the
+  listing are PRUNED, the mirror file is KEPT and reported
+  (`stale_candidates`) — deleting a governed doc is a human decision (K5).
+  `dry_run` fetches/converts nothing it would skip and writes NOTHING.
+- `SpSyncReport(BaseModel)`: `pulled`, `unchanged`, `skipped_unmapped`,
+  `skipped_filtered`, `stale_candidates`, `written` (sorted tuples/counts, K10).
+
+CLI: `cdx sp-sync [--config config/spmirror.yaml] [--repo-root .] [--force]
+[--dry-run] [--json]` — mirror-writer verb (the `monitor --apply` side of K1's
+line, never wired into `check`). The e2e loop it exists for: sp-sync → declare
+the mirrored docs in config/cdmon (owner + `depends_on` from the engineering
+docs) → `monitor --apply` baselines → upstream SharePoint edit → sp-sync →
+dependents flip SUSPECT → human `cdx resolve --edge`.

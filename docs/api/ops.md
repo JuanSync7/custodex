@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 9df6d13de2640ced
+  fingerprint: c2549d7823ca5e95
   fingerprint_tiers:
-    composite: 9df6d13de2640ced
-    docstring: 1c6a8925d4997174
-    signature: 88db6ae27b0e9050
+    composite: c2549d7823ca5e95
+    docstring: 7254a72ea1ee54ae
+    signature: 2d069e5afdc99d0e
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -43,6 +43,7 @@ cdm:
     - 7482f6dd334689ff
     - 75c75efe327a8ef3
     - 763cdc62a869262b
+    - 79e1ad65cf059761
     - 7de97367c9cdc3c6
     - 845e91831319e89c
     - 85877352f834ad30
@@ -82,7 +83,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 8a9b17bf5ecc8298
+    symbols: 36aa5464377a9325
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -120,6 +121,7 @@ cdm:
     7482f6dd334689ff: beadfe23310d2a49
     75c75efe327a8ef3: 41b3443a5133331f
     763cdc62a869262b: 3209114b9963834b
+    79e1ad65cf059761: 6a59abba4660c68f
     7de97367c9cdc3c6: 44bb81b499473b41
     845e91831319e89c: 9b02c4079bd0db59
     85877352f834ad30: b4c547466f9413b4
@@ -231,6 +233,7 @@ cdm:
 | serve | function | def serve(host: str = typer.Option('127.0.0.1', '--host', help='Host/interface to bind the standalone server to.'), port: int = typer.Option(0, '--port', help='Port to bind (0 = let the OS pick a free port).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Repo id for the standalone view. Defaults to the bundle's index `repo` field (else the current directory name)."), no_open: bool = typer.Option(False, '--no-open', help='Do not open a browser tab (accepted for parity; never auto-opens).')) -> None |
 | settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
 | should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdx should-sync`).'), config: Path = _CONFIG_OPTION) -> None |
+| sp_sync | function | def sp_sync(config: Path = typer.Option(DEFAULT_SPMIRROR_PATH, '--config', help='The spmirror connector config (config/spmirror.yaml).'), repo_root: Path = typer.Option(Path('.'), '--repo-root', help='The repo the mirror is written into (dest is relative to it).'), force: bool = typer.Option(False, '--force', help='Ignore the manifest skip and refetch every listed file (unchanged bytes still write nothing — K7).'), dry_run: bool = typer.Option(False, '--dry-run', help='Report what would be pulled; fetch nothing, write nothing.'), as_json: bool = typer.Option(False, '--json', help='Emit the sync report as JSON.')) -> None |
 | staleness | function | def staleness(config: Path = _CONFIG_OPTION, now: str \| None = typer.Option(None, '--now', help='ISO timestamp to grade freshness against (default: the current time).'), as_json: bool = typer.Option(False, '--json', help='Emit {findings} as JSON (includes fresh docs).'), fail_on_stale: bool = typer.Option(False, '--fail-on-stale', help='Exit 1 if any document is stale or never reviewed (a review gate).')) -> None |
 | suggest | function | def suggest(kind: str = typer.Option('all', '--kind', help='Which suggester runs: fixes (drift/suspect/promotable) \| docs (gaps/mappings) \| all.'), config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help='Emit the suggestion list as JSON.'), write: bool = typer.Option(False, '--write', help='Append NEW suggestion keys to .cdmon/suggestions.jsonl — an append-only audit LOG (never read back as pending state).')) -> None |
 | surface | function | def surface(config: Path = _CONFIG_OPTION, as_json: bool = typer.Option(False, '--json', help="Dump each document's surface as a JSON list.")) -> None |

@@ -133,6 +133,10 @@ entities:
     - frontend/dist
     - .project/STATUS.md
     - .project/
+    # EPIC SP: the raw-byte library puller lives in the rag-sharepoint-api
+    # repo (deployed on ai03), not here — docs/api/spmirror.md cites it as
+    # the deployed upstream of `cdx sp-sync`, which is navigation, not rot.
+    - pull_sharepoint.py
 
 # REQUIRED index of every unit file in this directory (stable, ordered). Every
 # *.yaml unit on disk MUST be listed (run `cdx index` to regenerate). The three
