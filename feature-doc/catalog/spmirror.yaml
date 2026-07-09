@@ -20,9 +20,18 @@ features:
       CONTAINER-CHURN-INVARIANT: output depends ONLY on word/document.xml,
       never zip timestamps/member order/sibling parts, so a Word re-save
       with unchanged words never moves a fingerprint (the property the
-      engine's hash needs; docx byte-hashes flip on no-op saves). A DTD or
-      ENTITY declaration anywhere in document.xml is refused loudly BEFORE
-      any XML parse (XXE/billion-laughs shape — Word never writes one).
+      engine's hash needs; docx byte-hashes flip on no-op saves). Tabs (\t)
+      and line/page breaks (\n) are preserved so tab/CR-separated content
+      cannot collide, and each body paragraph is emitted once (a nested
+      text-box paragraph folds into its parent, never double-counted).
+      Hardened against hostile library bytes (K8): a DTD/DOCTYPE is refused
+      at the PARSER (expat StartDoctypeDeclHandler — encoding-robust, so a
+      UTF-16 payload cannot slip past a byte scan) before any entity expands
+      (XXE/billion-laughs), and a document.xml that decompresses past a
+      64 MiB cap is refused (decompression bomb). Text-bearing auxiliary
+      parts docx-text does NOT mirror (headers/footers/footnotes/endnotes/
+      comments) are REPORTED via SpSyncReport.lossy_parts — an edit there is
+      never a silent blind spot; full fidelity is the doc2md converter's job.
       Unknown converter ids are loud at config load; conversion fidelity is
       the converter's concern (a lossless doc2md plugs into the registry)
       while HASHING STAYS IN THE ENGINE — a baseline is a property of
@@ -37,9 +46,14 @@ features:
       sync_mirror(cfg, repo_root, source, *, force, dry_run) → SpSyncReport:
       per listed file, include/exclude (inventory ** glob semantics) +
       max_bytes filter → manifest skip (.cdmon/sp-manifest.json — a file
-      whose size_bytes AND last_modified match the prior sync is not even
-      FETCHED; both values copied verbatim from the source listing, never
-      the clock, K10) → fetch → convert → write ONLY when the body actually
+      unchanged since the prior sync is not even FETCHED; the skip-key is an
+      EXACT content_hash when the source supplies one (DirSource hashes the
+      local bytes — so a same-size edit within one clock second is caught and
+      an mtime-only bump is NOT a needless re-fetch), else the listing's
+      size_bytes + last_modified, copied verbatim, never the clock, K10;
+      pruning is against the FULL listing, so a file merely filtered out this
+      run is never mislabelled gone) → fetch → convert → write ONLY when the
+      body actually
       changed (K7: a re-run with no upstream change writes zero bytes; force
       refetches but still writes nothing for unchanged text) — PRESERVING
       any engine-stamped `cdm:` front matter via manifest.parse_text +

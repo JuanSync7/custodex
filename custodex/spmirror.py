@@ -23,17 +23,20 @@ Three seams:
   conversion fidelity is the converter's concern; HASHING STAYS IN THE ENGINE
   (a baseline is a property of governance, not of the document).
 - :func:`sync_mirror` — the writer verb behind ``cdx sp-sync``. Skips
-  unchanged files via ``.cdmon/sp-manifest.json`` (size + last_modified from
-  the SOURCE LISTING, never the clock — K10), writes a mirror file only when
+  unchanged files via ``.cdmon/sp-manifest.json`` (an EXACT ``content_hash``
+  when the source supplies one, else the listing's ``size_bytes`` +
+  ``last_modified``, never the clock — K10), writes a mirror file only when
   its body actually changed (K7), and PRESERVES any existing ``cdm:`` front
   matter so the engine baseline survives every re-sync. A file gone from the
-  listing is pruned from the manifest but its mirror file is KEPT and
-  reported — deleting a governed doc is a human decision (K5).
+  full listing (not merely filtered out) is pruned from the manifest but its
+  mirror file is KEPT and reported — deleting a governed doc is a human
+  decision (K5).
 """
 
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import re
@@ -46,6 +49,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError, model_validator
@@ -63,14 +67,21 @@ __all__ = [
     "SpMirrorConfig",
     "SpSyncReport",
     "convert_bytes",
+    "docx_lossy_parts",
     "load_spmirror_config",
     "sync_mirror",
+    "source_from_config",
     "DEFAULT_SPMIRROR_PATH",
 ]
 
 DEFAULT_SPMIRROR_PATH = Path("config") / "spmirror.yaml"
 _MANIFEST_REL = Path(".cdmon") / "sp-manifest.json"
 _MANIFEST_SCHEMA_VERSION = "1.0.0"
+
+#: Cap on a single proxy HTTP response / base64 blob we buffer into RAM — a
+#: hostile or buggy service must not stream the connector into OOM (128 MiB,
+#: far above any real document).
+_MAX_RESPONSE_BYTES = 128 * 1024 * 1024
 
 # The one HTTP leaf, module-level so tests monkeypatch it (K4: no socket in
 # any test) — the gitfetch/gitauth injected-leaf precedent.
@@ -86,7 +97,13 @@ class SpDocument(BaseModel):
 
     ``last_modified`` is copied verbatim from the SOURCE LISTING (Graph /
     stat), never read from the clock (K10) — it is a skip-key, not
-    provenance.
+    provenance. ``content_hash`` is an OPTIONAL exact skip-key a source may
+    supply when it can hash cheaply (``DirSource`` does — the bytes are
+    local); when present it supersedes ``last_modified`` in the skip
+    decision, so a same-size edit within one clock second is never missed
+    and an mtime-only bump never forces a needless re-fetch. A source that
+    cannot hash without fetching (``ProxySource``) leaves it ``None`` and
+    the listing's ``last_modified`` remains the skip signal.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -94,6 +111,7 @@ class SpDocument(BaseModel):
     path: str  # library-relative, POSIX separators
     size_bytes: int
     last_modified: str
+    content_hash: str | None = None
 
 
 class Source(Protocol):
@@ -122,25 +140,47 @@ class DirSource:
     def list_documents(self) -> tuple[SpDocument, ...]:
         if not self._root.is_dir():
             raise SpMirrorError(f"spmirror source_dir does not exist: {self._root}")
+        root_resolved = self._root.resolve()
         out: list[SpDocument] = []
         for path in sorted(self._root.rglob("*")):
+            # Skip a symlink (file OR the entries under a symlinked dir): it
+            # can point OUT of the library tree, and mirroring out-of-tree
+            # content into the governed dest is an escape (K8). Belt-and-
+            # braces: also require the resolved path stays inside the root.
+            if path.is_symlink():
+                continue
             if not path.is_file() or path.name.startswith("."):
+                continue
+            try:
+                resolved = path.resolve()
+                resolved.relative_to(root_resolved)
+            except (OSError, ValueError):
                 continue
             stat = path.stat()
             stamp = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).strftime(
                 "%Y-%m-%dT%H:%M:%SZ"
             )
+            # A local file can be hashed cheaply — supply the EXACT skip-key
+            # (kills both the same-second same-size miss and the mtime-bump
+            # false re-fetch; also makes the manifest machine-independent).
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()[:16]
             out.append(
                 SpDocument(
                     path=path.relative_to(self._root).as_posix(),
                     size_bytes=stat.st_size,
                     last_modified=stamp,
+                    content_hash=digest,
                 )
             )
         return tuple(out)
 
     def fetch(self, path: str) -> bytes:
-        return (self._root / PurePosixPath(path)).read_bytes()
+        try:
+            return (self._root / PurePosixPath(path)).read_bytes()
+        except OSError as exc:
+            raise SpMirrorError(
+                f"spmirror source_dir file unreadable: {path}: {exc}"
+            ) from exc
 
 
 class ProxySource:
@@ -173,7 +213,15 @@ class ProxySource:
         )
         try:
             with _urlopen(req, timeout=self._timeout) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+                # Bound the body: a malicious/buggy proxy must not stream us
+                # into OOM. Read one byte past the cap to detect overflow.
+                body = resp.read(_MAX_RESPONSE_BYTES + 1)
+            if len(body) > _MAX_RESPONSE_BYTES:
+                raise SpMirrorError(
+                    f"spmirror proxy response from {route} exceeds "
+                    f"{_MAX_RESPONSE_BYTES} bytes — refusing to buffer it"
+                )
+            return json.loads(body.decode("utf-8"))
         except urllib.error.URLError as exc:
             raise SpMirrorError(
                 f"spmirror proxy unreachable at {self._api_url}{route}: {exc}"
@@ -218,6 +266,10 @@ class ProxySource:
                 f"spmirror proxy returned no content_base64 for {path!r} "
                 "(is include_content supported by the service?)"
             )
+        # No separate size guard is needed here: ``_post`` already caps the
+        # whole HTTP body at ``_MAX_RESPONSE_BYTES``, and the base64 string is
+        # a field inside that body — so it is bounded, and the decode (which
+        # SHRINKS to ~3/4) cannot exceed the cap either.
         try:
             return base64.b64decode(encoded, validate=True)
         except (ValueError, TypeError) as exc:
@@ -251,6 +303,49 @@ class _Passthrough:
 _W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _HEADING_RE = re.compile(r"[Hh]eading(\d+)$")
 
+#: Cap on the DECOMPRESSED size of a single docx part we will read into RAM.
+#: A ~200 KB zip can expand to hundreds of MB (a decompression bomb); the
+#: listing-side ``max_bytes`` gate only sees the compressed size, so the cap
+#: lives here at the read (default 64 MiB — larger than any real document.xml).
+_MAX_PART_BYTES = 64 * 1024 * 1024
+
+#: Auxiliary WordprocessingML parts that carry human text ``docx-text`` does
+#: NOT mirror. A text-bearing one is REPORTED (never silently dropped) so an
+#: edit landing there is visible as a lossy-part warning, not an invisible
+#: governance blind spot — full fidelity is the doc2md converter's job.
+_AUX_TEXT_PART_RE = re.compile(
+    r"^word/(header\d+|footer\d+|footnotes|endnotes|comments)\.xml$"
+)
+
+
+def _reject_dtd(payload: bytes, source_name: str) -> None:
+    """Refuse any DTD/DOCTYPE at the PARSER (K8; XXE / billion-laughs).
+
+    A raw-byte substring scan is evadable by a UTF-16-encoded
+    ``document.xml`` (the ASCII bytes never appear). expat's
+    ``StartDoctypeDeclHandler`` fires at the start of the DOCTYPE in ANY
+    encoding expat auto-detects, BEFORE the internal subset's entities are
+    declared or expanded — so raising there stops billion-laughs before it
+    can begin. Word never writes a DTD into WordprocessingML.
+    """
+
+    def _on_doctype(
+        name: str, sysid: object, pubid: object, has_internal: bool
+    ) -> None:
+        raise SpMirrorError(
+            f"docx-text converter: {source_name!r} carries a DTD/DOCTYPE "
+            "in word/document.xml — refusing to parse it"
+        )
+
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = _on_doctype
+    try:
+        parser.Parse(payload, True)
+    except expat.ExpatError:
+        # A malformed body is not our concern here — ElementTree.fromstring
+        # will raise the real, message-carrying parse error next.
+        return
+
 
 class _DocxText:
     """WordprocessingML → markdown-shaped text, container-churn-invariant.
@@ -258,29 +353,37 @@ class _DocxText:
     Reads ONLY ``word/document.xml`` — zip timestamps, member order, and
     every other part (docProps, styles, …) are invisible, so a Word re-save
     with unchanged words converts byte-identically (the property the
-    fingerprint needs). Fidelity is deliberately minimal (paragraphs,
-    Heading``N`` styles, list items); a lossless converter (doc2md) can take
-    this registry slot without any engine change.
+    fingerprint needs).
+
+    Fidelity is deliberately minimal (body paragraphs, Heading``N`` styles,
+    list items, tabs/line-breaks); a lossless converter (doc2md) plugs into
+    the same registry when full fidelity is needed. Two documented
+    limitations follow from the minimalism: (1) text in headers, footers,
+    footnotes, endnotes, and comments is NOT mirrored — :func:`docx_lossy_parts`
+    reports its presence so the gap is visible, never silent; (2) a
+    style-derived prefix (``# ``/``- ``) shares the output byte-space with
+    literal body text, so a HeadingN over a paragraph whose text already
+    begins with ``# `` is a fingerprint no-op. Both are acceptable for a
+    readable mirror; neither is silent.
     """
 
     def convert(self, raw: bytes, *, source_name: str) -> str:
         try:
             with zipfile.ZipFile(BytesIO(raw)) as zf:
+                info = zf.getinfo("word/document.xml")
+                if info.file_size > _MAX_PART_BYTES:
+                    raise SpMirrorError(
+                        f"docx-text converter: {source_name!r} "
+                        f"word/document.xml decompresses to {info.file_size} "
+                        f"bytes (> {_MAX_PART_BYTES} cap) — refusing (bomb guard)"
+                    )
                 payload = zf.read("word/document.xml")
-        except (zipfile.BadZipFile, KeyError) as exc:
+        except (zipfile.BadZipFile, KeyError, OSError) as exc:
             raise SpMirrorError(
                 f"docx-text converter: {source_name!r} is not a docx "
                 f"(no readable word/document.xml: {exc})"
             ) from exc
-        # XXE / billion-laughs guard (K8): Word never writes a DTD into
-        # WordprocessingML — refuse the shape before any XML parser runs.
-        # The WHOLE payload is scanned (a head-only window is paddable past);
-        # the strings cannot appear in well-formed element text un-escaped.
-        if b"<!DOCTYPE" in payload or b"<!ENTITY" in payload:
-            raise SpMirrorError(
-                f"docx-text converter: {source_name!r} carries a DTD/DOCTYPE "
-                "in word/document.xml — refusing to parse it"
-            )
+        _reject_dtd(payload, source_name)
         try:
             root = ElementTree.fromstring(payload)
         except ElementTree.ParseError as exc:
@@ -289,8 +392,15 @@ class _DocxText:
                 f"word/document.xml: {exc}"
             ) from exc
 
+        # Only BODY-LEVEL paragraphs: a paragraph nested inside another (a
+        # text box's ``w:txbxContent``) is folded into its outer paragraph's
+        # text by ``_paragraph_text`` and must not ALSO be emitted on its own
+        # (that double-counted the box text).
+        parents = {child: parent for parent in root.iter() for child in parent}
         blocks: list[str] = []
         for para in root.iter(f"{_W_NS}p"):
+            if self._has_paragraph_ancestor(para, parents):
+                continue
             text = self._paragraph_text(para)
             if not text.strip():
                 continue
@@ -299,13 +409,27 @@ class _DocxText:
         return "\n\n".join(blocks) + "\n" if blocks else ""
 
     @staticmethod
+    def _has_paragraph_ancestor(
+        para: ElementTree.Element,
+        parents: dict[ElementTree.Element, ElementTree.Element],
+    ) -> bool:
+        node = parents.get(para)
+        while node is not None:
+            if node.tag == f"{_W_NS}p":
+                return True
+            node = parents.get(node)
+        return False
+
+    @staticmethod
     def _paragraph_text(para: ElementTree.Element) -> str:
         parts: list[str] = []
         for node in para.iter():
             if node.tag == f"{_W_NS}t":
                 parts.append(node.text or "")
-            elif node.tag == f"{_W_NS}br":
+            elif node.tag == f"{_W_NS}br" or node.tag == f"{_W_NS}cr":
                 parts.append("\n")
+            elif node.tag == f"{_W_NS}tab":
+                parts.append("\t")
         return "".join(parts)
 
     @staticmethod
@@ -322,6 +446,31 @@ class _DocxText:
                 level = min(max(int(match.group(1)), 1), 6)
                 return "#" * level + " "
         return ""
+
+
+def docx_lossy_parts(raw: bytes) -> tuple[str, ...]:
+    """Sorted auxiliary docx parts carrying text ``docx-text`` cannot mirror.
+
+    Empty for a body-only document. A non-empty result is surfaced in the
+    sync report (and by the CLI) so an operator knows a doc's headers /
+    footers / footnotes / endnotes / comments hold text the mirror — and
+    therefore the fingerprint — does not see; the fix is to route that doc
+    through a fuller converter (doc2md).
+    """
+    try:
+        with zipfile.ZipFile(BytesIO(raw)) as zf:
+            names = [n for n in zf.namelist() if _AUX_TEXT_PART_RE.match(n)]
+            found: list[str] = []
+            for name in names:
+                info = zf.getinfo(name)
+                if info.file_size > _MAX_PART_BYTES:
+                    found.append(name)  # oversized but present — still report
+                    continue
+                if b"<w:t" in zf.read(name):
+                    found.append(name)
+    except (zipfile.BadZipFile, KeyError, OSError):
+        return ()
+    return tuple(sorted(found))
 
 
 _CONVERTERS: dict[str, Converter] = {
@@ -437,6 +586,7 @@ class SpSyncReport(BaseModel):
     skipped_unmapped: tuple[str, ...] = ()
     written: tuple[str, ...] = ()
     stale_candidates: tuple[str, ...] = ()
+    lossy_parts: tuple[str, ...] = ()
     dry_run: bool = False
 
 
@@ -467,11 +617,26 @@ def _load_sp_manifest(path: Path) -> dict[str, Any]:
         return {"schema_version": _MANIFEST_SCHEMA_VERSION, "files": {}}
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         raise SpMirrorError(f"malformed sp-manifest at {path}: {exc}") from exc
     if not isinstance(loaded, dict) or not isinstance(loaded.get("files"), dict):
         raise SpMirrorError(f"malformed sp-manifest at {path}: expected files map")
     return loaded
+
+
+def _skip_unchanged(prior: object, doc: SpDocument) -> bool:
+    """True when the manifest entry proves ``doc`` is byte-unchanged.
+
+    Prefers the EXACT ``content_hash`` when both sides carry one (DirSource):
+    a same-size edit within one clock second is caught and an mtime-only bump
+    is ignored. Falls back to the listing's ``last_modified`` for a source
+    that cannot hash cheaply (ProxySource, where Graph versions on any edit).
+    """
+    if not isinstance(prior, dict) or prior.get("size_bytes") != doc.size_bytes:
+        return False
+    if doc.content_hash is not None and prior.get("content_hash") is not None:
+        return bool(prior.get("content_hash") == doc.content_hash)
+    return bool(prior.get("last_modified") == doc.last_modified)
 
 
 def _write_body_preserving_meta(target: Path, body: str) -> bool:
@@ -480,7 +645,15 @@ def _write_body_preserving_meta(target: Path, body: str) -> bool:
     Returns True when the file's bytes actually changed (K7's unit of
     account). The engine's baseline lives in that front matter — a re-sync
     must never strip it, or every pass would re-trigger a HASH drift.
+
+    Refuses to write THROUGH a symlink at the target: an attacker who plants
+    one inside ``dest`` could otherwise redirect the write onto an
+    out-of-tree file (K8).
     """
+    if target.is_symlink():
+        raise SpMirrorError(
+            f"mirror target is a symlink, refusing to write through it: {target}"
+        )
     if target.is_file():
         existing = parse_text(target.read_text(encoding="utf-8"), target)
         if existing.body == body:
@@ -504,10 +677,13 @@ def sync_mirror(
     """Mirror the library into ``repo_root`` (the ``cdx sp-sync`` core).
 
     Per listed file: include/exclude/max_bytes filter → manifest skip
-    (``size_bytes`` + ``last_modified`` both equal → no fetch) → fetch →
-    convert → write only on body change, preserving ``cdm:`` front matter.
-    ``dry_run`` fetches nothing and writes nothing; ``force`` ignores the
-    manifest skip but still writes only changed bytes (K7).
+    (exact ``content_hash`` when the source supplies one, else ``size_bytes``
+    + ``last_modified``; equal → no fetch) → fetch → convert → write only on
+    body change, preserving ``cdm:`` front matter. A file gone from the FULL
+    listing (not merely filtered out) is pruned from the manifest and its
+    mirror reported as a stale candidate. ``dry_run`` fetches nothing and
+    writes nothing; ``force`` ignores the manifest skip but still writes only
+    changed bytes (K7).
     """
     repo_root = Path(repo_root)
     include = tuple(_translate(p) for p in cfg.include)
@@ -519,9 +695,15 @@ def sync_mirror(
     pulled = unchanged = skipped_filtered = 0
     skipped_unmapped: list[str] = []
     written: list[str] = []
-    live_paths: set[str] = set()
+    lossy: list[str] = []
+    listed_paths: set[str] = set()
+    claimed: dict[str, str] = {}  # mirror_rel -> source path (collision guard)
 
     for doc in source.list_documents():
+        # Track EVERY listed path (pre-filter) so prune means "gone upstream",
+        # never "transiently filtered by a config knob".
+        listed_paths.add(doc.path)
+
         if not _matches_any(doc.path, include) or _matches_any(doc.path, exclude):
             skipped_filtered += 1
             continue
@@ -533,33 +715,37 @@ def sync_mirror(
         if converter_id is None:
             skipped_unmapped.append(doc.path)
             continue
-        live_paths.add(doc.path)
         mirror_rel = _mirror_rel(cfg, doc.path, converter_id)
+        if mirror_rel in claimed:
+            raise SpMirrorError(
+                f"two source files map to the same mirror path {mirror_rel!r}: "
+                f"{claimed[mirror_rel]!r} and {doc.path!r} — rename one or "
+                "narrow the include globs"
+            )
+        claimed[mirror_rel] = doc.path
 
-        prior = entries.get(doc.path)
-        if (
-            not force
-            and isinstance(prior, dict)
-            and prior.get("size_bytes") == doc.size_bytes
-            and prior.get("last_modified") == doc.last_modified
-        ):
+        if not force and _skip_unchanged(entries.get(doc.path), doc):
             unchanged += 1
             continue
 
         pulled += 1
         if dry_run:
             continue
-        body = convert_bytes(converter_id, source.fetch(doc.path), source_name=doc.path)
+        raw = source.fetch(doc.path)
+        if converter_id == "docx-text":
+            lossy.extend(f"{doc.path} ({part})" for part in docx_lossy_parts(raw))
+        body = convert_bytes(converter_id, raw, source_name=doc.path)
         if _write_body_preserving_meta(repo_root / mirror_rel, body):
             written.append(mirror_rel)
         entries[doc.path] = {
             "size_bytes": doc.size_bytes,
             "last_modified": doc.last_modified,
+            "content_hash": doc.content_hash,
             "mirror": mirror_rel,
         }
 
     stale: list[str] = []
-    for gone in sorted(set(entries) - live_paths):
+    for gone in sorted(set(entries) - listed_paths):
         prior = entries.pop(gone)
         gone_mirror = prior.get("mirror") if isinstance(prior, dict) else None
         if isinstance(gone_mirror, str) and (repo_root / gone_mirror).is_file():
@@ -582,5 +768,6 @@ def sync_mirror(
         skipped_unmapped=tuple(sorted(skipped_unmapped)),
         written=tuple(sorted(written)),
         stale_candidates=tuple(sorted(stale)),
+        lossy_parts=tuple(sorted(lossy)),
         dry_run=dry_run,
     )

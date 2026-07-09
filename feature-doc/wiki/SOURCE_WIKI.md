@@ -265,7 +265,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `spmirror`
 
 - Path: `spmirror.py`
-- Public symbols: `Converter`, `DEFAULT_SPMIRROR_PATH`, `DirSource`, `ProxySource`, `Source`, `SpDocument`, `SpMirrorConfig`, `SpMirrorError`, `SpSyncReport`, `__all__`, `convert_bytes`, `load_spmirror_config`, `source_from_config`, `sync_mirror`
+- Public symbols: `Converter`, `DEFAULT_SPMIRROR_PATH`, `DirSource`, `ProxySource`, `Source`, `SpDocument`, `SpMirrorConfig`, `SpMirrorError`, `SpSyncReport`, `__all__`, `convert_bytes`, `docx_lossy_parts`, `load_spmirror_config`, `source_from_config`, `sync_mirror`
 - Implemented by: `FEAT-SPMIRROR-001`, `FEAT-SPMIRROR-002`, `FEAT-SPMIRROR-003`
 
 ## `srcindex`

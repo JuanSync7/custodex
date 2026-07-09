@@ -2260,6 +2260,11 @@ def sp_sync(
         typer.echo(f"  wrote {path}")
     for path in report.stale_candidates:
         typer.echo(f"  stale (gone upstream, kept on disk — human decision): {path}")
+    for part in report.lossy_parts:
+        typer.echo(
+            f"  lossy: {part} — docx-text does not mirror this part; an edit "
+            "there is invisible to the fingerprint (use a fuller converter)"
+        )
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:

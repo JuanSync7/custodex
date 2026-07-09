@@ -2281,3 +2281,29 @@ own implementing modules are inside the thing being gated.
 - **Display order is a documented claim.** DEMO-107 said "severity-first"; the
   renderer printed hash order. Sort at the DISPLAY layer (severity, then key)
   and keep the data layer key-sorted for reconciliation — both deterministic.
+
+## [SP-RF1] A content mirror's skip-key must be content, not a timestamp
+
+EPIC SP mirrors SharePoint docx into the repo as text. The first cut keyed the
+"unchanged, skip fetch" decision on `(size_bytes, last_modified)` — the shape
+`pull_sharepoint.py` already used for RagWeave. The adversarial review found two
+bugs in that one choice: (1) a DirSource mtime truncated to whole seconds meant
+a SAME-SIZE edit within one second was SILENTLY MISSED — the worst failure a
+governance tool can have (it fingerprints stale text and goes blind); (2) an
+mtime-only bump (git checkout, rsync) with unchanged content forced a needless
+re-fetch + manifest rewrite, breaking the K7 "second sync writes nothing" claim.
+Both dissolve when the skip-key is an exact content hash. Lesson: for a *mirror*,
+the skip-key must be derived from the bytes (a hash), never from metadata a
+filesystem or transport is free to change independently of content. Keep the
+listing metadata only as a cheap first-pass hint where hashing costs a fetch
+(ProxySource), never as the sole equality signal where you can hash locally.
+
+Corollary lessons from the same round: (a) a byte-substring guard (`b"<!DOCTYPE"
+in payload`) is encoding-naive — a UTF-16 document.xml sails past it; reject
+hostile XML at the PARSER (expat StartDoctypeDeclHandler), which sees the DOCTYPE
+in any encoding, before entity expansion. (b) A "minimal" converter that
+SILENTLY drops content (headers/footers/footnotes) is a false-negative factory
+for a change-detector; if you can't mirror a part, REPORT it — silence is the
+bug, not incompleteness. (c) Prune-vs-filter: "gone upstream" must mean absent
+from the FULL listing, never merely filtered out this run, or a config knob flip
+looks like a deletion.
