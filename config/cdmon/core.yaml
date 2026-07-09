@@ -6,7 +6,7 @@ unit: core
 title: "custodex engine core"
 owner: cdmon-team
 created: "2026-06-07"
-updated: "2026-06-07"
+updated: "2026-07-09"
 ---
 # Body: the coverage scope this unit owns + the documents it carries.
 
@@ -136,6 +136,16 @@ documents:
     code_refs:
       - path: custodex/cli.py
       - path: custodex/doctor.py
+
+  # The SharePoint mirror connector (EPIC SP): sources, converters, sync core.
+  - id: spmirror
+    path: docs/api/spmirror.md
+    audience: eng-guide
+    region_keys: ["symbols", "overview"]
+    region_modes:
+      overview: llm
+    code_refs:
+      - path: custodex/spmirror.py
 
   # The project README — a USER-GUIDE narrative monitored against the CLI surface
   # it documents (FEAT-CONFIGV2-016). It declares NO managed region, so the engine

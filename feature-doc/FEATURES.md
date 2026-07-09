@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**248 features** across 30 subsystems.
+**251 features** across 31 subsystems.
 
 ## agent
 
@@ -1333,6 +1333,26 @@ GET /settings is an OPEN read returning the effective non-secret settings plus t
 ### `FEAT-SETTINGS-008` — cdx settings CLI
 
 The read-only `cdx settings [--settings PATH] [--json]` command resolves the effective settings (file → env → defaults) and prints the host/port + hardening knobs and the secret presence, never a secret value; a malformed file is a loud ConfigError → exit 1. Offline, no backend (K1/K4).
+
+## spmirror
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-SPMIRROR-001` | deterministic library conversion — sources + converters | spmirror | K0, K4, K8, K10 | — | — | implemented |
+| `FEAT-SPMIRROR-002` | the idempotent mirror sync — manifest skip, baseline preservation | spmirror | K5, K7, K8, K10 | — | — | implemented |
+| `FEAT-SPMIRROR-003` | `cdx sp-sync` — the SharePoint governance loop end to end | spmirror, cli | K1, K5, K7, K10 | — | — | implemented |
+
+### `FEAT-SPMIRROR-001` — deterministic library conversion — sources + converters
+
+The two seams that turn SharePoint bytes into governable text with NO engine change (K0; the gitfetch/pr edge-module precedent, stdlib-only). Source protocol (list_documents/fetch) with DirSource (a library already mirrored to disk — the deployed pull_sharepoint.py output, and every offline fixture, K4) and ProxySource (the rag-sharepoint-api service over in-process urllib — EDR-safe; auth stays in the service's cert-based Graph app, no credential passes through Custodex). Converter protocol with built-ins `passthrough` (UTF-8, loud on undecodable — K8) and `docx-text` (WordprocessingML → markdown-shaped text: paragraphs, HeadingN → #·N clamped 1..6, numPr → list items) — CONTAINER-CHURN-INVARIANT: output depends ONLY on word/document.xml, never zip timestamps/member order/sibling parts, so a Word re-save with unchanged words never moves a fingerprint (the property the engine's hash needs; docx byte-hashes flip on no-op saves). Tabs (\t) and line/page breaks (\n) are preserved so tab/CR-separated content cannot collide, and each body paragraph is emitted once (a nested text-box paragraph folds into its parent, never double-counted). Hardened against hostile library bytes (K8): a DTD/DOCTYPE is refused at the PARSER (expat StartDoctypeDeclHandler — encoding-robust, so a UTF-16 payload cannot slip past a byte scan) before any entity expands (XXE/billion-laughs), and a document.xml that decompresses past a 64 MiB cap is refused (decompression bomb). Text-bearing auxiliary parts docx-text does NOT mirror (headers/footers/footnotes/endnotes/ comments) are REPORTED via SpSyncReport.lossy_parts — an edit there is never a silent blind spot; full fidelity is the doc2md converter's job. Unknown converter ids are loud at config load; conversion fidelity is the converter's concern (a lossless doc2md plugs into the registry) while HASHING STAYS IN THE ENGINE — a baseline is a property of governance, not of the document.
+
+### `FEAT-SPMIRROR-002` — the idempotent mirror sync — manifest skip, baseline preservation
+
+sync_mirror(cfg, repo_root, source, *, force, dry_run) → SpSyncReport: per listed file, include/exclude (inventory ** glob semantics) + max_bytes filter → manifest skip (.cdmon/sp-manifest.json — a file unchanged since the prior sync is not even FETCHED; the skip-key is an EXACT content_hash when the source supplies one (DirSource hashes the local bytes — so a same-size edit within one clock second is caught and an mtime-only bump is NOT a needless re-fetch), else the listing's size_bytes + last_modified, copied verbatim, never the clock, K10; pruning is against the FULL listing, so a file merely filtered out this run is never mislabelled gone) → fetch → convert → write ONLY when the body actually changed (K7: a re-run with no upstream change writes zero bytes; force refetches but still writes nothing for unchanged text) — PRESERVING any engine-stamped `cdm:` front matter via manifest.parse_text + render_doc, so fingerprints and upstream_hashes baselines survive every re-sync (without this, every pass would re-trigger a HASH drift). A transforming converter appends `.md` (specs/Design.docx → Design.docx.md — collision-free, provenance visible); passthrough keeps the name. A file GONE from the listing is pruned from the manifest but its mirror file is KEPT and reported as a stale_candidate — deleting a governed doc is a human decision (K5). A file with an unmapped suffix is skipped + reported, never fetched, never loud (libraries hold noise). dry_run fetches nothing and writes nothing. Config: config/spmirror.yaml (`spmirror:` key; the settings.yaml file precedent — the CONNECTOR is configured here, which docs are GOVERNED stays in config/cdmon) with CDMON_SP_API env override; malformed config/manifest is a typed SpMirrorError (K8).
+
+### `FEAT-SPMIRROR-003` — `cdx sp-sync` — the SharePoint governance loop end to end
+
+The CLI verb + the flow the epic exists for: `cdx sp-sync [--config config/spmirror.yaml] [--repo-root .] [--force] [--dry-run] [--json]` mirrors the library, then the ordinary machinery takes over — declare the mirrored doc in config/cdmon (owner, audience, and `depends_on` edges from the engineering docs that cite it), `cdx monitor --apply` stamps baselines, and from then on a SharePoint-side edit → re-sync → every dependent doc flips SUSPECT_LINK and gates `cdx check` → the accountable human reviews and `cdx resolve --edge` clears exactly one edge. sp-sync is a WRITER verb (the monitor --apply side of the K1 line — `cdx check` never fetches anything); its report is deterministic and sorted (K10) and `--json` emits it structurally (K6-style additive shape). Missing/malformed connector config exits 1 with a typed error message.
 
 ## staleness
 

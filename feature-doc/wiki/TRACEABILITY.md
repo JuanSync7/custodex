@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**248 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**251 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -245,6 +245,9 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-SETTINGS-006` | integration/test_server_settings.py | DEMOS.md |
 | `FEAT-SETTINGS-007` | integration/test_server_settings.py | DEMOS.md |
 | `FEAT-SETTINGS-008` | system/test_settings_cli.py | DEMOS.md |
+| `FEAT-SPMIRROR-001` | unit/test_spmirror.py | DEMOS.md |
+| `FEAT-SPMIRROR-002` | unit/test_spmirror.py | DEMOS.md |
+| `FEAT-SPMIRROR-003` | system/test_spmirror_cli.py | DEMOS.md |
 | `FEAT-STALENESS-001` | unit/test_staleness.py | DEMOS.md |
 | `FEAT-STALENESS-002` | unit/test_staleness.py | DEMOS.md |
 | `FEAT-STALENESS-003` | unit/test_staleness.py | DEMOS.md |

@@ -1,0 +1,39 @@
+# The spmirror CONNECTOR config (EPIC SP) — copy to <your-repo>/config/spmirror.yaml.
+#
+# This file configures HOW library bytes reach the repo. WHICH mirrored docs
+# are governed (owner, audience, depends_on edges) stays declared in
+# config/cdmon like every other managed doc — see README.md alongside.
+spmirror:
+  # --- where the library bytes come from -----------------------------------
+  # "dir"   — a library already mirrored to local disk (e.g. the output of
+  #           rag-sharepoint-api's pull_sharepoint.py, which handles Graph
+  #           auth + delta-skip on its own). The zero-new-infrastructure path.
+  # "proxy" — talk to a running rag-sharepoint-api service directly
+  #           (POST /documents/list + /documents/fetch). Auth stays in the
+  #           service (cert-based Azure AD app); no credential enters cdx.
+  source: dir
+  source_dir: /scratch/your-user/documents          # required for source: dir
+
+  # For source: proxy instead (CDMON_SP_API env var overrides api_url):
+  # source: proxy
+  # api_url: http://localhost:8100
+  # site_url: https://yourtenant.sharepoint.com/sites/YourSite
+  # folder: Shared Documents/Specs                  # optional library subfolder
+  # timeout_seconds: 120
+
+  # --- what lands in the repo ----------------------------------------------
+  dest: docs/sharepoint          # repo-relative mirror root (commit it: git
+                                 # history becomes the change audit)
+  include: ["**/*.docx", "**/*.md"]
+  exclude: ["archive/**"]
+  max_bytes: 10000000            # skip anything larger (optional)
+
+  # suffix -> converter. `docx-text` is container-churn-invariant (a Word
+  # re-save with unchanged words never moves a fingerprint); `passthrough`
+  # copies UTF-8 text verbatim. A listed file with an unmapped suffix is
+  # skipped + reported, never an error. A lossless converter (doc2md) can
+  # take a registry slot without any engine change.
+  converters:
+    .docx: docx-text
+    .md: passthrough
+    .txt: passthrough

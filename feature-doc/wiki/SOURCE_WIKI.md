@@ -2,7 +2,7 @@
 
 Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
-**53 public modules**, 0 without a catalogued feature.
+**54 public modules**, 0 without a catalogued feature.
 
 ## `_v2base`
 
@@ -37,8 +37,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
+- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `sp_sync`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-SPMIRROR-003`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
 
 ## `config`
 
@@ -261,6 +261,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Path: `sinks.py`
 - Public symbols: `FileSink`, `HttpSink`, `IngestEnvelope`, `NullSink`, `RepoIdentity`, `Sink`, `__all__`, `make_sink`
 - Implemented by: `FEAT-RECORD-010`, `FEAT-RECORD-011`, `FEAT-RECORD-012`, `FEAT-RECORD-013`
+
+## `spmirror`
+
+- Path: `spmirror.py`
+- Public symbols: `Converter`, `DEFAULT_SPMIRROR_PATH`, `DirSource`, `ProxySource`, `Source`, `SpDocument`, `SpMirrorConfig`, `SpMirrorError`, `SpSyncReport`, `__all__`, `convert_bytes`, `docx_lossy_parts`, `load_spmirror_config`, `source_from_config`, `sync_mirror`
+- Implemented by: `FEAT-SPMIRROR-001`, `FEAT-SPMIRROR-002`, `FEAT-SPMIRROR-003`
 
 ## `srcindex`
 

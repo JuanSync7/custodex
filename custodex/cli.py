@@ -121,6 +121,12 @@ from .reviewlog import (
 )
 from .schema import Resolution, ResolutionRecord, Verdict, review_record_schema
 from .settings import Settings, resolve_settings, secret_presence
+from .spmirror import (
+    DEFAULT_SPMIRROR_PATH,
+    load_spmirror_config,
+    source_from_config,
+    sync_mirror,
+)
 from .staleness import (
     StalenessStatus,
     detect_stale,
@@ -2189,6 +2195,76 @@ def suggest(
         )
     else:
         typer.echo(render_workers_text(tuple(suggestions)))
+
+
+@app.command(name="sp-sync")
+def sp_sync(
+    config: Path = typer.Option(
+        DEFAULT_SPMIRROR_PATH,
+        "--config",
+        help="The spmirror connector config (config/spmirror.yaml).",
+    ),
+    repo_root: Path = typer.Option(
+        Path("."),
+        "--repo-root",
+        help="The repo the mirror is written into (dest is relative to it).",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Ignore the manifest skip and refetch every listed file "
+        "(unchanged bytes still write nothing — K7).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Report what would be pulled; fetch nothing, write nothing.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit the sync report as JSON."),
+) -> None:
+    """Mirror a SharePoint library into the repo as governable text (EPIC SP).
+
+    The connector half of SharePoint governance: fetch listed library files
+    (a local ``pull_sharepoint.py`` mirror dir, or the rag-sharepoint-api
+    proxy), convert each to deterministic text (``docx-text`` /
+    ``passthrough``), and write them under ``dest`` — PRESERVING any
+    ``cdm:`` front matter the engine has stamped, so baselines survive every
+    re-sync. Which mirrored docs are GOVERNED (owner, audience,
+    ``depends_on``) stays declared in ``config/cdmon`` like any other doc;
+    after a sync that changed files, ``cdx check`` shows exactly which
+    dependents went SUSPECT.
+    """
+    try:
+        cfg = load_spmirror_config(config)
+        report = sync_mirror(
+            cfg,
+            repo_root,
+            source_from_config(cfg),
+            force=force,
+            dry_run=dry_run,
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if as_json:
+        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2))
+        return
+    verb = "would pull" if report.dry_run else "pulled"
+    typer.echo(
+        f"sp-sync: {verb} {report.pulled}, unchanged {report.unchanged}, "
+        f"filtered {report.skipped_filtered}, "
+        f"unmapped {len(report.skipped_unmapped)}"
+    )
+    for path in report.written:
+        typer.echo(f"  wrote {path}")
+    for path in report.stale_candidates:
+        typer.echo(f"  stale (gone upstream, kept on disk — human decision): {path}")
+    for part in report.lossy_parts:
+        typer.echo(
+            f"  lossy: {part} — docx-text does not mirror this part; an edit "
+            "there is invisible to the fingerprint (use a fuller converter)"
+        )
 
 
 def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str]:
