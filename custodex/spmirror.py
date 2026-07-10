@@ -537,7 +537,18 @@ class _Doc2mdOffice:
                 f"doc2md-office: {source_name!r} is not a readable office zip: {exc}"
             ) from exc
 
-        body = ooxml_markdown(ext, parts)
+        # doc2md is an external optional dep — wrap ANY failure inside its
+        # converter as a typed error so nothing raw escapes (K8). Today it
+        # tolerates malformed OOXML and returns ""; a future version must not
+        # be able to leak an untyped traceback through `cdx sp-sync`.
+        try:
+            body = ooxml_markdown(ext, parts)
+        except SpMirrorError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — third-party boundary
+            raise SpMirrorError(
+                f"doc2md-office: doc2md failed to convert {source_name!r}: {exc}"
+            ) from exc
         if not body.strip():
             return ""
         return body if body.endswith("\n") else body + "\n"

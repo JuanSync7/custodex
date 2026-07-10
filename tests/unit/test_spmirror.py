@@ -292,6 +292,24 @@ class TestDoc2mdOffice:
         with pytest.raises(SpMirrorError):
             convert_bytes("doc2md-office", b"not a zip", source_name="a.docx")
 
+    def test_doc2md_internal_failure_is_wrapped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A future doc2md that RAISES inside its converter must surface as a
+        # typed SpMirrorError, never a raw traceback through the CLI (K8).
+        pytest.importorskip("backend.ingest")
+        import backend.ingest as ingest
+
+        def boom(ext: str, parts: dict, emit_images: bool = False):  # noqa: ANN202
+            raise RuntimeError("doc2md exploded")
+
+        monkeypatch.setattr(ingest, "ooxml_markdown", boom)
+        with pytest.raises(SpMirrorError) as exc:
+            convert_bytes(
+                "doc2md-office", self._docx([(None, "x")]), source_name="a.docx"
+            )
+        assert "doc2md failed" in str(exc.value)
+
     def test_config_accepts_doc2md_office_without_the_dep(self, tmp_path: Path) -> None:
         # Config validation must not require doc2md — only conversion does.
         cfg_path = _config(tmp_path, converters={".docx": "doc2md-office"})
