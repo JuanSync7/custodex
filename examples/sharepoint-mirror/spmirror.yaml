@@ -28,12 +28,20 @@ spmirror:
   exclude: ["archive/**"]
   max_bytes: 10000000            # skip anything larger (optional)
 
-  # suffix -> converter. `docx-text` is container-churn-invariant (a Word
-  # re-save with unchanged words never moves a fingerprint); `passthrough`
-  # copies UTF-8 text verbatim. A listed file with an unmapped suffix is
-  # skipped + reported, never an error. A lossless converter (doc2md) can
-  # take a registry slot without any engine change.
+  # suffix -> converter:
+  #   passthrough    UTF-8 text copied verbatim.
+  #   docx-text      built-in, stdlib-only, container-churn-invariant (a Word
+  #                  re-save with unchanged words never moves a fingerprint) —
+  #                  a minimal body-only fallback (headers/footers/footnotes
+  #                  are reported as lossy, not mirrored).
+  #   doc2md-office  LOSSLESS docx/pptx/xlsx (token recall = 1.0), also mirrors
+  #                  footnotes/endnotes/comments. Needs the optional package:
+  #                  pip install custodex[doc2md]
+  #                  (its office lane is stdlib-only — no heavy deps).
+  # A listed file with an unmapped suffix is skipped + reported, never an error.
   converters:
-    .docx: docx-text
+    .docx: doc2md-office     # or docx-text for the zero-dep fallback
+    .pptx: doc2md-office
+    .xlsx: doc2md-office
     .md: passthrough
     .txt: passthrough

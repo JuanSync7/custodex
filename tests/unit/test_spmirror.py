@@ -199,6 +199,106 @@ def _raw_docx(
         return p.read_bytes()
 
 
+class TestDoc2mdOffice:
+    """The in-process `doc2md-office` converter (optional [doc2md] extra).
+
+    Gated on doc2md being importable — these SKIP cleanly in a core/CI env
+    without it (the live_llm/pg opt-in precedent), and run for real when
+    `pip install custodex[doc2md]` is present.
+    """
+
+    def _docx(self, paragraphs: list[tuple[str | None, str]], **kw: object) -> bytes:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "x.docx"
+            build_docx(p, paragraphs, **kw)  # type: ignore[arg-type]
+            return p.read_bytes()
+
+    def test_registered_even_without_doc2md(self) -> None:
+        # The converter is REGISTERED unconditionally, so a config naming it
+        # loads/validates (and dry-runs) without doc2md installed.
+        cfg_ok = load_spmirror_config  # smoke: import is fine
+        assert cfg_ok is not None
+        from custodex.spmirror import _CONVERTERS
+
+        assert "doc2md-office" in _CONVERTERS
+
+    def test_missing_dep_is_a_loud_install_hint(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Force the lazy import to fail and assert the actionable message.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def _no_backend(name: str, *a: object, **k: object):  # noqa: ANN202
+            if name == "backend.ingest" or name.startswith("backend."):
+                raise ImportError("no doc2md")
+            return real_import(name, *a, **k)
+
+        monkeypatch.setattr(builtins, "__import__", _no_backend)
+        with pytest.raises(SpMirrorError) as exc:
+            convert_bytes(
+                "doc2md-office", self._docx([(None, "x")]), source_name="a.docx"
+            )
+        assert "custodex[doc2md]" in str(exc.value)
+
+    def test_converts_docx_deterministically(self) -> None:
+        pytest.importorskip("backend.ingest")
+        out = convert_bytes(
+            "doc2md-office",
+            self._docx([("Heading1", "Spec"), (None, "widgets")]),
+            source_name="a.docx",
+        )
+        assert "widgets" in out and out.endswith("\n")
+
+    def test_container_churn_is_invisible(self) -> None:
+        pytest.importorskip("backend.ingest")
+        a = self._docx([(None, "same words")], zip_date=(2026, 1, 1, 0, 0, 0))
+        b = self._docx(
+            [(None, "same words")],
+            zip_date=(2026, 6, 30, 12, 0, 0),
+            reverse_order=True,
+            extra_member="<x/>",
+        )
+        assert a != b
+        assert convert_bytes("doc2md-office", a, source_name="a.docx") == convert_bytes(
+            "doc2md-office", b, source_name="b.docx"
+        )
+
+    def test_unsupported_ext_is_loud(self) -> None:
+        pytest.importorskip("backend.ingest")
+        with pytest.raises(SpMirrorError) as exc:
+            convert_bytes(
+                "doc2md-office", self._docx([(None, "x")]), source_name="a.txt"
+            )
+        assert "office" in str(exc.value)
+
+    def test_dtd_refused_through_the_doc2md_path(self) -> None:
+        pytest.importorskip("backend.ingest")
+        raw = _raw_docx(
+            "<w:p><w:r><w:t>hi</w:t></w:r></w:p>",
+            xml_prolog=(
+                '<?xml version="1.0"?><!DOCTYPE w:document [<!ENTITY x "boom">]>'
+            ),
+        )
+        with pytest.raises(SpMirrorError) as exc:
+            convert_bytes("doc2md-office", raw, source_name="evil.docx")
+        assert "DOCTYPE" in str(exc.value) or "DTD" in str(exc.value)
+
+    def test_non_zip_is_loud(self) -> None:
+        pytest.importorskip("backend.ingest")
+        with pytest.raises(SpMirrorError):
+            convert_bytes("doc2md-office", b"not a zip", source_name="a.docx")
+
+    def test_config_accepts_doc2md_office_without_the_dep(self, tmp_path: Path) -> None:
+        # Config validation must not require doc2md — only conversion does.
+        cfg_path = _config(tmp_path, converters={".docx": "doc2md-office"})
+        cfg = load_spmirror_config(cfg_path, env={})
+        assert cfg.converters[".docx"] == "doc2md-office"
+
+
 class TestConverterFixes:
     """Review-round fixes to the load-bearing docx-text converter."""
 

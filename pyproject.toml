@@ -41,6 +41,16 @@ server = [
     # import secrets.py), so the core dependency surface is unchanged (K0).
     "cryptography>=42",
 ]
+# EPIC SP: the lossless docx/pptx/xlsx → markdown converter for `cdx sp-sync`'s
+# `doc2md-office` converter. Optional so a plain install keeps K0's minimal
+# surface; the office lane is stdlib-only (no heavy transitive deps — doc2md's
+# own PDF/docling lane is a separate concern). A direct git reference (not on
+# PyPI); custodex is installed editable by adopters, so a PEP 508 URL resolves.
+# Deliberately NOT in `dev`: the core gate stays doc2md-free and its tests skip
+# (importorskip) when the package is absent, the live_llm/pg opt-in precedent.
+doc2md = [
+    "doc2md @ git+https://github.com/JuanSync7/doc2md.git",
+]
 dev = [
     "pytest",
     "pytest-cov",
@@ -115,6 +125,13 @@ disallow_untyped_defs = false
 # missing stub — it's part of the [server] extra, not the type-checked surface.
 [[tool.mypy.overrides]]
 module = "uvicorn"
+ignore_missing_imports = true
+
+# doc2md (the [doc2md] extra) ships no type stubs and is imported lazily inside
+# the spmirror `doc2md-office` converter only. Don't fail mypy on its missing
+# stub whether or not it's installed — it's optional, not the typed surface.
+[[tool.mypy.overrides]]
+module = "backend.*"
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------

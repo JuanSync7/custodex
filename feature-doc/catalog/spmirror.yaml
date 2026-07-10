@@ -32,10 +32,18 @@ features:
       parts docx-text does NOT mirror (headers/footers/footnotes/endnotes/
       comments) are REPORTED via SpSyncReport.lossy_parts — an edit there is
       never a silent blind spot; full fidelity is the doc2md converter's job.
-      Unknown converter ids are loud at config load; conversion fidelity is
-      the converter's concern (a lossless doc2md plugs into the registry)
-      while HASHING STAYS IN THE ENGINE — a baseline is a property of
-      governance, not of the document.
+      A third converter `doc2md-office` delegates in-process to the OPTIONAL
+      doc2md package (`pip install custodex[doc2md]`; its office lane is
+      stdlib-only, no heavy deps) — a lossless, recall-gated (token recall
+      = 1.0) docx/pptx/xlsx→markdown converter that additionally mirrors
+      footnotes/endnotes/comments. It is REGISTERED unconditionally (a config
+      naming it loads + dry-runs without doc2md present) but a real conversion
+      lazily imports and is loud with an install hint if absent (the
+      backends.make_backend extra-import precedent); the same K8 hardening
+      (per-part size cap + parser-level DTD refusal) is applied to the fetched
+      bytes before they reach doc2md. Unknown converter ids are loud at config
+      load; conversion fidelity is the converter's concern while HASHING STAYS
+      IN THE ENGINE — a baseline is a property of governance, not the document.
     subsystem: spmirror
     modules: [spmirror]
     constraints: [K0, K4, K8, K10]

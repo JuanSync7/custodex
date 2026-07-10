@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: aca40b58a7f22528
+  fingerprint: d0a6a0fb88d53287
   fingerprint_tiers:
-    composite: aca40b58a7f22528
-    docstring: 46f85877261fea34
-    signature: c70d36d641b19951
+    composite: d0a6a0fb88d53287
+    docstring: 74ace2e6f4d57fea
+    signature: 370cb4ed3cc8db6c
   region_anchors:
     symbols:
     - 014219481103975f
@@ -22,6 +22,7 @@ cdm:
     - 313a910dd2688512
     - 3174cff531ec41ba
     - 35b6313d22612a48
+    - 3846dd887d7e0678
     - 3fbc1943cd94a01c
     - 4a892bd5029ae280
     - 55351556ae9399a2
@@ -29,6 +30,7 @@ cdm:
     - 688242835feffd6f
     - 6c5a289087c6b765
     - 75f7eff1aaffca07
+    - 78099ba05b34053f
     - 7ce08ff8a94cd389
     - 7ce397d3281dcc41
     - 7db6d8f5a04787c6
@@ -43,6 +45,7 @@ cdm:
     - 8f030459f12924b0
     - 9c0dc0cbb585b90c
     - 9dcacac4b571fa09
+    - b0c45e2664601ef3
     - b55c78646b9a1428
     - b8b240b11b893fde
     - bfa8ce695d2fcc6e
@@ -56,8 +59,8 @@ cdm:
     - f1a4235dbda80934
     - ff89906d9fa65087
   region_hashes:
-    overview: 0312b7cc3a854eee
-    symbols: 52088c9464173002
+    overview: d9f5bd1b0227656f
+    symbols: adf1e3c08f807f01
   schema_version: 1.0.0
   symbol_sigs:
     014219481103975f: c7ab2bead314c420
@@ -74,6 +77,7 @@ cdm:
     313a910dd2688512: b457a471275fccbe
     3174cff531ec41ba: 76de7c773c6f0214
     35b6313d22612a48: b43860ff0d330deb
+    3846dd887d7e0678: 9edfe8d1f2bfee02
     3fbc1943cd94a01c: 93d2a08902256346
     4a892bd5029ae280: eef3dc349d1affb9
     55351556ae9399a2: e365d9e98848c292
@@ -81,6 +85,7 @@ cdm:
     688242835feffd6f: 7e9e9d40d6758c38
     6c5a289087c6b765: ecef71d4f1e3943c
     75f7eff1aaffca07: d489ae7a5bb86ffa
+    78099ba05b34053f: 2e0afb29e5e35646
     7ce08ff8a94cd389: d47ae37676fcdd2f
     7ce397d3281dcc41: c6afa9619993d62c
     7db6d8f5a04787c6: c7c61d525560779f
@@ -95,6 +100,7 @@ cdm:
     8f030459f12924b0: c6831d0b1906f7a5
     9c0dc0cbb585b90c: 116eac776616f56a
     9dcacac4b571fa09: 93882ad37fda4f12
+    b0c45e2664601ef3: cde66ac02a4d416e
     b55c78646b9a1428: 7575022367e16e29
     b8b240b11b893fde: fef15a0579f2656d
     bfa8ce695d2fcc6e: 8081578398050a54
@@ -142,6 +148,8 @@ cdm:
 | SpSyncReport | class | class SpSyncReport(BaseModel) |
 | _AUX_TEXT_PART_RE | variable | _AUX_TEXT_PART_RE = ... |
 | _CONVERTERS | variable | _CONVERTERS: dict[str, Converter] = ... |
+| _Doc2mdOffice | class | class _Doc2mdOffice |
+| _Doc2mdOffice.convert | method | def convert(self, raw: bytes, *, source_name: str) -> str |
 | _DocxText | class | class _DocxText |
 | _DocxText._has_paragraph_ancestor | method | def _has_paragraph_ancestor(para: ElementTree.Element, parents: dict[ElementTree.Element, ElementTree.Element]) -> bool |
 | _DocxText._paragraph_text | method | def _paragraph_text(para: ElementTree.Element) -> str |
@@ -152,6 +160,7 @@ cdm:
 | _MANIFEST_SCHEMA_VERSION | variable | _MANIFEST_SCHEMA_VERSION = '1.0.0' |
 | _MAX_PART_BYTES | variable | _MAX_PART_BYTES = 64 * 1024 * 1024 |
 | _MAX_RESPONSE_BYTES | variable | _MAX_RESPONSE_BYTES = 128 * 1024 * 1024 |
+| _OFFICE_EXTS | variable | _OFFICE_EXTS = {'docx', 'pptx', 'xlsx'} |
 | _Passthrough | class | class _Passthrough |
 | _Passthrough.convert | method | def convert(self, raw: bytes, *, source_name: str) -> str |
 | _W_NS | variable | _W_NS = ... |
@@ -170,5 +179,5 @@ cdm:
 <!-- CDM:END symbols -->
 
 <!-- CDM:BEGIN overview -->
-This eng-guide section is authored from the code surface (the single source of truth) and is re-authored whenever that surface changes. It covers the public API: `Converter`, `Converter.convert`, `DEFAULT_SPMIRROR_PATH`, `DirSource`, `DirSource.__init__`, `DirSource.fetch`, `DirSource.list_documents`, `ProxySource`, `ProxySource.__init__`, `ProxySource.fetch`, `ProxySource.list_documents`, `Source`, `Source.fetch`, `Source.list_documents`, `SpDocument`, `SpMirrorConfig`, `SpMirrorError`, `SpSyncReport`, `_DocxText.convert`, `_Passthrough.convert`, `__all__`, `convert_bytes`, `docx_lossy_parts`, `load_spmirror_config`, `source_from_config`, `sync_mirror`.
+This eng-guide section is authored from the code surface (the single source of truth) and is re-authored whenever that surface changes. It covers the public API: `Converter`, `Converter.convert`, `DEFAULT_SPMIRROR_PATH`, `DirSource`, `DirSource.__init__`, `DirSource.fetch`, `DirSource.list_documents`, `ProxySource`, `ProxySource.__init__`, `ProxySource.fetch`, `ProxySource.list_documents`, `Source`, `Source.fetch`, `Source.list_documents`, `SpDocument`, `SpMirrorConfig`, `SpMirrorError`, `SpSyncReport`, `_Doc2mdOffice.convert`, `_DocxText.convert`, `_Passthrough.convert`, `__all__`, `convert_bytes`, `docx_lossy_parts`, `load_spmirror_config`, `source_from_config`, `sync_mirror`.
 <!-- CDM:END overview -->
