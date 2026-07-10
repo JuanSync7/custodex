@@ -75,8 +75,13 @@ Semantics you can rely on:
   manifest byte-identical. Safe on any cadence.
 - **Baseline-preserving**: the engine's `cdm:` front matter survives every
   re-sync — no spurious drift from the connector itself.
-- **Churn-immune**: `docx-text` reads only `word/document.xml`; a Word
-  re-save with unchanged words never moves a fingerprint.
+- **Churn-immune**: both office converters read only the OOXML content parts;
+  a Word re-save with unchanged words never moves a fingerprint.
+- **Lossless option**: map `.docx/.pptx/.xlsx` to `doc2md-office` and
+  `pip install custodex[doc2md]` for recall-gated (token recall = 1.0)
+  conversion that also mirrors footnotes/endnotes/comments; the built-in
+  `docx-text` is the zero-dependency body-only fallback (it *reports* the
+  header/footer/footnote text it can't see rather than dropping it silently).
 - **Human-gated deletion** (K5): a file removed from SharePoint is reported
   as a stale candidate; its mirror (and governance record) stays until a
   human deletes it.

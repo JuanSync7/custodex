@@ -15,13 +15,16 @@ Three seams:
   ``rag-sharepoint-api`` service (``POST /documents/list`` +
   ``POST /documents/fetch`` with ``include_content=true``).
 - :class:`Converter` — raw library bytes → stable text. Built-ins:
-  ``passthrough`` (UTF-8, loud on undecodable — K8) and ``docx-text``
-  (WordprocessingML → markdown-shaped text; CONTAINER-CHURN-INVARIANT: the
-  output depends only on ``word/document.xml``, never zip timestamps or
-  member order, so a Word re-save with unchanged words never moves a hash).
-  A lossless external converter (doc2md) plugs in as a registry entry later —
-  conversion fidelity is the converter's concern; HASHING STAYS IN THE ENGINE
-  (a baseline is a property of governance, not of the document).
+  ``passthrough`` (UTF-8, loud on undecodable — K8), ``docx-text`` (a
+  stdlib-only WordprocessingML → markdown-shaped fallback;
+  CONTAINER-CHURN-INVARIANT: output depends only on ``word/document.xml``,
+  never zip timestamps or member order, so a Word re-save with unchanged
+  words never moves a hash), and ``doc2md-office`` — the LOSSLESS, recall-
+  gated docx/pptx/xlsx converter delegated in-process to the optional
+  ``doc2md`` package (``pip install custodex[doc2md]``; office lane is
+  stdlib-only). Conversion fidelity is the converter's concern; HASHING
+  STAYS IN THE ENGINE (a baseline is a property of governance, not of the
+  document).
 - :func:`sync_mirror` — the writer verb behind ``cdx sp-sync``. Skips
   unchanged files via ``.cdmon/sp-manifest.json`` (an EXACT ``content_hash``
   when the source supplies one, else the listing's ``size_bytes`` +
@@ -473,9 +476,88 @@ def docx_lossy_parts(raw: bytes) -> tuple[str, ...]:
     return tuple(sorted(found))
 
 
+_OFFICE_EXTS = {"docx", "pptx", "xlsx"}
+
+
+class _Doc2mdOffice:
+    """The lossless OOXML lane delegated to the external ``doc2md`` package.
+
+    doc2md's ``backend.ingest.ooxml_markdown`` is a deterministic,
+    recall-gated (token recall = 1.0) docx/pptx/xlsx → markdown converter —
+    stdlib-only, no heavy deps (the PDF lane's docling is a separate extra).
+    Custodex imports it in-process behind an OPTIONAL dependency
+    (``pip install custodex[doc2md]``): the converter is always REGISTERED
+    (so a config naming it loads and dry-runs without doc2md present), but a
+    real conversion lazily imports and is loud with an install hint if absent
+    (the ``backends.make_backend`` extra-import precedent, K8).
+
+    Same K8 hardening as the built-in ``docx-text`` still applies to the
+    library-fetched bytes BEFORE they reach doc2md: each OOXML part is size-
+    capped (decompression-bomb guard) and DTD-refused at the parser
+    (XXE/billion-laughs). Reads only the format's declared main parts, so it
+    is container-churn-invariant like ``docx-text`` (and additionally mirrors
+    footnotes/endnotes/comments, which ``docx-text`` cannot).
+    """
+
+    def convert(self, raw: bytes, *, source_name: str) -> str:
+        try:
+            from backend.ingest import OOXML_MAIN_PARTS, ooxml_markdown
+        except ImportError as exc:
+            raise SpMirrorError(
+                "the 'doc2md-office' converter needs the optional doc2md "
+                "package; install custodex[doc2md] (or pip install "
+                "'doc2md @ git+https://github.com/JuanSync7/doc2md.git')"
+            ) from exc
+
+        ext = PurePosixPath(source_name).suffix.lower().lstrip(".")
+        if ext not in _OFFICE_EXTS:
+            raise SpMirrorError(
+                f"doc2md-office: {source_name!r} is not a supported office "
+                f"format (expected one of {sorted(_OFFICE_EXTS)})"
+            )
+        patterns = [re.compile(p) for p in OOXML_MAIN_PARTS.get(ext, ())]
+        parts: dict[str, str] = {}
+        try:
+            with zipfile.ZipFile(BytesIO(raw)) as zf:
+                for name in zf.namelist():
+                    if not any(p.match(name) for p in patterns):
+                        continue
+                    info = zf.getinfo(name)
+                    if info.file_size > _MAX_PART_BYTES:
+                        raise SpMirrorError(
+                            f"doc2md-office: {source_name!r} part {name!r} "
+                            f"decompresses to {info.file_size} bytes "
+                            f"(> {_MAX_PART_BYTES} cap) — refusing (bomb guard)"
+                        )
+                    payload = zf.read(name)
+                    _reject_dtd(payload, f"{source_name}:{name}")
+                    parts[name] = payload.decode("utf-8", "replace")
+        except (zipfile.BadZipFile, KeyError, OSError) as exc:
+            raise SpMirrorError(
+                f"doc2md-office: {source_name!r} is not a readable office zip: {exc}"
+            ) from exc
+
+        # doc2md is an external optional dep — wrap ANY failure inside its
+        # converter as a typed error so nothing raw escapes (K8). Today it
+        # tolerates malformed OOXML and returns ""; a future version must not
+        # be able to leak an untyped traceback through `cdx sp-sync`.
+        try:
+            body = ooxml_markdown(ext, parts)
+        except SpMirrorError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — third-party boundary
+            raise SpMirrorError(
+                f"doc2md-office: doc2md failed to convert {source_name!r}: {exc}"
+            ) from exc
+        if not body.strip():
+            return ""
+        return body if body.endswith("\n") else body + "\n"
+
+
 _CONVERTERS: dict[str, Converter] = {
     "passthrough": _Passthrough(),
     "docx-text": _DocxText(),
+    "doc2md-office": _Doc2mdOffice(),
 }
 
 
