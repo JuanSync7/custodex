@@ -3461,33 +3461,44 @@ tracked follow-on (MCP-04).
   layout) wins, else `repo_root/cdmon.yaml` (single-file back-compat), else a
   loud `McpError` (K8). Returns `(cfg, config_dir)` — the same pair every
   detector takes.
+- `resolve_repo_id(repo_root: Path, config_dir: Path) -> str` — the bundle index
+  `repo` field, else the dir name (K8-safe; mirrors `standalone.resolve_repo_id`
+  without importing the `[server]` subpackage).
 - `class StatusSummary(BaseModel)` (`extra=forbid`, frozen): `repo_id: str`,
   `clean: bool`, `doc_count: int`, `drift_total: int`, `code_doc_drift: int`,
   `suspect_link_drift: int`, `summary: str`. ⟨R⟩ ADDITIVE — MCP-01 enriches it
   with coverage/ownership/staleness counts (K6).
-- `status_summary(cfg: MonitorConfig, config_dir: Path) -> StatusSummary` — the
-  overview fold: runs `Monitor(cfg, config_dir).check()` (the SAME detect `cdx
-  check` runs, K1/K2) and projects the `DriftReport` into counts. NO clock (the
-  MCP-00 status is time-independent → K10 trivial); NO mutation; NO network.
+- `status_summary(cfg: MonitorConfig, config_dir: Path, *, repo_id: str) ->
+  StatusSummary` — the overview fold: runs `Monitor(cfg, config_dir).check()` (the
+  SAME detect `cdx check` runs, K1/K2) and projects the `DriftReport` into counts,
+  split code↔doc vs doc↔doc (`SUSPECT_LINK`). `repo_id` is injected (kept out of
+  the pure fold). NO clock (K10 trivial); NO mutation; NO network.
 
-### `custodex/mcp/server.py`  (the FastMCP builder — imports the SDK; MCP-00)
+### `custodex/mcp/server.py`  (the FastMCP builder — IMPORT-SAFE; MCP-00)
 
-- `build_mcp_server(repo_root: Path) -> object` — the IMPORT-SAFE-ish builder
-  (mirrors `server.standalone.build_standalone_app`): `from mcp.server.fastmcp
-  import FastMCP`, construct `FastMCP("custodex")`, register the curated tools as
-  thin wrappers over `tools.py`, return the server. Returns `object` so the
-  annotation doesn't leak the SDK type. Each tool RELOADS the bundle per call
-  (`load_repo_bundle`) so it reflects live repo state, and returns
+- `build_mcp_server(repo_root: Path) -> object` — the import-safe builder
+  (mirrors `server.standalone.build_standalone_app`). The `mcp` SDK is imported
+  LAZILY inside it (`from mcp.server.fastmcp import FastMCP`), wrapped in a typed
+  `McpError("install custodex[mcp]")` on ImportError (K8, the `make_backend`
+  precedent) — so importing this module needs NO extra; only *building* does.
+  Then fail-fast validates the config (`load_repo_bundle`), constructs
+  `FastMCP("custodex")`, and registers the curated tools as thin wrappers over
+  `tools.py`. Returns `object` so the annotation doesn't leak the SDK type. Each
+  tool RELOADS the bundle per call so it reflects live repo state, and returns
   `model_dump(mode="json")` (shaped output). MCP-00 registers ONE tool:
   - `custodex_status()` → `StatusSummary` dict — "is this repo in sync?": drift
     totals split code↔doc vs doc↔doc, doc count, clean flag, human summary.
+- `main()  # pragma: no cover` — the `cdx-mcp` entry point: build the cwd repo's
+  server and `.run()` it, catching `McpError` → stderr + exit 1, so `cdx-mcp` is
+  guarded IDENTICALLY to `cdx mcp-serve` (both reach the same guarded builder).
 
 ### CLI + launch leaf  (mirrors `serve()`/`_run_uvicorn`)
 
-- `cdx mcp-serve [--repo-root .]` — lazy in-body `from .mcp import
-  build_mcp_server` wrapped in `try/except ImportError -> typer.Exit(1)` with an
-  actionable "install custodex[mcp]" message (K8, the `make_backend` agent-branch
-  precedent), then hands the built server to `_run_mcp`.
+- `cdx mcp-serve [--repo-root .]` — lazy in-body `from .mcp.server import
+  build_mcp_server` (import-safe), then `build_mcp_server(root)` in a single
+  `try/except CodeDocMonitorError -> typer.Exit(1)`: the builder raises a typed
+  `McpError` for BOTH a missing extra AND a config-less repo, so one loud guard
+  covers both (K8, the `make_backend` precedent). Hands the server to `_run_mcp`.
 - `def _run_mcp(server) -> None  # pragma: no cover — the real stdio transport
   leaf (K4)` — `server.run()` (FastMCP's default transport is stdio). Isolated so
   all logic lives in the import-safe builder + pure tools; tests drive those and

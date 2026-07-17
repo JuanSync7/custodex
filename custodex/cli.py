@@ -1028,15 +1028,11 @@ def mcp_serve(
     import-safe builder, so this launch stays thin — tests never open a transport.
     """
     root = repo_root.resolve()
-    try:
-        from .mcp.server import build_mcp_server
-    except ImportError as exc:  # pragma: no cover - only without the [mcp] extra
-        typer.echo(
-            "error: `cdx mcp-serve` needs the optional 'mcp' dependency; "
-            "install custodex[mcp]",
-            err=True,
-        )
-        raise typer.Exit(code=1) from exc
+    # server.py is import-safe (the SDK is imported lazily inside build_mcp_server,
+    # the make_backend precedent), so a missing extra AND a config-less repo both
+    # surface as a typed McpError from the builder — one loud guard covers both (K8).
+    from .mcp.server import build_mcp_server
+
     try:
         server = build_mcp_server(root)
     except CodeDocMonitorError as exc:

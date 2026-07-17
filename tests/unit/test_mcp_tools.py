@@ -18,10 +18,13 @@ from custodex.blocks import symbol_table
 from custodex.config import (
     Audience,
     CodeRef,
+    DocDepsConfig,
+    DocEdge,
     DocumentSpec,
     MonitorConfig,
     write_template,
 )
+from custodex.docdeps import stamp_edges
 from custodex.errors import McpError
 from custodex.extract import build_document_surface
 from custodex.manifest import render_doc, set_fingerprint, set_region
@@ -92,6 +95,42 @@ def test_status_summary_flags_code_doc_drift(tmp_path: Path) -> None:
     assert summary.code_doc_drift >= 1
     assert summary.suspect_link_drift == 0
     # The counts partition the total (no double-counting).
+    assert summary.code_doc_drift + summary.suspect_link_drift == summary.drift_total
+
+
+def test_status_summary_counts_suspect_link_drift(tmp_path: Path) -> None:
+    # A doc↔doc edge (api depends_on overview) goes SUSPECT when the upstream body
+    # moves — exercises the code↔doc vs doc↔doc split with suspect_link_drift != 0
+    # (so a one-sided miscount of the split can't survive; the code↔doc side is
+    # covered by test_status_summary_flags_code_doc_drift).
+    overview = DocumentSpec(
+        id="overview", path="overview.md", audience=Audience.ENG_GUIDE
+    )
+    api = DocumentSpec(
+        id="api",
+        path="api.md",
+        audience=Audience.USER_GUIDE,
+        depends_on=(DocEdge(doc="overview"),),
+    )
+    cfg = MonitorConfig(
+        root=".", documents=(overview, api), docdeps=DocDepsConfig(enabled=True)
+    )
+
+    def _managed(spec: DocumentSpec, body: str) -> None:
+        surface = build_document_surface(spec, tmp_path)
+        meta = set_fingerprint({}, surface.surface_hash())
+        (tmp_path / spec.path).write_text(render_doc(meta, body), encoding="utf-8")
+
+    _managed(overview, "# Overview\nupstream\n")
+    _managed(api, "# API\ndownstream\n")
+    stamp_edges(cfg, tmp_path, "api")  # baseline the edge → starts OK
+    assert status_summary(cfg, tmp_path, repo_id="demo").clean is True
+
+    _managed(overview, "# Overview\nUPSTREAM MOVED\n")  # move the upstream body
+    summary = status_summary(cfg, tmp_path, repo_id="demo")
+    assert summary.clean is False
+    assert summary.suspect_link_drift >= 1
+    assert summary.code_doc_drift == 0  # the ONLY drift is the doc↔doc suspect link
     assert summary.code_doc_drift + summary.suspect_link_drift == summary.drift_total
 
 
