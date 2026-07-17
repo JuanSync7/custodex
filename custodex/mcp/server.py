@@ -27,6 +27,7 @@ from typing import Any
 from ..config import Audience
 from ..drift import DriftKind
 from ..errors import McpError
+from ..schema import Verdict
 from . import tools
 
 __all__ = ["build_mcp_server", "main"]
@@ -177,12 +178,15 @@ def build_mcp_server(repo_root: Path) -> Any:
         )
 
     @server.tool()
-    def custodex_records(verdict: str | None = None, limit: int = 20) -> dict[str, Any]:
+    def custodex_records(
+        verdict: Verdict | None = None, limit: int = 20
+    ) -> dict[str, Any]:
         """The local review-log audit trail (K5), newest-first.
 
         Each handled drift is one record (doc, verdict, severity, timestamps).
-        Optionally filter by ``verdict`` (FIX / INVALIDATE / ESCALATE); capped at
-        ``limit``. A fresh repo with no log returns an empty list (not an error).
+        Optionally filter by ``verdict`` (FIX / INVALIDATE / ESCALATE — the enum
+        is advertised in the tool schema); capped at ``limit``. A fresh repo with
+        no log returns an empty list (not an error).
         """
         cfg, config_dir, repo_id = _bundle()
         return tools.list_records(

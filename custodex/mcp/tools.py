@@ -160,6 +160,7 @@ class StatusSummary(BaseModel):
     drift_total: int
     code_doc_drift: int
     suspect_link_drift: int
+    coverage_available: bool
     coverage_file_pct: float
     coverage_symbol_pct: float
     docs_unowned: int
@@ -177,13 +178,30 @@ def status_summary(
     helpers (so the overview never disagrees with the drill-down tools). ``now``
     is INJECTED (the staleness fold is as-of that date, K10) — no clock read, no
     mutation, no network.
+
+    Unlike drift/ownership/staleness (bounded to the config), coverage does a
+    FULL-repo tree walk + symbol extraction, so an unparseable in-scope ``.py``
+    file (e.g. a WIP file mid-edit) would otherwise abort the WHOLE overview. As
+    the "call first" progressive-disclosure entrypoint, ``custodex_status`` must
+    stay answerable for the other pillars, so a coverage failure DEGRADES to an
+    honest partial (``coverage_available=False``, sentinel ``-1.0`` percentages) —
+    the dedicated ``custodex_coverage`` tool still surfaces the parse error loudly
+    (K8). This mirrors the ``roster_checked=False`` honest-partial precedent.
     """
     report = Monitor(cfg, config_dir).check()
     total = len(report.drifts)
     suspect = sum(1 for d in report.drifts if d.kind is DriftKind.SUSPECT_LINK)
-    cov = coverage_summary(cfg, config_dir, repo_id=repo_id)
     own = ownership_summary(cfg, config_dir, repo_id=repo_id)
     stale = staleness_summary(cfg, config_dir, repo_id=repo_id, now=now)
+    try:
+        cov = coverage_summary(cfg, config_dir, repo_id=repo_id)
+        coverage_available = True
+        coverage_file_pct = cov.percent_files
+        coverage_symbol_pct = cov.percent_public_symbols
+    except CodeDocMonitorError:
+        coverage_available = False
+        coverage_file_pct = -1.0
+        coverage_symbol_pct = -1.0
     return StatusSummary(
         repo_id=repo_id,
         clean=report.ok,
@@ -191,8 +209,9 @@ def status_summary(
         drift_total=total,
         code_doc_drift=total - suspect,
         suspect_link_drift=suspect,
-        coverage_file_pct=cov.percent_files,
-        coverage_symbol_pct=cov.percent_public_symbols,
+        coverage_available=coverage_available,
+        coverage_file_pct=coverage_file_pct,
+        coverage_symbol_pct=coverage_symbol_pct,
         docs_unowned=own.unowned_count,
         docs_needing_review=stale.needs_review_total,
         summary=report.summary(),

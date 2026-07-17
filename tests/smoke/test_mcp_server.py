@@ -84,12 +84,14 @@ def test_custodex_status_tool_returns_enriched_summary(tmp_path: Path) -> None:
         "drift_total",
         "code_doc_drift",
         "suspect_link_drift",
+        "coverage_available",
         "coverage_file_pct",
         "coverage_symbol_pct",
         "docs_unowned",
         "docs_needing_review",
         "summary",
     }
+    assert structured["coverage_available"] is True
 
 
 def test_custodex_drift_tool_returns_shaped_list(tmp_path: Path) -> None:
@@ -146,6 +148,18 @@ def test_custodex_records_tool_empty_log(tmp_path: Path) -> None:
     assert structured["repo_id"] == tmp_path.name
     assert structured["total"] == 0
     assert structured["records"] == []
+
+
+def test_custodex_records_advertises_verdict_enum(tmp_path: Path) -> None:
+    # The `verdict` param is typed as the Verdict enum so a client planning tool
+    # args from the JSON schema can machine-discover the three legal values
+    # (rather than only reading the docstring). Assert the enum reaches the schema.
+    server = build_mcp_server(_repo(tmp_path))
+    tool = next(
+        t for t in asyncio.run(server.list_tools()) if t.name == "custodex_records"
+    )
+    blob = json.dumps(tool.inputSchema)
+    assert "FIX" in blob and "INVALIDATE" in blob and "ESCALATE" in blob
 
 
 def test_build_mcp_server_refuses_configless_repo(tmp_path: Path) -> None:

@@ -29,7 +29,7 @@ from custodex.config import (
 )
 from custodex.docdeps import stamp_edges
 from custodex.drift import DriftKind
-from custodex.errors import McpError
+from custodex.errors import CodeDocMonitorError, McpError
 from custodex.extract import build_document_surface
 from custodex.manifest import render_doc, set_fingerprint, set_region
 from custodex.mcp.tools import (
@@ -169,6 +169,70 @@ def test_status_summary_counts_suspect_link_drift(tmp_path: Path) -> None:
     assert summary.code_doc_drift + summary.suspect_link_drift == summary.drift_total
 
 
+def test_status_enrichment_coverage_axes_map_correctly(tmp_path: Path) -> None:
+    # An ASYMMETRIC repo: `extra.py` has two undocumented public symbols, so
+    # file% (1/2) != symbol% (1/3). A swapped file%↔symbol% mapping can't survive.
+    cfg = _synced_repo(tmp_path)
+    (tmp_path / "repo" / "src" / "extra.py").write_text(
+        "def one():\n    return 1\n\n\ndef two():\n    return 2\n", encoding="utf-8"
+    )
+    cov = coverage_summary(cfg, tmp_path, repo_id="demo")
+    assert cov.percent_files != cov.percent_public_symbols  # genuinely asymmetric
+    summary = status_summary(cfg, tmp_path, repo_id="demo", now=NOW)
+    assert summary.coverage_available is True
+    assert summary.coverage_file_pct == cov.percent_files
+    assert summary.coverage_symbol_pct == cov.percent_public_symbols
+
+
+def test_status_enrichment_ownership_staleness_map_correctly(tmp_path: Path) -> None:
+    # An ASYMMETRIC repo: unowned (2) != needs-review (1), so a swapped
+    # docs_unowned↔docs_needing_review mapping can't survive.
+    docs = (
+        # owned + fresh → neither unowned nor needs-review
+        DocumentSpec(
+            id="a",
+            path="a.md",
+            audience=Audience.ENG_GUIDE,
+            owner="alice",
+            reviewed="2026-05-30T00:00:00+00:00",
+        ),
+        # unowned + fresh → unowned only
+        DocumentSpec(
+            id="b",
+            path="b.md",
+            audience=Audience.ENG_GUIDE,
+            reviewed="2026-05-30T00:00:00+00:00",
+        ),
+        # unowned + never-reviewed → both
+        DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),
+    )
+    cfg = MonitorConfig(root=".", documents=docs)
+    for doc in docs:
+        (tmp_path / doc.path).write_text("# doc\n", encoding="utf-8")
+    own = ownership_summary(cfg, tmp_path, repo_id="demo")
+    stale = staleness_summary(cfg, tmp_path, repo_id="demo", now=NOW)
+    assert own.unowned_count == 2
+    assert stale.needs_review_total == 1
+    summary = status_summary(cfg, tmp_path, repo_id="demo", now=NOW)
+    assert summary.docs_unowned == own.unowned_count
+    assert summary.docs_needing_review == stale.needs_review_total
+
+
+def test_status_summary_degrades_on_coverage_parse_error(tmp_path: Path) -> None:
+    # An unparseable in-scope .py file must NOT abort the "call first" overview:
+    # coverage degrades to an honest partial while the other pillars still answer,
+    # and the dedicated coverage tool stays loud (K8).
+    cfg = _synced_repo(tmp_path)
+    (tmp_path / "repo" / "src" / "broken.py").write_text("def (:\n", encoding="utf-8")
+    summary = status_summary(cfg, tmp_path, repo_id="demo", now=NOW)
+    assert summary.coverage_available is False
+    assert summary.coverage_file_pct == -1.0
+    assert summary.coverage_symbol_pct == -1.0
+    assert summary.doc_count == 1  # the other pillars are still populated
+    with pytest.raises(CodeDocMonitorError):
+        coverage_summary(cfg, tmp_path, repo_id="demo")
+
+
 def test_load_repo_bundle_single_file(tmp_path: Path) -> None:
     write_template(tmp_path / "cdmon.yaml")
     cfg, config_dir = load_repo_bundle(tmp_path)
@@ -238,11 +302,27 @@ def test_drift_detail_lists_and_partitions(tmp_path: Path) -> None:
     (tmp_path / "repo" / "src" / "mod.py").write_text(CODE_V2, encoding="utf-8")
     detail = drift_detail(cfg, tmp_path, repo_id="demo")
     assert detail.clean is False
-    assert detail.total >= 1
     assert detail.shown == len(detail.items)
     assert all(isinstance(i, DriftItem) for i in detail.items)
-    # by_kind partitions the (filtered) total exactly — no double-count, no drop.
-    assert sum(detail.by_kind.values()) == detail.total
+    # The signature bump drifts BOTH the surface fingerprint (HASH) and the
+    # symbol region (REGION). Pin the exact partition + count (catches a
+    # collapsed/mislabelled by_kind bucket), not just the sum.
+    assert detail.total == 2
+    assert detail.by_kind == {"HASH": 1, "REGION": 1}
+    # Deterministic sort (doc_id, region_id or "", kind): HASH (no region) first.
+    assert [i.kind for i in detail.items] == ["HASH", "REGION"]
+    # Field-level pins — a doc_id / doc_path / message / severity swap can't hide.
+    hash_item = next(i for i in detail.items if i.kind == "HASH")
+    assert hash_item.doc_id == "api"
+    assert hash_item.doc_path == "docs/api.md"
+    assert hash_item.audience == "eng-guide"  # K3-visible
+    assert hash_item.healable is True
+    assert hash_item.region_id is None
+    assert hash_item.change_severity == "unknown"
+    assert "fingerprint" in hash_item.message
+    region_item = next(i for i in detail.items if i.kind == "REGION")
+    assert region_item.region_id == "symbols"
+    assert "symbols" in region_item.message
 
 
 def test_drift_detail_cap_truncates(tmp_path: Path) -> None:
@@ -263,6 +343,30 @@ def test_drift_detail_kind_filter_excludes(tmp_path: Path) -> None:
     assert detail.total == 0
     assert detail.items == ()
     assert detail.clean is False
+
+
+def test_drift_detail_kind_filter_includes_subset(tmp_path: Path) -> None:
+    # A POSITIVE filter: kind=HASH returns strictly the HASH subset (1 of the 2
+    # drifts) — a predicate that only over-includes is caught.
+    cfg = _synced_repo(tmp_path)
+    (tmp_path / "repo" / "src" / "mod.py").write_text(CODE_V2, encoding="utf-8")
+    only_hash = drift_detail(cfg, tmp_path, repo_id="demo", kind=DriftKind.HASH)
+    assert only_hash.total == 1
+    assert only_hash.by_kind == {"HASH": 1}
+    assert all(i.kind == "HASH" for i in only_hash.items)
+
+
+def test_drift_detail_audience_filter(tmp_path: Path) -> None:
+    # The drift is on an ENG_GUIDE doc (K3), so a USER_GUIDE filter removes it
+    # while an ENG_GUIDE filter keeps the full set — the predicate runs both ways
+    # (a no-op `audience is None or True` filter can't survive).
+    cfg = _synced_repo(tmp_path)
+    (tmp_path / "repo" / "src" / "mod.py").write_text(CODE_V2, encoding="utf-8")
+    unfiltered = drift_detail(cfg, tmp_path, repo_id="demo")
+    user = drift_detail(cfg, tmp_path, repo_id="demo", audience=Audience.USER_GUIDE)
+    eng = drift_detail(cfg, tmp_path, repo_id="demo", audience=Audience.ENG_GUIDE)
+    assert user.total == 0
+    assert eng.total == unfiltered.total >= 1
 
 
 # --- custodex_coverage ---------------------------------------------------------
@@ -379,26 +483,53 @@ def test_staleness_summary_fresh(tmp_path: Path) -> None:
 
 
 def test_worklist_summary_stale_item(tmp_path: Path) -> None:
-    # A never-reviewed, unowned doc → one STALE work item in the unowned bucket.
-    spec = DocumentSpec(id="api", path="api.md", audience=Audience.ENG_GUIDE)
+    # An owned, never-reviewed doc → one STALE work item carrying its owner. Pin
+    # the full projected WorkItemView so a dropped/swapped field is caught.
+    spec = DocumentSpec(
+        id="api", path="api.md", audience=Audience.ENG_GUIDE, owner="bob"
+    )
     cfg = MonitorConfig(root=".", documents=(spec,))
     wl = worklist_summary(cfg, tmp_path, repo_id="demo", now=NOW)
     assert isinstance(wl, WorklistSummary)
-    assert wl.item_count >= 1
+    assert wl.item_count == 1
     assert wl.orphans_included is False  # no roster supplied
-    assert any(item.reason == "stale" for item in wl.items)
+    item = wl.items[0]
+    assert item.accountable == "bob"
+    assert item.doc_id == "api"
+    assert item.doc_path == "api.md"
+    assert item.audience == "eng-guide"
+    assert item.reason == "stale"
+    assert item.severity == "high"  # NEVER_REVIEWED → HIGH
+    assert item.upstream_id is None
 
 
-def test_worklist_summary_cap_truncates(tmp_path: Path) -> None:
-    specs = tuple(
-        DocumentSpec(id=f"d{i}", path=f"d{i}.md", audience=Audience.ENG_GUIDE)
-        for i in range(3)
+def test_worklist_summary_global_priority_cap(tmp_path: Path) -> None:
+    # Three items differing on the sort key across two owners + the unowned
+    # bucket. worklist_from_repo emits them in OWNER order (alice, bob, unowned),
+    # so a correct GLOBAL re-sort must reorder before the cap: the single
+    # highest-priority item is bob's never-reviewed doc (HIGH, doc_id "a"), NOT
+    # alice's MEDIUM stale doc that sorts first in owner order. Kills a
+    # no-resort / reverse-sort / owner-tiebreak mutation.
+    docs = (
+        DocumentSpec(id="a", path="a.md", audience=Audience.ENG_GUIDE, owner="bob"),
+        DocumentSpec(
+            id="b",
+            path="b.md",
+            audience=Audience.ENG_GUIDE,
+            owner="alice",
+            reviewed="2020-01-01T00:00:00+00:00",  # long past SLA → STALE (MEDIUM)
+        ),
+        DocumentSpec(id="c", path="c.md", audience=Audience.ENG_GUIDE),  # unowned
     )
-    cfg = MonitorConfig(root=".", documents=specs)
+    cfg = MonitorConfig(root=".", documents=docs)
     wl = worklist_summary(cfg, tmp_path, repo_id="demo", now=NOW, limit=1)
+    assert wl.item_count == 3  # total is exact regardless of the cap
     assert wl.returned_item_count == 1
     assert wl.truncated is True
-    assert wl.item_count >= 3  # the total is exact regardless of the cap
+    top = wl.items[0]
+    assert top.doc_id == "a"
+    assert top.accountable == "bob"
+    assert top.severity == "high"
 
 
 # --- custodex_doc_graph --------------------------------------------------------
@@ -449,10 +580,25 @@ def test_doc_graph_summary_disabled_is_unambiguous(tmp_path: Path) -> None:
     assert graph.edge_count == 0
 
 
+def test_doc_graph_summary_gates_passthrough(tmp_path: Path) -> None:
+    # `gates` is the config's docdeps.gate verbatim — pin the False case so a
+    # hardcoded-True mutant is caught (the enabled test only sees the default).
+    spec = DocumentSpec(id="api", path="api.md", audience=Audience.ENG_GUIDE)
+    cfg = MonitorConfig(
+        root=".",
+        documents=(spec,),
+        docdeps=DocDepsConfig(enabled=True, gate=False),
+    )
+    graph = doc_graph_summary(cfg, tmp_path, repo_id="demo")
+    assert graph.gates is False
+
+
 # --- custodex_records ----------------------------------------------------------
 
 
 def _record(record_id: str, verdict: Verdict, detected_at: str) -> ReviewRecord:
+    # resolved_at is deliberately DISTINCT from detected_at so the projection's
+    # detected_at↔resolved_at mapping is checkable (a swap can't hide).
     return ReviewRecord(
         record_id=record_id,
         doc_id="api",
@@ -475,7 +621,7 @@ def _record(record_id: str, verdict: Verdict, detected_at: str) -> ReviewRecord:
         surface_hash="hash",
         backend_kind="mock",
         detected_at=detected_at,
-        resolved_at=detected_at,
+        resolved_at=detected_at.replace("T00:00:00", "T00:00:05"),
         config_snapshot={},
     )
 
@@ -499,6 +645,18 @@ def test_list_records_newest_first_and_by_verdict(tmp_path: Path) -> None:
     assert records.total == 2
     assert [r.record_id for r in records.records] == ["r2", "r1"]  # newest first
     assert records.by_verdict == {"FIX": 1, "INVALIDATE": 1}
+    # Field-level pins on the newest record — catches a dropped/swapped field,
+    # especially the detected_at↔resolved_at pair (deliberately distinct).
+    top = records.records[0]
+    assert top.record_id == "r2"
+    assert top.verdict == "INVALIDATE"
+    assert top.doc_id == "api"
+    assert top.doc_path == "api.md"
+    assert top.audience == "eng-guide"
+    assert top.drift_kind == "HASH"
+    assert top.detected_at == "2026-06-02T00:00:00+00:00"
+    assert top.resolved_at == "2026-06-02T00:00:05+00:00"
+    assert isinstance(top.change_severity, str)
 
 
 def test_list_records_verdict_filter(tmp_path: Path) -> None:
