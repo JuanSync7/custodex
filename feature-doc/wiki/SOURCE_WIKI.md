@@ -181,7 +181,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `mcp`
 
 - Path: `mcp/__init__.py`
-- Public symbols: `StatusSummary`, `__all__`, `build_mcp_server`, `load_repo_bundle`, `main`, `resolve_repo_id`, `status_summary`
+- Public symbols: `CoverageSummary`, `DocGraph`, `DriftDetail`, `DriftItem`, `OwnershipSummary`, `RecordList`, `RecordSummary`, `StalenessSummary`, `StatusSummary`, `SymbolGap`, `WorkItemView`, `WorklistSummary`, `__all__`, `build_mcp_server`, `coverage_summary`, `doc_graph_summary`, `drift_detail`, `list_records`, `load_repo_bundle`, `main`, `ownership_summary`, `resolve_repo_id`, `staleness_summary`, `status_summary`, `worklist_summary`
 - Implemented by: `FEAT-MCP-001`
 
 ## `monitor`
