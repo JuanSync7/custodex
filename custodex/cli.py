@@ -1011,6 +1011,46 @@ def _run_uvicorn(  # pragma: no cover — the real socket-binding launch leaf (K
     server.run()
 
 
+@app.command(name="mcp-serve")
+def mcp_serve(
+    repo_root: Path = typer.Option(
+        Path("."),
+        "--repo-root",
+        help="Repo whose Custodex config to serve (default: the current directory).",
+    ),
+) -> None:
+    """Serve Custodex as an MCP server over stdio — the read/write agent surface.
+
+    An MCP client (Claude Code / any client) launches this as a subprocess and
+    calls the curated tools (``custodex_status``, …) to query the repo. Needs the
+    optional ``mcp`` SDK — a missing extra is a loud install hint (K8), and a repo
+    with no resolvable config is refused at launch (K8). All logic lives in the
+    import-safe builder, so this launch stays thin — tests never open a transport.
+    """
+    root = repo_root.resolve()
+    # server.py is import-safe (the SDK is imported lazily inside build_mcp_server,
+    # the make_backend precedent), so a missing extra AND a config-less repo both
+    # surface as a typed McpError from the builder — one loud guard covers both (K8).
+    from .mcp.server import build_mcp_server
+
+    try:
+        server = build_mcp_server(root)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    _run_mcp(server)
+
+
+def _run_mcp(server: Any) -> None:  # pragma: no cover — the stdio transport leaf (K4)
+    """Run the built MCP server over stdio (FastMCP's default transport).
+
+    Isolated so :func:`mcp_serve`'s logic stays in the import-safe builder and
+    tests drive that directly without ever opening a transport (the
+    :func:`_run_uvicorn` precedent).
+    """
+    server.run()
+
+
 @app.command()
 def doctor(config: Path = _CONFIG_OPTION) -> None:
     """Offline preflight: is this repo wired to run cdx + report? (G-02).

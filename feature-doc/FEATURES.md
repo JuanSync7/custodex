@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**251 features** across 31 subsystems.
+**252 features** across 32 subsystems.
 
 ## agent
 
@@ -853,6 +853,16 @@ stored_region_anchors reads cdm.region_anchors[region_id] as a tuple (None on a 
 ### `FEAT-MANIFEST-009` — Standard-meta stamp and re-render
 
 stamp_standard_meta sets the Layout Standard static keys cdm.schema_version and cdm.audience while preserving every other cdm key, and render_doc re-emits front matter plus body to one string (body verbatim when meta is empty, sorted-key YAML fence otherwise).
+
+## mcp
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-MCP-001` | the MCP server surface + `custodex_status` overview (MCP-00) | mcp, cli | K0, K1, K2, K4, K8, K10 | — | — | implemented |
+
+### `FEAT-MCP-001` — the MCP server surface + `custodex_status` overview (MCP-00)
+
+The opt-in `[mcp]` extra + `custodex/mcp/` subpackage that stands up a Model Context Protocol server over Custodex with NO change to the engine (K0; the `[server]` extra precedent — `import custodex` pulls in nothing from here, the SDK is imported lazily and pinned `mcp>=1.8,<2` until the 2026-07-28 v2 rework). A two-layer split tighter than `[server]`'s: the PURE `tools` module (core deps only, no SDK — so its projection logic imports and tests even in a core-only install) holds `load_repo_bundle` (resolve a repo's config the way the CLI does — `config/cdmon/index.yaml` then `cdmon.yaml`, loud `McpError` if neither, K8), `resolve_repo_id`, and `status_summary` (run the SAME detect `cdx check` runs via `Monitor.check` and fold the `DriftReport` into a shaped `StatusSummary` — clean flag + drift totals split code↔doc vs doc↔doc; pure, no clock/mutation/network, K1/K2/K10); the `server` module (imports the SDK) builds a `FastMCP` instance whose curated tools are thin wrappers over `tools` that RELOAD the bundle per call and return `model_dump(mode="json")` (shaped output, NOT a 1:1 wrap of 37 verbs, NOT raw blobs — the 2026 MCP best practice). MCP-00 registers the `custodex_status` overview (the progressive-disclosure entrypoint: "is this repo in sync?"). `cdx mcp-serve [--repo-root]` launches it over stdio (how an MCP client runs it as a subprocess) — a missing extra is a loud `install custodex[mcp]` hint and a config-less repo is refused at launch (K8); the `cdx-mcp` entry point mirrors `cdx-server`. All logic lives in the import-safe builder + pure tools, so the stdio transport is a thin `# pragma: no cover` leaf tests never open (the `_run_uvicorn` precedent). The read tools (`check_drift`/`get_coverage`/… ) are MCP-01 and the gated write/agentic tools (`remediate_drift`/`resolve_drift`/… ) MCP-02.
 
 ## monitor
 

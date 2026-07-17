@@ -51,6 +51,14 @@ server = [
 doc2md = [
     "doc2md @ git+https://github.com/JuanSync7/doc2md.git",
 ]
+# EPIC MCP: the Model Context Protocol server SDK (FastMCP) for `cdx mcp-serve` —
+# the read/write surface external agents (Claude Code / any MCP client) use.
+# Optional so a plain install keeps K0's minimal core (pydantic/typer/pyyaml);
+# the `custodex.mcp` subpackage imports the SDK lazily, exactly like `[server]`
+# imports fastapi. Pinned `<2`: an SDK v2 rework lands ~2026-07-28 (MCP-04 migrates).
+mcp = [
+    "mcp>=1.8,<2",
+]
 dev = [
     "pytest",
     "pytest-cov",
@@ -65,6 +73,7 @@ dev = [
     "alembic",
     "psycopg[binary]",
     "cryptography>=42",
+    "mcp>=1.8,<2",
 ]
 
 [project.scripts]
@@ -72,6 +81,9 @@ cdx = "custodex.cli:app"
 # The central server launcher (needs the [server] extra). Equivalent to
 # `uvicorn custodex.server.app:create_app --factory`.
 cdx-server = "custodex.server.app:main"
+# The MCP server launcher (needs the [mcp] extra). Serves `custodex.mcp` over
+# stdio for an MCP client; equivalent to `cdx mcp-serve`.
+cdx-mcp = "custodex.mcp.server:main"
 # Deprecated aliases — `cdmon`/`cdmon-server` were the pre-rebrand names (the tool
 # is now Custodex/`cdx`). Kept as working aliases so existing scripts, CI, and
 # muscle memory don't break; they point at the same entrypoints.
@@ -132,6 +144,14 @@ ignore_missing_imports = true
 # stub whether or not it's installed — it's optional, not the typed surface.
 [[tool.mypy.overrides]]
 module = "backend.*"
+ignore_missing_imports = true
+
+# the mcp SDK (the [mcp] extra) is imported lazily inside custodex/mcp/ only. Its
+# type coverage is partial across the 1.x line; don't fail mypy on its stubs —
+# it's part of an optional extra, not the type-checked core surface (the uvicorn
+# precedent above).
+[[tool.mypy.overrides]]
+module = "mcp.*"
 ignore_missing_imports = true
 
 # ----------------------------------------------------------------------------

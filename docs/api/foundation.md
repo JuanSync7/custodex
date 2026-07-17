@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 69539f1726b6a6df
+  fingerprint: f827212e8eca17db
   fingerprint_tiers:
-    composite: 69539f1726b6a6df
-    docstring: d27bbbc8d85768fd
-    signature: b8e65783446e2645
+    composite: f827212e8eca17db
+    docstring: 9e1982796c110e4d
+    signature: f32af7dd573551fe
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -61,6 +61,7 @@ cdm:
     - 5f31511731a8d710
     - 5f3888a5d6d1f3a2
     - 6509a508c42b1144
+    - 66ff7880805386b2
     - 67280832bd5a56c8
     - 67768f80fff0ce41
     - 68abb78557da6b6c
@@ -140,7 +141,7 @@ cdm:
     - fd87e7b303770609
     - ff51b2032355ac8b
   region_hashes:
-    symbols: fcb13ab6a31a6ed9
+    symbols: 16e6b555c9642d07
   schema_version: 1.0.0
   symbol_sigs:
     00652c5f721d5ef6: 7148212130f198af
@@ -191,6 +192,7 @@ cdm:
     5f31511731a8d710: 1a5b7d44af8567c4
     5f3888a5d6d1f3a2: cd5361cd86ef6c9c
     6509a508c42b1144: d8f1a66c284b0cac
+    66ff7880805386b2: c2ce20b0f4349d33
     67280832bd5a56c8: df61ce877bff592e
     67768f80fff0ce41: 376eb1f69d78d461
     68abb78557da6b6c: dfaa867e92529be8
@@ -325,6 +327,7 @@ cdm:
 | IndexFrontmatter._version_must_match | method | def _version_must_match(self) -> IndexFrontmatter |
 | IndexUnitRef | class | class IndexUnitRef(BaseModel) |
 | InventoryError | class | class InventoryError(CodeDocMonitorError) |
+| McpError | class | class McpError(CodeDocMonitorError) |
 | MonitorConfig | class | class MonitorConfig(BaseModel) |
 | MonitorConfig._depends_on_targets_exist | method | def _depends_on_targets_exist(self) -> MonitorConfig |
 | ProposedFix | class | class ProposedFix(BaseModel) |

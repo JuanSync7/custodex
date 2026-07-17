@@ -20,6 +20,7 @@ __all__ = [
     "SyncError",
     "CatalogError",
     "SecretError",
+    "McpError",
 ]
 
 
@@ -79,4 +80,15 @@ class SecretError(CodeDocMonitorError):
     KEK that seals per-repo provider credentials at rest) or a sealed value that
     fails authentication (tampered ciphertext or the wrong key). The plaintext
     credential is NEVER included in the message.
+    """
+
+
+class McpError(CodeDocMonitorError):
+    """The MCP server surface could not be built (EPIC MCP, K8).
+
+    Raised when ``cdx mcp-serve`` (the ``[mcp]`` extra) is pointed at a directory
+    with no resolvable Custodex config — neither a ``config/cdmon/index.yaml`` dir
+    layout nor a single ``cdmon.yaml`` — so there is nothing to serve. The missing
+    ``mcp`` SDK itself is guarded separately at the lazy import site with an
+    actionable ``install custodex[mcp]`` message (the ``make_backend`` precedent).
     """

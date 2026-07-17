@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: c2549d7823ca5e95
+  fingerprint: 0a699d9e401e06a0
   fingerprint_tiers:
-    composite: c2549d7823ca5e95
-    docstring: 7254a72ea1ee54ae
-    signature: 2d069e5afdc99d0e
+    composite: 0a699d9e401e06a0
+    docstring: fb52707e077d897c
+    signature: 4a5537fa078fa21a
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -31,10 +31,12 @@ cdm:
     - 484de142f352dff3
     - 49e9627e39c92dd0
     - 4e95b8c32f60f796
+    - 56fd7f64460dc953
     - 602fda589448378a
     - 62067d75d7bbed60
     - 655076b86b1c4c83
     - 663f896d732e2207
+    - 6aa02816300e85df
     - 6eb2db11cfd447e6
     - 7022c89609e06451
     - 706a95d834379a05
@@ -83,7 +85,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 36aa5464377a9325
+    symbols: 275fae26d7990134
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -109,10 +111,12 @@ cdm:
     484de142f352dff3: 1cc66be4e6718295
     49e9627e39c92dd0: b0cee0ff8f060823
     4e95b8c32f60f796: 73f7a91734c59485
+    56fd7f64460dc953: f91887b8e84c9244
     602fda589448378a: 8afb4765b2d48e0c
     62067d75d7bbed60: 0dd0bdc9a39f47d0
     655076b86b1c4c83: d224333854a59422
     663f896d732e2207: 28d51fc52e99427c
+    6aa02816300e85df: 195417ea8e0dae5e
     6eb2db11cfd447e6: f16bdd54bea272d8
     7022c89609e06451: 407c3e26ff00f036
     706a95d834379a05: e06b473a8e4f7ffc
@@ -199,6 +203,7 @@ cdm:
 | _region_mode_lines | function | def _region_mode_lines(cfg: MonitorConfig, config_dir: Path) -> list[str] |
 | _resolve_config | function | def _resolve_config(config: Path) -> tuple[MonitorConfig, Path] |
 | _resolve_edge | function | def _resolve_edge(downstream: str, upstream: str, config: Path) -> None |
+| _run_mcp | function | def _run_mcp(server: Any) -> None |
 | _run_uvicorn | function | def _run_uvicorn(app_obj: Any, *, host: str, port: int) -> None |
 | _settings_lines | function | def _settings_lines(resolved: Settings, presence: dict[str, bool]) -> list[str] |
 | _sync_run_lines | function | def _sync_run_lines(run: dict) -> list[str] |
@@ -218,6 +223,7 @@ cdm:
 | link | function | def link(downstream: str = typer.Argument(..., metavar='DOWN', help='The dependent doc.'), upstream: str = typer.Argument(..., metavar='UP', help='The doc it depends on.'), edge_type: str = typer.Option('depends', '--type', help='Edge role: depends \| refines \| implements \| verifies.'), reject: bool = typer.Option(False, '--reject', help="Record a durable REJECTION instead: the suggested edge never returns from `cdx deps --suggest` (the human 'no' — K11)."), by: str \| None = typer.Option(None, '--by', help='Who decided (audit trail).'), note: str \| None = typer.Option(None, '--note', help='Why (audit trail).'), config: Path = _CONFIG_OPTION) -> None |
 | lint | function | def lint(config: Path = _CONFIG_OPTION, fix: bool = typer.Option(False, '--fix', help='Stamp missing static front matter (schema_version/audience).'), modes: bool = typer.Option(False, '--modes', help="Also print each managed region's authority mode + lock/advisory state (informational — does NOT change lint's pass/fail).")) -> None |
 | main | function | def main() -> None |
+| mcp_serve | function | def mcp_serve(repo_root: Path = typer.Option(Path('.'), '--repo-root', help='Repo whose Custodex config to serve (default: the current directory).')) -> None |
 | monitor | function | def monitor(config: Path = _CONFIG_OPTION, apply: bool \| None = typer.Option(None, '--apply/--no-apply', help="Auto-apply FIX verdicts (defaults to the config's apply_default)."), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Source code ref/commit to stamp on every review record (provenance, C-05). Precedence: this flag, else $CI_COMMIT_SHA, else none. The same ref can flow to `open-docs-pr --ref` (one source of truth).')) -> None |
 | new_doc | function | def new_doc(doc_id: str = typer.Argument(..., help='The document id from the config.'), config: Path = _CONFIG_OPTION, force: bool = typer.Option(False, '--force', help='Overwrite an existing doc file.')) -> None |
 | onboard | function | def onboard(path: Path = typer.Option(Path('.'), '--path', help='The repo root to onboard (default: cwd).'), repo: str \| None = typer.Option(None, '--repo', help='Repo name for the config (default: the dir name).'), owner: str \| None = typer.Option(None, '--owner', help="Accountable unit owner (default: git user.name, else 'unassigned')."), apply: bool = typer.Option(False, '--apply', help='WRITE the proposed config/cdmon/, scaffold the docs, heal, and self-validate (arrive-green). Default is a DRY-RUN plan (K11).'), force: bool = typer.Option(False, '--force', help='With --apply: replace an existing config/cdmon/ directory.')) -> None |

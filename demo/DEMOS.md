@@ -1547,3 +1547,27 @@ doc + edge in `config/cdmon` → `cdx monitor --apply` → edit the library file
 green. Pinned by `tests/system/test_spmirror_cli.py`
 (test_sp_sync_then_suspect_then_resolve_end_to_end + dry-run/json/loud-config).
 Features: FEAT-SPMIRROR-003
+
+## O. The MCP read/write surface (EPIC MCP — agents query Custodex over MCP)
+
+### DEMO-112 — `cdx mcp-serve`: the MCP `custodex_status` overview
+**What it shows.** Custodex speaks the Model Context Protocol, so an external
+agent (Claude Code / any MCP client) asks "is this repo in sync?" with a tool
+call instead of shelling out to `cdx` or parsing HTTP. `cdx mcp-serve` stands up
+a stdio MCP server whose curated `custodex_status` tool runs the SAME detect
+`cdx check` runs and returns a SHAPED summary — a `clean` flag plus drift totals
+split code↔doc vs doc↔doc — never a raw dump. The engine never imports the SDK
+(the `[mcp]` extra is opt-in, lazily imported, K0); the transport is stdio (how a
+client launches the server as a subprocess); a missing extra or a config-less
+repo is refused loudly (K8). This is the backbone the read tools (MCP-01) and the
+gated write/agentic tools (MCP-02 — where Custodex's own remediation agent is
+exposed AS a tool, the answer to "chain with the agent vs. MCP") hang off.
+**How to observe.** In a `config/cdmon` repo, register `cdx mcp-serve` as an MCP
+server (command `cdx mcp-serve`, transport stdio) in your client, then call the
+`custodex_status` tool — it returns `{repo_id, clean, doc_count, drift_total,
+code_doc_drift, suspect_link_drift, summary}`. Pinned by
+`tests/unit/test_mcp_tools.py` (the pure status projection + config resolution),
+`tests/smoke/test_mcp_server.py` (the FastMCP server registers the tool), and
+`tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches; loud on a
+config-less repo).
+Features: FEAT-MCP-001
