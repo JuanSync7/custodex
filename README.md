@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: d7b275bbd13013d3
+  fingerprint: db257e3a813e2cc1
   fingerprint_tiers:
-    composite: d7b275bbd13013d3
-    signature: d7b275bbd13013d3
+    composite: db257e3a813e2cc1
+    signature: db257e3a813e2cc1
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -21,6 +21,7 @@ cdm:
     2cc497857559ff85: 6724a3e462f7b17d
     44575cf5b28512d7: deba6b00c018c6ab
     602fda589448378a: 8afb4765b2d48e0c
+    6aa02816300e85df: 195417ea8e0dae5e
     72f4be89d6ebab14: 82cdb795b1cfefb7
     75c75efe327a8ef3: 41b3443a5133331f
     763cdc62a869262b: 3209114b9963834b
@@ -150,6 +151,7 @@ cdx surface-gaps [--dry-run] [--provider gitlab|github]  # turn undocumented-pub
 cdx register [--dry-run] # announce this repo to the central server: POST its identity (RegistrationPayload) to <central url>/repos (bearer from central.auth_env; stdlib only); --dry-run prints the payload without any network call (E-02)
 cdx sync [--mode local|git] [--remote URL --repo-id ID]  # run a config sync. LOCAL (no --remote): read-only against the cwd, prints drift+coverage+commits-ahead (or --json). REMOTE: POST {mode} to <URL>/repos/{ID}/sync (bearer from --token-env) and print the server's run summary
 cdx serve [--host H --port P]  # serve THIS repo's standalone console + API locally over the built Astro frontend — no central access (L-01); needs a config/cdmon/ layout (run `cdx init --v2` first)
+cdx mcp-serve [--repo-root .]  # NEW: serve Custodex as a Model Context Protocol server over stdio so an external agent (Claude Code / any MCP client) can query this repo via curated tools (custodex_status: is it in sync?) instead of shelling out — opt-in `[mcp]` extra, lazily imported (K0); a missing extra or config-less repo is a loud install/config hint (EPIC MCP)
 
 # --- feature catalog & traceability (EPIC R) ---
 cdx wiki [--check]       # regenerate the golden feature-doc/FEATURES.md + feature-doc/wiki/* from their single sources; --check is the CI freshness gate (fails if any wiki is stale)

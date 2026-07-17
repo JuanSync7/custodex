@@ -729,6 +729,42 @@ Driver seams. Every proposal is advisory-with-provenance under the new **K11**
 > ticks (audience classification, concept entities) behind `live_llm`, hub-side
 > cross-repo graph fusion.
 
+## EPIC MCP — the Model Context Protocol read/write surface  (`custodex/mcp/`)
+
+Closes the AGT DoD's named follow-on ("an MCP read surface … the 2026
+table-stakes gap") and extends it to WRITES. Lets an external agent (Claude Code
+/ any MCP client) query and act on Custodex through the standard tool protocol
+instead of shelling out to `cdx` or hitting raw HTTP. ⟨R⟩ **MCP is the backbone;
+Custodex's own (non-conversational, single-turn) agents are exposed AS tools, not
+as a rival chat protocol — the orchestrating client IS the chain.** Curated tool
+set (NOT a 1:1 wrap of 37 verbs), shaped pydantic output, `custodex_status`
+overview for progressive disclosure. Opt-in `[mcp]` extra imported lazily (K0,
+`[server]` precedent); stdio transport first; pinned `mcp>=1.8,<2` (a v2 rework
+lands ~2026-07-28). Pinned contract: `ARCHITECTURE.md` §EPIC MCP.
+
+- ◐ **MCP-00** `pyproject` `[mcp]` extra + `cdx-mcp` entry + mypy override;
+  `custodex/mcp/` subpackage (`__init__` boundary, `tools.py` pure
+  `load_repo_bundle`/`status_summary`/`StatusSummary`, `server.py`
+  `build_mcp_server` over FastMCP); `errors.McpError`; `cdx mcp-serve` +
+  `_run_mcp` stdio leaf; the `custodex_status` tool. *Goal:* `build_mcp_server`
+  registers `custodex_status` (driven in-process, no transport) and it projects
+  the live `DriftReport` into a shaped summary over a fixture repo; missing extra
+  is a loud K8 install hint; full gate green.
+- ☐ **MCP-01** the read tools — `check_drift`, `get_coverage`, `get_ownership`,
+  `get_staleness`, `get_worklist`, `get_doc_graph`, `list_review_records`; enrich
+  `StatusSummary` with coverage/ownership/staleness counts. *Goal:* each tool
+  reuses the SAME pure detector its `cdx` verb calls (K1/K2), shaped output, no
+  new detection logic.
+- ☐ **MCP-02** the gated write/agentic tools (K11, `apply=False` default) —
+  `remediate_drift` (drives `Monitor.run`; the agent-chaining seam),
+  `resolve_drift` (`reviewlog.append_resolution`), `sync_docs`
+  (`syncpr.sync_pr(dry_run=True)` → unified diff). *Goal:* a write tool records a
+  ReviewRecord/ResolutionRecord through the existing seam; nothing mutates
+  without an explicit opt-in.
+- ☐ **MCP-03** streamable-HTTP transport mounted on the central hub (remote,
+  multi-repo) over the existing `_verify_token` bearer auth.
+- ☐ **MCP-04** migrate to `mcp` SDK v2 (post-2026-07-28).
+
 ## Dependency order (high level)
 
 ```

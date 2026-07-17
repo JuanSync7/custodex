@@ -2,7 +2,7 @@
 
 Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
-**54 public modules**, 0 without a catalogued feature.
+**55 public modules**, 0 without a catalogued feature.
 
 ## `_v2base`
 
@@ -37,8 +37,8 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `sp_sync`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-SPMIRROR-003`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
+- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `mcp_serve`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `sp_sync`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-MCP-001`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-SPMIRROR-003`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
 
 ## `config`
 
@@ -103,7 +103,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `errors`
 
 - Path: `errors.py`
-- Public symbols: `BackendError`, `CatalogError`, `CodeDocMonitorError`, `ConfigError`, `DriftError`, `ExtractionError`, `InventoryError`, `SchemaError`, `SecretError`, `SyncError`, `TransportError`, `__all__`
+- Public symbols: `BackendError`, `CatalogError`, `CodeDocMonitorError`, `ConfigError`, `DriftError`, `ExtractionError`, `InventoryError`, `McpError`, `SchemaError`, `SecretError`, `SyncError`, `TransportError`, `__all__`
 - Implemented by: `FEAT-CONFIG-012`
 
 ## `extract`
@@ -177,6 +177,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Path: `manifest.py`
 - Public symbols: `Doc`, `__all__`, `drop_upstream_hash`, `parse_doc`, `parse_text`, `region_body_hash`, `region_is_locked`, `regions`, `render_doc`, `set_fingerprint`, `set_fingerprint_tiers`, `set_region`, `set_region_anchors`, `set_region_hash`, `set_symbol_sigs`, `set_upstream_hash`, `stamp_standard_meta`, `stored_fingerprint`, `stored_fingerprint_tiers`, `stored_region_anchors`, `stored_region_hash`, `stored_symbol_sigs`, `stored_upstream_hashes`
 - Implemented by: `FEAT-DOCDEPS-002`, `FEAT-DRIFT-012`, `FEAT-MANIFEST-001`, `FEAT-MANIFEST-002`, `FEAT-MANIFEST-003`, `FEAT-MANIFEST-004`, `FEAT-MANIFEST-005`, `FEAT-MANIFEST-006`, `FEAT-MANIFEST-007`, `FEAT-MANIFEST-008`, `FEAT-MANIFEST-009`
+
+## `mcp`
+
+- Path: `mcp/__init__.py`
+- Public symbols: `StatusSummary`, `__all__`, `build_mcp_server`, `load_repo_bundle`, `main`, `resolve_repo_id`, `status_summary`
+- Implemented by: `FEAT-MCP-001`
 
 ## `monitor`
 

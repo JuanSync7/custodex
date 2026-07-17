@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**251 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**252 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -158,6 +158,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-MANIFEST-007` | regression/test_corpus_pipeline.py, system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MANIFEST-008` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MANIFEST-009` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
+| `FEAT-MCP-001` | smoke/test_mcp_server.py, system/test_mcp_cli.py, unit/test_mcp_tools.py | DEMOS.md |
 | `FEAT-MONITOR-001` | integration/test_monitor.py, regression/test_corpus_pipeline.py, system/test_cli.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_live_llm.py, system/test_system.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |
 | `FEAT-MONITOR-002` | integration/test_monitor.py, regression/test_corpus_selfcoverage.py, system/test_dogfood.py, system/test_example_multilang.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |
 | `FEAT-MONITOR-003` | integration/test_apply_fix.py, integration/test_monitor.py, regression/test_corpus_pipeline.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_demo_walkthrough.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, system/test_example_external.py, system/test_live_llm.py, system/test_system.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |

@@ -2307,3 +2307,37 @@ for a change-detector; if you can't mirror a part, REPORT it — silence is the
 bug, not incompleteness. (c) Prune-vs-filter: "gone upstream" must mean absent
 from the FULL listing, never merely filtered out this run, or a config knob flip
 looks like a deletion.
+
+## [MCP-00] The client is the chain; and regenerate the wiki AFTER the tests are final
+
+Two durable lessons from standing up the MCP surface.
+
+(1) **Architecture — "should agents chain with Custodex's agents instead of MCP?"
+is a false choice, and the code settles it.** A surface survey proved NONE of
+Custodex's "agents" are conversational: every one is a pure deterministic
+function (`entities`/`kgraph`/`docmap`/`workers`/`onboard`) or a single-turn
+`Backend.propose(FixRequest) -> BackendResult` — even the LangGraph remediation
+graph is "fully deterministic; the only non-determinism is the driver", carrying
+no dialogue state. There is no conversational agent to chain *to*. So MCP is the
+right primary interface and agent capabilities are exposed AS tools; the
+orchestrating client (Claude Code) IS the chain — it calls a tool, reads the
+structured result, decides the next call. Chaining agent-to-agent would only
+leak the internal `FixRequest`/graph surface. Lesson: before inventing a bespoke
+agent-to-agent protocol, check whether your "agents" are actually conversational
+— usually they're schema-in/schema-out functions, and MCP already models that.
+
+(2) **Process — the test wiki indexes test FUNCTIONS, so `cdx wiki` must run
+LAST, after every test edit.** The DoD sequence bit back: `cdx wiki` was
+regenerated, `cdx wiki --check` was green, and then two more test functions were
+added (a tool-invocation test + a fallback-branch test) to close a coverage gap
+— which silently staled `TEST_WIKI.md`, failing `test_committed_wikis_are_fresh`
+in the full run even though the CLI check had just passed. Lesson: `cdx wiki`
+(and `cdx monitor --apply`, and `cdx index`) are the FINAL steps of a slice — run
+them after the last source/test/catalog/demo edit, never in the middle, or a
+later edit invalidates the freshness you just certified.
+
+(3) **Minor gotcha — the bare `cdx init` template has placeholder code_refs**
+(`src/myproject/cli.py`), so invoking `custodex_status` over a freshly-templated
+repo raises `ExtractionError` (correctly, loudly, as a `ToolError`). A tool
+whose fixture must resolve real code needs a real (or empty-`documents:`) config,
+not the scaffold template — the template is a starting point, not a runnable repo.

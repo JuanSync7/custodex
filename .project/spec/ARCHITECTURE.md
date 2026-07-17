@@ -3413,3 +3413,105 @@ line, never wired into `check`). The e2e loop it exists for: sp-sync → declare
 the mirrored docs in config/cdmon (owner + `depends_on` from the engineering
 docs) → `monitor --apply` baselines → upstream SharePoint edit → sp-sync →
 dependents flip SUSPECT → human `cdx resolve --edge`.
+
+## EPIC MCP — the Model Context Protocol read/write surface  (`custodex/mcp/` — K0/K4/K8/K10)
+
+The standardized surface that lets an EXTERNAL agent (Claude Code, or any MCP
+client) query and act on Custodex cleanly, without shelling out to `cdx` or
+parsing raw HTTP. ⟨R⟩ **MCP is the transport/discovery layer; Custodex's own
+agents are exposed AS tools, not as a rival chat protocol.** The survey settled
+the "agent-chaining vs MCP" question decisively: NONE of Custodex's agents are
+conversational — every one is a pure deterministic function or a single-turn
+`Backend.propose(FixRequest) -> BackendResult` (the LangGraph remediation graph
+is "fully deterministic; the only non-determinism is the driver"). There is no
+conversational agent to chain *to*; the orchestrating LLM (the MCP client) IS
+the chain — it calls a tool, reads the structured result, decides the next call.
+
+Design principles (2026 MCP best practice): a CURATED, small tool set (NOT a 1:1
+wrapper of the 37 `cdx` verbs — the "43-tools-dumped-into-context" anti-pattern),
+SHAPED output (pydantic → `model_dump(mode="json")`, never raw blobs), and a
+`custodex_status` overview tool for progressive disclosure. Custodex is already
+CLI-verb-shaped over pure core functions, and every data model is clean pydantic
+v2 (`extra=forbid`, frozen, str-enums), so the surface reuses the engine — it
+never re-implements detection (K1/K2 upheld: the MCP layer only READS the same
+detectors `cdx check`/`coverage`/`ownership`/… call, plus GATED writes via the
+existing `Monitor.run`/`reviewlog`/`syncpr` seams).
+
+⟨R⟩ **The engine never imports `mcp`.** Like `[server]`/`[agent]`, the SDK is an
+opt-in `[mcp]` extra imported lazily; `import custodex` pulls in nothing from
+here (K0). Transport is **stdio first** (how an MCP client launches `cdx
+mcp-serve` as a subprocess); streamable-HTTP-on-the-hub is a later slice. The
+SDK is pinned `mcp>=1.8,<2` — a v2 rework lands ~2026-07-28; v2 migration is a
+tracked follow-on (MCP-04).
+
+### `custodex/mcp/` subpackage  (mirrors `custodex/server/`)
+
+- `__init__.py` — a MINIMAL boundary that imports NEITHER layer (tighter than
+  `server/__init__.py`, which imports `app`): so `import custodex.mcp.tools`
+  never drags in the SDK and the pure layer tests even in a core-only install.
+  The CLI + `cdx-mcp` entry point reach the builder via the full
+  `custodex.mcp.server` path; importing THAT is what requires the `[mcp]` extra.
+- `class McpError(CodeDocMonitorError)` (in `errors.py`) — a missing config/extra
+  is loud (K8), mirroring `SpMirrorError`/`BackendError`.
+
+### `custodex/mcp/tools.py`  (PURE — imports only core deps; MCP-00)
+
+- `load_repo_bundle(repo_root: Path) -> tuple[MonitorConfig, Path]` — resolve a
+  repo's config the way the CLI does: `repo_root/config/cdmon/index.yaml` (dir
+  layout) wins, else `repo_root/cdmon.yaml` (single-file back-compat), else a
+  loud `McpError` (K8). Returns `(cfg, config_dir)` — the same pair every
+  detector takes.
+- `class StatusSummary(BaseModel)` (`extra=forbid`, frozen): `repo_id: str`,
+  `clean: bool`, `doc_count: int`, `drift_total: int`, `code_doc_drift: int`,
+  `suspect_link_drift: int`, `summary: str`. ⟨R⟩ ADDITIVE — MCP-01 enriches it
+  with coverage/ownership/staleness counts (K6).
+- `status_summary(cfg: MonitorConfig, config_dir: Path) -> StatusSummary` — the
+  overview fold: runs `Monitor(cfg, config_dir).check()` (the SAME detect `cdx
+  check` runs, K1/K2) and projects the `DriftReport` into counts. NO clock (the
+  MCP-00 status is time-independent → K10 trivial); NO mutation; NO network.
+
+### `custodex/mcp/server.py`  (the FastMCP builder — imports the SDK; MCP-00)
+
+- `build_mcp_server(repo_root: Path) -> object` — the IMPORT-SAFE-ish builder
+  (mirrors `server.standalone.build_standalone_app`): `from mcp.server.fastmcp
+  import FastMCP`, construct `FastMCP("custodex")`, register the curated tools as
+  thin wrappers over `tools.py`, return the server. Returns `object` so the
+  annotation doesn't leak the SDK type. Each tool RELOADS the bundle per call
+  (`load_repo_bundle`) so it reflects live repo state, and returns
+  `model_dump(mode="json")` (shaped output). MCP-00 registers ONE tool:
+  - `custodex_status()` → `StatusSummary` dict — "is this repo in sync?": drift
+    totals split code↔doc vs doc↔doc, doc count, clean flag, human summary.
+
+### CLI + launch leaf  (mirrors `serve()`/`_run_uvicorn`)
+
+- `cdx mcp-serve [--repo-root .]` — lazy in-body `from .mcp import
+  build_mcp_server` wrapped in `try/except ImportError -> typer.Exit(1)` with an
+  actionable "install custodex[mcp]" message (K8, the `make_backend` agent-branch
+  precedent), then hands the built server to `_run_mcp`.
+- `def _run_mcp(server) -> None  # pragma: no cover — the real stdio transport
+  leaf (K4)` — `server.run()` (FastMCP's default transport is stdio). Isolated so
+  all logic lives in the import-safe builder + pure tools; tests drive those and
+  NEVER open a transport (the `_run_uvicorn` precedent).
+
+### Packaging  (mirrors `[server]`)
+
+- `pyproject.toml`: `mcp = ["mcp>=1.8,<2"]` optional-dependency (comment: opt-in
+  per K0; v2 pinned out until MCP-04) + the SAME pin duplicated into `[dev]` so
+  the gate exercises the MCP path; `cdx-mcp = "custodex.mcp.server:main"` entry
+  point; `[[tool.mypy.overrides]] module = "mcp.*" ignore_missing_imports = true`
+  (mirrors the `uvicorn` override — the SDK ships partial stubs).
+
+### Slice plan
+
+- **MCP-00** — packaging + `custodex/mcp/` skeleton + `cdx mcp-serve` + the
+  `custodex_status` tool, full gate green (THIS slice).
+- **MCP-01** — the read tools: `check_drift`, `get_coverage`, `get_ownership`,
+  `get_staleness`, `get_worklist`, `get_doc_graph`, `list_review_records`;
+  enrich `StatusSummary`.
+- **MCP-02** — the gated write/agentic tools (K11 "agents suggest; humans
+  apply", `apply=False` default): `remediate_drift` (drives `Monitor.run` —
+  where the user's agent-chaining idea lands), `resolve_drift`
+  (`reviewlog.append_resolution`), `sync_docs` (`syncpr.sync_pr(dry_run=True)`).
+- **MCP-03** — streamable-HTTP transport mounted on the central hub (remote,
+  multi-repo, over the existing `_verify_token` auth).
+- **MCP-04** — migrate to the `mcp` SDK v2 (post-2026-07-28).
