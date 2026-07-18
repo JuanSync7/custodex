@@ -1550,24 +1550,30 @@ Features: FEAT-SPMIRROR-003
 
 ## O. The MCP read/write surface (EPIC MCP — agents query Custodex over MCP)
 
-### DEMO-112 — `cdx mcp-serve`: the MCP `custodex_status` overview
+### DEMO-112 — `cdx mcp-serve`: the MCP read surface (`custodex_status` + drill-downs)
 **What it shows.** Custodex speaks the Model Context Protocol, so an external
 agent (Claude Code / any MCP client) asks "is this repo in sync?" with a tool
 call instead of shelling out to `cdx` or parsing HTTP. `cdx mcp-serve` stands up
 a stdio MCP server whose curated `custodex_status` tool runs the SAME detect
-`cdx check` runs and returns a SHAPED summary — a `clean` flag plus drift totals
-split code↔doc vs doc↔doc — never a raw dump. The engine never imports the SDK
-(the `[mcp]` extra is opt-in, lazily imported, K0); the transport is stdio (how a
-client launches the server as a subprocess); a missing extra or a config-less
-repo is refused loudly (K8). This is the backbone the read tools (MCP-01) and the
+`cdx check` runs and returns a SHAPED 4-pillar summary — a `clean` flag, drift
+totals split code↔doc vs doc↔doc, coverage %, and the unowned / needs-review
+counts — never a raw dump. The seven MCP-01 drill-down tools each project one
+detector `cdx` already runs: `custodex_drift` (per-drift detail, filterable by
+kind/audience — K3), `custodex_coverage`, `custodex_ownership`,
+`custodex_staleness` (as-of an injected `now` — K10), `custodex_worklist` (the
+prioritised ownership+SLA+doc↔doc join), `custodex_doc_graph` (edges + per-edge
+suspect status), and `custodex_records` (the local review-log audit). The engine
+never imports the SDK (the `[mcp]` extra is opt-in, lazily imported, K0); the
+transport is stdio (how a client launches the server as a subprocess); a missing
+extra or a config-less repo is refused loudly (K8). This is the backbone the
 gated write/agentic tools (MCP-02 — where Custodex's own remediation agent is
 exposed AS a tool, the answer to "chain with the agent vs. MCP") hang off.
 **How to observe.** In a `config/cdmon` repo, register `cdx mcp-serve` as an MCP
-server (command `cdx mcp-serve`, transport stdio) in your client, then call the
-`custodex_status` tool — it returns `{repo_id, clean, doc_count, drift_total,
-code_doc_drift, suspect_link_drift, summary}`. Pinned by
-`tests/unit/test_mcp_tools.py` (the pure status projection + config resolution),
-`tests/smoke/test_mcp_server.py` (the FastMCP server registers the tool), and
-`tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches; loud on a
-config-less repo).
+server (command `cdx mcp-serve`, transport stdio) in your client, then call
+`custodex_status` for the health headline and any `custodex_*` drill-down for the
+per-domain detail (each returns a shaped, capped, deterministic payload). Pinned
+by `tests/unit/test_mcp_tools.py` (the pure projections + config resolution),
+`tests/smoke/test_mcp_server.py` (the FastMCP server registers + invokes every
+tool), and `tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches;
+loud on a config-less repo).
 Features: FEAT-MCP-001

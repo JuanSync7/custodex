@@ -3512,13 +3512,120 @@ tracked follow-on (MCP-04).
   point; `[[tool.mypy.overrides]] module = "mcp.*" ignore_missing_imports = true`
   (mirrors the `uvicorn` override — the SDK ships partial stubs).
 
+### MCP-01 — the read tools  (`tools.py` pure helpers + `server.py` wrappers; BUILT)
+
+Seven per-domain READ tools + an enriched `custodex_status`, each the pure
+projection of a detector `cdx` already runs (K1/K2 — the MCP layer never
+re-detects, never mutates). All reuse the MCP-00 `(cfg, config_dir) + repo_id`
+shape via `load_repo_bundle`/`resolve_repo_id`; the pure helpers stay
+core-deps-only (K0 — a survey PROVED all six detector modules import no
+server/agent/crypto extra); output is SHAPED + CAPPED + deterministically sorted
+(K10); malformed input surfaces a loud typed `CodeDocMonitorError`/`McpError`
+(K8, never swallowed).
+
+⟨R⟩ **Tool naming is `custodex_*`-prefixed** (not the older unprefixed sketch
+`check_drift`/`get_coverage`/…): MCP tools share ONE flat namespace in a client
+that mounts several servers, so a prefix is collision-safe — and it keeps the
+MCP-00 `custodex_status` precedent. Final surface (8 tools, curated — NOT the
+37-verb dump): `custodex_status`, `custodex_drift`, `custodex_coverage`,
+`custodex_ownership`, `custodex_staleness`, `custodex_worklist`,
+`custodex_doc_graph`, `custodex_records`.
+
+⟨R⟩ **`now` is INJECTED at the impure boundary (K10).** The staleness/worklist
+folds — and the enriched status — take `now: str`; the `server.py` tool wrapper
+supplies it from a private `_now()` (the `cli._now` seam, `datetime.now(utc)`),
+so the pure helpers in `tools.py` NEVER read a clock. Unit tests pass a fixed
+`now`; the smoke tests assert shape only.
+
+⟨R⟩ **Local-only surface.** The stdio server governs ONE local repo, so it uses
+LOCAL state (config + `.cdmon/`) — never the central store/roster the FastAPI
+routes read. So orphan detection (needs a departed-owner roster) only runs when
+a `roster_path` is passed; without it the tools report the roster-free signal
+(UNOWNED, staleness, suspect) and flag `roster_checked=False` honestly (the
+CLI's vacuous-gate precedent). The doc-graph, by contrast, is RICHER locally
+than on the hub: we hold the doc bodies, so `custodex_doc_graph` layers per-edge
+SUSPECT status (`detect_suspect_links(include_ok=True)`), where the hub serves
+graph-only (K2).
+
+Pure helpers added to `tools.py` (reuse the frozen `extra=forbid` engine models
+`OwnershipFinding`/`StalenessFinding`/`SuspectLink` directly on the wire — K6
+additive; new wrapper models are frozen `extra=forbid` too):
+
+- `status_summary(cfg, config_dir, *, repo_id, now) -> StatusSummary` — ENRICHED
+  (K6 additive): the existing drift fields + `coverage_file_pct: float`,
+  `coverage_symbol_pct: float`, `docs_unowned: int`, `docs_needing_review: int`
+  — the 4-pillar health headline in one call. Now takes `now` (staleness fold).
+- `drift_detail(cfg, config_dir, *, repo_id, limit=50, kind=None, audience=None)
+  -> DriftDetail` — the per-drift LIST (`custodex_status` only counts). Runs
+  `Monitor(cfg, config_dir).check()`, filters by `kind`/`audience` (K3), sorts
+  `(doc_id, region_id or '', kind.value)`, caps. `DriftDetail`: `repo_id, clean,
+  total, shown, truncated, by_kind: dict[str,int], items: tuple[DriftItem,...]`.
+  `DriftItem` (shaped subset — DROP the heavy `diff`/tier/anchor tuples):
+  `doc_id, doc_path, kind, audience, healable, region_id: str|None,
+  change_severity, message` (`=Drift.detail`).
+- `coverage_summary(cfg, config_dir, *, repo_id, gap_limit=50) -> CoverageSummary`
+  — composes `discover_files(root, include=cfg.coverage.include,
+  exclude=cfg.coverage.exclude) → discover_symbols → resolve_coverage`
+  (`root = resolve_repo_root(config_dir, cfg.root)`). Returns pcts + basket
+  counts + a CAPPED `top_gaps: tuple[SymbolGap,...]` (`path,name,kind`) +
+  `gaps_truncated` (NOT the lossless thousands-of-rows `files`/`symbols`).
+- `ownership_summary(cfg, config_dir, *, repo_id, roster=None) -> OwnershipSummary`
+  — `resolve_ownership(cfg, unit_owner=_unit_owner_map(config_dir))`;
+  `unowned_count = Σ(accountable is None)` (roster-free); orphans only when
+  `roster` given (`detect_orphans`). Fields: `repo_id, doc_count, unowned_count,
+  orphan_count, roster_checked, clean, findings: tuple[OwnershipFinding,...]`
+  (capped), `findings_truncated`. `_unit_owner_map(config_dir)` is a ~6-line pure
+  copy of `cli._unit_owner_map` (NEVER import `cli` — it drags typer).
+- `staleness_summary(cfg, config_dir, *, repo_id, now, include_fresh=False) ->
+  StalenessSummary` — `detect_stale(reviewed_docs_from_config(cfg), now=now,
+  default_days=cfg.staleness.default_days, audience_days=cfg.staleness.audience_days)`.
+  Fields: `repo_id, now, doc_count, stale_count, never_reviewed_count,
+  needs_review_total, fresh, findings: tuple[StalenessFinding,...]` (capped),
+  `findings_truncated, summary`.
+- `worklist_summary(cfg, config_dir, *, repo_id, now, owner_filter=None,
+  include_suspect=True, roster=None, limit=50) -> WorklistSummary` — reuses
+  `worklist_from_repo(cfg, resolve_repo_root(config_dir, cfg.root), now=now,
+  roster=roster, unit_owner=_unit_owner_map(config_dir),
+  include_suspect=include_suspect, owner_filter=owner_filter)`, then FLATTENS
+  every `OwnerWorklist.items` into `(accountable, WorkItem)` and re-sorts by the
+  engine's global priority before the cap. Fields: `repo_id, item_count,
+  doc_count, owner_count, includes_suspect, orphans_included, truncated,
+  returned_item_count, items: tuple[WorkItemView,...], summary`. `WorkItemView` =
+  `WorkItem` fields + `accountable: str|None`.
+- `doc_graph_summary(cfg, config_dir, *, repo_id) -> DocGraph` —
+  `detect_suspect_links(cfg, resolve_repo_root(config_dir, cfg.root),
+  include_ok=True)`; the edge IS a `SuspectLink` (reused on the wire). Fields:
+  `repo_id, enabled` (`cfg.docdeps.enabled` — disambiguates empty), `doc_count,
+  edge_count, suspect_count` (status != OK), `gates` (`cfg.docdeps.gate`),
+  `edges: tuple[SuspectLink,...]`, `summary`. Transitive advisory
+  (`propagate_suspect`) DEFERRED — additively addable later (K6).
+- `list_records(cfg, config_dir, *, repo_id, verdict=None, limit=20) ->
+  RecordList` — `reviewlog.read_all(config_dir / DEFAULT_LOG_PATH)` (returns `[]`
+  on a fresh repo — NOT an error), optional `select_by_verdict` (a bad verdict
+  string → loud `McpError`, since `Verdict(x)` raises bare `ValueError`),
+  NEWEST-FIRST (reverse the append-ordered log — the one deviation from the
+  oldest-first CLI/server, documented), cap. Fields: `repo_id, total, returned,
+  truncated, by_verdict: dict[str,int]` (`reviewlog.summarize`), `records:
+  tuple[RecordSummary,...]`. `RecordSummary` = compact projection (`record_id,
+  doc_id, doc_path, audience, drift_kind, verdict, change_severity, detected_at,
+  resolved_at`) — NOT the heavy full `ReviewRecord` (drops `config_snapshot`,
+  `ticket`, `fix`, tiers).
+
+`server.py` gains seven `@server.tool()` wrappers (each: reload bundle →
+`resolve_repo_id` → pure helper → `.model_dump(mode="json")`), plus a private
+`_now()` for the `now`-taking tools. No CLI change — `cdx mcp-serve` reaches the
+same builder. FEAT-MCP-001 is EXTENDED (not renumbered — the catalog already
+pre-declares these read tools); no new demo/trace tag needed (DEMO-112 already
+tags it); `tools.py`/`server.py` stay coverage-waived (edits, not new files).
+
 ### Slice plan
 
 - **MCP-00** — packaging + `custodex/mcp/` skeleton + `cdx mcp-serve` + the
-  `custodex_status` tool, full gate green (THIS slice).
-- **MCP-01** — the read tools: `check_drift`, `get_coverage`, `get_ownership`,
-  `get_staleness`, `get_worklist`, `get_doc_graph`, `list_review_records`;
-  enrich `StatusSummary`.
+  `custodex_status` tool, full gate green (DONE, PR #24).
+- **MCP-01** — the seven read tools (`custodex_drift`/`custodex_coverage`/
+  `custodex_ownership`/`custodex_staleness`/`custodex_worklist`/
+  `custodex_doc_graph`/`custodex_records`) + enriched `custodex_status`
+  (pinned above).
 - **MCP-02** — the gated write/agentic tools (K11 "agents suggest; humans
   apply", `apply=False` default): `remediate_drift` (drives `Monitor.run` —
   where the user's agent-chaining idea lands), `resolve_drift`

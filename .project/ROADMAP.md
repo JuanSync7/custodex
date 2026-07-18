@@ -742,19 +742,19 @@ overview for progressive disclosure. Opt-in `[mcp]` extra imported lazily (K0,
 `[server]` precedent); stdio transport first; pinned `mcp>=1.8,<2` (a v2 rework
 lands ~2026-07-28). Pinned contract: `ARCHITECTURE.md` §EPIC MCP.
 
-- ◐ **MCP-00** `pyproject` `[mcp]` extra + `cdx-mcp` entry + mypy override;
+- ● **MCP-00** `pyproject` `[mcp]` extra + `cdx-mcp` entry + mypy override;
   `custodex/mcp/` subpackage (`__init__` boundary, `tools.py` pure
   `load_repo_bundle`/`status_summary`/`StatusSummary`, `server.py`
   `build_mcp_server` over FastMCP); `errors.McpError`; `cdx mcp-serve` +
-  `_run_mcp` stdio leaf; the `custodex_status` tool. *Goal:* `build_mcp_server`
-  registers `custodex_status` (driven in-process, no transport) and it projects
-  the live `DriftReport` into a shaped summary over a fixture repo; missing extra
-  is a loud K8 install hint; full gate green.
-- ☐ **MCP-01** the read tools — `check_drift`, `get_coverage`, `get_ownership`,
-  `get_staleness`, `get_worklist`, `get_doc_graph`, `list_review_records`; enrich
-  `StatusSummary` with coverage/ownership/staleness counts. *Goal:* each tool
-  reuses the SAME pure detector its `cdx` verb calls (K1/K2), shaped output, no
-  new detection logic.
+  `_run_mcp` stdio leaf; the `custodex_status` tool. *Done — PR #24 (merged).*
+- ● **MCP-01** the seven `custodex_*` read tools — `custodex_drift`,
+  `custodex_coverage`, `custodex_ownership`, `custodex_staleness`,
+  `custodex_worklist`, `custodex_doc_graph`, `custodex_records`; enriched
+  `custodex_status` with the coverage/ownership/staleness headline counts. Each
+  reuses the SAME pure detector its `cdx` verb calls (K1/K2), core-deps only
+  (K0), shaped + capped + deterministic (K10), `now` injected at the server
+  boundary. *Done — full gate green, mcp package 100%, 8-finding adversarial
+  review round applied (incl. the coverage-in-status honest-partial degradation).*
 - ☐ **MCP-02** the gated write/agentic tools (K11, `apply=False` default) —
   `remediate_drift` (drives `Monitor.run`; the agent-chaining seam),
   `resolve_drift` (`reviewlog.append_resolution`), `sync_docs`

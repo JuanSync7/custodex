@@ -2341,3 +2341,48 @@ later edit invalidates the freshness you just certified.
 repo raises `ExtractionError` (correctly, loudly, as a `ToolError`). A tool
 whose fixture must resolve real code needs a real (or empty-`documents:`) config,
 not the scaffold template — the template is a starting point, not a runnable repo.
+
+## [MCP-01] A consistency test whose fields collapse to equal values is swap-blind
+
+MCP-01 added seven read tools + enriched `custodex_status` with four counts, each
+mapped from a dedicated helper (`coverage_file_pct`/`coverage_symbol_pct`/
+`docs_unowned`/`docs_needing_review`). The one test meant to PROVE the mapping —
+`assert status.coverage_file_pct == cov.percent_files` and the three siblings —
+was a booby-trap: in the reused single-doc fixture both percentages were `100.0`
+and both counts were `1`, so a `status_summary` that assigned `percent_public_symbols`
+to `coverage_file_pct` (or swapped `docs_unowned`↔`docs_needing_review`) passed
+every assertion. An 18-agent adversarial review caught it as the round's only HIGH.
+**Lesson: a test that asserts `out.a == src.a` and `out.b == src.b` is worthless
+unless the fixture makes `a != b`.** Any mapping/projection/rename test needs an
+ASYMMETRIC fixture where every field carries a DISTINCT value (here: an `extra.py`
+with two undocumented symbols so file% `50` ≠ symbol% `33.3`; and a 3-doc config
+so unowned `2` ≠ needs-review `1`). Then re-run the swap mutation and confirm the
+test now FAILS. The same discipline killed the worklist "global priority cap" test
+(populate owners so the input order does NOT already match the target sort, or a
+no-op sort passes) and the per-item field pins (distinct `detected_at`/`resolved_at`
+so a swap shows).
+
+(2) **Folding a heavy detector into the "call first" overview makes it strictly
+MORE fragile than the tools it fronts — degrade, don't abort.** The enriched
+`custodex_status` called `coverage_summary`, which does a FULL-repo tree walk +
+symbol extraction; a single unparseable in-scope `.py` file (a WIP file mid-edit —
+exactly the MCP-client-editing-a-live-repo scenario) made the overview raise
+`ExtractionError` and return nothing, while the drift/ownership/staleness pillars
+(config-bounded) would have answered fine. The progressive-disclosure entrypoint
+must never be the most brittle tool. Fix = the `roster_checked=False` honest-partial
+pattern: wrap the fragile pillar in `try/except CodeDocMonitorError`, degrade it to
+a sentinel + an additive `coverage_available=False` boolean (K6), and keep the
+others populated — while the DEDICATED `custodex_coverage` tool stays loud (K8), so
+the fault still surfaces on drill-in. Not silent-swallow, not abort: degrade one
+pillar and SAY SO.
+
+(3) **Type an MCP filter param as the real enum, not `str`, so the schema
+advertises its values.** `custodex_drift`'s `kind`/`audience` were typed as the
+`DriftKind`/`Audience` enums (their members appear in the JSON `$defs`), but
+`custodex_records`'s `verdict` was a plain `str` — valid values lived only in the
+docstring. An MCP client that plans tool arguments from the input schema (not the
+prose) can't discover `FIX`/`INVALIDATE`/`ESCALATE` and trips the error path.
+Fix: type the wrapper param `Verdict | None` (the pure helper stays `str | None` —
+`Verdict` is a str-subclass so both callers and the validation are unaffected).
+Lesson: for a curated tool surface, the param TYPES are the machine-readable
+contract — an enum-shaped choice must be an enum in the signature, not free text.

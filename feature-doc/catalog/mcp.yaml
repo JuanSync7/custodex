@@ -6,7 +6,7 @@
 # orchestrating client IS the chain. Golden source of truth (EPIC R).
 features:
   - id: FEAT-MCP-001
-    title: "the MCP server surface + `custodex_status` overview (MCP-00)"
+    title: "the MCP read surface: `custodex_status` overview + seven per-domain read tools (MCP-00/01)"
     summary: >-
       The opt-in `[mcp]` extra + `custodex/mcp/` subpackage that stands up a
       Model Context Protocol server over Custodex with NO change to the engine
@@ -31,9 +31,20 @@ features:
       launch (K8); the `cdx-mcp` entry point mirrors `cdx-server`. All logic
       lives in the import-safe builder + pure tools, so the stdio transport is a
       thin `# pragma: no cover` leaf tests never open (the `_run_uvicorn`
-      precedent). The read tools (`check_drift`/`get_coverage`/… ) are MCP-01 and
-      the gated write/agentic tools (`remediate_drift`/`resolve_drift`/… ) MCP-02.
+      precedent). MCP-01 adds the seven `custodex_*`-prefixed per-domain read
+      tools — each the pure projection of a detector `cdx` already runs (K1/K2,
+      SHAPED + CAPPED + deterministically sorted, K10): `custodex_drift` (the
+      per-drift detail list, filterable by kind/audience — K3), `custodex_coverage`
+      (doc-coverage % + capped symbol gaps), `custodex_ownership` (unowned gaps +
+      roster-gated orphans), `custodex_staleness` (review-SLA grading, as-of an
+      INJECTED `now` — K10), `custodex_worklist` (the prioritised ownership+SLA+
+      doc↔doc join), `custodex_doc_graph` (the doc↔doc graph with per-edge suspect
+      status — richer than the hub's graph-only view since the bodies are local,
+      K2), and `custodex_records` (the local `.cdmon` review-log audit, newest
+      first — K5). MCP-01 also ENRICHES `custodex_status` with the coverage /
+      ownership / staleness headline counts (additive, K6). The gated write/
+      agentic tools (`remediate_drift`/`resolve_drift`/`sync_docs`) are MCP-02.
     subsystem: mcp
     modules: [mcp, cli]
-    constraints: [K0, K1, K2, K4, K8, K10]
+    constraints: [K0, K1, K2, K3, K4, K6, K8, K10]
     status: implemented
