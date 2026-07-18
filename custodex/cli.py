@@ -1018,14 +1018,22 @@ def mcp_serve(
         "--repo-root",
         help="Repo whose Custodex config to serve (default: the current directory).",
     ),
+    read_only: bool = typer.Option(
+        False,
+        "--read-only",
+        help="Serve ONLY the read tools — do not mount the write tools "
+        "(remediate/resolve/sync-docs). The operator's provable no-write "
+        "surface for an untrusted agent (K11).",
+    ),
 ) -> None:
     """Serve Custodex as an MCP server over stdio — the read/write agent surface.
 
     An MCP client (Claude Code / any client) launches this as a subprocess and
     calls the curated tools (``custodex_status``, …) to query the repo. Needs the
     optional ``mcp`` SDK — a missing extra is a loud install hint (K8), and a repo
-    with no resolvable config is refused at launch (K8). All logic lives in the
-    import-safe builder, so this launch stays thin — tests never open a transport.
+    with no resolvable config is refused at launch (K8). ``--read-only`` mounts only
+    the read tools (the write tools are never registered, K11). All logic lives in
+    the import-safe builder, so this launch stays thin — tests never open a transport.
     """
     root = repo_root.resolve()
     # server.py is import-safe (the SDK is imported lazily inside build_mcp_server,
@@ -1034,7 +1042,7 @@ def mcp_serve(
     from .mcp.server import build_mcp_server
 
     try:
-        server = build_mcp_server(root)
+        server = build_mcp_server(root, read_only=read_only)
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc

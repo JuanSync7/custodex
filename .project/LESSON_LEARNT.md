@@ -2386,3 +2386,54 @@ Fix: type the wrapper param `Verdict | None` (the pure helper stays `str | None`
 `Verdict` is a str-subclass so both callers and the validation are unaffected).
 Lesson: for a curated tool surface, the param TYPES are the machine-readable
 contract — an enum-shaped choice must be an enum in the signature, not free text.
+
+## [MCP-02] A "1:1 FK" claim on the wire must match the identifier's actual grain
+
+MCP-02 added the three gated WRITE tools (`custodex_remediate`/`custodex_resolve`/
+`custodex_sync_docs`). `custodex_remediate` returns one `RemediationItem` per
+handled drift, each carrying a `record_id` the docstring called "the FK a client
+feeds to `custodex_resolve`" — implying a per-drift handle. But `record_id =
+hash(doc_id, surface_hash, injected_stamp)` (the engine's `new_record_id`), and
+`surface_hash` is per-DOCUMENT while the stamp is constant within a run — so a
+doc's simultaneous drifts (the everyday HASH+REGION pair from a signature change)
+ALL collapse to the SAME `record_id`. A client that "resolves the HASH item" thus
+resolves the REGION drift too (`resolved_index` keys purely on `record_id`). A
+25-agent adversarial review (3 skeptics per finding) flagged this HIGH; all three
+reproduced the exact collision from the shipped fixture. **Lesson: before you
+advertise an identifier as a per-X foreign key, verify what X it actually keys —
+`resolve` is faithful to `cdx resolve` (record-grain), so the FIX was to make the
+CONTRACT truthful (docstrings say the id is per-review-record, shared across a
+doc's drifts; `drift_kind`/`region_id` disambiguate the facets) + a pinning test
+`len({it.record_id}) == 1` for the two same-doc items — NOT to re-derive
+`new_record_id` engine-wide (a cross-cutting change to the audit-record identity,
+out of a tool slice's scope; noted as an engine follow-up instead).** The tell was
+that no test asserted `record_id` UNIQUENESS — a mutation collapsing every id to a
+constant stayed green; the review's other MEDIUMs were the same shape (the server
+wrapper's `apply=True` passthrough was never driven — every write-tool smoke test
+ran the `apply=False` default, so a hardcoded `apply=False` in the wrapper would
+survive; the now-injection was unpinned — no test read `detected_at` back to catch
+a dropped `now=lambda: now`).
+
+(2) **When you add mutating helpers to a module whose docstring promised purity,
+the MODULE-WIDE contract statement is now a lie — fix it in the same slice.**
+`tools.py`'s header said "Pure MCP tool logic … the MCP layer never mutates"; three
+lines of MCP-02 made it false for `remediate`/`resolve`/`sync_docs`. The read
+tools' per-function "pure, no mutation, no clock" language cannot be copied to a
+write tool, and the module preamble must be re-scoped (MCP-00/01 read = pure fold;
+MCP-02 write = deliberate mutation via the engine seams, gated by `apply=False` +
+`read_only`). Same for the per-tool docstrings: `custodex_remediate` correctly
+warned "each call records the proposals" (the K5 audit write is unconditional even
+at `apply=False`), but `custodex_sync_docs` omitted that its dry-run still grows
+`.cdmon/review-log.jsonl` — an inconsistency a client plans around. A docstring
+that overstates safety (or purity) is a contract defect, reviewed as such.
+
+(3) **The gate for write tools is TWO layers, and BOTH need a test.** K11 ("agents
+suggest; humans apply") at the per-call level is `apply=False` — but passed THROUGH
+EXPLICITLY (`Monitor.run(apply=apply)`, never `apply=None`), because `apply=None`
+inherits `config.apply_default` and a repo could set it `true`, letting a remote
+agent trigger an auto-apply implicitly. The per-server layer is
+`build_mcp_server(read_only=True)`, which must not REGISTER the write tools at all
+(guard the `@server.tool()` definitions inside `if not read_only:` — a runtime
+refusal inside a still-mounted tool is weaker). Test both: assert a `read_only`
+server's `list_tools()` is `disjoint` from the write-tool names, and that the
+`apply=True` path is exercised end-to-end (else a hardcoded default survives).

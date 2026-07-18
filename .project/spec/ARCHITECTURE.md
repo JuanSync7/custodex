@@ -3618,6 +3618,127 @@ same builder. FEAT-MCP-001 is EXTENDED (not renumbered — the catalog already
 pre-declares these read tools); no new demo/trace tag needed (DEMO-112 already
 tags it); `tools.py`/`server.py` stay coverage-waived (edits, not new files).
 
+### MCP-02 — the gated write tools  (`tools.py` helpers + `server.py` wrappers; BUILT)
+
+Three WRITE tools — the FIRST mutating tools in the MCP layer (the eight MCP-00/01
+tools are all pure projections over `Monitor.check()`/detectors). Each drives an
+EXISTING engine write seam through its own gate; none re-implements remediation,
+resolution, or diffing. This is where the user's "chain custodex's agents" idea
+lands: `custodex_remediate` exposes the remediation pipeline AS a tool, so the
+orchestrating MCP client is the chain.
+
+The pure/impure SEAM from MCP-00/01 SURVIVES — but the "pure, no mutation, no
+clock, no network" language does NOT apply here (these helpers mutate on purpose,
+gated by K5/K11). What carries over: the clock stays in `server.py`'s `_now()` and
+is INJECTED (K10); every result model is frozen `extra=forbid` with `tuple[...]`
+list fields; output is SHAPED + CAPPED (never the raw heavy `MonitorResult` /
+`ReviewRecord` blobs); a failed write fails LOUDLY (K8) — the `custodex_status`
+honest-partial degrade is for the read overview ONLY, NEVER a mutation (a silently
+half-degraded write is a data-integrity bug).
+
+⟨R⟩ **The gate is TWO-LAYER (K11 "agents suggest; humans apply").**
+1. *Per-call* — every write tool surfaces `apply: bool = False` and passes it
+   THROUGH EXPLICITLY (`Monitor.run(apply=apply)`, never `apply=None`). This is
+   STRICTER than `cdx monitor` (which defaults `apply=None` → `config.apply_default`,
+   and a repo could set `apply_default: true`): the MCP surface must NEVER let a
+   remote agent trigger a configured auto-apply implicitly, so it ignores
+   `apply_default` entirely and defaults to advisory.
+2. *Per-server* — `build_mcp_server(repo_root, *, read_only: bool = False)`. When
+   `read_only=True` the three write tools are NOT registered at all (only the 8
+   read tools), so an operator can PROVABLY expose Custodex to an untrusted agent
+   with no write surface — the coarse gate complementing the per-call one. Wired to
+   `cdx mcp-serve --read-only` and the `cdx-mcp` entry stays read-write.
+
+⟨R⟩ **The K5 audit write is UNCONDITIONAL and intended — even at `apply=False`.**
+`Monitor.run` appends one `ReviewRecord` per handled drift (and emits to the sink)
+on EVERY call regardless of `apply` (monitor.py:338/393/472); the doc tree is only
+touched by `apply_fix` (heal.py) under the triple guard `apply and verdict is FIX
+and fix is not None`. So `custodex_remediate(apply=False)` records the proposals
+(K5: "every handled drift produces a ReviewRecord with BOTH the drift and the
+proposed fix") WITHOUT mutating a doc — the record IS the suggestion made
+auditable, which K11 explicitly blesses ("an applied proposal leaves the same
+audit trail as the equivalent human action"). CONSEQUENCE (documented in the tool
+docstring, NOT hidden): the record write is NOT idempotent — `record_id` embeds
+the injected `now`, so repeated previews grow `.cdmon/review-log.jsonl`. The pure,
+side-effect-free "what is drifted?" question is answered by `custodex_drift` (K1);
+`custodex_remediate` is the "propose + record" action, a different verb. Doc-side
+idempotence (K7) still holds: once `apply=True` heals a drift, re-running detects
+nothing → no further records.
+
+⟨R⟩ **`now` INJECTED, backend from config (mock offline by default, K4/K10).** The
+helpers take `now: str` and build the `Monitor` with `now=lambda: now` so every
+`record_id`/`detected_at`/`resolved_at`/`resolved_at` is deterministic under a
+fixed `now`. The backend is whatever the config selects — `mock` by default
+(offline, K4); a config that names a live LLM/agent backend WILL call it (network/
+subprocess) even at `apply=False`, because dry-run stops APPLIES, not the propose
+step. Tests pin `backend.kind: mock`.
+
+New pure helpers in `tools.py` (mutate via the existing seams; compact projections
+mirroring MCP-01's `RecordSummary` compaction — DROP `config_snapshot`/`ticket`/
+`fix`/tier blobs):
+
+- `remediate_drift(cfg, config_dir, *, repo_id, now, apply=False, limit=50) ->
+  RemediationResult` — builds `Monitor(cfg, config_dir, now=lambda: now)` and calls
+  `.run(apply=apply)`. Projects `MonitorResult` → a shaped list. `handled[i]` and
+  `records[i]` are appended in LOCKSTEP by `Monitor.run` (rule / backend / suspect
+  branches each append one of each per iteration; SUSPECT_LINK `continue`s before
+  any append), so `zip(handled, records)` pairs a handled drift to its record id.
+  `RemediationItem` (frozen `extra=forbid`): `doc_id, doc_path, drift_kind,
+  audience, verdict` (FIX/INVALIDATE/ESCALATE), `cause` (the backend's
+  explanation), `applied: bool` (did THIS run write the doc), `record_id` (FK for
+  `custodex_resolve`), `region_id: str|None`, `rationale: str|None` (the
+  `ProposedFix.rationale`, None when no fix), `fix_preview: str|None` (CAPPED
+  `new_doc_text` else `new_region_body` — the applied text is re-derived from the
+  on-disk record at apply time, so a truncated preview is SAFE), `fix_truncated:
+  bool`. `RemediationResult`: `repo_id, applied` (the effective flag), `clean`
+  (`remaining` empty), `handled_count, remaining_count, applied_count` (Σ applied),
+  `record_count` (records written this run), `by_verdict: dict[str,int]`, `items:
+  tuple[RemediationItem,...]` (sorted `(doc_id, region_id or '', drift_kind)`,
+  capped), `truncated, summary`.
+- `resolve_drift(cfg, config_dir, *, repo_id, record_id, resolution, now,
+  resolved_text=None, resolved_by=None, note=None) -> ResolutionResult` — mirrors
+  `cli.resolve`'s record-mode EXACTLY: validate `record_id` EXISTS in
+  `read_all(config_dir / DEFAULT_LOG_PATH)` (absent → loud `McpError`, K8), parse
+  `resolution` via `Resolution(value.lower())` (bad → loud `McpError` listing the
+  four choices, mirroring `list_records`' Verdict validation), then
+  `append_resolution(config_dir / DEFAULT_RESOLUTIONS_PATH, ResolutionRecord(...,
+  resolved_at=now))`. Append-only, LAST-WRITE-WINS (K5): a re-resolution is a
+  correction (a NEW event), NOT idempotent by construction — documented, not
+  deduped. The `--edge` alternate mode of `cli.resolve` is NOT exposed (record
+  mode only). `ResolutionResult` (frozen `extra=forbid`): `repo_id, record_id,
+  resolution, recorded` (True), `resolved_by: str|None, resolved_at, note: str|None,
+  resolutions_path` (the conventional `.cdmon/resolutions.jsonl` POSIX string, NOT
+  the absolute local path), `summary`.
+- `sync_docs(cfg, config_dir, *, repo_id, now, apply=False, patch_limit=20000) ->
+  SyncDocsResult` — builds a `Monitor(now=lambda: now)` and calls
+  `syncpr.sync_pr(monitor, dry_run=not apply)`. `apply=False` → `dry_run=True`: the
+  SAME patch is computed but the doc tree is restored byte-for-byte (K1),
+  INCLUDING deleting any file the run newly created — so the NET effect is an
+  untouched tree, though `sync_pr` transiently heals-then-restores (tests assert
+  the tree is unchanged AFTER, not that nothing was written during). `apply=True` →
+  `dry_run=False`: the docs are healed for real. Like `remediate`, the K5 audit
+  records are written either way. `SyncDocsResult` (frozen `extra=forbid`):
+  `repo_id, applied` (False = dry-run preview), `clean` (empty patch = no drift,
+  K7), `changed_count, changed_paths: tuple[str,...]` (sorted POSIX),
+  `patch: str` (the unified diff, CAPPED at `patch_limit`), `patch_truncated: bool,
+  summary`.
+
+New imports for `tools.py` (all core deps — K0 holds: `syncpr`/`reviewlog`/`schema`
+pull no server/agent/crypto extra, and `Monitor` was already imported for
+`status_summary`): `append_resolution`, `DEFAULT_RESOLUTIONS_PATH` from
+`..reviewlog`; `Resolution`, `ResolutionRecord` from `..schema`; `sync_pr` from
+`..syncpr`. `__all__` grows (alphabetical) with the three helpers + six models.
+
+`server.py` gains three `@server.tool()` wrappers (`custodex_remediate`,
+`custodex_resolve`, `custodex_sync_docs`) — each reloads the bundle, injects
+`_now()`, calls the helper, `model_dump(mode="json")`. `custodex_resolve`'s
+`resolution` param is typed as the `Resolution` enum (advertises accepted/
+overridden/rejected/invalidated in the JSON schema — the MCP-01 Verdict-enum
+lesson). Registration of the three is GUARDED by `if not read_only:`. The
+`build_mcp_server` signature gains `*, read_only: bool = False`; `cdx mcp-serve`
+gains `--read-only`. FEAT-MCP-001 is EXTENDED again (write tools); DEMO-112 already
+tags the feature; `tools.py`/`server.py` stay coverage-waived (edits).
+
 ### Slice plan
 
 - **MCP-00** — packaging + `custodex/mcp/` skeleton + `cdx mcp-serve` + the
@@ -3627,9 +3748,10 @@ tags it); `tools.py`/`server.py` stay coverage-waived (edits, not new files).
   `custodex_doc_graph`/`custodex_records`) + enriched `custodex_status`
   (pinned above).
 - **MCP-02** — the gated write/agentic tools (K11 "agents suggest; humans
-  apply", `apply=False` default): `remediate_drift` (drives `Monitor.run` —
-  where the user's agent-chaining idea lands), `resolve_drift`
-  (`reviewlog.append_resolution`), `sync_docs` (`syncpr.sync_pr(dry_run=True)`).
+  apply", `apply=False` default + a per-server `read_only` gate): `custodex_remediate`
+  (drives `Monitor.run` — where the user's agent-chaining idea lands),
+  `custodex_resolve` (`reviewlog.append_resolution`), `custodex_sync_docs`
+  (`syncpr.sync_pr(dry_run=True)`) — pinned above.
 - **MCP-03** — streamable-HTTP transport mounted on the central hub (remote,
   multi-repo, over the existing `_verify_token` auth).
 - **MCP-04** — migrate to the `mcp` SDK v2 (post-2026-07-28).

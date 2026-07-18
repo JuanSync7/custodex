@@ -19,9 +19,16 @@ import pytest
 
 pytest.importorskip("mcp", reason="the [mcp] extra is not installed")
 
-from custodex.config import write_template  # noqa: E402
+from custodex.config import Audience, write_template  # noqa: E402
 from custodex.errors import McpError  # noqa: E402
 from custodex.mcp.server import build_mcp_server  # noqa: E402
+from custodex.monitor import DEFAULT_LOG_PATH  # noqa: E402
+from custodex.reviewlog import (  # noqa: E402
+    DEFAULT_RESOLUTIONS_PATH,
+    append,
+    read_resolutions,
+)
+from custodex.schema import ReviewRecord, Verdict  # noqa: E402
 
 # A minimal, self-contained config that resolves (no code_refs → no extraction),
 # so every tool executes end-to-end and returns a clean summary.
@@ -37,6 +44,13 @@ _EXPECTED_TOOLS = {
     "custodex_worklist",
     "custodex_doc_graph",
     "custodex_records",
+}
+
+# The three MCP-02 gated WRITE tools (registered only on a read-write server).
+_WRITE_TOOLS = {
+    "custodex_remediate",
+    "custodex_resolve",
+    "custodex_sync_docs",
 }
 
 
@@ -165,3 +179,100 @@ def test_custodex_records_advertises_verdict_enum(tmp_path: Path) -> None:
 def test_build_mcp_server_refuses_configless_repo(tmp_path: Path) -> None:
     with pytest.raises(McpError):
         build_mcp_server(tmp_path)
+
+
+# --- MCP-02: the gated write tools + the read_only server gate --------------------
+
+
+def _seed_record(record_id: str) -> ReviewRecord:
+    """A minimal ReviewRecord so a smoke test has a valid FK for custodex_resolve."""
+    return ReviewRecord(
+        record_id=record_id,
+        doc_id="api",
+        doc_path="api.md",
+        audience=Audience.ENG_GUIDE,
+        drift_kind="HASH",
+        drift_detail="moved",
+        cause="changed",
+        verdict=Verdict.FIX,
+        surface_hash="hash",
+        backend_kind="mock",
+        detected_at="2026-06-01T00:00:00+00:00",
+        resolved_at="2026-06-01T00:00:00+00:00",
+        config_snapshot={},
+    )
+
+
+def test_read_write_server_registers_the_write_tools(tmp_path: Path) -> None:
+    server = build_mcp_server(_repo(tmp_path))
+    names = {tool.name for tool in asyncio.run(server.list_tools())}
+    assert names >= _EXPECTED_TOOLS | _WRITE_TOOLS
+
+
+def test_read_only_server_omits_the_write_tools(tmp_path: Path) -> None:
+    # The per-server K11 gate: an operator can PROVABLY expose Custodex with no
+    # write surface — the read tools stay, the three write tools are never mounted.
+    server = build_mcp_server(_repo(tmp_path), read_only=True)
+    names = {tool.name for tool in asyncio.run(server.list_tools())}
+    assert names >= _EXPECTED_TOOLS
+    assert names.isdisjoint(_WRITE_TOOLS)
+
+
+def test_custodex_remediate_tool_defaults_to_advisory(tmp_path: Path) -> None:
+    server = build_mcp_server(_empty_repo(tmp_path))
+    structured = _call(server, "custodex_remediate")
+    assert structured["repo_id"] == tmp_path.name
+    assert structured["applied"] is False  # K11: apply defaults OFF
+    assert structured["handled_count"] == 0  # empty config → no docs → no drift
+    assert structured["items"] == []
+
+
+def test_custodex_sync_docs_tool_dry_run_is_clean(tmp_path: Path) -> None:
+    server = build_mcp_server(_empty_repo(tmp_path))
+    structured = _call(server, "custodex_sync_docs")
+    assert structured["repo_id"] == tmp_path.name
+    assert structured["applied"] is False
+    assert structured["clean"] is True
+    assert structured["patch"] == ""
+
+
+def test_custodex_remediate_wrapper_passes_apply_through(tmp_path: Path) -> None:
+    # The wrapper binds `apply=apply`; driving it with apply=True must reach the
+    # helper (a hardcoded `apply=False` in the wrapper would keep `applied` False).
+    server = build_mcp_server(_empty_repo(tmp_path))
+    assert _call(server, "custodex_remediate", {"apply": True})["applied"] is True
+    assert _call(server, "custodex_remediate")["applied"] is False
+
+
+def test_custodex_sync_docs_wrapper_passes_apply_through(tmp_path: Path) -> None:
+    server = build_mcp_server(_empty_repo(tmp_path))
+    assert _call(server, "custodex_sync_docs", {"apply": True})["applied"] is True
+    assert _call(server, "custodex_sync_docs")["applied"] is False
+
+
+def test_custodex_resolve_tool_records_outcome(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)  # single-file cdmon.yaml → config_dir == repo
+    log = repo / DEFAULT_LOG_PATH
+    log.parent.mkdir(parents=True, exist_ok=True)
+    append(log, _seed_record("rec-1"))
+    server = build_mcp_server(repo)
+    structured = _call(
+        server, "custodex_resolve", {"record_id": "rec-1", "resolution": "accepted"}
+    )
+    assert structured["recorded"] is True
+    assert structured["record_id"] == "rec-1"
+    assert structured["resolution"] == "accepted"
+    # The resolution actually landed on disk (joinable by FK).
+    res = read_resolutions(repo / DEFAULT_RESOLUTIONS_PATH)
+    assert any(r.record_id == "rec-1" for r in res)
+
+
+def test_custodex_resolve_advertises_resolution_enum(tmp_path: Path) -> None:
+    # The `resolution` param is typed as the Resolution enum so a client planning
+    # tool args from the JSON schema can machine-discover the four legal values.
+    server = build_mcp_server(_repo(tmp_path))
+    tool = next(
+        t for t in asyncio.run(server.list_tools()) if t.name == "custodex_resolve"
+    )
+    blob = json.dumps(tool.inputSchema)
+    assert all(v in blob for v in ("accepted", "overridden", "rejected", "invalidated"))

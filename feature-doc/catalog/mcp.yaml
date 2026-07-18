@@ -42,9 +42,26 @@ features:
       status — richer than the hub's graph-only view since the bodies are local,
       K2), and `custodex_records` (the local `.cdmon` review-log audit, newest
       first — K5). MCP-01 also ENRICHES `custodex_status` with the coverage /
-      ownership / staleness headline counts (additive, K6). The gated write/
-      agentic tools (`remediate_drift`/`resolve_drift`/`sync_docs`) are MCP-02.
+      ownership / staleness headline counts (additive, K6). MCP-02 adds the three
+      GATED WRITE tools — the first mutating tools in the layer, each driving an
+      existing engine write seam behind a K11 gate ("agents suggest; humans
+      apply"): `custodex_remediate` (drives `Monitor.run` — proposes fixes,
+      recording a ReviewRecord per handled drift whatever the verdict, K5;
+      `apply=False` default writes NO doc, so an agent never triggers a configured
+      auto-apply — where the user's agent-chaining idea lands as a tool),
+      `custodex_resolve` (records a human `Resolution` outcome via
+      `reviewlog.append_resolution`, append-only, loud on an unknown record-id or
+      resolution — K8), and `custodex_sync_docs` (a unified-diff preview of the doc
+      heal via `syncpr.sync_pr`, `dry_run` by default so the working tree is
+      restored byte-for-byte — K1; `apply=True` heals for real). The gate is TWO
+      layers: each tool's advisory `apply=False` default PLUS a per-server
+      `read_only` switch (`cdx mcp-serve --read-only`) that refuses to mount the
+      write tools at all — an operator's provable no-write surface for an untrusted
+      agent. K7 holds (once `apply=True` heals a drift, a re-run detects nothing);
+      output stays SHAPED + CAPPED (never the raw heavy `MonitorResult`), and the
+      clock is INJECTED (K10). Streamable-HTTP on the hub is MCP-03; the SDK v2
+      migration is MCP-04.
     subsystem: mcp
     modules: [mcp, cli]
-    constraints: [K0, K1, K2, K3, K4, K6, K8, K10]
+    constraints: [K0, K1, K2, K3, K4, K5, K6, K7, K8, K10, K11]
     status: implemented

@@ -1550,7 +1550,7 @@ Features: FEAT-SPMIRROR-003
 
 ## O. The MCP read/write surface (EPIC MCP — agents query Custodex over MCP)
 
-### DEMO-112 — `cdx mcp-serve`: the MCP read surface (`custodex_status` + drill-downs)
+### DEMO-112 — `cdx mcp-serve`: the MCP read/write surface (`custodex_status` + drill-downs + gated writes)
 **What it shows.** Custodex speaks the Model Context Protocol, so an external
 agent (Claude Code / any MCP client) asks "is this repo in sync?" with a tool
 call instead of shelling out to `cdx` or parsing HTTP. `cdx mcp-serve` stands up
@@ -1565,15 +1565,26 @@ prioritised ownership+SLA+doc↔doc join), `custodex_doc_graph` (edges + per-edg
 suspect status), and `custodex_records` (the local review-log audit). The engine
 never imports the SDK (the `[mcp]` extra is opt-in, lazily imported, K0); the
 transport is stdio (how a client launches the server as a subprocess); a missing
-extra or a config-less repo is refused loudly (K8). This is the backbone the
-gated write/agentic tools (MCP-02 — where Custodex's own remediation agent is
-exposed AS a tool, the answer to "chain with the agent vs. MCP") hang off.
+extra or a config-less repo is refused loudly (K8). On top of that read backbone,
+MCP-02 hangs the three GATED WRITE tools — where Custodex's own remediation
+pipeline is exposed AS a tool (the answer to "chain with the agent vs. MCP"):
+`custodex_remediate` drives `Monitor.run` (proposes fixes, records a ReviewRecord
+per handled drift, K5), `custodex_resolve` records a human `Resolution` outcome,
+and `custodex_sync_docs` returns a unified-diff preview of the heal. Every write
+is gated K11 "agents suggest; humans apply": each defaults to advisory
+(`apply=False` writes no doc / `dry_run` restores the tree, K1), and `cdx
+mcp-serve --read-only` refuses to mount the write tools at all — an operator's
+provable no-write surface for an untrusted agent.
 **How to observe.** In a `config/cdmon` repo, register `cdx mcp-serve` as an MCP
 server (command `cdx mcp-serve`, transport stdio) in your client, then call
 `custodex_status` for the health headline and any `custodex_*` drill-down for the
-per-domain detail (each returns a shaped, capped, deterministic payload). Pinned
-by `tests/unit/test_mcp_tools.py` (the pure projections + config resolution),
-`tests/smoke/test_mcp_server.py` (the FastMCP server registers + invokes every
-tool), and `tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches;
-loud on a config-less repo).
+per-domain detail (each returns a shaped, capped, deterministic payload). Call
+`custodex_remediate` for advisory fix proposals (add `apply=true` to heal), feed
+an item's `record_id` to `custodex_resolve`, and `custodex_sync_docs` for the
+diff preview; launch with `--read-only` to expose the read tools alone. Pinned
+by `tests/unit/test_mcp_tools.py` (the pure projections + config resolution + the
+write helpers), `tests/smoke/test_mcp_server.py` (the FastMCP server registers +
+invokes every tool, and the `read_only` gate omits the write tools), and
+`tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches; loud on a
+config-less repo).
 Features: FEAT-MCP-001
