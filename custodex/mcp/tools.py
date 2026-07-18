@@ -598,18 +598,13 @@ def worklist_summary(
     flat: list[tuple[str | None, WorkItem]] = [
         (owner.accountable, item) for owner in worklist.owners for item in owner.items
     ]
-    # Global priority order: the engine's item key first (severity, reason,
-    # doc_id, upstream), then the owner as a stable tiebreak (named alphabetical,
-    # the unowned bucket last) — so a cap keeps the highest-priority items across
-    # ALL owners, deterministically (K10). Reusing _item_sort_key keeps the MCP
-    # order in lockstep with the CLI/engine rather than duplicating the rank maps.
-    flat.sort(
-        key=lambda pair: (
-            _item_sort_key(pair[1]),
-            0 if pair[0] is not None else 1,
-            pair[0] or "",
-        )
-    )
+    # Global priority order: the engine's OWN item key (severity, reason, doc_id,
+    # upstream) — which is UNIQUE per work item (granularity is (doc_id, reason,
+    # upstream_id)), so it is a total order and the cap keeps the highest-priority
+    # items across ALL owners deterministically (K10). Reusing _item_sort_key keeps
+    # the MCP order in lockstep with the CLI/engine rather than duplicating the
+    # rank maps; no owner tiebreak is needed (the key never ties).
+    flat.sort(key=lambda pair: _item_sort_key(pair[1]))
     items = tuple(
         WorkItemView(
             accountable=accountable,

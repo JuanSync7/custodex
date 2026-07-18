@@ -509,7 +509,7 @@ def test_worklist_summary_global_priority_cap(tmp_path: Path) -> None:
     # so a correct GLOBAL re-sort must reorder before the cap: the single
     # highest-priority item is bob's never-reviewed doc (HIGH, doc_id "a"), NOT
     # alice's MEDIUM stale doc that sorts first in owner order. Kills a
-    # no-resort / reverse-sort / owner-tiebreak mutation.
+    # no-resort or reverse-sort mutation of the global priority order.
     docs = (
         DocumentSpec(id="a", path="a.md", audience=Audience.ENG_GUIDE, owner="bob"),
         DocumentSpec(
