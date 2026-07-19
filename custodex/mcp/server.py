@@ -27,7 +27,7 @@ from typing import Any
 from ..config import Audience
 from ..drift import DriftKind
 from ..errors import McpError
-from ..schema import Verdict
+from ..schema import Resolution, Verdict
 from . import tools
 
 __all__ = ["build_mcp_server", "main"]
@@ -43,7 +43,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def build_mcp_server(repo_root: Path) -> Any:
+def build_mcp_server(repo_root: Path, *, read_only: bool = False) -> Any:
     """Build the Custodex MCP server over ``repo_root`` (import-safe; no transport).
 
     Guards the missing SDK loudly (K8, the ``make_backend`` precedent), then fails
@@ -54,6 +54,12 @@ def build_mcp_server(repo_root: Path) -> Any:
     server WITHOUT binding a transport, so tests drive it directly (the
     :func:`custodex.server.standalone.build_standalone_app` precedent — all logic
     here, the stdio launch stays a thin leaf).
+
+    The eight MCP-00/01 READ tools always register. The three MCP-02 WRITE tools
+    (``custodex_remediate``/``custodex_resolve``/``custodex_sync_docs``) register
+    ONLY when ``read_only`` is False (the default): ``read_only=True`` gives an
+    operator a PROVABLE no-write surface for an untrusted agent (K11), the coarse
+    gate complementing each write tool's own advisory ``apply=False`` default.
     """
     try:
         from mcp.server.fastmcp import FastMCP
@@ -192,6 +198,76 @@ def build_mcp_server(repo_root: Path) -> Any:
         return tools.list_records(
             cfg, config_dir, repo_id=repo_id, verdict=verdict, limit=limit
         ).model_dump(mode="json")
+
+    if not read_only:
+        # MCP-02: the gated WRITE tools — registered ONLY on a read-write server, so
+        # `read_only=True` leaves an operator a provable no-write surface (K11). Each
+        # defaults its write to advisory and injects `_now()` at this boundary (K10).
+
+        @server.tool()
+        def custodex_remediate(apply: bool = False, limit: int = 50) -> dict[str, Any]:
+            """Propose (and optionally apply) fixes for the repo's drift.
+
+            Drives the remediation pipeline: each handled drift gets a verdict + a
+            proposed fix, RECORDED as a ReviewRecord (K5) whatever the outcome. With
+            ``apply=False`` (the default, K11) NOTHING is written to a doc — the
+            proposals are advisory and each item's ``record_id`` is the handle you
+            pass to ``custodex_resolve``. Set ``apply=True`` to heal ``FIX`` verdicts
+            in place. Each call records the proposals; for a pure, record-free view
+            of what is drifted, use ``custodex_drift``.
+            """
+            cfg, config_dir, repo_id = _bundle()
+            return tools.remediate_drift(
+                cfg, config_dir, repo_id=repo_id, now=_now(), apply=apply, limit=limit
+            ).model_dump(mode="json")
+
+        @server.tool()
+        def custodex_resolve(
+            record_id: str,
+            resolution: Resolution,
+            resolved_by: str | None = None,
+            resolved_text: str | None = None,
+            note: str | None = None,
+        ) -> dict[str, Any]:
+            """Record the human OUTCOME of a handled drift (K5, append-only).
+
+            Links a ``Resolution`` (accepted / overridden / rejected / invalidated —
+            the enum is advertised in the tool schema) to an existing review
+            ``record_id`` (from ``custodex_records`` or ``custodex_remediate``). The
+            review log is never mutated — the outcome is a separate append-only event
+            (a re-resolution is a correction, last-write-wins). An unknown
+            ``record_id`` or resolution is a loud error (K8). Use ``resolved_text``
+            for the human's final body when the resolution is ``overridden``.
+            """
+            cfg, config_dir, repo_id = _bundle()
+            return tools.resolve_drift(
+                cfg,
+                config_dir,
+                repo_id=repo_id,
+                record_id=record_id,
+                resolution=resolution,
+                now=_now(),
+                resolved_text=resolved_text,
+                resolved_by=resolved_by,
+                note=note,
+            ).model_dump(mode="json")
+
+        @server.tool()
+        def custodex_sync_docs(apply: bool = False) -> dict[str, Any]:
+            """Preview (or apply) the doc heal as a unified diff.
+
+            With ``apply=False`` (the default, K1) returns the ``patch`` of what
+            healing WOULD change while leaving the working tree untouched; set
+            ``apply=True`` to write the healed docs. ``clean`` (empty patch) means the
+            docs are already in sync. Like ``custodex_remediate``, even a preview
+            records the proposals to the review log (the doc tree is restored, but
+            ``.cdmon/review-log.jsonl`` grows — a repeated preview is not idempotent
+            on the audit log). The live merge-request bot stays in ``cdx``.
+            """
+            cfg, config_dir, repo_id = _bundle()
+            return tools.sync_docs(
+                cfg, config_dir, repo_id=repo_id, now=_now(), apply=apply
+            ).model_dump(mode="json")
 
     return server
 

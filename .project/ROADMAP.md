@@ -755,12 +755,16 @@ lands ~2026-07-28). Pinned contract: `ARCHITECTURE.md` §EPIC MCP.
   (K0), shaped + capped + deterministic (K10), `now` injected at the server
   boundary. *Done — full gate green, mcp package 100%, 8-finding adversarial
   review round applied (incl. the coverage-in-status honest-partial degradation).*
-- ☐ **MCP-02** the gated write/agentic tools (K11, `apply=False` default) —
-  `remediate_drift` (drives `Monitor.run`; the agent-chaining seam),
-  `resolve_drift` (`reviewlog.append_resolution`), `sync_docs`
-  (`syncpr.sync_pr(dry_run=True)` → unified diff). *Goal:* a write tool records a
-  ReviewRecord/ResolutionRecord through the existing seam; nothing mutates
-  without an explicit opt-in.
+- ● **MCP-02** the gated write/agentic tools (K11, `apply=False` default) —
+  `custodex_remediate` (drives `Monitor.run`; the agent-chaining seam),
+  `custodex_resolve` (`reviewlog.append_resolution`), `custodex_sync_docs`
+  (`syncpr.sync_pr(dry_run=True)` → unified diff). Two-layer gate: each tool's
+  advisory `apply=False` default (passed THROUGH explicitly, never via
+  `config.apply_default`) PLUS a per-server `read_only` switch
+  (`cdx mcp-serve --read-only`) that refuses to mount the write tools at all. A
+  write records a ReviewRecord/ResolutionRecord through the existing seam;
+  nothing mutates a doc without an explicit opt-in. *Done — full gate green, mcp
+  package 100%.*
 - ☐ **MCP-03** streamable-HTTP transport mounted on the central hub (remote,
   multi-repo) over the existing `_verify_token` bearer auth.
 - ☐ **MCP-04** migrate to `mcp` SDK v2 (post-2026-07-28).

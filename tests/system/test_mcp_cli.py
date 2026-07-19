@@ -40,3 +40,25 @@ def test_mcp_serve_configless_repo_exits_1(tmp_path: Path) -> None:
     result = runner.invoke(app, ["mcp-serve", "--repo-root", str(tmp_path)])
     assert result.exit_code == 1
     assert "cdmon" in result.output.lower() or "config" in result.output.lower()
+
+
+def test_mcp_serve_read_only_omits_write_tools(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The --read-only flag must thread through to build_mcp_server(read_only=True),
+    # so the built server mounts the read tools but NOT the write tools (K11).
+    import asyncio
+
+    write_template(tmp_path / "cdmon.yaml")
+    captured: list[object] = []
+    monkeypatch.setattr(cli, "_run_mcp", lambda server: captured.append(server))
+    result = runner.invoke(
+        app, ["mcp-serve", "--repo-root", str(tmp_path), "--read-only"]
+    )
+    assert result.exit_code == 0, result.output
+    assert len(captured) == 1
+    names = {tool.name for tool in asyncio.run(captured[0].list_tools())}
+    assert "custodex_status" in names  # read tools present
+    assert names.isdisjoint(
+        {"custodex_remediate", "custodex_resolve", "custodex_sync_docs"}
+    )

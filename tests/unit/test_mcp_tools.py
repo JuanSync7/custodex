@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from custodex.blocks import symbol_table
 from custodex.config import (
@@ -39,24 +40,38 @@ from custodex.mcp.tools import (
     DriftItem,
     OwnershipSummary,
     RecordList,
+    RemediationItem,
+    RemediationResult,
+    ResolutionResult,
     StalenessSummary,
     StatusSummary,
+    SyncDocsResult,
     WorklistSummary,
+    _fix_preview,
     coverage_summary,
     doc_graph_summary,
     drift_detail,
     list_records,
     load_repo_bundle,
     ownership_summary,
+    remediate_drift,
+    resolve_drift,
     resolve_repo_id,
     staleness_summary,
     status_summary,
+    sync_docs,
     worklist_summary,
 )
 from custodex.monitor import DEFAULT_LOG_PATH
 from custodex.ownership import Identity, RosterSnapshot
-from custodex.reviewlog import append
-from custodex.schema import ProposedFix, ReviewRecord, Verdict
+from custodex.reviewlog import (
+    DEFAULT_RESOLUTIONS_PATH,
+    append,
+    read_all,
+    read_resolutions,
+    resolved_index,
+)
+from custodex.schema import ProposedFix, Resolution, ReviewRecord, Verdict
 from custodex.templates_v2 import scaffold_config_dir
 
 # A fixed as-of date so the staleness/worklist folds are deterministic (K10).
@@ -687,3 +702,337 @@ def test_list_records_cap_truncates(tmp_path: Path) -> None:
     assert records.returned == 2
     assert records.truncated is True
     assert records.records[0].record_id == "r2"  # newest of the capped slice
+
+
+# --- MCP-02: the gated write tools (remediate / resolve / sync_docs) --------------
+
+
+def _drifted_repo(tmp_path: Path) -> tuple[MonitorConfig, Path]:
+    """The synced one-doc repo, then a public-signature change → HASH+REGION drift.
+
+    Returns ``(cfg, doc_path)`` so a test can assert the doc's bytes before/after a
+    write tool runs — the load-bearing K11 check (``apply=False`` never mutates).
+    """
+    cfg = _synced_repo(tmp_path)
+    (tmp_path / "repo" / "src" / "mod.py").write_text(CODE_V2, encoding="utf-8")
+    return cfg, tmp_path / "repo" / "docs" / "api.md"
+
+
+def test_remediate_drift_apply_false_records_but_never_mutates_doc(
+    tmp_path: Path,
+) -> None:
+    cfg, doc = _drifted_repo(tmp_path)
+    before = doc.read_text(encoding="utf-8")
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=False)
+    assert isinstance(result, RemediationResult)
+    # The K11/K5 core guarantee: proposals are RECORDED, the doc is UNTOUCHED.
+    assert doc.read_text(encoding="utf-8") == before
+    assert result.applied is False
+    assert result.applied_count == 0
+    assert result.clean is False  # nothing healed → drift persists
+    assert result.remaining_count >= 1
+    assert result.handled_count == 2  # HASH + REGION on the one doc
+    assert result.record_count == 2  # one ReviewRecord per handled drift (K5)
+    assert result.by_verdict == {"FIX": 2}
+    # A ReviewRecord per handled drift is actually on disk (custodex_records sees it),
+    # stamped with the INJECTED now (K10) — a dropped `now=lambda: now` would make
+    # detected_at the wall clock and fail this.
+    assert (tmp_path / DEFAULT_LOG_PATH).is_file()
+    written = read_all(tmp_path / DEFAULT_LOG_PATH)
+    assert written and all(r.detected_at == NOW for r in written)
+    # Every item is advisory (applied False), carries a verdict + an FK record_id.
+    assert all(it.applied is False for it in result.items)
+    assert all(it.verdict == "FIX" for it in result.items)
+    assert all(it.record_id for it in result.items)
+    # Sorted (doc_id, region_id or '', drift_kind): HASH (region '') before REGION.
+    assert [it.drift_kind for it in result.items] == ["HASH", "REGION"]
+    hash_item, region_item = result.items
+    assert hash_item.region_id is None
+    assert hash_item.fix_preview is not None and hash_item.rationale is not None
+    assert region_item.region_id == "symbols"
+    assert region_item.fix_preview is not None
+
+
+def test_remediate_drift_apply_true_heals_and_is_idempotent(tmp_path: Path) -> None:
+    cfg, doc = _drifted_repo(tmp_path)
+    before = doc.read_text(encoding="utf-8")
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=True)
+    assert result.applied is True
+    assert result.applied_count >= 1
+    assert doc.read_text(encoding="utf-8") != before  # healed
+    assert result.clean is True
+    assert result.remaining_count == 0
+    # K7: a second apply run finds nothing to do — no new handled drift / records.
+    again = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=True)
+    assert again.handled_count == 0
+    assert again.record_count == 0
+    assert again.clean is True
+
+
+def test_remediate_drift_clean_repo_is_a_noop(tmp_path: Path) -> None:
+    cfg = _synced_repo(tmp_path)
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW)  # default apply
+    assert result.applied is False
+    assert result.handled_count == 0
+    assert result.record_count == 0
+    assert result.clean is True
+    assert result.by_verdict == {}
+    assert result.items == ()
+
+
+def test_remediate_drift_cap_truncates_but_totals_stay_exact(tmp_path: Path) -> None:
+    cfg, _ = _drifted_repo(tmp_path)
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, limit=1)
+    assert result.handled_count == 2  # the FULL count, not the capped slice
+    assert result.record_count == 2
+    assert len(result.items) == 1
+    assert result.truncated is True
+
+
+def test_remediate_drift_fix_preview_truncates(tmp_path: Path) -> None:
+    cfg, _ = _drifted_repo(tmp_path)
+    result = remediate_drift(
+        cfg, tmp_path, repo_id="demo", now=NOW, apply=False, fix_preview_limit=8
+    )
+    trimmed = [it for it in result.items if it.fix_truncated]
+    assert trimmed, "expected at least one fix preview long enough to trip the cap"
+    assert all(
+        it.fix_preview is not None and len(it.fix_preview) <= 8 for it in trimmed
+    )
+
+
+def test_resolve_drift_records_the_outcome(tmp_path: Path) -> None:
+    cfg = MonitorConfig(root=".", documents=())
+    log = tmp_path / DEFAULT_LOG_PATH
+    log.parent.mkdir(parents=True, exist_ok=True)
+    append(log, _record("r1", Verdict.FIX, "2026-06-01T00:00:00+00:00"))
+    result = resolve_drift(
+        cfg, tmp_path, repo_id="demo", record_id="r1", resolution="accepted", now=NOW
+    )
+    assert isinstance(result, ResolutionResult)
+    assert result.recorded is True
+    assert result.record_id == "r1"
+    assert result.resolution == "accepted"
+    assert result.resolved_at == NOW  # INJECTED now, never a clock read (K10)
+    assert result.resolutions_path == ".cdmon/resolutions.jsonl"
+    # The ResolutionRecord is on disk + joinable to the review record by FK.
+    idx = resolved_index(read_resolutions(tmp_path / DEFAULT_RESOLUTIONS_PATH))
+    assert "r1" in idx
+    assert idx["r1"].resolution is Resolution.ACCEPTED
+    assert idx["r1"].resolved_at == NOW
+
+
+def test_resolve_drift_unknown_record_is_loud(tmp_path: Path) -> None:
+    cfg = MonitorConfig(root=".", documents=())
+    with pytest.raises(McpError):
+        resolve_drift(
+            cfg,
+            tmp_path,
+            repo_id="demo",
+            record_id="nope",
+            resolution="accepted",
+            now=NOW,
+        )
+
+
+def test_resolve_drift_bad_resolution_is_loud(tmp_path: Path) -> None:
+    cfg = MonitorConfig(root=".", documents=())
+    log = tmp_path / DEFAULT_LOG_PATH
+    log.parent.mkdir(parents=True, exist_ok=True)
+    append(log, _record("r1", Verdict.FIX, "2026-06-01T00:00:00+00:00"))
+    with pytest.raises(McpError) as exc:
+        resolve_drift(
+            cfg, tmp_path, repo_id="demo", record_id="r1", resolution="bogus", now=NOW
+        )
+    assert "accepted" in str(exc.value)  # loud + lists the legal choices (K8)
+
+
+def test_resolve_drift_overridden_carries_text_and_by(tmp_path: Path) -> None:
+    cfg = MonitorConfig(root=".", documents=())
+    log = tmp_path / DEFAULT_LOG_PATH
+    log.parent.mkdir(parents=True, exist_ok=True)
+    append(log, _record("r1", Verdict.FIX, "2026-06-01T00:00:00+00:00"))
+    result = resolve_drift(
+        cfg,
+        tmp_path,
+        repo_id="demo",
+        record_id="r1",
+        resolution="OVERRIDDEN",  # case-insensitive parse (mirrors cli._parse)
+        now=NOW,
+        resolved_text="my final body",
+        resolved_by="alice",
+        note="see PR",
+    )
+    assert result.resolution == "overridden"
+    assert result.resolved_by == "alice"
+    assert result.note == "see PR"
+    idx = resolved_index(read_resolutions(tmp_path / DEFAULT_RESOLUTIONS_PATH))
+    assert idx["r1"].resolution is Resolution.OVERRIDDEN
+    assert idx["r1"].resolved_text == "my final body"
+
+
+def test_remediate_record_id_feeds_resolve(tmp_path: Path) -> None:
+    # The two write tools COMPOSE: a record_id surfaced by custodex_remediate is the
+    # exact FK custodex_resolve consumes — the human-in-the-loop apply seam (K5/K11),
+    # and the "chain" the MCP client orchestrates.
+    cfg, _ = _drifted_repo(tmp_path)
+    rem = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=False)
+    rid = rem.items[0].record_id
+    res = resolve_drift(
+        cfg, tmp_path, repo_id="demo", record_id=rid, resolution="accepted", now=NOW
+    )
+    assert res.recorded is True
+    idx = resolved_index(read_resolutions(tmp_path / DEFAULT_RESOLUTIONS_PATH))
+    assert rid in idx
+
+
+def test_remediate_record_id_is_per_doc_review_record(tmp_path: Path) -> None:
+    # CONTRACT PIN (MCP02-CORR-1): a doc's simultaneous drifts (HASH + REGION here)
+    # SHARE one record_id — it identifies the review RECORD, not the drift, exactly
+    # as the .cdmon log + `cdx resolve` key it. `drift_kind`/`region_id` disambiguate
+    # the facets. This pins the truthful contract (the docstrings no longer promise a
+    # 1:1 per-drift FK) so a change to the id grain is a deliberate, caught decision.
+    cfg, _ = _drifted_repo(tmp_path)
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=False)
+    assert result.handled_count == 2
+    # Same doc → ONE shared record_id across both items...
+    assert len({it.record_id for it in result.items}) == 1
+    # ...but the drift facets are distinguishable (locus differs).
+    assert {(it.drift_kind, it.region_id) for it in result.items} == {
+        ("HASH", None),
+        ("REGION", "symbols"),
+    }
+
+
+def test_sync_docs_dry_run_previews_without_touching_the_tree(tmp_path: Path) -> None:
+    cfg, doc = _drifted_repo(tmp_path)
+    before = doc.read_text(encoding="utf-8")
+    result = sync_docs(cfg, tmp_path, repo_id="demo", now=NOW, apply=False)
+    assert isinstance(result, SyncDocsResult)
+    assert result.applied is False
+    assert result.clean is False
+    assert result.changed_count == 1
+    assert result.changed_paths == ("docs/api.md",)
+    assert result.patch and "docs/api.md" in result.patch
+    assert result.patch_truncated is False
+    # K1: the NET effect is an untouched tree (sync_pr heals-then-restores).
+    assert doc.read_text(encoding="utf-8") == before
+    # K10: the audit records the dry-run still writes are stamped with the injected
+    # now (a dropped `now=lambda: now` would leave the wall clock and fail this).
+    written = read_all(tmp_path / DEFAULT_LOG_PATH)
+    assert written and all(r.detected_at == NOW for r in written)
+
+
+def test_sync_docs_apply_heals_and_is_idempotent(tmp_path: Path) -> None:
+    cfg, doc = _drifted_repo(tmp_path)
+    before = doc.read_text(encoding="utf-8")
+    result = sync_docs(cfg, tmp_path, repo_id="demo", now=NOW, apply=True)
+    assert result.applied is True
+    assert result.clean is False  # the diff of what WAS healed
+    assert doc.read_text(encoding="utf-8") != before
+    # K7: a second apply finds nothing left to heal.
+    again = sync_docs(cfg, tmp_path, repo_id="demo", now=NOW, apply=True)
+    assert again.clean is True
+    assert again.patch == ""
+    assert again.changed_count == 0
+
+
+def test_sync_docs_clean_repo_is_empty_patch(tmp_path: Path) -> None:
+    cfg = _synced_repo(tmp_path)
+    result = sync_docs(cfg, tmp_path, repo_id="demo", now=NOW)  # default apply=False
+    assert result.clean is True
+    assert result.patch == ""
+    assert result.changed_count == 0
+    assert result.changed_paths == ()
+
+
+def test_sync_docs_patch_truncates(tmp_path: Path) -> None:
+    cfg, _ = _drifted_repo(tmp_path)
+    result = sync_docs(
+        cfg, tmp_path, repo_id="demo", now=NOW, apply=False, patch_limit=12
+    )
+    assert result.patch_truncated is True
+    assert len(result.patch) <= 12
+
+
+def test_remediate_drift_escalate_item_has_no_fix(tmp_path: Path) -> None:
+    # A MISSING_DOC drift the mock backend cannot remediate → ESCALATE with fix=None:
+    # the item still records for audit (K5) but carries no rationale/preview (the
+    # fix-less verdict path — proves a non-FIX verdict is shaped, not just FIX).
+    root = tmp_path / "repo"
+    (root / "src").mkdir(parents=True)
+    (root / "docs").mkdir()
+    (root / "src" / "mod.py").write_text(CODE_V1, encoding="utf-8")
+    spec = DocumentSpec(
+        id="api",
+        path="docs/api.md",  # deliberately never created → MISSING_DOC drift
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="src/mod.py"),),
+        region_keys=("symbols",),
+    )
+    cfg = MonitorConfig(root="repo", documents=(spec,))
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW, apply=False)
+    assert result.by_verdict == {"ESCALATE": 1}
+    (item,) = result.items
+    assert item.verdict == "ESCALATE"
+    assert item.applied is False
+    assert item.fix_preview is None
+    assert item.rationale is None
+    assert item.region_id is None
+    assert item.record_id  # still recorded for the audit trail (K5)
+
+
+def test_fix_preview_region_only_fix_has_no_body() -> None:
+    # A degenerate fix carrying a region_id but no body: the preview surfaces the
+    # region locus with a None body (the defensive shape heal itself would reject).
+    region_id, preview, truncated = _fix_preview(
+        ProposedFix(
+            region_id="symbols",
+            new_region_body=None,
+            new_doc_text=None,
+            rationale="none",
+        ),
+        100,
+    )
+    assert region_id == "symbols"
+    assert preview is None
+    assert truncated is False
+
+
+def test_fix_preview_whole_doc_wins_over_region_body() -> None:
+    # heal.apply_fix precedence: when BOTH bodies are set, new_doc_text wins — so the
+    # preview shows the whole-doc text a client would review, not the region body.
+    _region_id, preview, _truncated = _fix_preview(
+        ProposedFix(
+            region_id="r",
+            new_region_body="REGION",
+            new_doc_text="WHOLEDOC",
+            rationale="x",
+        ),
+        100,
+    )
+    assert preview == "WHOLEDOC"
+
+
+@pytest.mark.parametrize(
+    "model",
+    [RemediationItem, RemediationResult, ResolutionResult, SyncDocsResult],
+)
+def test_mcp02_result_models_are_frozen_and_forbid_extra(model: type) -> None:
+    # The shaped-wire contract: every MCP-02 result model is frozen (immutable on the
+    # wire) + extra="forbid" (a stray/renamed field is a loud error, not silent
+    # drift). Guards against a mutation relaxing either config flag.
+    assert model.model_config.get("frozen") is True
+    assert model.model_config.get("extra") == "forbid"
+
+
+def test_remediation_result_is_immutable_and_rejects_unknown_fields(
+    tmp_path: Path,
+) -> None:
+    # Behavioural teeth on the two config flags above, on a real instance.
+    cfg, _ = _drifted_repo(tmp_path)
+    result = remediate_drift(cfg, tmp_path, repo_id="demo", now=NOW)
+    with pytest.raises(ValidationError):
+        result.repo_id = "mutated"  # frozen → no in-place mutation
+    with pytest.raises(ValidationError):
+        RemediationResult.model_validate({**result.model_dump(), "bogus": 1})

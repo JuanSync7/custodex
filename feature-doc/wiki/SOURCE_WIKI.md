@@ -181,7 +181,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `mcp`
 
 - Path: `mcp/__init__.py`
-- Public symbols: `CoverageSummary`, `DocGraph`, `DriftDetail`, `DriftItem`, `OwnershipSummary`, `RecordList`, `RecordSummary`, `StalenessSummary`, `StatusSummary`, `SymbolGap`, `WorkItemView`, `WorklistSummary`, `__all__`, `build_mcp_server`, `coverage_summary`, `doc_graph_summary`, `drift_detail`, `list_records`, `load_repo_bundle`, `main`, `ownership_summary`, `resolve_repo_id`, `staleness_summary`, `status_summary`, `worklist_summary`
+- Public symbols: `CoverageSummary`, `DocGraph`, `DriftDetail`, `DriftItem`, `OwnershipSummary`, `RecordList`, `RecordSummary`, `RemediationItem`, `RemediationResult`, `ResolutionResult`, `StalenessSummary`, `StatusSummary`, `SymbolGap`, `SyncDocsResult`, `WorkItemView`, `WorklistSummary`, `__all__`, `build_mcp_server`, `coverage_summary`, `doc_graph_summary`, `drift_detail`, `list_records`, `load_repo_bundle`, `main`, `ownership_summary`, `remediate_drift`, `resolve_drift`, `resolve_repo_id`, `staleness_summary`, `status_summary`, `sync_docs`, `worklist_summary`
 - Implemented by: `FEAT-MCP-001`
 
 ## `monitor`
