@@ -134,10 +134,10 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-HEAL-009` | integration/test_heal.py, regression/test_corpus_pipeline.py, system/test_live_llm.py, system/test_system.py | DEMOS.md |
 | `FEAT-KGRAPH-001` | system/test_kgraph_cli.py, unit/test_kgraph.py | DEMOS.md |
 | `FEAT-KGRAPH-002` | system/test_kgraph_cli.py, unit/test_kgraph.py | DEMOS.md |
-| `FEAT-LAYOUT-001` | integration/test_layout.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_dogfood.py, system/test_example_multilang.py, system/test_system.py | DEMOS.md |
+| `FEAT-LAYOUT-001` | integration/test_foreign_frontmatter.py, integration/test_layout.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_dogfood.py, system/test_example_multilang.py, system/test_system.py | DEMOS.md |
 | `FEAT-LAYOUT-002` | integration/test_layout.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_dogfood.py, system/test_example_multilang.py | DEMOS.md |
 | `FEAT-LAYOUT-003` | integration/test_layout.py, system/test_cli.py, system/test_system.py | DEMOS.md |
-| `FEAT-LAYOUT-004` | integration/test_layout.py, system/test_cli.py | DEMOS.md |
+| `FEAT-LAYOUT-004` | integration/test_foreign_frontmatter.py, integration/test_layout.py, system/test_cli.py | DEMOS.md |
 | `FEAT-LAYOUT-005` | integration/test_build.py, integration/test_layout.py, system/test_example_multilang.py, system/test_system.py | DEMOS.md |
 | `FEAT-LAYOUT-006` | integration/test_layout.py, system/test_dogfood.py | DEMOS.md |
 | `FEAT-LAYOUT-007` | integration/test_layout.py, system/test_cli.py, system/test_system.py | DEMOS.md |
@@ -192,7 +192,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-PR-011` | unit/test_ticket.py | DEMOS.md |
 | `FEAT-QUALITY-001` | system/test_demo_e2e.py, unit/test_docstyle.py | DEMOS.md |
 | `FEAT-QUALITY-002` | unit/test_docstyle.py | DEMOS.md |
-| `FEAT-QUALITY-003` | integration/test_agent_style.py, unit/test_docstyle.py | DEMOS.md |
+| `FEAT-QUALITY-003` | integration/test_agent_style.py, unit/test_docstyle.py, unit/test_writing_templates.py | DEMOS.md |
 | `FEAT-QUALITY-004` | integration/test_generate.py, integration/test_templates_v2.py | DEMOS.md |
 | `FEAT-QUALITY-005` | integration/test_report.py, system/test_demo_e2e.py | DEMOS.md |
 | `FEAT-QUALITY-006` | integration/test_report.py | DEMOS.md |

@@ -18,3 +18,15 @@ Guidance:
 - Bring in concrete examples and analogies to anchor abstract points.
 - Close the loop: return at the end to the question or motivation you opened
   with.
+
+## Standing alone, and one home per fact
+
+Narrative prose still has to survive being entered in the middle.
+
+- Do not rely on "the above" or "as noted earlier" to carry a claim; name the
+  thing you mean, even where the flow makes the reference obvious to you.
+- When a fact belongs to another document, state the conclusion and point at it.
+  Do not restate its reasons or values: two live copies drift apart, and the
+  reader cannot tell which one went stale.
+- Carry through every identifier other text can cite — section numbers, entry
+  ids, anchors — unchanged and attached to the same content. Never renumber a set.
