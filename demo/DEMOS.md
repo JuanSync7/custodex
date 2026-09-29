@@ -1703,3 +1703,237 @@ idempotency, foreign files never pruned) and `tests/system/test_okf_cli.py`
 (the verb end-to-end).
 Features: FEAT-OKF-001
 
+### DEMO-117 — The apply-tier router: which drifts could close themselves
+**What it shows.** Custodex can detect drift and propose a fix, but every fix needs a
+human — so on a codebase with real technical debt the docs stay stale and the tool is
+correct but useless. RTE-01 makes the routing decision visible: each drift is classified
+by the AUTHORITY that could close it. A renderer-backed region body or a symbol-table
+refresh whose severity is **cosmetic**/**additive** is `code-derived` — a pure projection
+of the surface with **no model consulted**, so there is nothing to be confident about. A
+**breaking** change (a documented symbol removed/renamed, or a survivor's signature moved)
+is `needs-intent`, because prose naming that symbol is now factually false and that prose
+lives OUTSIDE the managed regions where the engine can neither see nor repair it. So is a
+legacy doc whose severity is **unknown** — that value is overloaded ("not a HASH drift"
+vs "nothing stamped to diff against"), and an un-attributable surface move is exactly the
+case where auto-applying could bless a falsified sentence.
+**How to observe.** Sync a doc, add a public symbol, and run `cdx check`: the report's
+trailing `routing:` line reports the per-document tally, and each drift carries the sorted
+evidence naming the rule that fired (`surface-refresh`/`severity:additive`,
+`mechanical-render`/`region:symbols`). Change a signature instead and the same document
+flips to `needs-intent` (`severity:breaking`). Note the tally is per DOCUMENT, not per
+drift: one `needs-intent` drift holds the whole document, because healing part of a doc
+also stamps its fingerprint — which would silently bless any sibling region the engine
+could not render into permanent staleness. Detect-only: nothing is applied differently
+(the `apply_tiered` gate arrives in RTE-03). Pinned by `tests/unit/test_drift.py` (the
+12-rule truth table, the per-document fold, the legacy-doc denial, and the guard that no
+construction point is left unclassified).
+Features: FEAT-DRIFT-013
+
+### DEMO-118 — Decorator fidelity: the doc stops telling you to call an attribute
+**What it shows.** The clearest evidence that "documentation generated from code" can be
+confidently WRONG with no LLM anywhere near it. Custodex's extractor never looked at
+`decorator_list`, so a `@property` was projected as a plain method — and that error was
+already shipped in Custodex's OWN generated docs: `docs/api/coverage-system.md` listed five
+consecutive `@property` attributes (`percent_files`, `percent_public_symbols`,
+`documented_symbols`, `undocumented_files`, `undocumented_symbols`) as callable methods.
+A reader following that table writes `report.percent_files()` and gets a `TypeError`.
+Now the decorator rides in the signature, so the cell reads
+`@property def percent_public_symbols(self) -> float` and the reader writes `obj.percent`.
+**How to observe.** Run `cdx check` after upgrading: every eng-guide doc covering decorated
+code drifts, grades `[breaking]` (a surviving symbol's signature moved), and the RTE-01
+routing line reports `0/N document(s) auto-routable` — every one escalated to a human.
+That is the intended interaction, not a nuisance: prose in those docs may say `.net()`,
+which is now false, and only a human can tell. `cdx monitor --apply` then reheals the
+machine-managed regions. Pinned by `tests/unit/test_extract.py` (the property/staticmethod/
+classmethod signatures, source-order preservation, `@app.command(...)` contributing only
+its callee, and an unnameable decorator being skipped rather than fatal).
+Features: FEAT-EXTRACT-007
+
+### DEMO-119 — The 1,039 invisible fields (and why the router waves them through)
+**What it shows.** Custodex's extractor never descended into a class body for anything but
+methods, so every annotated field — `MonitorConfig.apply_default`, `DocumentSpec.audience`,
+every pydantic setting an adopter actually configures — was absent from the docs AND from
+the coverage denominator. Not "missed": invisible, so nothing could report it missing.
+1,039 of them in custodex's own tree. They are now `Class.field` symbols, and they land in
+the rendered table as well as the surface — deliberately coupled, because coverage counts a
+symbol as documented iff a config glob SELECTS it, so a surface-only field would be scored
+as documented while appearing in no document at all.
+**How to observe.** `cdx check` after upgrading shows the surface moved with
+`anchored symbols changed: +281/-0` and grades **additive**, so the routing line reads
+`11/12 document(s) auto-routable` — nothing existing was falsified, the docs are merely
+incomplete, and a refreshed table is strictly better than a stale one. Contrast DEMO-118,
+where moving existing signatures graded **breaking** and escalated every document. Same
+router, opposite verdicts, both correct. Pinned by `tests/unit/test_extract.py` (qualified
+names, bare-name visibility so `Class._private` stays private, module-level variables left
+unqualified, and the surface/table coupling that keeps coverage honest).
+Features: FEAT-EXTRACT-008
+
+### DEMO-120 — 100% of nothing: the coverage gate that passed on an empty repo
+**What it shows.** The completeness number Custodex reports is only as trustworthy as the
+universe it divides by. Point `coverage.include` at a path that matches nothing — a typo, a
+moved `src/`, a monorepo sub-path — and Custodex printed `public symbols: 100.0% documented
+(0/0)` and **exited 0 under `--fail-under 95`**. A CI job wired to that gate would stay
+green forever while documenting nothing at all. The percentage is not wrong (100% of an
+empty set is vacuously true, and other callers want a number, not an exception); reading it
+as a GATE verdict was.
+**How to observe.** In a scratch dir with `coverage.include: ["src/**/*.py"]` and no `src/`,
+run `cdx coverage --fail-under 95`: it now exits 1 with
+`coverage universe is empty — no public, non-waived symbols were found`, naming the likely
+cause. Drop the `--fail-under` and it still reports 100.0 and exits 0, unchanged — only the
+gate moved. Pinned by `tests/unit/test_coverage.py` (`public_universe` distinguishing "100%
+of many" from "100% of nothing", and excluding private + waived symbols) and
+`tests/system/test_cli.py` (the gate refusing loudly, and the reporting path unchanged).
+Features: FEAT-COVERAGE-011
+
+### DEMO-121 — two renderers, one writer: the index table heal deleted
+**What it shows.** A managed region can have more than one renderer, and only one of them
+writes. `drift.detect` grades a `source: index` region against the index-aware layer (it
+needs the config's *other* documents); `heal` had only `expected_region`, which fell through
+the records branch and returned a header-only table. `render_template`'s own docstring says
+an index table is "rendered by the index-aware layer … not here" — but nothing enforced it,
+so the layer that WRITES silently authored the wrong body over a live table. On this repo's
+own `docs/api/index.md` that is 16 lines in, 2 lines out: **all 14 document rows deleted**,
+unattended, reachable today through `cdx write-doc` / the server's config editor
+(`generate.apply_edits_to_disk` → `regenerate_regions`).
+**How to observe.** `.venv/bin/python -c` calling `heal.regenerate_regions` on a copy of
+`docs/api/index.md` used to print `api-index rows: 16 -> 2`; it now leaves the body
+byte-identical. `expected_region` returns `None` for an index template, so heal hits its
+existing skip guard instead of pretending it can render one. Skipping does not bless the
+region: `detect` grades an index region unconditionally (unlike a `mode: llm` no-renderer
+region, whose only trigger IS the fingerprint), so a stale index table still drifts on the
+very next `cdx check`. Pinned by `tests/unit/test_templates.py` (the selector declines),
+`tests/integration/test_heal.py` (both write shapes leave it byte-identical, and the
+skipped region still drifts), and the corpus guard
+`tests/regression/test_corpus_pipeline.py::test_heal_never_writes_a_region_body_detect_would_call_wrong`,
+which asserts the CLASS: for every template this repo configures, what heal would author is
+either exactly what detect grades against, or nothing at all.
+Features: FEAT-HEAL-010
+
+### DEMO-122 — the three-way routing tally: how much would unattended mode close?
+**What it shows.** RTE-01 made routing visible as one number: how many documents could
+close themselves. That number bundles two very different authorities. A document the ENGINE
+can rebuild from the extracted surface costs nothing and involves no model at all; a document
+that needs a model to author prose is a different decision with a different risk. `cdx check`
+now separates them:
+```
+routing: 2/6 document(s) mechanical, 1 delegated, 3 need human intent
+```
+**How to observe.** Run `cdx check` on any repo with drift. `mechanical` is the set an
+unattended write may touch — every actionable drift on the document is `code-derived`;
+`delegated` needs a model; the rest need a human. The three buckets **partition the documents
+that have something to close**: a document whose only drift is a doc↔doc suspect link is
+excluded from the denominator entirely, because it has nothing to close and counting it
+anywhere would mislabel it — as `mechanical` it is a phantom closure claiming a document is
+done while its edge is still open. Pinned by `tests/unit/test_drift.py`: the generalised fold
+over an arbitrary tier set, `AUTO_TIERS` derived from `is_auto` rather than restated,
+`auto_routable_docs` proved byte-unchanged **including its vacuous member**, `mechanical_docs`
+proved strictly narrower than it, and the tally asserted verbatim on a fixture whose three
+counts are all DISTINCT (2/1/3) — equal counts would make a swapped pair of labels an
+unkillable mutant.
+Features: FEAT-DRIFT-014
+
+### DEMO-123 — `--tiered`: the escalation that stopped being asked about
+**What it shows.** The failure this whole epic exists to fix, reproduced against a backend
+that FIXes the mechanical HASH and ESCALATEs the prose — exactly what a real LLM does when
+it will not invent a WHY:
+```
+handled guide HASH   [needs-intent] -> FIX      applied=True     <- fingerprint stamped
+handled guide REGION [delegated]    -> ESCALATE applied=False    <- a human must write this
+remaining after run: []
+NEXT CYCLE (fresh detect, nothing changed):  clean — no drift detected
+the prose still says: 'Prose a model authored about alpha.'
+```
+A human was asked to author that prose. Applying its sibling's mechanical fix stamped
+`cdm.fingerprint`, and for a no-renderer `mode: llm` region that stamp is the **only**
+staleness trigger it has — so `cdx check` is green forever and the human is never asked
+again. That is the exact inversion of "nothing is missed", and it is reachable today with
+plain `--apply`.
+**How to observe.** `cdx monitor --apply --tiered` on a document with a renderer-backed
+`symbols` region and a `mode: llm` `overview` region: the file is left **byte-identical**,
+the ReviewRecord is still written for the reviewer (K5), and the next `cdx check` still
+reports the prose region. One drift needing human intent holds the WHOLE document — the
+per-DOCUMENT grain is the correctness condition, not a refinement of it. It is OFF by
+default. One honest caveat, reproduced rather than claimed away: on the mechanical path no
+backend is consulted at all, so `--tiered` REPLACES the authority there rather than merely
+narrowing it — against a backend that returns INVALIDATE, `--apply` writes nothing and
+`--apply --tiered` writes. On every other document it is strictly narrower. Exit code is unchanged: a held document still exits 1 through the
+pre-existing remaining-drift gate. Pinned by `tests/integration/test_monitor.py`,
+`tests/system/test_cli.py`, and the corpus guard
+`test_tiered_never_blesses_an_escalation_into_permanent_staleness`.
+Features: FEAT-MONITOR-010, FEAT-CLI-023
+
+### DEMO-124 — the knob that must never arrive by omission
+**What it shows.** `tiered=None` resolves to the repo's `apply_tiered`, mirroring `apply`.
+That convenience is a hole off the CLI: **every call site that omits the argument opts in by
+omission.** Six do — `cdx sync-pr`, `cdx open-docs-pr`, the server's docs-PR route, the MCP
+sync tool (all four via `syncpr.sync_pr`), the MCP remediation tool, and onboarding's
+arrive-green self-validation. MCP-02 ratified the opposite rule in writing for `apply` ("a
+repo's `apply_default: true` can NEVER be triggered implicitly by a remote agent"), and the
+server route loads the config of a **cloned, untrusted repo** — an adopter's own config must
+not decide the server's authoring authority.
+**How to observe.** Set `apply_tiered: true` in a config and drive `sync_pr`: it still
+applies in full, because `sync_pr` now takes an explicit `tiered` parameter defaulting to
+OFF (and it exists, so a caller *can* opt in deliberately — the foil test proves both
+directions). The MCP remediation tool forces it OFF and says so in its docstring beside the
+`apply` promise it already made. The durable guard is source-level: a test asserts no
+`Monitor.run(apply=...)` outside `cli.py`/`syncpr.py` omits `tiered=`, because a leak is
+invisible at runtime — the call simply inherits the knob and nothing looks wrong.
+Features: FEAT-MONITOR-011
+
+### DEMO-125 — the half-plumbed config knob
+**What it shows.** In the `config/cdmon/` directory form a global travels through three
+places: the `MonitorConfig` field, the index-file mirror, and the **merge lift** that copies
+one to the other. Miss the lift and nothing fails — the index file validates, the adopter
+sets the knob, and it silently does nothing. That is the worst shape of config bug: it looks
+configured.
+**How to observe.** `test_every_index_global_is_lifted_onto_monitor_config` asserts that
+every index-file field except the four that are structurally index-only (`frontmatter`,
+`units`, `ignore`, `doc_style`) names a real `MonitorConfig` field. Delete
+`apply_tiered=index.apply_tiered` from the merge and the guard goes red by name. It guards
+the CLASS, so the next global added cannot be half-plumbed either.
+Features: FEAT-CONFIGV2-018
+
+### DEMO-126 — a document that documents itself for free
+**What it shows.** On the code-derived path there is **no model to be confident about**:
+the bytes are the engine's own projection of the surface, produced by the same functions
+`heal` calls. So tiered mode does not ask a backend at all — it closes the document itself.
+**How to observe.** Point a `Monitor` at a mechanically-closable document with a backend
+whose `propose` **raises on any call**, run `--apply --tiered`, and the document closes
+clean: zero tokens, zero network, byte-deterministic. The fix shapes are the mock backend's
+own two rules — region-scoped for a `REGION`, whole-doc for a `HASH` — and the region body
+comes from the **same index-aware selector `detect` grades against**, so an index region is
+rendered by the index-aware layer instead of being written wrong. Collapsing both shapes
+into one whole-doc rewrite would make a `REGION` close stamp `fingerprint_tiers` and
+`symbol_sigs` it never touches today, which on a legacy composite-only doc silently supplies
+the digests the severity classifier needs to move a **future** HASH drift from `unknown`
+(needs-intent) to `cosmetic` (code-derived): the unattended write would widen what it may
+next write unattended. Two guardrails ride along: a promoted rule still wins (a verdict
+humans reached ≥K times is never overwritten by an engine write), and a drift routing called
+mechanical that the engine cannot render becomes a **loud ESCALATE**, never a `FIX` carrying
+no fix.
+Features: FEAT-MONITOR-012
+
+### DEMO-127 — the alarm that fires on the write nobody watched
+**What it shows.** The failure mode unattended mode must never have is silence: the engine
+writes, the drift does not clear, the document looks handled, and nobody is told. Every
+unattended close therefore emits a `ClosureRecord`, and `cdx monitor` prints it:
+```
+closure: guide — HASH closed mechanically (no backend)
+closure ALARM: guide — auto-apply did not converge: the engine rewrote the document and HASH drift remains
+closure ALARM: guide — the write boundary DECLINED what routing called mechanical (HASH); nothing was written
+closure preview: guide — HASH would close mechanically (dry — pass --apply)
+```
+**How to observe.** The alarm gates on **attempted**, never on whether bytes were written.
+`apply_fix` returns `False` for an *attempted* write it declined — a preserved id, a B-03
+locked region — and that is exactly the "routing promised mechanical closure and the write
+boundary silently refused" case; gating on `wrote` would print it as a dry-run preview and
+report success. With no `--apply`, records are **previews** and never say "did not
+converge", so the most common invocation cannot raise a false alarm. There is deliberately
+**no new exit code**: `verified` derives from the same recheck that already drives the
+remaining-drift gate, so an unverified closure always exits 1 there anyway — the deliverable
+is the message that names the pathology, printed before the symptom. Pinned by
+`tests/integration/test_monitor.py` (converged / preview / declined / held / tiered-off /
+sorted-by-doc / facets-sorted-not-encounter-ordered), `test_monitor_docdeps.py` (an open
+suspect link does NOT un-verify a clean close — else the alarm becomes noise), and
+`tests/system/test_cli.py` (each marker asserted verbatim, so the alarm is killable).
+Features: FEAT-RECORD-014

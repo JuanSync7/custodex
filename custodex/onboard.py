@@ -241,6 +241,7 @@ updated: "{now}"
 root: "../.."
 version: "2.0.0"
 apply_default: false
+apply_tiered: false
 backend:
   kind: mock
 central:

@@ -905,9 +905,16 @@ def remediate_drift(
     """Drive the remediation pipeline and shape the outcome (K5/K10/K11).
 
     Builds ``Monitor(cfg, config_dir, now=lambda: now)`` and calls
-    ``.run(apply=apply)`` — ``apply`` passed THROUGH EXPLICITLY so a repo's
-    ``apply_default: true`` can NEVER be triggered implicitly by a remote agent
-    (stricter than ``cdx monitor``, which defaults to the config). ``apply=False``
+    ``.run(apply=apply, tiered=False)`` — ``apply`` passed THROUGH EXPLICITLY so a
+    repo's ``apply_default: true`` can NEVER be triggered implicitly by a remote agent
+    (stricter than ``cdx monitor``, which defaults to the config). RTE-03c extends
+    that gate to ``apply_tiered``: it is FORCED to False here, so a repo's knob
+    cannot switch a remote agent's remediation onto a different authoring
+    authority. (Forcing it OFF keeps MCP on the backend-authored path, which is
+    never broader than the tiered one — so this is the SAFE direction, and it is
+    exactly today's behaviour. Note tiered mode is NOT merely a narrowing: on a
+    mechanical document it replaces the backend's verdict rather than deferring to
+    it, which is the other reason not to expose it here yet.) ``apply=False``
     (the default) records one ``ReviewRecord`` per handled drift (the K5 audit — the
     proposal made auditable) but mutates NO doc; ``apply=True`` also heals ``FIX``
     verdicts. ``Monitor.run`` appends ``handled`` and ``records`` in lockstep
@@ -918,7 +925,7 @@ def remediate_drift(
     drift_kind)`` and capped; totals stay exact. Deterministic under a fixed
     ``now`` (K10).
     """
-    result = Monitor(cfg, config_dir, now=lambda: now).run(apply=apply)
+    result = Monitor(cfg, config_dir, now=lambda: now).run(apply=apply, tiered=False)
     # Monitor.run appends one `handled` and one `record` per drift in lockstep, so
     # they are 1:1 and index-aligned — `strict=True` makes that invariant loud (a
     # mismatch would raise, never silently truncate the pairing).

@@ -1,10 +1,69 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 209ed508511887c8
+  fingerprint: 8879040bb7523cb5
+  fingerprint_tiers:
+    composite: 8879040bb7523cb5
+    docstring: 6e2f9e1d2966c204
+    signature: af7c2d51c4b2f61c
+  region_anchors:
+    symbols:
+    - 01d254983c6eabdb
+    - 035bfab147084b99
+    - 069d2548e1165eea
+    - 0b81151021fa9e55
+    - 2184a4e3f4ce0f21
+    - 3ba20ece0aae8c4d
+    - 3f18c3f2bdae2d2e
+    - 4395084cde593e1c
+    - 4bc74b21357c6cf5
+    - 55d9215a311ca38a
+    - 5736e8582b0bae41
+    - 5b7630d7c5ff1f3c
+    - 666b56014eda8817
+    - 7415318241c9b05b
+    - 8e75ebbdb21505d2
+    - 9055800807e449ee
+    - 920e413c7d411b61
+    - 950ccd68cc3cc246
+    - 9860ca227b0ec7d2
+    - c723c0f59aaa1e3c
+    - d0d8a692464a376a
+    - d90f149f7527b7a4
+    - f040bcdd69d14013
+    - f3dd5bbdd5c044ba
+    - f8f6ea60b3e9190c
+    - fdafe75610dfceb6
   region_hashes:
-    symbols: 1b155e3a6ee6d032
+    symbols: 8af5dfe9b554e8e6
   schema_version: 1.0.0
+  symbol_sigs:
+    01d254983c6eabdb: 09896761ca792ecd
+    035bfab147084b99: 4c340a386f7f99d0
+    069d2548e1165eea: f3ee8c6241efded2
+    0b81151021fa9e55: c80a887908593269
+    2184a4e3f4ce0f21: 96fb7975a1d0d34e
+    3ba20ece0aae8c4d: aa65d7bbf1344422
+    3f18c3f2bdae2d2e: e3c3aea826fc0fc3
+    4395084cde593e1c: abd488e020796195
+    4bc74b21357c6cf5: 6fc55cf3dc30d9a5
+    55d9215a311ca38a: cd941d0c1e226393
+    5736e8582b0bae41: 048a393b89f92f46
+    5b7630d7c5ff1f3c: fb12be05481fb283
+    666b56014eda8817: d79db7ad66691868
+    7415318241c9b05b: 5e2183514a285efa
+    8e75ebbdb21505d2: 74ba5c824a10a127
+    9055800807e449ee: d01e076b866e5734
+    920e413c7d411b61: 1c805c7c3426f37b
+    950ccd68cc3cc246: 0ba90c8cf3a1538e
+    9860ca227b0ec7d2: 30d046baa47b781b
+    c723c0f59aaa1e3c: e5e5b63f093d16e0
+    d0d8a692464a376a: 5693eb9f070b0b2b
+    d90f149f7527b7a4: 85c4a102536747a6
+    f040bcdd69d14013: 6861f45c93c62b43
+    f3dd5bbdd5c044ba: 7981097afc971095
+    f8f6ea60b3e9190c: f11b79aed4305a5d
+    fdafe75610dfceb6: bfb133130cc249a1
 ---
 # core-api
 
@@ -24,13 +83,22 @@ cdm:
 | Engine.topological_order | method | def topological_order(self) -> tuple[str, ...] |
 | Runner | variable | Runner = Callable[[Task], bool] |
 | Status | class | class Status(str, Enum) |
-| Status.is_terminal | method | def is_terminal(self) -> bool |
+| Status.DONE | variable | DONE = 'done' |
+| Status.FAILED | variable | FAILED = 'failed' |
+| Status.PENDING | variable | PENDING = 'pending' |
+| Status.RUNNING | variable | RUNNING = 'running' |
+| Status.is_terminal | method | @property def is_terminal(self) -> bool |
 | Task | class | class Task |
 | Task.depends_on | method | def depends_on(self, task_id: str) -> bool |
+| Task.deps | variable | deps: tuple[str, ...] = () |
+| Task.id | variable | id: str |
+| Task.name | variable | name: str |
+| Task.status | variable | status: Status = Status.PENDING |
 | TaskGraph | class | class TaskGraph |
 | TaskGraph.add | method | def add(self, task: Task) -> None |
 | TaskGraph.get | method | def get(self, task_id: str) -> Task |
 | TaskGraph.predecessors | method | def predecessors(self, task_id: str) -> tuple[str, ...] |
 | TaskGraph.roots | method | def roots(self) -> tuple[str, ...] |
 | TaskGraph.successors | method | def successors(self, task_id: str) -> tuple[str, ...] |
+| TaskGraph.tasks | variable | tasks: dict[str, Task] = field(default_factory=dict) |
 <!-- CDM:END symbols -->

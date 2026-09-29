@@ -265,3 +265,37 @@ def test_ensure_writing_templates_never_overwrites(tmp_path):
     assert real.read_text(encoding="utf-8") == "MY REAL GUIDANCE\n"
     assert real not in written and len(written) == 3  # the other three only
     assert ensure_writing_templates(tmp_path) == ()  # idempotent (K7)
+
+
+# --- RTE-03a: the selector DECLINES what only the index-aware layer renders ---
+
+
+def test_expected_region_declines_an_index_source_template():
+    """[RTE-03a] `expected_region` returns None for a `source: index` template.
+
+    `render_template`'s own docstring says an index table "is rendered by the
+    index-aware layer (it needs other documents' surfaces), not here" — but it had
+    no index branch, so it fell through to the RECORDS branch and emitted a
+    header-only table. Every caller that could not tell the difference (heal)
+    silently DESTROYED the table. Declining at the selector makes heal skip the
+    region instead (`heal._corrected`'s existing `if expected is None: continue`).
+    """
+    from custodex.blocks import expected_region
+
+    tmpl = RegionTemplate(
+        source="index",
+        columns=(
+            RegionColumn(header="Document", field="title"),
+            RegionColumn(header="What it covers", field="summary"),
+        ),
+    )
+    surface = _surface_with_records()
+
+    assert expected_region("api-index", surface, tmpl) is None
+    # The foil: the two renderable sources are untouched.
+    assert expected_region(
+        "t", surface, RegionTemplate(source="records", columns=tmpl.columns)
+    )
+    assert expected_region(
+        "t", surface, RegionTemplate(source="symbols", columns=tmpl.columns)
+    )

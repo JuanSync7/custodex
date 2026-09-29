@@ -7,6 +7,7 @@ seam, loud typed failures, and CLI back-compat via ``_resolve_config``.
 Features: FEAT-CONFIGV2-001, FEAT-CONFIGV2-002, FEAT-CONFIGV2-003
 Features: FEAT-CONFIGV2-004, FEAT-CONFIGV2-005, FEAT-CONFIGV2-008
 Features: FEAT-CONFIGV2-010
+Features: FEAT-CONFIGV2-018
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ updated: "2026-06-07"
 root: "../.."
 version: "2.0.0"
 apply_default: true
+apply_tiered: true
 backend: {kind: mock}
 central: {sink: none}
 region_templates:
@@ -311,6 +313,7 @@ def test_load_config_dir_globals_from_index(tmp_path: Path) -> None:
     assert cfg.version == "2.0.0"
     assert cfg.root == "../.."
     assert cfg.apply_default is True
+    assert cfg.apply_tiered is True  # RTE-03c: the merge lift carries it
     assert cfg.backend.kind == "mock"
     assert "api-index" in cfg.region_templates
     assert cfg.region_templates["api-index"].source == "index"
@@ -639,3 +642,20 @@ def test_config_error_is_codedocmonitorerror(tmp_path: Path) -> None:
     empty.mkdir(parents=True)
     with pytest.raises(CodeDocMonitorError):
         load_config_dir(empty)
+
+
+def test_every_index_global_is_lifted_onto_monitor_config() -> None:
+    """[RTE-03c] The merge lift is the one silent plumbing step — guard the CLASS.
+
+    A new global on `IndexFile` that is not carried into `MonitorConfig` loads
+    without error and is simply ignored: the knob exists in the schema, the adopter
+    sets it, and nothing happens. Every field on `IndexFile` except the four that
+    are structurally index-only must therefore name a real `MonitorConfig` field,
+    so the next global cannot be half-plumbed.
+    """
+    index_only = {"frontmatter", "units", "ignore", "doc_style"}
+    lifted = set(IndexFile.model_fields) - index_only
+    missing = sorted(lifted - set(MonitorConfig.model_fields))
+    assert not missing, (
+        f"IndexFile global(s) never lifted onto MonitorConfig: {missing}"
+    )
