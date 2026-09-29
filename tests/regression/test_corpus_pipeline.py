@@ -10,7 +10,7 @@ Features: FEAT-EXTRACT-001, FEAT-EXTRACT-002, FEAT-EXTRACT-004, FEAT-DRIFT-001
 Features: FEAT-DRIFT-004, FEAT-DRIFT-008, FEAT-MONITOR-001, FEAT-MONITOR-003
 Features: FEAT-MONITOR-006, FEAT-HEAL-001, FEAT-HEAL-004, FEAT-HEAL-005
 Features: FEAT-HEAL-007, FEAT-HEAL-008, FEAT-HEAL-009, FEAT-MANIFEST-003
-Features: FEAT-MANIFEST-006, FEAT-MANIFEST-007, FEAT-PR-003
+Features: FEAT-MANIFEST-006, FEAT-MANIFEST-007, FEAT-PR-003, FEAT-HEAL-010
 """
 
 from __future__ import annotations
@@ -459,3 +459,126 @@ def test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched(
     monitor(root, cfg).run(apply=True)
     assert md_path.read_bytes() == snap
     assert monitor(root, cfg).check().ok
+
+
+def test_heal_never_writes_a_region_body_detect_would_call_wrong() -> None:
+    """[RTE-03a] The two region renderers can never silently diverge again.
+
+    The learned failure: `drift.detect` renders an `index`-sourced region with the
+    index-aware layer while `heal._corrected` had only `expected_region`, which
+    fell through `render_template`'s RECORDS branch and returned a header-only
+    table. heal is the one that WRITES, so it deleted all 14 rows of this repo's
+    own `docs/api/index.md` — reachable unattended today via
+    `generate.apply_edits_to_disk`.
+
+    This guards the CLASS, not the instance: for every region template this repo
+    configures, what heal would author must be either exactly what detect grades
+    against, or NOTHING at all (heal declines and skips). A future template source
+    that only one of the two layers understands fails here.
+    """
+    from custodex.blocks import expected_region
+    from custodex.config import load_bundle, resolve_repo_root
+    from custodex.index import render_index
+
+    config_dir = Path(__file__).resolve().parents[2] / "config" / "cdmon"
+    cfg = load_bundle(config_dir).config
+    root = resolve_repo_root(config_dir, cfg.root)
+
+    checked = 0
+    for spec in cfg.documents:
+        surface = build_document_surface(spec, root)
+        for region_id in spec.region_keys:
+            template = cfg.region_templates.get(region_id)
+            if template is None:
+                continue
+            detect_expects = (
+                render_index(template, spec, cfg, root)
+                if template.source == "index"
+                else expected_region(region_id, surface, template)
+            )
+            heal_writes = expected_region(region_id, surface, template)
+            assert heal_writes is None or heal_writes == detect_expects, (
+                f"{spec.id}[{region_id}] (source={template.source}): heal would "
+                f"author a body detect grades as WRONG — that is silent data loss"
+            )
+            checked += 1
+    assert checked, "no configured region templates were exercised"
+
+
+def test_tiered_never_blesses_an_escalation_into_permanent_staleness(
+    tmp_path: Path,
+) -> None:
+    """[RTE-03c] A held document's escalation keeps its own staleness trigger.
+
+    The learned failure, reproduced against a backend that FIXes the mechanical
+    HASH and ESCALATEs the prose — which is exactly what a real LLM does when it
+    will not invent a WHY:
+
+        handled guide HASH   -> FIX      applied=True     <- fingerprint stamped
+        handled guide REGION -> ESCALATE applied=False    <- a human must write this
+        remaining after run: []
+        NEXT CYCLE: clean — no drift detected
+
+    Heal stamps `cdm.fingerprint` even when it skips the prose region, and for a
+    no-renderer `mode: llm` region that stamp is the ONLY staleness trigger it has
+    (`drift.detect` gates it on `stored != current`). So applying the mechanical
+    half destroys the escalation's own trigger: `cdx check` is green FOREVER and
+    the human is never asked again — the exact inversion of "nothing is missed".
+
+    `--tiered` refuses to write the document at all, so the next cycle still asks.
+    """
+    from custodex.backends import BackendResult, FixRequest, MockBackend
+    from custodex.config import Audience, CodeRef, DocumentSpec, MonitorConfig
+    from custodex.monitor import Monitor
+    from custodex.sinks import NullSink
+
+    class HalfBackend:
+        """FIX the mechanical HASH; ESCALATE the prose a human must author."""
+
+        def propose(self, req: FixRequest) -> BackendResult:
+            if req.drift.kind is DriftKind.REGION:
+                return BackendResult(
+                    verdict=Verdict.ESCALATE, cause="needs a human WHY", fix=None
+                )
+            return MockBackend().propose(req)
+
+    (tmp_path / "code.py").write_text(
+        '"""M."""\n\n\ndef alpha(x: int) -> int:\n    """Alpha."""\n    return x\n',
+        encoding="utf-8",
+    )
+    doc_path = tmp_path / "guide.md"
+    doc_path.write_text(
+        "# Guide\n\n<!-- CDM:BEGIN overview -->\nProse a model authored.\n"
+        "<!-- CDM:END overview -->\n\n"
+        "<!-- CDM:BEGIN symbols -->\nSTALE\n<!-- CDM:END symbols -->\n",
+        encoding="utf-8",
+    )
+    spec = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols", "overview"),
+        region_modes={"overview": RegionMode.LLM},
+    )
+    cfg = MonitorConfig(root=".", documents=(spec,))
+    mon = Monitor(
+        cfg,
+        tmp_path,
+        backend=HalfBackend(),
+        sink=NullSink(),
+        now=lambda: "2026-01-01T00:00:00+00:00",
+        log_path=tmp_path / "log.jsonl",
+    )
+    before = doc_path.read_bytes()
+
+    result = mon.run(apply=True, tiered=True)
+
+    assert doc_path.read_bytes() == before  # nothing was written
+    assert result.records  # but the human WAS told (K5)
+    # The escalation survives into the next cycle — the whole point.
+    assert not mon.check().ok
+    assert any(
+        d.region_id == "overview" and d.kind is DriftKind.REGION
+        for d in mon.check().drifts
+    )

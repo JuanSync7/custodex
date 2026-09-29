@@ -103,3 +103,64 @@ features:
     subsystem: monitor
     modules: [monitor]
     constraints: [K6]
+
+  - id: FEAT-MONITOR-010
+    title: Tiered apply — never write a document that needs human intent
+    summary: >-
+      `Monitor.run(tiered=...)` (overriding `apply_tiered`, default OFF) confines the
+      write to the documents the ENGINE alone could close — every actionable drift on
+      them code-derived, per `drift.mechanical_docs`. A document carrying any drift that
+      needs human intent is still sent to the backend, so the reviewer receives a
+      ReviewRecord with both the drift and a proposed fix (K5), but nothing on it is
+      applied. On the mechanical path no backend is consulted at all, so tiered mode
+      REPLACES the authority there rather than merely narrowing it: it can write a
+      document a declining backend would have left alone. On every other document it
+      is strictly narrower. The restraint is the point: applying a document's HASH fix
+      while its sibling prose region is ESCALATED destroys the ONLY staleness trigger
+      that region has, because heal stamps the fingerprint even when it skips the
+      region — so the recheck comes back empty, `cdx check` is green forever, and the
+      human is never asked again. Default OFF keeps run byte-identical.
+    subsystem: monitor
+    modules: [monitor, config]
+    constraints: [K5, K6, K7, K9, K11]
+
+  - id: FEAT-MONITOR-011
+    title: The apply_tiered leak gate — the knob is passed explicitly off the CLI
+    summary: >-
+      `tiered=None` resolves to the repo's `apply_tiered`, which means every call site
+      that omits it opts in BY OMISSION. MCP-02 ratified the opposite rule in writing
+      for `apply` (a repo's config must never implicitly trigger a write for a remote
+      agent), and the server's docs-PR route loads the config of a CLONED, untrusted
+      repo — an adopter's own config must not decide the server's authoring authority.
+      So `syncpr.sync_pr` takes an explicit `tiered` parameter defaulting to OFF (which
+      covers sync-pr, open-docs-pr, the server route and the MCP sync tool in one
+      place), the MCP remediation tool forces it OFF, and onboarding's arrive-green
+      self-validation forces the FULL apply. A source-level guard asserts that no
+      `Monitor.run(apply=...)` outside those sites omits `tiered=`, because a leak is
+      invisible at runtime — the call simply inherits the knob.
+    subsystem: monitor
+    modules: [monitor, syncpr, mcp]
+    constraints: [K5, K11]
+
+  - id: FEAT-MONITOR-012
+    title: The engine closes the mechanical path itself — zero backend calls
+    summary: >-
+      Under tiered mode a document whose every actionable drift is code-derived is
+      closed by the ENGINE with no backend consulted at all: there is no model
+      judgement to be confident about, because the bytes are the engine's own
+      projection of the surface produced by the same functions heal calls. The fix
+      SHAPES mirror the mock backend's two rules exactly — region-scoped for a REGION,
+      whole-doc for a HASH — and the region body comes from the SAME index-aware
+      selector detect grades against, so an index region is rendered by the
+      index-aware layer rather than written wrong. Keeping the shapes apart matters:
+      one whole-doc fix per document would make a REGION close rewrite front matter it
+      never touches today, which on a legacy composite-only doc silently adds the
+      per-tier and per-symbol digests the severity classifier needs to move a FUTURE
+      HASH drift from unknown to cosmetic — the unattended write would widen what it
+      may next write unattended. The promoted-rule layer keeps its precedence, so a
+      verdict humans reached repeatedly is never overwritten by an engine write, and a
+      drift routing called mechanical that the engine cannot render becomes a loud
+      ESCALATE rather than a silent FIX carrying no fix.
+    subsystem: monitor
+    modules: [monitor, heal, blocks]
+    constraints: [K2, K4, K5, K7, K8, K10]

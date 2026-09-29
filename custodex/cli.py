@@ -593,6 +593,13 @@ def monitor(
         "--apply/--no-apply",
         help="Auto-apply FIX verdicts (defaults to the config's apply_default).",
     ),
+    tiered: bool | None = typer.Option(
+        None,
+        "--tiered/--no-tiered",
+        help="Restrain --apply to the documents the ENGINE alone can close — "
+        "every actionable drift on them `code-derived` (defaults to the config's "
+        "apply_tiered). One drift needing human intent holds the WHOLE document.",
+    ),
     ref: str | None = typer.Option(
         None,
         "--ref",
@@ -607,6 +614,14 @@ def monitor(
     Exits 1 when drift remains after remediation, 0 when clean. Each review
     record carries a ``source_sha`` provenance stamp: ``--ref``/``--source-sha``
     wins, else ``$CI_COMMIT_SHA``, else none (C-05).
+
+    ``--tiered`` (RTE-03c) confines the write to documents the engine alone can
+    close. A document carrying any drift that needs human intent is still recorded
+    for a reviewer (K5) but is not written at all — because applying its mechanical
+    half would destroy the escalation's own staleness trigger. Note it is a
+    REPLACEMENT of authority on the mechanical path, not merely a subset of
+    ``--apply``: no backend is consulted there, so a backend that would have
+    declined never gets the chance.
     """
     try:
         cfg, config_dir = _load(config)
@@ -616,7 +631,7 @@ def monitor(
             config_dir,
             source_sha=source_sha,
             doc_style=_doc_style_for(config_dir),
-        ).run(apply=apply)
+        ).run(apply=apply, tiered=tiered)
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -627,6 +642,35 @@ def monitor(
             f"{handled.drift.doc_id}: {handled.drift.kind.value} -> "
             f"{handled.result.verdict.value}{applied}"
         )
+    # RTE-03d: what tiered mode closed unattended, and — loudly — what it did NOT.
+    # No new exit code: `verified` is derived from the same recheck that already
+    # drives the `remaining` gate below, so an unverified closure ALWAYS leaves
+    # drift and exits 1 there. The deliverable is the MESSAGE naming the pathology
+    # (K8), printed before that gate so a reader sees the cause before the symptom.
+    for closure in result.closures:
+        kinds = ", ".join(closure.drift_kinds)
+        if not closure.attempted:
+            typer.echo(
+                f"closure preview: {closure.doc_id} — {kinds} would close "
+                "mechanically (dry — pass --apply)"
+            )
+        elif closure.verified:
+            typer.echo(
+                f"closure: {closure.doc_id} — {kinds} closed mechanically (no backend)"
+            )
+        elif closure.wrote:
+            typer.echo(
+                f"closure ALARM: {closure.doc_id} — auto-apply did not converge: "
+                f"the engine rewrote the document and {kinds} drift remains",
+                err=True,
+            )
+        else:
+            typer.echo(
+                f"closure ALARM: {closure.doc_id} — routing called {kinds} "
+                "mechanical but nothing was written: the engine could not render "
+                "it, or the write boundary declined",
+                err=True,
+            )
     # PROP-01: opt-in transitive-suspect advisory — purely informational, never
     # affects the exit code (the gate stays the direct wavefront, K1/K7). Guarded so a
     # doc mutated between the run and here cannot turn a clean exit into a traceback.
@@ -678,7 +722,16 @@ def sync_pr_cmd(
     """
     try:
         cfg, config_dir = _load(config)
-        result = sync_pr(Monitor(cfg, config_dir), dry_run=dry_run)
+        result = sync_pr(
+            Monitor(cfg, config_dir),
+            dry_run=dry_run,
+            # RTE-03c: this is the OPERATOR'S OWN checkout, so its `apply_tiered`
+            # is honoured — passed EXPLICITLY, never inherited by omission. The
+            # leak that had to be closed was config arriving on a path where the
+            # config is not the operator's: a remote agent's tool call, or the
+            # server's route over a CLONED repo. Both still force it off.
+            tiered=cfg.apply_tiered,
+        )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
@@ -767,7 +820,16 @@ def open_docs_pr_cmd(
     try:
         cfg, config_dir = _load(config)
         root = config_dir / cfg.root
-        result = sync_pr(Monitor(cfg, config_dir), dry_run=dry_run)
+        result = sync_pr(
+            Monitor(cfg, config_dir),
+            dry_run=dry_run,
+            # RTE-03c: this is the OPERATOR'S OWN checkout, so its `apply_tiered`
+            # is honoured — passed EXPLICITLY, never inherited by omission. The
+            # leak that had to be closed was config arriving on a path where the
+            # config is not the operator's: a remote agent's tool call, or the
+            # server's route over a CLONED repo. Both still force it off.
+            tiered=cfg.apply_tiered,
+        )
         if not result.patch:
             typer.echo("clean — nothing to open")
             return
@@ -1296,8 +1358,22 @@ def coverage(
         for line in _coverage_lines(report):
             typer.echo(line)
 
-    if fail_under is not None and report.percent_public_symbols < fail_under:
-        raise typer.Exit(code=1)
+    if fail_under is not None:
+        # RTE-02c: an EMPTY universe is not 100% covered. `percent_public_symbols`
+        # returns 100.0 for zero symbols (vacuous truth, no zero-division), so a
+        # threshold check alone would PASS a mis-scoped include glob — reporting
+        # perfection for a repo we never looked at. A gate asked to enforce a
+        # threshold over nothing is mis-configured input, which is what K8 is for.
+        if not report.public_universe:
+            typer.echo(
+                "error: coverage universe is empty — no public, non-waived symbols "
+                "were found, so --fail-under cannot be evaluated. Check the "
+                "`coverage.include` globs resolve to real source files.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if report.percent_public_symbols < fail_under:
+            raise typer.Exit(code=1)
     raise typer.Exit(code=0)
 
 
@@ -2087,7 +2163,9 @@ def onboard(
             )
             scaffolded += 1
         monitor = Monitor(bundle_cfg, bundle_dir)
-        monitor.run(apply=True)
+        # RTE-03c: arrive-green needs the FULL apply — never the scaffolded repo's
+        # own `apply_tiered`, which onboarding has not validated yet.
+        monitor.run(apply=True, tiered=False)
 
         # Self-validation evidence (arrive-green, K8).
         checks = run_checks(bundle_cfg, bundle_dir)

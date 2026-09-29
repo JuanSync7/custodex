@@ -143,3 +143,25 @@ features:
     subsystem: record
     modules: [sinks]
     constraints: [K4, K8]
+
+  - id: FEAT-RECORD-014
+    title: ClosureRecord — the alarm for an unattended close that did not close
+    summary: >-
+      Every document the engine closes unattended produces a ClosureRecord naming the
+      drift kinds and routing evidence it closed, the review record it is joinable to,
+      and three booleans: whether the write path was entered, whether bytes changed,
+      and whether the post-run recheck shows the document actually clean. The alarm
+      gates on ATTEMPTED, never on whether bytes were written, because apply_fix
+      returns False for an attempted write it declined — a preserved id or a locked
+      region — which is precisely the "routing promised mechanical closure and the
+      write boundary silently refused" case the alarm exists to catch. With no apply
+      requested the records are previews and never report a non-convergence, so the
+      most common invocation cannot raise a false alarm. No new exit code is
+      introduced: verified derives from the same recheck that already drives the
+      remaining-drift gate, so the deliverable is the message naming the pathology.
+      The record id is singular because the review-record id is per document and run,
+      so a tuple of them would be duplicates pretending to be a set. Sorted by
+      document, with sorted and deduped facets.
+    subsystem: record
+    modules: [monitor, cli]
+    constraints: [K5, K6, K8, K10]

@@ -126,6 +126,14 @@ root: "../.."
 
 version: "2.0.0"
 apply_default: false                   # does `cdx monitor` auto-apply fixes?
+# Restrain --apply to what the ENGINE alone can close: a document is written only
+# if EVERY actionable drift on it is `code-derived`. One drift needing human
+# intent holds the WHOLE document (writing its mechanical half would destroy the
+# escalation's own staleness trigger). It narrows WHICH documents may be written
+# unattended and REPLACES the verdict authority on them: the engine closes those
+# itself with no backend call, so a backend that would have declined is not asked.
+# `cdx check` prints the tally so you can see what it would close before enabling.
+apply_tiered: false
 
 # Which LLM backend produces drift verdicts (mock = offline default, used in CI).
 backend:

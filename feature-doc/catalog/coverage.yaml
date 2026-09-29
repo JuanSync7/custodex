@@ -116,3 +116,24 @@ features:
     subsystem: coverage
     modules: [coverage]
     constraints: [K0, K1, K10]
+
+  - id: FEAT-COVERAGE-011
+    title: An empty coverage universe cannot pass a `--fail-under` gate
+    summary: >-
+      RTE-02c. `percent_public_symbols` returns 100.0 when the universe is empty (vacuous
+      truth, avoiding zero-division), and `cdx coverage --fail-under N` gated purely on that
+      number — so a MIS-SCOPED `coverage.include` glob printed "100.0% documented (0/0)" and
+      exited 0. The strictest gate Custodex offers passed on a repo it never looked at. For
+      a completeness metric that is the worst possible failure mode: silent, green, and
+      maximally confident. `CoverageReport.public_universe` now exposes the public,
+      non-waived symbols the percentage divides by, so a caller can distinguish "100% of
+      many" from "100% of nothing" — the two cases the percentage deliberately cannot tell
+      apart. The arithmetic is UNCHANGED and so is the reporting path (K9): vacuous truth is
+      the right answer for a property and for a report, and other callers (the JSON payload,
+      the manifest, the server view) legitimately want a number rather than an exception. It
+      is only wrong as a GATE verdict, so only the gate changed — `--fail-under` now refuses
+      an empty universe loudly (K8), naming the likely cause, because a gate asked to
+      enforce a threshold over nothing is mis-configured input.
+    subsystem: coverage
+    modules: [coverage, cli]
+    constraints: [K1, K6, K8, K9, K10]

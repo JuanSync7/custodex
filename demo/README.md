@@ -1,11 +1,31 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: da0e063e607dc1ba
+  fingerprint: 02cd3e72a7de0f53
   fingerprint_tiers:
-    composite: da0e063e607dc1ba
-    signature: da0e063e607dc1ba
+    composite: 02cd3e72a7de0f53
+    signature: 02cd3e72a7de0f53
   schema_version: 1.0.0
+  symbol_sigs:
+    01d254983c6eabdb: 09896761ca792ecd
+    035bfab147084b99: 4c340a386f7f99d0
+    069d2548e1165eea: f3ee8c6241efded2
+    0b81151021fa9e55: c80a887908593269
+    3f18c3f2bdae2d2e: e3c3aea826fc0fc3
+    4395084cde593e1c: abd488e020796195
+    4bc74b21357c6cf5: 6fc55cf3dc30d9a5
+    55d9215a311ca38a: cd941d0c1e226393
+    7415318241c9b05b: 5e2183514a285efa
+    9055800807e449ee: d01e076b866e5734
+    920e413c7d411b61: 1c805c7c3426f37b
+    950ccd68cc3cc246: 0ba90c8cf3a1538e
+    9860ca227b0ec7d2: 30d046baa47b781b
+    c723c0f59aaa1e3c: e5e5b63f093d16e0
+    d0d8a692464a376a: 5693eb9f070b0b2b
+    d90f149f7527b7a4: 85c4a102536747a6
+    f040bcdd69d14013: 6861f45c93c62b43
+    f3dd5bbdd5c044ba: 7981097afc971095
+    fdafe75610dfceb6: bfb133130cc249a1
 ---
 # demo-taskflow — a cdx adopter repo
 

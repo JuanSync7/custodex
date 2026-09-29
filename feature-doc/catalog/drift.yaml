@@ -63,7 +63,9 @@ features:
     title: Anchor-identity change classification
     summary: >-
       On a HASH drift, detect compares the documented symbol anchor_ids against the
-      stamped region anchor set and records Drift.anchors_added / anchors_removed —
+      stamped region anchor MULTISET (one entry per same-name symbol, so deleting one of
+      two `main`s is a removal; a count-only decrease the stored signature tier proves
+      stale is not) and records Drift.anchors_added / anchors_removed —
       both empty means the SAME symbols changed internally (a re-bind/move), while a
       nonempty delta means a symbol was added, removed or renamed (a structural
       change). Empty when the doc predates anchor stamping.
@@ -147,9 +149,70 @@ features:
       non-empty sigs_changed ABOVE the addition rule, closing the former masked
       false-negative where an in-place signature change was hidden as ADDITIVE whenever a
       symbol was also added in the same edit. A pure addition (no survivor moved) stays
-      ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that
+      ADDITIVE — unless a STAMPED anchor now repeats and the additions cannot be proven to
+      reproduce the stored signature tier, when rule 2b (CKI-1a, Drift.sigs_ambiguous)
+      grades it BREAKING — and a docstring/body-only move stays COSMETIC; a doc that
       predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never
       crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
     subsystem: drift
     modules: [extract, manifest, heal, drift]
     constraints: [K6, K8, K10]
+
+  - id: FEAT-DRIFT-013
+    title: The apply-tier router — which authority can close a drift
+    summary: >-
+      RTE-01 classifies every Drift with the AUTHORITY that could close it, so human
+      attention can be spent only where the code cannot answer the question. `ApplyTier`
+      is a provenance name, never a magnitude (K11 bans a bare confidence float — and a
+      float is also the wrong model, because on the code-derived path there is no model
+      judgement to be confident about: the bytes are the engine's own projection of the
+      surface, produced by the same functions heal calls). CODE_DERIVED = a renderer-backed
+      region body or a symbol-table refresh whose ChangeSeverity proves no sentence was
+      falsified; DELEGATED = prose a model authors into a region a HUMAN declared
+      `mode: llm`; NEEDS_INTENT = closing it needs a WHY the code cannot supply.
+      `classify_apply_tier` is a pure, clock-free, backend-free ordered precedence chain
+      (12 rules, first match wins, DENY BY DEFAULT) returning the tier plus sorted evidence
+      naming the rule that fired; it CONSUMES classify_change_severity and never re-tunes
+      it (K9). Kind rules precede the healable rule so SUSPECT_LINK/UNHEALABLE keep
+      distinct evidence instead of collapsing into one string; LLM_SEEDED is denied
+      wholesale because the classifier is given the region MODE but not the LOCK state, and
+      a rule must not decide what its inputs cannot evaluate. There is deliberately NO
+      audience term — K3 is already enforced upstream inside the fingerprint, so a
+      user-guide's drifted_tiers can only ever be ("signature",) and COSMETIC is
+      structurally unreachable there; a hand-written clause would double-count K3.
+      `auto_routable_docs` folds the per-DRIFT tiers to a per-DOCUMENT verdict: ONE
+      NEEDS_INTENT drift holds the WHOLE document. That grain is the correctness condition,
+      not a refinement — heal skips a region it cannot render but still stamps the doc
+      fingerprint, and that stamp is the ONLY staleness trigger such a region has, so
+      per-drift routing would let a mechanical HASH refresh bless its own sibling prose
+      region into PERMANENT staleness with `cdx check` green forever. SUSPECT_LINK is
+      excluded from the fold (Monitor never applies or blesses one, so a doc↔doc edge must
+      not veto its document). Detect-only and byte-identical in behaviour: the tier is
+      reported in `DriftReport.summary()` and nothing is applied differently (the
+      `apply_tiered` gate is RTE-03).
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1, K2, K3, K6, K9, K10, K11]
+
+  - id: FEAT-DRIFT-014
+    title: The mechanical fold — which documents the ENGINE alone can close
+    summary: >-
+      RTE-01 answered "could this drift close itself?"; RTE-03b answers the strictly
+      narrower question an unattended write actually depends on — "could the ENGINE
+      close this DOCUMENT, with no model consulted at all?". `docs_closable_by`
+      generalises the per-document fold over any set of tiers, `AUTO_TIERS` is DERIVED
+      from `is_auto` rather than restated as a literal, `auto_routable_docs` becomes a
+      one-line delegate whose output is unchanged, and `mechanical_docs` folds over
+      CODE_DERIVED alone. DELEGATED is deliberately excluded: it is auto-routable but
+      is prose a model authors, which carries a K11 widening needing explicit human
+      ratification. The closing fold additionally requires at least one qualifying
+      ACTIONABLE drift, because the fold is otherwise "nothing blocks" and a document
+      whose only drift is a doc-to-doc suspect link is a member by vacuous truth —
+      harmless for routing, where nothing reaches the apply gate, but a phantom closure
+      when the same set decides what gets written. `DriftReport.summary` reports the
+      three-way tally (mechanical / delegated / need human intent) over the documents
+      that have something to close, so `cdx check` answers "how much of this would
+      unattended mode close?" as a number rather than an argument.
+    subsystem: drift
+    modules: [drift]
+    constraints: [K1, K9, K10, K11]

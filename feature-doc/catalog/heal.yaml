@@ -113,3 +113,18 @@ features:
     subsystem: heal
     modules: [heal]
     constraints: [K2, K10]
+
+  - id: FEAT-HEAL-010
+    title: Heal declines a region only the index-aware layer can render
+    summary: >-
+      expected_region returns None for a source index region template, because an
+      index table is a function of the config's other documents and not of the one
+      surface this selector is given. Heal then hits its existing skip guard and
+      leaves the region byte-identical instead of authoring a header-only table
+      over it, which is what silently deleted every row of a live index region.
+      Declining is safe because detect grades an index region against the
+      index-aware renderer unconditionally, so a skipped index region still drifts
+      on the very next check rather than being blessed by the fingerprint stamp.
+    subsystem: heal
+    modules: [blocks, heal]
+    constraints: [K2, K7, K8]

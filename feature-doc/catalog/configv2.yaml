@@ -223,3 +223,16 @@ features:
     subsystem: configv2
     modules: [config, extract, heal]
     constraints: [K0, K2, K5, K7, K10]
+
+  - id: FEAT-CONFIGV2-018
+    title: Every index global is lifted onto MonitorConfig
+    summary: >-
+      The merge lift is the one silent plumbing step in the config directory form: a new
+      global declared on the index file but never carried into MonitorConfig loads
+      without error and is simply ignored — the knob exists in the schema, the adopter
+      sets it, and nothing happens. A guard asserts that every index-file field except
+      the four that are structurally index-only names a real MonitorConfig field, so the
+      next global cannot be half-plumbed.
+    subsystem: configv2
+    modules: [config]
+    constraints: [K8, K9]

@@ -240,3 +240,16 @@ features:
     subsystem: cli
     modules: [cli]
     constraints: [K6]
+
+  - id: FEAT-CLI-023
+    title: cdx monitor --tiered, and the routing tally on cdx check
+    summary: >-
+      `cdx monitor --tiered/--no-tiered` overrides the config's `apply_tiered`, exactly
+      as `--apply` overrides `apply_default`. On a held document it writes nothing and
+      still exits 1 through the pre-existing remaining-drift gate, so the exit-code
+      contract is unchanged (K9) — the deliverable is the restraint, not a new exit
+      code. `cdx check` reports the three-way routing tally so an adopter can read off
+      how much unattended mode would close before switching it on.
+    subsystem: cli
+    modules: [cli]
+    constraints: [K9]
