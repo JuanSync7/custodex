@@ -1,0 +1,44 @@
+features:
+  - id: FEAT-CODEINDEX-001
+    title: The persisted code index — `.cdmon/code-index.json` + `cdx codeindex`
+    summary: >-
+      codeindex.build_code_index folds the EXACT `cdx coverage` universe
+      (coverage.include/exclude → discover_files + discover_symbols) into a
+      versioned, diffable artifact: every file with a sha256[:16] content
+      digest, every symbol with its span and per-tier digests (sig_digest is
+      byte-identical to the DIG-01 cdm.symbol_sigs value — one identity
+      scheme, never two). Stamps (generated_by, source_sha) are provenance,
+      never identity: the idempotent writer compares schema_version + files
+      content only (index_in_sync), so
+      an unchanged tree writes zero bytes (K7) and the surviving source_sha
+      reads "content unchanged since" (the index.yaml updated:/N-06 analog).
+      diff_code_index attributes a tree change to files and symbols per tier
+      (added/removed/signature/docstring/body), short-circuiting unchanged
+      files on the content digest (SP-RF1: content, never mtime). `cdx
+      codeindex` is read-only by default (K1); --write is the one mutating
+      mode; --check exits 1 on a stale artifact; --ref/$CI_COMMIT_SHA inject
+      the stamp (K10 — never read from git inside the builder). No absolute
+      path and no wall-clock anywhere in the artifact.
+    subsystem: codeindex
+    modules: [codeindex, cli]
+    constraints: [K0, K1, K6, K7, K8, K10]
+  - id: FEAT-CODEINDEX-002
+    title: "`cdx impact` — the diff→docs surgical join"
+    summary: >-
+      codeindex.impact_report answers "I changed the tree — which docs are
+      affected, through which symbols?" WITHOUT a full check: it diffs the
+      stored code index against the current tree (built in memory, writing
+      nothing — K1) and joins every changed symbol to the docs covering it.
+      `direct` uses the docmap.symbol_owners public entity join for
+      surviving symbols and an honest file-level fallback for added/removed
+      ones (selection-aware attribution needs a surface that no longer, or
+      does not yet, exist). `via_callers` extends the blast radius ONE xref
+      hop through .cdmon/xrefs.json when present — never transitive (the
+      `deps --transitive` advisory precedent); callers_available=False
+      states plainly that an absent artifact means unknown callers, not no
+      callers. Informational like `report`: exit 0 whenever the join runs;
+      the one loud failure is a missing stored index (K8). Pure and sorted
+      (K10).
+    subsystem: codeindex
+    modules: [codeindex, cli]
+    constraints: [K0, K1, K8, K10]

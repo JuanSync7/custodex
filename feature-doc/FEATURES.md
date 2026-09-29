@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**252 features** across 32 subsystems.
+**256 features** across 35 subsystems.
 
 ## agent
 
@@ -208,6 +208,21 @@ A FixRequest carries additive authoring inputs — `context_refs` glance-through
 ### `FEAT-CLI-022` — Schema export (cdx schema)
 
 `cdx schema` emits the public review-record JSON schema (`review_record_schema`) to stdout, or to `--out FILE` — one source of truth for the record contract (K6).
+
+## codeindex
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-CODEINDEX-001` | The persisted code index — `.cdmon/code-index.json` + `cdx codeindex` | codeindex, cli | K0, K1, K6, K7, K8, K10 | — | — | implemented |
+| `FEAT-CODEINDEX-002` | `cdx impact` — the diff→docs surgical join | codeindex, cli | K0, K1, K8, K10 | — | — | implemented |
+
+### `FEAT-CODEINDEX-001` — The persisted code index — `.cdmon/code-index.json` + `cdx codeindex`
+
+codeindex.build_code_index folds the EXACT `cdx coverage` universe (coverage.include/exclude → discover_files + discover_symbols) into a versioned, diffable artifact: every file with a sha256[:16] content digest, every symbol with its span and per-tier digests (sig_digest is byte-identical to the DIG-01 cdm.symbol_sigs value — one identity scheme, never two). Stamps (generated_by, source_sha) are provenance, never identity: the idempotent writer compares schema_version + files content only (index_in_sync), so an unchanged tree writes zero bytes (K7) and the surviving source_sha reads "content unchanged since" (the index.yaml updated:/N-06 analog). diff_code_index attributes a tree change to files and symbols per tier (added/removed/signature/docstring/body), short-circuiting unchanged files on the content digest (SP-RF1: content, never mtime). `cdx codeindex` is read-only by default (K1); --write is the one mutating mode; --check exits 1 on a stale artifact; --ref/$CI_COMMIT_SHA inject the stamp (K10 — never read from git inside the builder). No absolute path and no wall-clock anywhere in the artifact.
+
+### `FEAT-CODEINDEX-002` — `cdx impact` — the diff→docs surgical join
+
+codeindex.impact_report answers "I changed the tree — which docs are affected, through which symbols?" WITHOUT a full check: it diffs the stored code index against the current tree (built in memory, writing nothing — K1) and joins every changed symbol to the docs covering it. `direct` uses the docmap.symbol_owners public entity join for surviving symbols and an honest file-level fallback for added/removed ones (selection-aware attribution needs a surface that no longer, or does not yet, exist). `via_callers` extends the blast radius ONE xref hop through .cdmon/xrefs.json when present — never transitive (the `deps --transitive` advisory precedent); callers_available=False states plainly that an absent artifact means unknown callers, not no callers. Informational like `report`: exit 0 whenever the join runs; the one loud failure is a missing stored index (K8). Pure and sorted (K10).
 
 ## config
 
@@ -914,6 +929,16 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
 
+## okf
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-OKF-001` | The OKF v0.2 bundle projection — `cdx okf` | okf, cli | K0, K1, K6, K7, K8, K10 | — | — | implemented |
+
+### `FEAT-OKF-001` — The OKF v0.2 bundle projection — `cdx okf`
+
+okf.export_okf projects the managed doc set into a Google Open Knowledge Format v0.2 bundle (.cdmon/okf by default) — a PROJECTION of existing truths (config + doc bytes + the local review and resolutions logs + the pure drift report), never a storage format: deleting it changes nothing and regenerating is byte-idempotent because the bundle is deliberately clock-free (v0.2 makes generated.at optional; we emit generated:{by} only — K10, plain per-file compare-skip K7). Each concept carries the one REQUIRED type field (doc-style document-type mapped to a display name, audience fallback), title/description/resource/tags, sources[] from code_refs, verified[] events with the spec-MUST human: prefix under ONE verdict per doc — only while the doc has no outstanding drift and no CURRENT review (a record's last-write resolution, graded against the doc's stored fingerprint and recorded at or after its newest record) rejects it or holds an override whose text is not yet in the body byte-for-byte; then one event per current accept or landed override with a recorded resolver, never human:unrecorded; the claim is bound to the code surface, not the content, and `cdx okf` runs drift detection only when some doc would verify — and a custodex: extension block (doc_id, audience, fingerprint) — the round-trip tag back to the cdm contract, legal per the v0.2 extensions clause. Bodies are byte-verbatim minus the cdm: front matter; the bundle mirrors spec.path so relative links survive; the bundle-root index.md carries okf_version "0.2" and nothing else; a doc NAMED index.md is emitted frontmatter-less as its directory's index file, while a log.md doc, a bundle-root index.md doc, a path escaping the bundle root or two doc ids on one bundle path is a loud ConfigError (K8). `cdx okf` follows the `cdx wiki` precedent (default writes, --check gates, --out overrides); foreign files under --out are never pruned.
+
 ## onboard
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -1198,6 +1223,16 @@ srcindex.render_source_wiki_md renders the source wiki from a SourceIndex — pe
 ### `FEAT-REFERENCE-007` — cdx wiki regeneration + freshness gate
 
 wiki.regenerate, driven by `cdx wiki`, regenerates ALL of EPIC R's derived artifacts from their single sources in one command — feature-doc/FEATURES.md plus the test, source, and traceability wikis under feature-doc/wiki/ — via a shared WIKI_TARGETS (path -> render thunk) that is the single source of the output set, so write-mode and --check can never diverge. `cdx wiki` writes every changed target (a second run is a no-op — idempotent K7); `cdx wiki --check` is the read-only CI freshness gate that lists every stale file and exits nonzero without writing (loud K8). Deterministic (K10), no new dependency (K0). With `cdx trace --fail-on-gap` wired into CI, the golden reference can no longer silently drift from the code, demos, or tests.
+
+## scip
+
+| ID | Feature | Modules | Constraints | Demos | Tests | Status |
+|----|---------|---------|-------------|-------|-------|--------|
+| `FEAT-SCIP-001` | The stdlib SCIP reader — `cdx scip` → `.cdmon/xrefs.json` → REFERENCES edges | scip, kgraph, cli | K0, K1, K6, K7, K8, K10, K11 | — | — | implemented |
+
+### `FEAT-SCIP-001` — The stdlib SCIP reader — `cdx scip` → `.cdmon/xrefs.json` → REFERENCES edges
+
+scip.read_scip decodes a SCIP protobuf index with the standard library alone — varint + LEN walking, packed AND unpacked repeated int32, the deprecated range/enclosing_range fields AND the typed range fields 8–11 (typed wins) — no protobuf dependency (K0); malformed wire bytes are a loud ExtractionError (K8) while odd SYMBOLS (locals, parameters, unresolvable targets) are data that tally into XrefSet.unmapped, the honesty counter. scip_symbol_to_dotted parses the full symbol grammar (double-space escapes, doubled backticks, every descriptor suffix) and build_xrefs projects references onto the EXISTING entity universe: target resolution by longest module split with a unique-suffix match (the scip-python project-root-relative quirk), source attribution by narrowest containing code-index span, public endpoints only, self-edges dropped, occurrence counts as provenance weight. SCIP is a CONSUMED format: a human runs the indexer and hands the file to `cdx scip` — custodex never shells out (K11). kgraph folds the persisted edges in additively as REFERENCES/indexed (schema_version 1.1.0, K6); the per-language coverage map travels with the artifact so an absent edge is never misread as an absent call.
 
 ## server
 

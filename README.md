@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 00687b8ee92fe521
+  fingerprint: 795aba8aff5201a0
   fingerprint_tiers:
-    composite: 00687b8ee92fe521
-    signature: 00687b8ee92fe521
+    composite: 795aba8aff5201a0
+    signature: 795aba8aff5201a0
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -12,6 +12,7 @@ cdm:
     0c9d51b72e16a207: 468c2620ca834755
     0d6e4079e36703eb: 14346d3eb68974a0
     12a435ec8454c6d1: a2ca2be3282d0600
+    184fb63b58524248: 2122a88f4f75b611
     1a4e31eebbd1771e: 7bd3f0f4e54746a8
     1bc04b5291c26a46: 76a6557de9f6049e
     1d3c8aff2168435b: 7f757c94419dec88
@@ -19,9 +20,11 @@ cdm:
     24c458cfb46d9a45: 953d02f5d1ac5781
     2c6c03ca07d1b881: 5a4a02b022bccca2
     2cc497857559ff85: 6724a3e462f7b17d
+    2e058c51303d1f55: 44e675789f8b7feb
     44575cf5b28512d7: deba6b00c018c6ab
     602fda589448378a: 8afb4765b2d48e0c
     6aa02816300e85df: a142792c2addee3d
+    6f61f46c23a66607: dec820ee752ae454
     72f4be89d6ebab14: 82cdb795b1cfefb7
     75c75efe327a8ef3: 41b3443a5133331f
     763cdc62a869262b: 3209114b9963834b
@@ -40,6 +43,7 @@ cdm:
     da966368ea663ea5: f39ba256826afdf5
     dc726d0a525fdaf7: 894e9d00b0e3d086
     df0ad6e43880f09c: 3019fb39391d3113
+    e7c6abb0f612da82: aa0b80d67b1abad2
     eafe895eb8119e6e: 2492d10714d01761
     eb2554c8c13b73f9: 34e432f7557b73ab
     edcc4b4214b84e54: 1fc512bec079aec4

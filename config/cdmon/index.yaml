@@ -3,7 +3,7 @@
 cdmon-config-version: "2.0.0"
 repo: "custodex"
 generated-by: cdx
-updated: "2026-07-17T17:15:03.929296+00:00"
+updated: "2026-09-29T05:03:43.744993+00:00"
 ---
 # custodex's own configuration (dir layout) — it monitors ITS OWN source
 # against its own engineering docs (dogfooding the CONFIG-V2 multi-file layout).
@@ -94,6 +94,12 @@ coverage:
       reason: "EPIC MCP pure tool projection (status_summary/load_repo_bundle); documented in feature-doc/catalog/mcp.yaml (api doc owned by cdx wiki)"
     - path: "custodex/mcp/server.py"
       reason: "EPIC MCP FastMCP server builder ([mcp] extra); documented in feature-doc/catalog/mcp.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/codeindex.py"
+      reason: "EPIC CIX persisted code index; documented in feature-doc/catalog/codeindex.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/scip.py"
+      reason: "EPIC CIX stdlib SCIP reader + xrefs artifact; documented in feature-doc/catalog/scip.yaml (api doc owned by cdx wiki)"
+    - path: "custodex/okf.py"
+      reason: "EPIC OKF v0.2 bundle projection; documented in feature-doc/catalog/okf.yaml (api doc owned by cdx wiki)"
     - path: "tests/smoke/__init__.py"
       reason: "empty test-package marker; no documentable surface (FEAT-CONFIGV2-017 test-doc mirror covers the smoke test modules themselves)"
 
