@@ -3755,3 +3755,322 @@ tags the feature; `tools.py`/`server.py` stay coverage-waived (edits).
 - **MCP-03** — streamable-HTTP transport mounted on the central hub (remote,
   multi-repo, over the existing `_verify_token` auth).
 - **MCP-04** — migrate to the `mcp` SDK v2 (post-2026-07-28).
+
+## EPIC CIX — the persisted code index, cross-references, and impact  (`custodex/codeindex.py`, `custodex/scip.py` — K0/K1/K6/K7/K8/K10/K11)
+
+Today every run recomputes the code surface and throws it away: nothing under
+`.cdmon/` is code-side, so there is nothing to diff a working tree against and
+no way to attribute a change to the docs it touches without a full re-extract.
+EPIC CIX persists the surface as a versioned, diffable artifact and layers
+symbol→symbol reference edges (from a SCIP index) and a change→doc impact join
+on top. Four ⟨R⟩ decisions:
+
+1. ⟨R⟩ **The index is a projection, never a truth.** `.cdmon/code-index.json` is
+   regenerable from the tree at any time; deleting it changes no behavior. The
+   coverage universe IS the index universe: the builder reuses
+   `inventory.discover_files(root, include=cfg.coverage.include,
+   exclude=cfg.coverage.exclude)` + `discover_symbols` (the exact `cdx coverage`
+   lines), so index scope never diverges from coverage scope (K0 — scope enters
+   through config).
+2. ⟨R⟩ **Stamps are provenance, never identity.** `source_sha`/`generated_by`
+   ride ON the artifact but enter no digest and no comparison: the idempotent
+   writer compares `files` content only, so an unchanged tree writes zero bytes
+   (K7) and the surviving `source_sha` reads "content unchanged since" (the
+   `index.yaml updated:`/N-06 blank-compare analog). Content digests are
+   `sha256[:16]` over bytes/payloads per the extract.py convention; no
+   wall-clock, no absolute paths anywhere in the artifact (K10 — the
+   `Inventory.root` absolute path deliberately does NOT cross into it).
+3. ⟨R⟩ **SCIP is a consumed format, not a dependency.** `scip.py` decodes the
+   protobuf wire format with stdlib only (varint + LEN walking; packed AND
+   unpacked int32 ranges; deprecated `range`=1/`enclosing_range`=7 AND typed
+   fields 8–11) — no `protobuf` package (K0). Reference attribution is span
+   containment: a reference occurrence in document D belongs to the narrowest
+   `code-index` symbol span in D that contains it (scip-python emits
+   `enclosing_range` only on definitions, never `enclosing_symbol`). Edges join
+   the entity universe by minting the EXISTING id scheme
+   `symbol <posix-path>#<Class.method>` (entities.py:296), public endpoints
+   only; a per-language `coverage` map states which languages have reference
+   data so absent edges are never read as absent calls (honesty over silence).
+4. ⟨R⟩ **The xrefs input pin is content the join could VOUCH for, never a stamp
+   — and no edit made after the join is exempt** (CIX-03b).
+   `XrefSet.input_digests` = `{path: content_digest}` of every code-index file a
+   SCIP document joined (a suffix-recovered document keyed by its INDEX path),
+   plus every same-language file with no public symbol — EXCEPT a file whose
+   stored entry is not what the tree gives at join time. `cdx scip` builds the
+   tree in memory and passes it as `build_xrefs(tree_index=…)`: the WHOLE
+   `IndexedFile` must be equal, spans and symbols over identical bytes included.
+   When the tree does not extract (any `ExtractionError`) it passes
+   `tree_digests=file_digests(…)` instead — `(language, content_digest)` only.
+   Given both, a file must pass both. The pin is exactly the joined set minus
+   `unsynced_paths(stored, fresh)`, the files the STALE warning names; the vouch
+   narrows the pin, never the edges. `input_languages` records the joined
+   languages at build time. Both fields enter `write_xrefs`' compare, which
+   ignores only `_STAMPS` (`generated_by`, `source_sha`).
+   `unknown_caller_files` lists, sorted: a covered-language file the pin does not
+   hold at its `current` digest, every `edited` file, a pinned file that is gone,
+   and every edge SOURCE the pin does not hold. No covered language ⇒ the pin
+   vouches for nothing; `input_digests=None` (a pre-pin artifact) ⇒ currency
+   unknown. `cdx graph` judges against the tree (`file_digests`). `cdx impact`
+   judges against the STORED baseline and passes EVERY file its diff modifies as
+   `edited`, whatever the edit, because the stored xrefs cannot hold an edited
+   file's current outgoing references. An ADDED file is not such an edit: its
+   edge sources are its own `symbols_added`, already `direct` through the same
+   owners join. `IndexedFile` stays the base schema above (no
+   `residual_digest`). Do NOT: turn the pin into a stamp; re-derive the covered
+   languages from pinned paths; exempt an edited file by reasoning about which
+   symbol digest moved (rounds 2–5 of CIX-03b each shipped a silent under-report
+   that way — LESSON [CIX-03b]); or vouch by bytes when a fresh build is
+   possible.
+
+### `custodex/codeindex.py`  (CIX-01 + CIX-03 — pure core, one isolated writer)
+
+```python
+CODE_INDEX_PATH = Path(".cdmon") / "code-index.json"   # config_dir-anchored (graph.json precedent)
+class IndexedSymbol(BaseModel):    # frozen, extra=forbid — one symbol, span + per-tier digests
+    name: str; kind: str; signature: str; lineno: int; end_lineno: int; is_public: bool
+    anchor: str          # extract.anchor_id(name) — lineno-free identity (P4)
+    sig_digest: str      # _hash_payload({name,kind,signature,is_public}) == cdm.symbol_sigs value (DIG-01)
+    doc_digest: str | None   # sha256[:16] of the docstring; None when absent
+    body_digest: str | None  # Symbol.body_hash carried through (None for class/variable/shell)
+class IndexedFile(BaseModel):
+    path: str; language: str; content_digest: str    # sha256[:16] of file BYTES (SP-RF1: content, never mtime)
+    symbols: tuple[IndexedSymbol, ...]               # sorted (name, lineno) (K10)
+class CodeIndex(BaseModel):
+    schema_version: str = "1.0.0"; generated_by: str          # "custodex/<version>"
+    source_sha: str | None = None                    # injected (--ref/$CI_COMMIT_SHA), NEVER hashed/compared
+    files: tuple[IndexedFile, ...]                   # sorted by path (K10)
+GENERATED_BY = f"custodex/{__version__}"   # the producer stamp (provenance, never identity)
+def build_code_index(config: MonitorConfig, root: Path, *, generated_by: str = GENERATED_BY, source_sha: str | None = None) -> CodeIndex   # pure fold over the coverage inventory, extracted ONE file at a time: unreadable bytes, or any extraction ValueError (Python 3.10's NUL byte; ast.unparse past the int-to-str digit limit) → ExtractionError naming the file (K8), never a bare OSError/ValueError
+def read_code_index(cdmon_dir: Path) -> CodeIndex | None      # missing → None; corrupt → SchemaError (K8)
+UNREADABLE_DIGEST = "unreadable"   # file_digests' sentinel for an unreadable file — non-hex, never equals a real digest
+def file_digests(config: MonitorConfig, root: Path) -> dict[str, tuple[str, str]]   # TOTAL: path → (language, content_digest | UNREADABLE_DIGEST) over the SAME coverage scan, raw bytes, no extraction
+def stale_paths(index: CodeIndex, listing: Mapping[str, tuple[str, str]]) -> tuple[str, ...]   # pure, sorted: content-level disagreement with a tree listing — `cdx scip`'s fallback when the tree does not extract
+def unsynced_paths(stored: CodeIndex, current: CodeIndex) -> tuple[str, ...]   # pure, sorted: files whose WHOLE entry differs (added/removed/any field) — `cdx scip`'s exact STALE check
+def index_in_sync(stored: CodeIndex, current: CodeIndex) -> bool   # THE stamp-blind compare (schema_version + files) — backs the writer skip and `codeindex --check`
+def write_code_index(index: CodeIndex, cdmon_dir: Path) -> bool   # IMPURE writer — index_in_sync skip (K7); a corrupt existing artifact is replaced; called only by `cdx codeindex --write`, NEVER by check (K1)
+class FileDelta(BaseModel):        # one changed file, symbol names sorted per bucket
+    path: str; status: Literal["added", "removed", "modified"]
+    symbols_added: tuple[str, ...] = (); symbols_removed: tuple[str, ...] = ()
+    sigs_changed: tuple[str, ...] = (); docs_changed: tuple[str, ...] = (); bodies_changed: tuple[str, ...] = ()
+class CodeIndexDiff(BaseModel):
+    files: tuple[FileDelta, ...]   # only files with a delta, sorted by path (K10)
+def diff_code_index(old: CodeIndex, new: CodeIndex) -> CodeIndexDiff   # pure; content_digest short-circuits unchanged files
+# CIX-03 — the change→doc impact join (pure; docmap.symbol_owners is the coverage join)
+class DocImpact(BaseModel):
+    doc_id: str; direct: tuple[str, ...]; via_callers: tuple[str, ...]   # entity ids, sorted
+class ImpactReport(BaseModel):
+    deltas: tuple[FileDelta, ...]; docs: tuple[DocImpact, ...]
+    callers_available: bool              # True ONLY for pinned xrefs current against `stored` AND a diff that modifies no covered file
+    callers_unknown: tuple[str, ...] = ()   # baseline lag + unpinned edge sources + EVERY modified covered file — sorted; additive (K6)
+def impact_report(config: MonitorConfig, root: Path, stored: CodeIndex, current: CodeIndex, xrefs: "XrefSet | None") -> ImpactReport
+```
+
+`cdx codeindex` (read-only default, K1/K11 flag conventions): summary to stdout;
+`--write` = the one mutating mode (echoes `wrote`/`unchanged`, K7); `--check` =
+exit 1 when the stored artifact's `files` differ from the current tree (stamp-
+blind compare); `--json`; `--ref` else `$CI_COMMIT_SHA` else None (monitor
+precedent). `cdx impact` (read-only ALWAYS, K1): loud `SchemaError`-style error
+when no stored index (`run cdx codeindex --write first`), builds the current
+index in memory, prints per-doc impact; `--json`. When the xrefs are stale,
+unvouched or unpinned — and for EVERY file the diff modifies — `cdx impact`
+prints `# caller data unknown for N file(s) whose current outgoing references
+are not in the stored xrefs … listed whether or not a reference changed`
+(`scip.caller_currency_note(…, remedy=scip.IMPACT_REMEDY)`) and reports
+`callers_available: false` + `callers_unknown`. Its remedy keeps the baseline:
+re-run the indexer and `cdx scip --write`; NEVER `cdx codeindex --write` before
+the impact is reviewed (that resets the baseline the report diffs against); a
+file with a pending edit stays unknown until the change lands. Errors: corrupt
+artifacts → `SchemaError`; extraction failures propagate `ExtractionError`, and
+an unreadable coverage file or an extraction ValueError is the same typed
+`ExtractionError` (clean `error:`, exit 1) — no new error class, K8 via the
+existing taxonomy.
+
+### `custodex/scip.py`  (CIX-02 — stdlib decoder + mapper; xrefs artifact)
+
+```python
+XREFS_PATH = Path(".cdmon") / "xrefs.json"
+class ScipOccurrence(BaseModel):   # decoded, normalized: 4-int half-open range, roles bitmask
+    symbol: str; roles: int; start_line: int; start_char: int; end_line: int; end_char: int
+class ScipDocument(BaseModel):
+    relative_path: str; language: str; occurrences: tuple[ScipOccurrence, ...]
+class ScipIndex(BaseModel):
+    tool_name: str; tool_version: str; project_root: str; documents: tuple[ScipDocument, ...]
+def read_scip(path: Path) -> ScipIndex            # stdlib wire decode; malformed → ExtractionError (K8)
+def scip_symbol_to_dotted(symbol: str) -> str | None   # grammar parse + backtick unescape; 'local …'/params → None
+class XrefEdge(BaseModel):
+    source: str; target: str; count: int          # entity ids (`symbol <path>#<name>`); count = occurrence tally
+class XrefSet(BaseModel):
+    schema_version: str = "1.0.0"; generated_by: str; tool: str    # e.g. "scip-python/0.6.6"
+    source_sha: str | None = None                 # provenance stamp, never compared (⟨R⟩2)
+    coverage: dict[str, str]                      # language → producer — the honesty map
+    unmapped: int                                 # references whose target never joined the index (rot/scope signal)
+    edges: tuple[XrefEdge, ...]                   # sorted (source, target) (K10)
+    unattributed: int = 0                         # resolved public refs with no public source: no enclosing span, or (unvouched file) a private/self span — counted, never lost
+    input_digests: dict[str, str] | None = None   # ⟨R⟩4 INPUT PIN — vouched content only, keyed by INDEX path; None = pre-pin artifact (currency unknown)
+    input_languages: tuple[str, ...] = ()         # ⟨R⟩4 covered languages, recorded at build time; () = the pin vouches for nothing
+def build_xrefs(scip: ScipIndex, index: CodeIndex, *, generated_by: str = GENERATED_BY, source_sha: str | None = None, tree_digests: Mapping[str, tuple[str, str]] | None = None, tree_index: CodeIndex | None = None) -> XrefSet   # pure: dotted→(path,qualname) by module-suffix match over index paths; enclosing symbol = narrowest span, ties → first in (name, lineno) order; public endpoints only; self-edges dropped; pins a file only when it passes every vouch given — tree_index: whole IndexedFile equal to a fresh build (exact); tree_digests: (language, content_digest) (fallback); neither = the index IS the tree
+def read_xrefs(cdmon_dir: Path) -> XrefSet | None  # missing → None; corrupt → SchemaError (K8)
+def write_xrefs(xrefs: XrefSet, cdmon_dir: Path) -> bool   # IMPURE writer — skip iff everything but _STAMPS is equal (K7; per-field census test)
+def unknown_caller_files(xrefs: XrefSet, current: Mapping[str, tuple[str, str]], *, edited: Collection[str] = ()) -> tuple[str, ...] | None   # pure, sorted (⟨R⟩4); None = no pin
+IMPACT_REMEDY: str   # `cdx impact`'s remedy: re-index + `cdx scip --write`, never refresh the baseline before review (UI copy)
+def caller_currency_note(unknown: tuple[str, ...] | None, *, remedy: str = <refresh remedy>) -> str | None   # the ONE "caller data unknown for N file(s) whose current outgoing references are not in the stored xrefs … listed whether or not a reference changed" line; None = current
+```
+
+`cdx scip INDEX_FILE` (K11 — an explicit human verb consuming an
+externally-produced index; custodex never shells out to scip-python): summary
+default (edges, unmapped, unattributed), `--write` persists
+`.cdmon/xrefs.json`, `--json`. A stored code index is checked against a FRESH
+in-memory build, whole entry per file (`unsynced_paths`, `tree_index`); if the
+tree does not extract (any `ExtractionError`, an extraction ValueError
+included) it is checked by content instead (`file_digests` + `stale_paths`),
+so an unreadable or unextractable file is STALE, never fatal. STALE files are
+named on stderr and left out of the pin, so impact and graph report them
+unknown. The advice to run `cdx codeindex --write` carries the caveat "once
+any pending `cdx impact` is reviewed". The verb warns and never refuses.
+kgraph additive bump (K6): `EdgeKind.REFERENCES = "references"` +
+`EdgeTier.INDEXED = "indexed"`, `KnowledgeGraph.schema_version` "1.0.0"→"1.1.0",
+`build_graph(config, root, *, unit_owner=None, xrefs: tuple[XrefEdge, ...] = (),
+xref_notes: tuple[str, ...] = ())` — the defaults keep byte-identical output;
+`xref_notes` ride `warnings` AFTER the registry's. `cdx graph` reads
+`.cdmon/xrefs.json` when present and folds REFERENCES/indexed edges in (both
+endpoints minted as SYMBOL nodes; no dedup against MENTIONS — different kinds,
+deliberately co-present). It checks the pin against the tree (`file_digests`,
+total) with the default refresh remedy, and prints the note in text views, in
+`warnings` for `--json`/`--write`, and on stderr under `--focus --json`; a
+pre-pin artifact yields the "carries no input pin" note.
+
+### `custodex/okf.py`  (OKF-01 — the OKF v0.2 bundle projection)
+
+```python
+OKF_DIR = Path(".cdmon") / "okf"
+class OkfExportResult(BaseModel):
+    written: tuple[str, ...]; unchanged: tuple[str, ...]; skipped: tuple[str, ...]   # bundle-relative paths / missing doc ids
+def okf_type_for(spec: DocumentSpec, doc_style: DocStyleMap | None) -> str    # doc-style document-type → "API Reference"/…; audience fallback "User Guide"/"Engineering Guide"
+VERIFYING_RESOLUTIONS: frozenset[Resolution] = frozenset({Resolution.ACCEPTED, Resolution.OVERRIDDEN})   # outcomes that CAN attest (an override only once its text is in the body byte-for-byte as one contiguous block)
+DISPUTING_RESOLUTIONS: frozenset[Resolution] = frozenset({Resolution.REJECTED})   # one current dispute withholds every claim on the doc; INVALIDATED is in neither set
+def pending_verifications(config: MonitorConfig, root: Path, *, records: Sequence[ReviewRecord] = (), resolutions: Sequence[ResolutionRecord] = ()) -> tuple[str, ...]   # pure (K1): doc ids, sorted by id (codepoint), that WOULD verify if drift-free — decides whether `cdx okf` runs detect
+def render_bundle(config: MonitorConfig, root: Path, *, doc_style: DocStyleMap | None = None, generated_by: str = GENERATED_BY, records: Sequence[ReviewRecord] = (), resolutions: Sequence[ResolutionRecord] = (), drift_report: DriftReport | None = None) -> tuple[dict[str, str], tuple[str, ...]]   # pure (K1): bundle-relative path → text, skipped doc ids; drift_report=None ⇒ nothing verifies and no instant is read
+def export_okf(config: MonitorConfig, root: Path, *, out_dir: Path, doc_style: DocStyleMap | None = None, generated_by: str = GENERATED_BY, records: Sequence[ReviewRecord] = (), resolutions: Sequence[ResolutionRecord] = (), drift_report: DriftReport | None = None) -> OkfExportResult   # IMPURE: per-file compare-skip (K7)
+def check_okf(config: MonitorConfig, root: Path, *, out_dir: Path, doc_style: DocStyleMap | None = None, generated_by: str = GENERATED_BY, records: Sequence[ReviewRecord] = (), resolutions: Sequence[ResolutionRecord] = (), drift_report: DriftReport | None = None) -> tuple[str, ...]   # read-only (K1): stale/missing bundle paths
+```
+
+⟨R⟩ **The bundle is deterministic and stamp-free.** OKF v0.2 makes `generated.at`
+optional — we emit `generated: {by: "<generated_by>"}` with NO timestamp, so the
+whole bundle is clock-free (K10) and byte-idempotent (K7) with plain per-file
+compare-skip. Per managed doc: OKF front matter (`type` REQUIRED; `title` = first
+H1 else doc id; `description` = first purpose-blockquote line when present;
+`resource` = repo-relative doc path; `tags` = [audience]; `sources[]` =
+one `{resource: <code_ref.path>}` per ref; `verified[]` = `{by: "human:<id>",
+at: <resolved_at>}` per ATTESTING current review under the doc-level verdict
+below — human: prefix is a spec MUST) plus
+a `custodex:` extension block (`doc_id`, `audience`, `fingerprint`) —
+legal per the v0.2 extensions clause ("Producers MAY include any additional
+keys"), and the round-trip traceability tag back to the cdm contract. Body =
+the doc body with the `cdm:` front matter stripped (regions/markers preserved
+verbatim — the bundle mirrors `spec.path` so relative doc↔doc links survive).
+Bundle root `index.md`: front matter `okf_version: "0.2"` ONLY (the sole
+frontmatter an index may carry), body = sorted `* [Title](path) - description`
+bullets. Reserved names honored: no concept is ever written as `index.md`/
+`log.md` — a doc NAMED index.md is emitted frontmatter-less as its
+directory's index file; a `log.md` doc, a bundle-root `index.md` doc, a `../`
+path, or two doc ids on ONE bundle path (compared once normalised — one file
+per path, so the later concept would silently replace the earlier one and its
+verdict) is a loud `ConfigError` naming the id(s) and path, raised over every
+doc before any existence check or write. No pruning of foreign files in
+`--out` targets (documented limit).
+`cdx okf` follows the `cdx wiki` precedent: default WRITES the bundle
+(regenerable projection), `--check` exits 1 listing stale files, `--out`
+overrides `.cdmon/okf`.
+
+⟨R⟩ **`verified` needs positive evidence, and a doc has ONE verdict
+(OKF-01b).** A doc's CURRENT reviews are the last-write resolutions
+(`reviewlog.resolved_index`, APPEND order) of its review records that were
+graded against the doc's CURRENT stored fingerprint and recorded at or after
+the doc's NEWEST review record — the newest chosen by parsed instant, never by
+string (a naive stamp is UTC). A review recorded before a newer record is
+superseded and never revives: the newer record may be of ANY drift kind or
+verdict and carry any resolution of its own, INVALIDATED included (a machine
+heal, a dry-run preview, a code move and its revert, an upstream edit's
+escalation). Only an ATTESTING review of a record bound to the current
+surface, recorded at or after the newest record, yields a claim. Supersession
+is per doc, and only a RECORD supersedes. The doc verifies iff (1)
+`drift_report` shows no outstanding drift on it (`None` ⇒ nothing), and (2) no
+current review disputes it — an outcome in `DISPUTING_RESOLUTIONS`, named or
+not, or an OVERRIDDEN whose stripped `resolved_text` is not in the BODY (the
+published bytes, `cdm:` front matter stripped) byte-for-byte as one contiguous
+block (interior whitespace is content; a mid-line substring counts). It then
+carries one event per current review that attests (ACCEPTED, or OVERRIDDEN
+with its text landed) and names a resolver, whitespace-collapsed; no resolver
+⇒ no event, never `human:unrecorded`. INVALIDATED is neutral. Events are
+ordered by (parsed instant, resolver, verbatim stamp) (K10). `cdx okf` calls
+`detect(cfg, config_dir)` only when `pending_verifications` is non-empty. K8:
+the review log's instants are read only when a resolution joins one of its
+records; then every `detected_at` is parsed and a corrupt one is a loud
+`SchemaError`.
+
+Scope, stated honestly. Every limit but "local logs only" is pinned by a
+ship-shape test in `tests/system/test_okf_cli.py` that flips when its
+follow-up lands (a STANDING limit's pin flips only if its decision is
+revisited):
+
+- **Presumption.** No run id and no applied marker, so a review at or after the
+  newest record is presumed to be of the doc as it stands: an OLD dry-run
+  proposal accepted after the heal verifies the heal's write. → OKF-02 run id.
+- **Code surface, not content.** ANY content change that moves no code surface
+  and writes no ReviewRecord keeps the claim: a human prose edit, custodex's own
+  `cdx new-doc --force`, the server editor's `generate.apply_record_fix` /
+  `generate.apply_edits_to_disk`. → OKF-03 resolve-time doc digest.
+- **Recorded instants.** `cdx monitor` stamps each record before its apply; MCP
+  `remediate_drift`/`sync_docs` stamp every record with the call-start instant,
+  so a resolution made mid-call — even of that call's OWN record — vouches for a
+  write made after it. A run id alone does not close it; OKF-02's applied
+  receipt or OKF-03's digest does.
+- **Record grain (standing).** The record id hashes doc + surface + stamp.
+  `cdx monitor` gives a run's HASH and REGION records distinct ids, so a sibling
+  REJECT withholds in either order; MCP gives a doc's simultaneous drifts ONE id
+  (the grain MCP documents), so REJECT(REGION) then ACCEPT(HASH) verifies.
+  Standing per the program decision "MCP grain (A): fix the docs"
+  (`.project/problems/MCP-02-record-id-grain.md`); a ResolutionRecord names no
+  facet, so okf cannot split one id.
+- **Containment, not replacement** for overrides.
+- **Writer not recorded:** an agent's `resolved_by` reads as `human:` →
+  OKF-CHANNEL.
+- **Local logs only (structural, unpinned).** `cdx okf` reads only
+  `.cdmon/review-log.jsonl` and `.cdmon/resolutions.jsonl`. A resolution
+  recorded through the hub (`POST /repos/{id}/resolutions`, `POST
+  /repos/{id}/records/{record_id}/apply-fix`) lives only in the server store, so
+  it neither attests nor vetoes: a console REJECT does not withhold a CLI
+  accept.
+
+### Slice plan
+
+- **CIX-01** — `codeindex.py` (models + build/read/write/diff) + `cdx codeindex`
+  (summary/`--write`/`--check`/`--json`) + governance (FEAT-CODEINDEX-001,
+  DEMO-113, waiver, wiki regen, cli-doc reheal).
+- **CIX-02** — `scip.py` (stdlib wire decoder + symbol mapper + xrefs artifact) +
+  `cdx scip` + kgraph REFERENCES/indexed additive bump to 1.1.0
+  (FEAT-SCIP-001, DEMO-114, kgraph doc reheal + schema_version test update).
+- **CIX-03** — `impact_report` + `cdx impact` — the diff→docs surgical join
+  (FEAT-CODEINDEX-002, DEMO-115).
+- **CIX-03b** — pre-merge review fix: the xrefs input pin + caller-currency
+  honesty (⟨R⟩4) — `input_digests`/`input_languages`/`unattributed`, the
+  fresh-build vouch in `cdx scip`, `unknown_caller_files` +
+  `caller_currency_note` in impact and graph, typed per-file extraction
+  errors. Reuses FEAT-SCIP-001 and FEAT-CODEINDEX-001/002; schemas stay 1.0.0.
+- **OKF-01** — `okf.py` + `cdx okf` — the OKF v0.2 bundle projection
+  (FEAT-OKF-001, DEMO-116).
+- **OKF-01b** — pre-merge review fix: `verified` on one verdict per doc with
+  positive evidence (the ⟨R⟩ above), `pending_verifications`, and the
+  two-ids-on-one-path guard. Reuses FEAT-OKF-001.
+- **OKF-02 / OKF-03 / OKF-CHANNEL (step 1)** — the run id + applied receipt,
+  the resolve-time doc digest, and the resolution `channel` field that close
+  the pinned OKF limits above. A design review comes first for OKF-02 (it
+  touches unattended writes); evaluate `ReviewRecord.result_digest` as the
+  alternative, which closes the presumption and the content limit but not the
+  in-run window under MCP's shared record id.
+- **CIX-04 (deferred)** — incremental `cdx check` fast-path over the stored
+  index. NOT in this epic: the skip predicate must also cover the doc bytes,
+  index-source region inputs, and config identity, and a false "clean" in CI is
+  worse than the re-extract it saves. Pinned here so the deferral is a decision,
+  not an omission.
+

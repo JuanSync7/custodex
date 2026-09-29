@@ -115,7 +115,7 @@ def test_graph_json_and_idempotent_write(tmp_path: Path) -> None:
     result = runner.invoke(app, ["graph", "--json", "--config", str(cfg)])
     assert result.exit_code == 0
     payload = json.loads(result.output)
-    assert payload["schema_version"] == "1.0.0"
+    assert payload["schema_version"] == "1.1.0"  # CIX-02 minor bump (K6)
     assert {n["kind"] for n in payload["nodes"]} >= {"doc", "symbol", "section"}
 
     first = runner.invoke(app, ["graph", "--write", "--config", str(cfg)])

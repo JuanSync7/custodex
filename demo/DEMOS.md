@@ -1588,3 +1588,118 @@ invokes every tool, and the `read_only` gate omits the write tools), and
 `tests/system/test_mcp_cli.py` (`cdx mcp-serve` builds + launches; loud on a
 config-less repo).
 Features: FEAT-MCP-001
+
+### DEMO-113 — `cdx codeindex`: the persisted, diffable code surface
+**What it shows.** Every other `.cdmon/` artifact is doc-side; the code surface
+was recomputed and discarded on every run — nothing to diff a working tree
+against. `cdx codeindex --write` persists it: every file in the COVERAGE
+universe (the exact `cdx coverage` scan, so the two scopes can never diverge)
+with a `sha256[:16]` content digest, and every symbol with its span and
+per-tier digests — `sig_digest` byte-identical to the DIG-01 `cdm.symbol_sigs`
+value, `doc_digest` over the docstring, `body_digest` the comment-insensitive
+body AST hash. Provenance (`generated_by`, `source_sha` via `--ref` or
+`$CI_COMMIT_SHA`) rides ON the artifact but enters no digest and no
+comparison: re-running `--write` on an unchanged tree writes zero bytes and
+the stored SHA survives as "content unchanged since" (K7 stamp-blind, the
+`index.yaml updated:`/N-06 analog). `diff_code_index` then attributes any
+tree change to the exact files and symbols that moved, per tier
+(added/removed/signature/docstring/body) — comment-only edits surface as an
+honest empty-bucket delta. No wall-clock, no absolute path, sorted everywhere
+(K10); the artifact is a projection, never a truth — delete it and nothing
+changes (⟨R⟩1).
+**How to observe.** In any `cdx` repo: `cdx codeindex` (read-only summary,
+K1), `cdx codeindex --write` then `--write` again (`wrote` → `unchanged`),
+edit a signature and `cdx codeindex --check` (exit 1, STALE), `--json` for
+the full artifact. Pinned by `tests/unit/test_codeindex.py` (models, digests,
+stamp-blind writes, diff buckets), `tests/system/test_codeindex_cli.py` (the
+verb end-to-end), and `tests/regression/test_fingerprint_stability_codeindex.py`
+(golden `main` literals prove no stored fingerprint moved — the P-01 capture).
+Features: FEAT-CODEINDEX-001
+
+### DEMO-114 — `cdx scip`: symbol→symbol references without a protobuf dependency
+**What it shows.** Custodex's graph knew which docs cover which symbols, but
+nothing about which symbols reference which — no call graph. `cdx scip
+INDEX_FILE` closes that gap by CONSUMING a SCIP index an external indexer
+produced (`scip-python index . --project-name=x`; custodex never shells out —
+K11, agents suggest / humans run indexers). The decode is pure stdlib — the
+protobuf wire format walked by hand (varints, LEN fields, packed and unpacked
+int32 ranges, deprecated field 1/7 AND typed ranges 8–11 with the
+spec-mandated precedence) — so K0's minimal core survives. Every reference
+occurrence is projected onto the EXISTING entity universe: the target resolves
+through the symbol grammar (backtick unescaping, the `src.`-prefix
+project-root quirk) to `symbol <path>#<name>`, the source is the narrowest
+enclosing span from the persisted code index (DEMO-113), endpoints are
+public-only, and the result lands in `.cdmon/xrefs.json` with a per-language
+`coverage` map and an `unmapped` count — so an absent edge is never misread
+as an absent call. `cdx graph` then folds the artifact in additively as
+REFERENCES edges under the new `indexed` provenance tier (schema_version
+1.1.0): the same graph that answers "which docs cover symbol X" now answers
+"and who calls it".
+**How to observe.** `cdx codeindex --write`, run scip-python (or any SCIP
+producer) over the repo, then `cdx scip index.scip` (summary: edge count,
+tool, unmapped), `cdx scip index.scip --write` twice (`wrote` → `unchanged`,
+K7), and `cdx graph --json | grep references`. Pinned by
+`tests/unit/test_scip.py` (wire decoder against hand-encoded bytes, the
+symbol-grammar table, attribution + honesty counters, the additive kgraph
+fold) and `tests/system/test_scip_cli.py` (the verb end-to-end on a
+hand-encoded fixture — the suite never runs a real indexer, K4).
+Features: FEAT-SCIP-001
+
+### DEMO-115 — `cdx impact`: surgical change→doc attribution from the diff
+**What it shows.** The reason the code index exists: precision. Before CIX,
+"what did my edit affect?" meant a full `cdx check` — re-extracting every
+surface to compare fingerprints. `cdx impact` answers from the DIFF instead:
+the stored `.cdmon/code-index.json` (DEMO-113) is compared against the
+current tree (built in memory, writing nothing — K1), each changed symbol is
+attributed per tier (signature / docstring / body — so a docstring edit and a
+breaking signature change are different facts), and the changed set joins to
+docs two ways. `direct`: the doc covers the symbol (the docmap.symbol_owners
+entity join; added/removed symbols fall back honestly to the file-level
+join). `via_callers`: when `.cdmon/xrefs.json` (DEMO-114) exists, docs
+covering a CALLER of the changed symbol are flagged one hop out — change
+`helper()`'s signature and the doc for `caller()`'s module lights up too.
+When the xrefs artifact is absent the report says `caller impact unknown` —
+absence of data is never presented as absence of callers. This is the
+surgical-rewrite feed: an agent (or `monitor`, in a later epic) can target
+exactly the affected regions instead of regenerating whole documents.
+**How to observe.** `cdx codeindex --write`, edit a tracked signature, then
+`cdx impact` (changed files with per-tier buckets, affected docs grouped
+direct-then-callers) and `cdx impact --json` (the round-trippable
+ImpactReport). Pinned by `tests/unit/test_impact.py` (direct + via_callers +
+honesty flag + file-level fallback + determinism) and
+`tests/system/test_impact_cli.py` (missing-index loudness, K1 no-write proof:
+the stored artifact still holds the old surface after the run).
+Features: FEAT-CODEINDEX-002
+
+### DEMO-116 — `cdx okf`: the portable OKF v0.2 knowledge bundle
+**What it shows.** Custodex's artifacts were readable only by Custodex.
+`cdx okf` projects the managed doc set into a Google Open Knowledge Format
+v0.2 bundle — a directory of markdown + YAML front matter any OKF-aware
+consumer can read — WITHOUT making OKF a storage format: the bundle is a
+projection of truths that already exist (config, doc bytes, the resolutions
+log), so deleting it changes nothing and regenerating it is byte-idempotent.
+The trick that makes idempotency trivial is the spec itself: v0.2 makes
+`generated.at` optional, so the bundle emits `generated: {by}` with no
+timestamp and the bytes are fully deterministic (K10) under plain per-file
+compare-skip (K7). Each concept carries the REQUIRED `type` (doc-style
+document-type → display name, audience fallback), `sources[]` from the doc's
+code_refs, `verified[]` (one verdict per doc: an ACCEPTED or landed
+OVERRIDDEN human resolution of a record graded against the doc's stored
+fingerprint, recorded at or after the doc's newest record, with no current
+REJECT and no drift — so it binds to the CODE SURFACE, never to prose; the
+spec-MUST `human:` prefix is never invented), and a `custodex:` extension block (doc_id,
+audience, fingerprint) — the round-trip tag from portable bundle back to the
+cdm ownership contract, legal because v0.2 requires consumers to preserve
+unknown keys. Reserved names are honored: the bundle-root `index.md` carries
+`okf_version: "0.2"` and nothing else; a managed doc NAMED index.md in a
+subdirectory is emitted body-verbatim as that directory's index file; a doc
+at the bundle-root `index.md`, a doc named `log.md`, a path escaping the
+bundle, or two doc ids on one path are refused loudly (K8).
+**How to observe.** In any `cdx` repo: `cdx okf` (writes `.cdmon/okf/`),
+`cdx okf` again (all unchanged), `cdx okf --check` (in sync → edit a doc →
+STALE, exit 1), `cdx okf --out /tmp/bundle --json`. Pinned by
+`tests/unit/test_okf.py` (golden front matter, reserved-name guard,
+idempotency, foreign files never pruned) and `tests/system/test_okf_cli.py`
+(the verb end-to-end).
+Features: FEAT-OKF-001
+

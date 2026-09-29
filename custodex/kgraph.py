@@ -10,7 +10,9 @@ from them, never stored):
 * ``MENTIONS`` (resolved) — doc → symbol/path/env, from the AGT-01 mention layer;
 * ``LINKS_TO`` (resolved) — doc → doc/url, from resolved prose links;
 * ``PART_OF`` (resolved) — section → doc, from the heading entities;
-* ``OWNED_BY`` (declared) — doc → owner, the accountable projection (EPIC OWN).
+* ``OWNED_BY`` (declared) — doc → owner, the accountable projection (EPIC OWN);
+* ``REFERENCES`` (indexed) — symbol → symbol, from a consumed SCIP index
+  passed in by the caller (CIX-02; the fold never reads the artifact, K1).
 
 Node identity is the AGT-01 SCIP-style string id (``doc <path>``,
 ``symbol <path>#<name>``…); a SECTION node's display name is its SLUG — never
@@ -36,6 +38,7 @@ from .docmap import symbol_owners
 from .entities import EntityKind, build_registry, corpus_entities
 from .errors import DriftError
 from .ownership import resolve_ownership
+from .scip import XrefEdge
 
 __all__ = [
     "NodeKind",
@@ -75,6 +78,7 @@ class EdgeKind(str, Enum):
     LINKS_TO = "links_to"  # doc → doc/url (resolved prose links)
     PART_OF = "part_of"  # section → doc (heading hierarchy)
     OWNED_BY = "owned_by"  # doc → owner (accountable projection)
+    REFERENCES = "references"  # symbol → symbol (SCIP xrefs — CIX-02)
 
 
 class EdgeTier(str, Enum):
@@ -82,6 +86,7 @@ class EdgeTier(str, Enum):
 
     DECLARED = "declared"
     RESOLVED = "resolved"
+    INDEXED = "indexed"  # produced by a code indexer (SCIP — CIX-02)
 
 
 class GraphNode(BaseModel):
@@ -110,11 +115,14 @@ class KnowledgeGraph(BaseModel):
 
     model_config = _MODEL_CONFIG
 
-    schema_version: str = "1.0.0"
+    # CIX-02 minor bump (K6): REFERENCES kind + indexed tier added additively;
+    # a graph built with xrefs=() is byte-identical to 1.0.0 content.
+    schema_version: str = "1.1.0"
     nodes: tuple[GraphNode, ...]  # sorted by id (K10)
     edges: tuple[GraphEdge, ...]  # sorted (source, kind, target) (K10)
     unresolved: dict[str, int]  # doc_id → unresolved-mention count (rot signal)
-    warnings: tuple[str, ...]  # registry warnings (unparseable sources)
+    #: registry warnings (unparseable sources), then xref currency notes
+    warnings: tuple[str, ...]
 
 
 def build_graph(
@@ -122,14 +130,23 @@ def build_graph(
     root: Path,
     *,
     unit_owner: dict[str, str] | None = None,
+    xrefs: tuple[XrefEdge, ...] = (),
+    xref_notes: tuple[str, ...] = (),
 ) -> KnowledgeGraph:
     """Fold the existing detectors into ONE typed graph (pure, K1/K10).
 
     Base facts only: DOCUMENTS/DEPENDS_ON/OWNED_BY are DECLARED (from config
-    joins); MENTIONS/LINKS_TO/PART_OF are RESOLVED (from the mention layer).
-    Deterministic and byte-identical across runs; derived quantities
-    (:func:`graph_neighbors`, :func:`rank_centrality`) recompute from these
-    facts and are never stored.
+    joins); MENTIONS/LINKS_TO/PART_OF are RESOLVED (from the mention layer);
+    REFERENCES are INDEXED (symbol→symbol facts a code indexer produced,
+    passed in by the caller — this function never reads the artifact, K1).
+    The ``xrefs=()`` default keeps the fold byte-identical to the pre-CIX-02
+    output (K6). ``xref_notes`` are the caller's currency notes on those
+    edges (``scip.caller_currency_note`` — e.g. files changed since the
+    xrefs join); they ride ``warnings`` after the registry's so a persisted
+    or serialized graph never presents stale REFERENCES as current (the
+    ``()`` default is byte-identical). Deterministic and byte-identical
+    across runs; derived quantities (:func:`graph_neighbors`,
+    :func:`rank_centrality`) recompute from these facts and are never stored.
     """
     nodes: dict[str, GraphNode] = {}
     edges: set[tuple[str, str, EdgeKind, EdgeTier]] = set()
@@ -252,6 +269,22 @@ def build_graph(
                 )
         if n_unresolved:
             unresolved[result.doc_id] = n_unresolved
+
+    # INDEXED: symbol → symbol reference edges (SCIP xrefs — CIX-02). Both
+    # endpoints are already entity-scheme ids (`symbol <path>#<name>`); no
+    # dedup against MENTIONS — different kinds, deliberately co-present.
+    for xref in xrefs:
+        for node_id in (xref.source, xref.target):
+            nodes.setdefault(
+                node_id,
+                GraphNode(
+                    id=node_id,
+                    kind=NodeKind.SYMBOL,
+                    name=node_id.split("#", 1)[1] if "#" in node_id else node_id,
+                ),
+            )
+        edges.add((xref.source, xref.target, EdgeKind.REFERENCES, EdgeTier.INDEXED))
+    warnings = (*warnings, *xref_notes)
 
     return KnowledgeGraph(
         nodes=tuple(sorted(nodes.values(), key=lambda n: n.id)),
