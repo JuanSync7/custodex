@@ -19,3 +19,10 @@ Guidance:
 - Never leave a step that can fail silently; tell the reader how to recognise
   and recover from the common stumble.
 - End with a working artifact and a clear pointer to what to read next.
+
+## Not its job
+
+Completeness. A tutorial names the one path that works and stays on it; the full
+surface belongs in a reference, alternatives in a how-to, and rationale in an
+explanation. Every step the reader cannot yet evaluate is a step they must be
+able to take on trust and verify immediately afterwards.

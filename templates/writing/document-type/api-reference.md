@@ -18,3 +18,14 @@ Guidance:
 - State defaults explicitly (`timeout=30`) and note units where they apply.
 - Prefer a stable, predictable structure across entries so the page is skimmable.
 - Examples are short and illustrate the call shape, not a full tutorial.
+
+## Not its job
+
+Teaching a workflow (that is a tutorial or how-to) or arguing for the design
+(that is an explanation). A reference is entered at any point and left again; it
+owes the reader correctness at that point, not a narrative.
+
+Say what each entry is **not** for when a reader could plausibly reach for the
+wrong one of two similar symbols — and name the one that does the job instead.
+Two entries that look alike with nothing saying why they are two is the failure a
+reader feels most.

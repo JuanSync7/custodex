@@ -2437,3 +2437,86 @@ agent trigger an auto-apply implicitly. The per-server layer is
 refusal inside a still-mounted tool is weaker). Test both: assert a `read_only`
 server's `list_tools()` is `disjoint` from the write-tool names, and that the
 `apply=True` path is exercised end-to-end (else a hardcoded default survives).
+## [DOC-STYLE] Generic templates carry generic rules; the adopter's repo carries its own
+
+Two documentation charters were folded into `templates/writing/**`: an external
+house-style charter and project-keel's own gate-integrated guide. The transfer
+rule that did the work was **one canonical home per fact** — which both charters
+state, and which is the reason most of their content must NOT be copied here.
+
+What stayed out, and why: Keel's `§N` citation grammar (a bare `§N` means
+`CONVENTIONS.md` — false in every other repo and false the day Keel renames that
+file), its closed `kind:` vocabulary (Custodex already commits to a Diátaxis
+taxonomy; two competing taxonomies in one repo is the failure both charters
+predict), roster mechanics and tool-spec section contracts (tree facts), the
+check letters (Keel's `check_T` already proves those names resolve — a copy here
+is unproven by construction), and every frontmatter-key semantic. That last one
+is not merely rot risk but a **boundary violation**: `CONVENTIONS.md §9` gives
+the host template the top-level keys and Custodex only the `cdm:` block, so a
+Custodex template telling a model how to write `updated:` would be writing rules
+for keys it explicitly does not own.
+
+Two rules the *mechanism* forbids, independent of any charter:
+
+- **Front matter.** Machine-managed and re-sorted on heal. A template that tells
+  an author to write or order it is telling it to fight the healer.
+- **History of the document.** Regions are re-authored from scratch. Rules that
+  depend on remembering an earlier version cannot survive — but rules that
+  *forbid* narrating history absolutely belong, and this is the trap: a survey
+  agent argued the no-changelog-voice rule was satisfied for free because the
+  author is memoryless. It is not. `build_prompt`/`render_context` both put
+  `Current document text: <<<DOC …DOC` in the prompt, so the author sees its own
+  previous prose beside the new surface and can narrate the delta perfectly well.
+  **Check what the prompt actually contains before concluding a rule is
+  unnecessary.**
+
+The structural finding worth carrying: `STYLE_CATEGORIES` is fixed at four axes,
+and only one stem per axis is ever composed. Rules that hold regardless of tone
+therefore have to be repeated in every `tone/` stem. That duplication is real and
+is marked in the files; a fifth axis is the right fix if the shared block grows.
+Conversely, adding new `document-type` stems is free — the stem is a free-form
+name resolved to a path, and only the selected one is composed, so a richer
+taxonomy costs zero prompt bytes.
+
+## [DOC-01b] A prose "edit these together" rule does not survive its first edit — test the copies
+
+The DOC-01 README told maintainers to edit the shared tone rules "together". The
+very change that introduced the instruction left `precise.md` with eight rule
+clauses that `formal.md` and `friendly.md` lacked, and a reviewer found it, not a
+test. Duplicated guidance needs a mechanical guard: one marked section (here
+`## Claim discipline (shared by every tone)`, placed last), compared byte for byte
+across the copies. Identity alone is not enough — it passes when every copy is cut
+down to the weakest version — so also pin the UNION of the rules with anchors. And
+read the list of categories from the engine (`docstyle.STYLE_CATEGORIES`), not from
+a literal, so a new category is checked the day it exists.
+
+## [DOC-01b] Verify a coexistence claim through the other tool's own code, on the exact tree the commit produces
+
+Several KEEL-01 claims failed review for one reason: each was checked against
+something easier than the real thing.
+
+- The F3 lint codes came from a hand-written README with no front matter, not
+  Keel's.
+- §9's "Custodex preserves foreign keys" was confirmed by re-parsing the output as
+  YAML. Keel reads its front matter line by line; through that reader one
+  `lint --fix` loses every authored tag and truncates, escapes or re-quotes titles
+  and summaries in 92 of 119 docs, while Keel's corpus check stays green.
+- The damage was first counted over 168 tracked paths, but Keel reads 37 of them
+  (`CLAUDE.md → AGENT.md` symlinks) once, as the file they point to.
+- "Custodex can fix it alone" was checked gate by gate: the structure hook on the
+  stamped tree, the freshness hook on the bumped one. Each was green alone. The
+  tree the adoption commit actually produces — stamp plus the `updated:` bump F10
+  requires — fails the twin check on all three twinned docs, because each `.jinja`
+  twin carries its own untemplated `updated:` line and the freshness gate never
+  looks at twins.
+- "`check_corpus` exits 0" held only because the scratch tree had no local
+  `wiki/corpus.json`, and the 89 changed nodes were `build_corpus`'s unlinked
+  output; in the linked corpus Keel validates and agents query, 307 changed.
+
+The rule: **measure a coexistence contract with the consumer's own code.** Count
+what the consumer counts, over the artifact it uses. Run every gate that compares
+TEXT, not only the parsers, and run them all together on the exact tree that will
+be committed. Say which fixture each measurement ran on and which local state (a
+generated file, a cache) a green verdict depends on. Prove "blocks" by fixing
+everything else first.
+
