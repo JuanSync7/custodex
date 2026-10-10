@@ -130,3 +130,56 @@ features:
     subsystem: pr
     modules: [ticket]
     constraints: [K1]
+
+  - id: FEAT-PR-012
+    title: One git work-tree probe, loud when a repo is expected
+    summary: >-
+      forge is the git work-tree probe that git-aware callers share, and
+      default_git_probe is its subprocess leaf (not every git call: the
+      server-side clone in gitfetch and the CLI's user.name lookup still run
+      git themselves). The leaf runs git under LC_ALL=C, decodes stdout as
+      UTF-8 with surrogateescape (lossless, so a non-UTF-8 path round-trips to
+      the filesystem) and stderr as UTF-8 with replacement, and returns a
+      non-zero exit as a GitOutcome for the caller to judge. An OSError is a
+      SyncError: one that says to install git when the git executable is
+      missing or not executable, and one naming the cwd for anything else.
+      forge.git_facts treats a .git entry (directory, gitdir file or dangling
+      symlink) at the root or any ancestor as a promise of a work tree. Any
+      failure to read it, including a missing binary, dubious ownership, a
+      broken gitdir pointer or any non-zero rev-parse exit, is a SyncError
+      carrying git's exit code and stderr. A HEAD that does not resolve counts
+      as unborn only when proven: symbolic-ref must name a branch with no ref
+      file at its loose path (absent, or a branch directory such as an orphan
+      feat beside feat/x, which git also calls unborn), so a corrupt ref is
+      loud, not "no baseline". Only a KNOWN-absent .git is silent: a directory
+      that cannot be searched for one is a SyncError too. With no .git
+      anywhere, git is never run and the result is the non-git GitFacts. Every
+      SyncError message shows paths and git output through forge.printable, so
+      it is valid UTF-8. configsync runs its git calls through this leaf and
+      refuses a local_path outside any work tree.
+    subsystem: pr
+    modules: [forge, configsync]
+    constraints: [K0, K4, K7, K8, K10]
+
+  - id: FEAT-PR-013
+    title: GitFacts — prefix, config id and a managed-doc-aware baseline HEAD
+    summary: >-
+      git_facts(root, config_path=, doc_paths=) returns a frozen GitFacts:
+      in_work_tree, the root's prefix inside its work tree (rev-parse
+      --show-prefix of the physical path), config_id (the config file or
+      directory's toplevel-relative POSIX path, such as config/cdmon, cdmon.yaml
+      or demo/config/cdmon), and head. head is HEAD only while `git
+      --no-optional-locks status --porcelain -z --untracked-files=no` exits 0
+      and lists no path other than a managed doc (normpath(prefix + doc.path),
+      so ./docs/a.md and ../README.md match), counting both paths of a rename or
+      copy. It is None for a zero-commit repo or orphan branch (proven unborn, see
+      FEAT-PR-012) or any other tracked change; any non-zero status exit, or porcelain that is not exactly (XY SP path NUL
+      [origin NUL])*, is a SyncError. A root and config in different work
+      trees, such as a nested or vendored repo, are a SyncError. The probe is
+      read-only and never refreshes .git/index. configsync's git mode takes its
+      subdir from this prefix. prefix and config_id are filesystem-lossless,
+      not JSON-safe: show them through forge.printable or hash their
+      surrogateescape bytes.
+    subsystem: pr
+    modules: [forge]
+    constraints: [K7, K8, K10]

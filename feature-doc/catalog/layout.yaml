@@ -117,3 +117,38 @@ features:
     subsystem: layout
     modules: [build, layout]
     constraints: [K0, K10]
+
+  - id: FEAT-LAYOUT-010
+    title: Front-matter splice — an engine write rewrites only what changed
+    summary: >-
+      render_doc(meta, body, source=) splices meta into the front matter the doc
+      already carries. A data-equal meta (exact types, NaN-safe, tuple equals its
+      list) returns the stored block byte for byte. Otherwise each unchanged
+      top-level entry keeps its exact bytes (comments, quoting, flow style,
+      folding, anchors), a changed entry is re-dumped in place (losing the
+      comments inside it) and keeps the comment lines after it, a new entry lands
+      where meta puts it, a ... marker and the comments after it stay last, and a
+      re-dumped cdm block has its keys sorted. The splice applies to a column-0
+      block mapping with no duplicate top-level key, << merge key, aliased key or
+      flow root, and only when the result parses back to exactly meta (so not
+      when an alias points into an entry the write changes); any other layout gets
+      the fresh dump (FEAT-LAYOUT-011). Front matter in source that is malformed
+      YAML or not a mapping raises DriftError. All seven managed-doc writers pass
+      the text they parsed as source.
+    subsystem: layout
+    modules: [manifest, layout, heal, docdeps, docwriter, spmirror]
+    constraints: [K7, K8, K10]
+
+  - id: FEAT-LAYOUT-011
+    title: Deterministic fresh front-matter dump
+    summary: >-
+      With no source fence (or when the splice is refused) render_doc dumps the
+      front matter in one call, keeping meta's key order and sorting only the cdm
+      block. Non-ASCII text is written literally (allow_unicode), with an escaped
+      re-dump when a character would not round-trip (U+0085). Set members are
+      sorted (by repr when their types do not compare) so the output does not
+      depend on the hash seed, and every anchor is unique. A doc with empty meta
+      and no fence keeps its body verbatim.
+    subsystem: layout
+    modules: [manifest]
+    constraints: [K6, K10]

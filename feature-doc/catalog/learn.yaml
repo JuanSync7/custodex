@@ -40,9 +40,7 @@ features:
     title: Promotion detector for recurring resolved drift shapes
     summary: >-
       detect_promotions groups resolved records by the generalizable shape
-      (doc_id, drift_kind, audience) — NOT surface_hash — and emits a
-      PromotionCandidate per shape whose resolved records unanimously share one
-      decision >= min_count times; orphan resolutions are ignored and output is
+      (doc_id, drift_kind, audience) — NOT surface_hash — and emits a PromotionCandidate per shape whose DISTINCT resolved decisions (resolved record_ids, at least min_count of them) unanimously share one decision; orphan resolutions are ignored and output is
       deterministically sorted. Pure, no I/O, no wall-clock.
     subsystem: learn
     modules: [promotion]
@@ -70,3 +68,32 @@ features:
     subsystem: learn
     modules: [promotion]
     constraints: [K4, K10]
+
+  - id: FEAT-LEARN-007
+    title: Promotion counts distinct human decisions
+    summary: >-
+      detect_promotions counts DISTINCT resolved record_ids per shape (one human
+      decision each, last-write-wins via resolved_index), never review-log lines:
+      a record_id shared by several drifts under one injected clock, a duplicated
+      log line, a re-ingested hub record and a retried resolve each count once, so
+      one resolve can never promote a shape by itself. min_count below one is a
+      loud ConfigError, even on an empty log. One code event can still mint several
+      ids (a per-record clock, or repeated runs over an unchanged surface), a pinned
+      residual.
+    subsystem: learn
+    modules: [promotion]
+    constraints: [K8, K10]
+
+  - id: FEAT-LEARN-008
+    title: Per-shape distinct-decision scoping
+    summary: >-
+      The distinct-decision count, the min_count threshold and unanimity are all
+      scoped to one (doc_id, drift_kind, audience) shape: a record_id spanning the
+      HASH and REGION drifts of one doc counts once in EACH shape, a dissent in one
+      shape never blocks another, different audiences of one doc are separate
+      shapes, a non-promotable decision (overridden/accepted) on any id blocks the
+      shape, and deduplication is keyed by record_id exactly so it can never
+      overwrite a dissenting decision, whatever the input order.
+    subsystem: learn
+    modules: [promotion]
+    constraints: [K3, K10]

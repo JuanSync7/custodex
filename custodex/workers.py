@@ -41,12 +41,13 @@ never reaches a key (K10). Output is sorted by key (K10).
 from __future__ import annotations
 
 import hashlib
+import posixpath
 from enum import Enum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .config import MonitorConfig, resolve_repo_root
+from .config import MonitorConfig, doc_path, resolve_repo_root
 from .docdeps import SuspectStatus, detect_suspect_links, upstream_fingerprint
 from .docmap import read_rejections, suggest_edges
 from .drift import DriftKind, detect
@@ -170,7 +171,7 @@ def suggest_fixes_tick(
         upstream_spec = doc_by_id.get(link.upstream_id)
         fingerprint = "missing"
         if upstream_spec is not None:
-            upstream_path = root / upstream_spec.path
+            upstream_path = doc_path(root, upstream_spec.path)
             if upstream_path.is_file():
                 doc = parse_text(
                     upstream_path.read_text(encoding="utf-8"), upstream_path
@@ -241,9 +242,26 @@ def suggest_docs_tick(
     out: list[Suggestion] = []
 
     # DOCUMENT_GAP — one per mentioned-but-undocumented symbol (STANDING).
+    # The coverage join honours each ref's selectors, so a gap can sit in a
+    # file some doc's code_ref already names (unselected): the next verb is
+    # then "widen that doc's selector", never a second whole-file doc.
+    naming: dict[str, set[str]] = {}
+    for spec in config.documents:
+        for ref in spec.code_refs:
+            naming.setdefault(posixpath.normpath(ref.path), set()).add(spec.id)
     g = build_graph(config, root)
     for node_id, count in rank_centrality(g, undocumented_only=True):
-        path = node_id.split(" ", 1)[1].split("#", 1)[0]
+        path, name = node_id.split(" ", 1)[1].split("#", 1)
+        namers = sorted(naming.get(path, ()))
+        if namers:
+            listed = ", ".join(f"`{d}`" for d in namers)
+            verb = "names" if len(namers) == 1 else "name"
+            advice = (
+                f"{listed} already {verb} {path} in a code_ref but none selects "
+                f"`{name}` — widen that code_ref's selector, not a new doc"
+            )
+        else:
+            advice = f"draft a doc with `cdx write-doc {path}`"
         out.append(
             Suggestion(
                 key=_key(SuggestionKind.DOCUMENT_GAP, node_id),
@@ -252,7 +270,7 @@ def suggest_docs_tick(
                 target=node_id,
                 detail=(
                     f"{node_id} is mentioned by {count} doc(s) but covered by "
-                    f"none — draft a doc with `cdx write-doc {path}`"
+                    f"none — {advice}"
                 ),
                 evidence=(f"{count} mentioning doc(s)",),
                 severity=_severity(SuggestionKind.DOCUMENT_GAP),

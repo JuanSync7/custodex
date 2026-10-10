@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**268 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**282 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -77,6 +77,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-CONFIGV2-016` | system/test_dogfood.py | DEMOS.md |
 | `FEAT-CONFIGV2-017` | smoke/test_demo_fixture_tracked.py, system/test_testdoc_mirror.py | DEMOS.md |
 | `FEAT-CONFIGV2-018` | integration/test_config_v2.py | DEMOS.md |
+| `FEAT-CONFIGV2-019` | integration/test_containment_server.py, integration/test_containment_writers.py, system/test_containment_cli.py, unit/test_containment.py | DEMOS.md |
+| `FEAT-CONFIGV2-020` | unit/test_containment.py | DEMOS.md |
 | `FEAT-COVERAGE-001` | integration/test_config_ignore.py, integration/test_editable_tree.py, integration/test_generate.py, integration/test_report.py, regression/test_corpus_selfcoverage.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-002` | integration/test_config_ignore.py, unit/test_inventory.py | DEMOS.md |
 | `FEAT-COVERAGE-003` | unit/test_inventory.py | DEMOS.md |
@@ -101,6 +103,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-DOCMAP-001` | system/test_docmap_cli.py, unit/test_docmap.py | DEMOS.md |
 | `FEAT-DOCMAP-002` | system/test_docmap_cli.py, unit/test_docdeps_baseline.py, unit/test_docmap.py | DEMOS.md |
 | `FEAT-DOCMAP-003` | system/test_docmap_cli.py, unit/test_docmap.py | DEMOS.md |
+| `FEAT-DOCMAP-004` | regression/test_owners_join_parser_parity.py, unit/test_docmap_lang.py | DEMOS.md |
 | `FEAT-DOCWRITER-001` | system/test_docwriter_cli.py, unit/test_docwriter.py | DEMOS.md |
 | `FEAT-DRIFT-001` | regression/test_corpus_pipeline.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_demo_walkthrough.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, system/test_example_external.py, system/test_example_multilang.py, system/test_live_llm.py, system/test_system.py, unit/test_drift.py | DEMOS.md |
 | `FEAT-DRIFT-002` | system/test_system.py, unit/test_drift.py, unit/test_traceability.py | DEMOS.md |
@@ -153,12 +156,16 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-LAYOUT-007` | integration/test_layout.py, system/test_cli.py, system/test_system.py | DEMOS.md |
 | `FEAT-LAYOUT-008` | integration/test_build.py | DEMOS.md |
 | `FEAT-LAYOUT-009` | integration/test_build.py | DEMOS.md |
+| `FEAT-LAYOUT-010` | integration/test_foreign_frontmatter.py, unit/test_fm_splice.py | DEMOS.md |
+| `FEAT-LAYOUT-011` | unit/test_fm_splice.py | DEMOS.md |
 | `FEAT-LEARN-001` | integration/test_monitor.py, unit/test_similar.py | DEMOS.md |
 | `FEAT-LEARN-002` | unit/test_similar.py | DEMOS.md |
 | `FEAT-LEARN-003` | integration/test_monitor.py, unit/test_agent.py, unit/test_similar.py | DEMOS.md |
 | `FEAT-LEARN-004` | system/test_cli.py, unit/test_promotion.py | DEMOS.md |
 | `FEAT-LEARN-005` | unit/test_promotion.py | DEMOS.md |
 | `FEAT-LEARN-006` | integration/test_monitor.py, regression/test_corpus_contracts.py, unit/test_promotion.py | DEMOS.md |
+| `FEAT-LEARN-007` | integration/test_promotion_distinct.py, unit/test_promotion_distinct.py | DEMOS.md |
+| `FEAT-LEARN-008` | integration/test_promotion_distinct.py, unit/test_promotion_distinct.py | DEMOS.md |
 | `FEAT-MANIFEST-001` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MANIFEST-002` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MANIFEST-003` | regression/test_corpus_pipeline.py, system/test_system.py, unit/test_manifest.py | DEMOS.md |
@@ -169,6 +176,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-MANIFEST-008` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MANIFEST-009` | system/test_system.py, unit/test_manifest.py | DEMOS.md |
 | `FEAT-MCP-001` | smoke/test_mcp_server.py, system/test_mcp_cli.py, unit/test_mcp_tools.py | DEMOS.md |
+| `FEAT-MCP-002` | smoke/test_mcp_status_degrade_server.py, unit/test_mcp_status_degrade.py | DEMOS.md |
 | `FEAT-MONITOR-001` | integration/test_monitor.py, regression/test_anchor_collision.py, regression/test_corpus_pipeline.py, system/test_cli.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_live_llm.py, system/test_system.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |
 | `FEAT-MONITOR-002` | integration/test_monitor.py, regression/test_corpus_selfcoverage.py, system/test_dogfood.py, system/test_example_multilang.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |
 | `FEAT-MONITOR-003` | integration/test_apply_fix.py, integration/test_monitor.py, regression/test_corpus_pipeline.py, regression/test_corpus_selfcoverage.py, system/test_cli.py, system/test_demo_walkthrough.py, system/test_dirlayout_e2e.py, system/test_dogfood.py, system/test_example_external.py, system/test_live_llm.py, system/test_system.py, unit/test_index.py, unit/test_templates.py | DEMOS.md |
@@ -204,6 +212,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-PR-009` | integration/test_monitor.py, integration/test_server_store_parity.py, system/test_e2e_ticket_coverage.py, unit/test_ticket.py | DEMOS.md |
 | `FEAT-PR-010` | system/test_e2e_ticket_coverage.py, unit/test_ticket.py | DEMOS.md |
 | `FEAT-PR-011` | unit/test_ticket.py | DEMOS.md |
+| `FEAT-PR-012` | integration/test_configsync_gitfacts.py, unit/test_forge_git.py | DEMOS.md |
+| `FEAT-PR-013` | integration/test_configsync_gitfacts.py, unit/test_forge_git.py | DEMOS.md |
 | `FEAT-QUALITY-001` | system/test_demo_e2e.py, unit/test_docstyle.py | DEMOS.md |
 | `FEAT-QUALITY-002` | unit/test_docstyle.py | DEMOS.md |
 | `FEAT-QUALITY-003` | integration/test_agent_style.py, unit/test_docstyle.py, unit/test_writing_templates.py | DEMOS.md |
@@ -213,6 +223,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-QUALITY-007` | integration/test_report.py, system/test_demo_e2e.py | DEMOS.md |
 | `FEAT-QUALITY-008` | integration/test_doctor.py, system/test_demo_walkthrough.py | DEMOS.md |
 | `FEAT-QUALITY-009` | integration/test_doctor.py | DEMOS.md |
+| `FEAT-QUALITY-010` | integration/test_dir_covered_file_entry.py, system/test_deploy_managed.py | DEMOS.md |
+| `FEAT-QUALITY-011` | integration/test_deploy_shell_blocks.py, unit/test_deploy_runbook.py | DEMOS.md |
 | `FEAT-RECORD-001` | regression/test_corpus_contracts.py, system/test_cli.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_system.py, unit/test_schema.py | DEMOS.md |
 | `FEAT-RECORD-002` | integration/test_db.py, regression/test_corpus_contracts.py, unit/test_schema.py | DEMOS.md |
 | `FEAT-RECORD-003` | regression/test_corpus_contracts.py, system/test_cli.py, system/test_system.py, unit/test_schema.py | DEMOS.md |
@@ -233,7 +245,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-REFERENCE-004` | unit/test_testwiki.py | DEMOS.md |
 | `FEAT-REFERENCE-005` | unit/test_srcindex.py | DEMOS.md |
 | `FEAT-REFERENCE-006` | unit/test_srcindex.py | DEMOS.md |
-| `FEAT-REFERENCE-007` | system/test_wiki_cli.py, unit/test_wiki.py | DEMOS.md |
+| `FEAT-REFERENCE-007` | system/test_wiki_cli.py, system/test_wiki_cli_hygiene.py, unit/test_wiki.py | DEMOS.md |
 | `FEAT-SCIP-001` | system/test_scip_cli.py, unit/test_scip.py | DEMOS.md |
 | `FEAT-SERVER-001` | integration/test_server.py, system/test_demo_e2e.py, system/test_example_external.py, system/test_server_launch.py, system/test_standalone.py | DEMOS.md |
 | `FEAT-SERVER-002` | integration/test_server.py, integration/test_server_store_parity.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_server_launch.py | DEMOS.md |
@@ -254,6 +266,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-SERVER-017` | system/test_cli.py, system/test_example_external.py, unit/test_registry.py | DEMOS.md |
 | `FEAT-SERVER-018` | system/test_cli_sync.py | DEMOS.md |
 | `FEAT-SERVER-019` | integration/test_server.py | DEMOS.md |
+| `FEAT-SERVER-020` | integration/test_repo_token.py | DEMOS.md |
+| `FEAT-SERVER-021` | system/test_register_token_cli.py | DEMOS.md |
 | `FEAT-SETTINGS-001` | unit/test_settings.py | DEMOS.md |
 | `FEAT-SETTINGS-002` | unit/test_settings.py | DEMOS.md |
 | `FEAT-SETTINGS-003` | unit/test_settings.py | DEMOS.md |
@@ -271,7 +285,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-STALENESS-004` | system/test_staleness_cli.py | DEMOS.md |
 | `FEAT-STALENESS-005` | integration/test_staleness_server.py | DEMOS.md |
 | `FEAT-STALENESS-006` | integration/test_staleness_server.py, system/test_demo_e2e.py | DEMOS.md |
-| `FEAT-WORKERS-001` | system/test_suggest_cli.py, unit/test_workers.py | DEMOS.md |
+| `FEAT-WORKERS-001` | system/test_suggest_cli.py, unit/test_workers.py, unit/test_workers_gap_advice.py | DEMOS.md |
 | `FEAT-WORKERS-002` | integration/test_worker_loop.py | DEMOS.md |
 | `FEAT-WORKLIST-001` | integration/test_worklist_server.py, system/test_worklist_cli.py, unit/test_worklist.py | DEMOS.md |
 

@@ -31,6 +31,8 @@ from .sinks import RepoIdentity
 __all__ = [
     "RegistrationPayload",
     "RegisterTransport",
+    "bearer_token_problem",
+    "token_from_env",
     "HttpRegisterTransport",
     "HttpSyncTransport",
     "repo_identity_from_config",
@@ -41,6 +43,53 @@ __all__ = [
 # Frozen + extra="forbid": the registration payload is an immutable, audited wire
 # artifact and an unexpected key is a loud error, not a silent pass (K6, K8).
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
+
+# SRV-TOKEN: the ONE bearer-token charset rule, applied wherever a bearer is SET.
+# Part of it is forced: both server verifiers strip the presented bearer, so a
+# padded token can never match, and HTTP clients cannot send CR/LF, NUL or
+# characters outside latin-1, so such a token would lock the repo. The rest is
+# POLICY: inner whitespace and other non-ASCII CAN be presented today, but are
+# excluded so every token fits one RFC 6750-style grammar (printable ASCII, no
+# whitespace). A validity rule, not a knob.
+_BEARER_CHARSET = frozenset(chr(c) for c in range(0x21, 0x7F))
+_BEARER_RULE = (
+    "a bearer token must be printable ASCII with no whitespace (0x21-0x7E), "
+    "e.g. `openssl rand -hex 32`"
+)
+# The dry-run mask for a write-only token (the same mask gitfetch redacts with).
+_REDACTED = "***"
+
+
+def bearer_token_problem(token: str) -> str | None:
+    """Why ``token`` cannot be a bearer token, or ``None`` when it can (SRV-TOKEN).
+
+    The shared rule for every place a bearer is SET: the admin reset route, the
+    admin token at app build, :func:`token_from_env` and :func:`register_repo`.
+    The phrase never quotes the token (it is a secret).
+    """
+    if not token.strip():
+        return f"is empty (or only whitespace); {_BEARER_RULE}"
+    if token != token.strip():
+        return f"has leading/trailing whitespace; {_BEARER_RULE}"
+    if not set(token) <= _BEARER_CHARSET:
+        return f"contains whitespace, control or non-ASCII characters; {_BEARER_RULE}"
+    return None
+
+
+def token_from_env(var: str, *, what: str = "the bearer token") -> str:
+    """Read a bearer token from ``$var``; loud :class:`SchemaError` if unusable (K8).
+
+    Asking for a token must never degrade to an OPEN register, so an unset
+    variable or one failing :func:`bearer_token_problem` raises, naming ``$var``
+    but never its value.
+    """
+    value = os.environ.get(var)
+    if value is None:
+        raise SchemaError(f"{what} is read from ${var}, which is not set")
+    problem = bearer_token_problem(value)
+    if problem is not None:
+        raise SchemaError(f"{what} in ${var} {problem}")
+    return value
 
 
 class RegistrationPayload(BaseModel):
@@ -250,6 +299,7 @@ def register_repo(
     default_branch: str | None = None,
     description: str | None = None,
     auth_token: str | None = None,
+    rotate: bool = False,
 ) -> dict | None:
     """Register ``identity`` with the central server; return its response.
 
@@ -260,7 +310,21 @@ def register_repo(
     :class:`HttpRegisterTransport` built from ``url``/``auth_env`` (lazily building
     its stdlib leaf, K0) — and the server response is returned. A missing/empty
     ``url`` on the real submit path is a loud, typed :class:`SchemaError` (K8).
+
+    SRV-TOKEN: ``auth_token`` registers the repo token-protected; ``rotate=True``
+    rotates it to ``auth_token`` while the transport presents the CURRENT token
+    from ``$auth_env``. When ``$auth_env`` already holds ``auth_token`` the
+    rotation is done, and the call is an ordinary protected re-register (K7).
+    :func:`_check_token_request` refuses an unusable request BEFORE anything is
+    sent (a dry run too). A dry run shows the token as ``***``.
+    Every register re-sends the whole registration (fields left unset reset).
     """
+    _check_token_request(
+        auth_env=auth_env,
+        auth_token=auth_token,
+        rotate=rotate,
+        default_transport=transport is None,
+    )
     payload = RegistrationPayload(
         repo=identity,
         default_branch=default_branch,
@@ -268,7 +332,10 @@ def register_repo(
         auth_token=auth_token,
     )
     if dry_run:
-        return payload.model_dump(mode="json")
+        shown = payload.model_dump(mode="json")
+        if shown["auth_token"] is not None:
+            shown["auth_token"] = _REDACTED
+        return shown
     if transport is None:
         if not url:
             raise SchemaError(
@@ -277,3 +344,68 @@ def register_repo(
             )
         transport = HttpRegisterTransport(url, auth_env)
     return transport.register(payload)
+
+
+def _check_token_request(
+    *,
+    auth_env: str | None,
+    auth_token: str | None,
+    rotate: bool,
+    default_transport: bool,
+) -> None:
+    """Refuse a token register/rotation that cannot work, before sending (K8).
+
+    - a supplied ``auth_token`` must pass :func:`bearer_token_problem`;
+    - a rotation needs the new token and a configured ``auth_env`` whose value is
+      a usable CURRENT bearer. When that bearer already IS the new token, the
+      rotation has happened and this is a plain protected re-register (K7: a
+      re-run converges; the server still verifies that bearer);
+    - a protected register through the DEFAULT transport needs ``$auth_env`` to
+      hold EXACTLY ``auth_token`` (no stripping): the next register and the http
+      sink present ``$auth_env``, so anything else locks the repo out of its own
+      writes. An injected transport owns its bearer, so it is not checked.
+    """
+    if auth_token is not None:
+        problem = bearer_token_problem(auth_token)
+        if problem is not None:
+            raise SchemaError(f"the new repo token {problem}")
+    if rotate:
+        if auth_token is None:
+            raise SchemaError("a token rotation needs the new token (auth_token)")
+        if not auth_env:
+            raise SchemaError(
+                "a token rotation presents the repo's current token from "
+                "central.auth_env, which is not configured — set central.auth_env "
+                "to the variable holding the current token"
+            )
+        token_from_env(auth_env, what="the current repo token (central.auth_env)")
+        return
+    if auth_token is None or not default_transport:
+        return
+    lockout = "a token-protected register would lock the repo out of its own writes"
+    if not auth_env:
+        raise SchemaError(
+            f"{lockout}: the next register and the http sink present the bearer "
+            "from central.auth_env, which is not configured — set central.auth_env "
+            "to the variable holding this token"
+        )
+    held = os.environ.get(auth_env)
+    if held == auth_token:
+        return
+    if held is None:
+        why = "which is not set"
+    else:
+        problem = bearer_token_problem(held)
+        why = (
+            f"which {problem}"
+            if problem is not None
+            else ("which holds a different token")
+        )
+    raise SchemaError(
+        f"{lockout}: the next register and the http sink present the bearer from "
+        f"${auth_env} (central.auth_env), {why}. For a NEW repo, put this token "
+        f"in ${auth_env} and register with --auth-token-env {auth_env}; to CHANGE "
+        f"an already-protected repo's token, keep its CURRENT token in "
+        f"${auth_env} and rotate instead with --rotate-to-env VAR (VAR holding "
+        "the new token)"
+    )

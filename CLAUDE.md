@@ -64,7 +64,8 @@ them in commits/PRs):
   enters through config. The **core** depends only on `pydantic`, `typer`,
   `pyyaml`. `langgraph` (`[agent]`), `fastapi`/`sqlalchemy`/`cryptography`
   (`[server]`) are opt-in extras, imported lazily — a core-only install must stay
-  minimal.
+  minimal. No hard-coded values: every install-time or tunable value comes from
+  config, never a literal in code (see Conventions).
 - **K1** — `cdx check` and `drift` are detect-only: pure, no file mutation, no
   backend call.
 - **K2** — Single source of truth = the code; docs are graded against the surface,
@@ -85,6 +86,11 @@ them in commits/PRs):
   no slice breaks a previous slice's tests; coverage ≥ 90%.
 - **K10** — Determinism: sorted keys, normalized whitespace, no wall-clock in
   hashes; timestamps are injected, not read from the clock inside pure functions.
+  In front matter the `cdm:` block is written key-sorted whenever the engine
+  rewrites it (an unchanged one keeps its bytes); the author's other entries
+  keep their bytes and order (column-0 block mapping with no duplicate,
+  `<<` or aliased key and no alias into a changed entry; any other layout gets a
+  data-exact, fixed-order fresh dump — see `manifest.render_doc`).
 
 ## Repository layout
 
@@ -166,6 +172,20 @@ durable) a `LESSON_LEARNT.md` entry. Pin new module signatures in
 - **Commits/PRs** use Conventional Commits with an epic scope, e.g.
   `feat(gitsync): …`, `docs(project): …`, `chore(frontend): …`.
 - **Branch off `main`**; open a PR rather than pushing to `main` directly.
+- **Nothing hard-coded (K0).** A URL, timeout, branch, path, label, threshold or
+  env-var name an adopter might tune is a config field with a declared default
+  (`MonitorConfig`/`IndexFile` for the repo config, `Settings` for `server.*`,
+  `SpMirrorConfig` for `spmirror.*`); code reads the field and never restates
+  the value. A literal that is not a knob (protocol constant, kept convention
+  name, or a per-invocation CLI flag default that is not a repo-wide tunable)
+  is a `keep` row in `.project/problems/HC-AUDIT.md` once the sweep finds it. That audit's rows are frozen: a newly found literal
+  is a `keep` row or a new one-row `HC-<TOPIC>` slice, never growth of an
+  existing slice, and it is frozen in the same change
+  (`tests/smoke/test_hc_audit.py` enforces both and prints the batch to add).
+  When a doc quotes a shipped value it names the key, in one of the forms
+  listed in `tests/smoke/test_config_quotes.py` (`QUOTE_FORMS`), as in
+  (default `fingerprint_body_tier: false`); that test checks each quote against
+  the model.
 - **Frontend** (`frontend/`) is Astro + React islands; `astro check` and `astro
   build` are the type/build gates. Vitest is run in CI (host load can starve the
   local worker startup).

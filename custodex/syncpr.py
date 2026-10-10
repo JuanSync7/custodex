@@ -31,12 +31,12 @@ backend, K4).
 from __future__ import annotations
 
 import difflib
+import posixpath
 from collections.abc import Iterable
-from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
-from .config import MonitorConfig
+from .config import MonitorConfig, doc_path
 from .monitor import Monitor
 
 __all__ = ["SyncResult", "sync_pr", "should_sync"]
@@ -45,11 +45,13 @@ __all__ = ["SyncResult", "sync_pr", "should_sync"]
 def _norm(path: str) -> str:
     """Normalize a repo-relative path to a comparable POSIX string (C-04, K10).
 
-    Back-slashes become ``/`` and a leading ``./`` (and any ``.`` segments) are
-    collapsed via :class:`PurePosixPath`, so ``./docs/x.md``, ``docs/x.md`` and
-    ``docs\\x.md`` all compare equal to the managed doc path ``docs/x.md``.
+    Back-slashes become ``/`` and the path is normalised LEXICALLY with
+    :func:`posixpath.normpath` — the same formula as :func:`custodex.config.doc_path`
+    (X-CONTAIN) — so ``./docs/x.md``, ``docs\\x.md`` and a managed path spelled
+    ``ghost/../docs/x.md`` all compare equal to ``docs/x.md``. (``PurePosixPath``
+    collapses ``.`` but keeps ``..``, so it named a different file than heal.)
     """
-    return PurePosixPath(path.replace("\\", "/")).as_posix()
+    return posixpath.normpath(path.replace("\\", "/"))
 
 
 def should_sync(changed_files: Iterable[str], config: MonitorConfig) -> bool:
@@ -86,12 +88,18 @@ class SyncResult(BaseModel):
 
 
 def _diff_one(path: str, before: str, after: str) -> str:
-    """A deterministic unified diff for one document (``a/<path>`` → ``b/<path>``)."""
+    """A deterministic unified diff for one document (``a/<path>`` → ``b/<path>``).
+
+    The headers name the file healed, ``posixpath.normpath(path)`` (X-CONTAIN)
+    — exactly the path :func:`custodex.pr.plan_docs_pr` commits — never a
+    ``ghost/..`` config spelling, which ``git apply`` and patch(1) refuse.
+    """
+    repo_path = posixpath.normpath(path)
     lines = difflib.unified_diff(
         before.splitlines(keepends=True),
         after.splitlines(keepends=True),
-        fromfile=f"a/{path}",
-        tofile=f"b/{path}",
+        fromfile=f"a/{repo_path}",
+        tofile=f"b/{repo_path}",
         lineterm="",
     )
     return "".join(lines)
@@ -110,6 +118,12 @@ def sync_pr(
     most for the server's docs-PR route, which loads the config of a CLONED,
     untrusted repo (``server/app.py``): an adopter's own config must not decide
     the server's authoring authority. Mirrors the MCP-02 discipline for ``apply``.
+
+    Each doc is snapshotted, re-read and (on ``dry_run``) restored at
+    ``doc_path(monitor.root, spec.path)`` — the file monitor heals (X-CONTAIN).
+    ``changed_paths`` keeps the CONFIG spelling (``spec.path``);
+    :func:`custodex.pr.plan_docs_pr` normalises it for the commit. The diff
+    headers name the normalised path, the file the commit carries.
     """
     specs = monitor.config.documents
     # Snapshot BEFORE: repo-relative POSIX path -> current text, or None if missing.
@@ -117,10 +131,10 @@ def sync_pr(
     doc_paths = {}
     for spec in specs:
         rel = spec.path
-        doc_path = monitor.root / spec.path
-        doc_paths[rel] = doc_path
+        doc_file = doc_path(monitor.root, spec.path)
+        doc_paths[rel] = doc_file
         before[rel] = (
-            doc_path.read_text(encoding="utf-8") if doc_path.is_file() else None
+            doc_file.read_text(encoding="utf-8") if doc_file.is_file() else None
         )
 
     # Heal in place via the existing pipeline (honors B-02/B-03 authority, K5/K7).
@@ -129,9 +143,9 @@ def sync_pr(
     diffs: list[str] = []
     changed: list[str] = []
     for rel in sorted(before):
-        doc_path = doc_paths[rel]
+        doc_file = doc_paths[rel]
         after_text = (
-            doc_path.read_text(encoding="utf-8") if doc_path.is_file() else None
+            doc_file.read_text(encoding="utf-8") if doc_file.is_file() else None
         )
         before_text = before[rel]
         if after_text == before_text:
@@ -143,13 +157,13 @@ def sync_pr(
         # Restore the tree byte-for-byte (K1): rewrite pre-existing docs to their
         # before-text and DELETE any file the run newly created.
         for rel in changed:
-            doc_path = doc_paths[rel]
+            doc_file = doc_paths[rel]
             before_text = before[rel]
             if before_text is None:
-                if doc_path.is_file():
-                    doc_path.unlink()
+                if doc_file.is_file():
+                    doc_file.unlink()
             else:
-                doc_path.write_text(before_text, encoding="utf-8")
+                doc_file.write_text(before_text, encoding="utf-8")
 
     patch = "".join(diffs)
     summary = "clean" if not changed else f"{len(changed)} doc(s) updated"

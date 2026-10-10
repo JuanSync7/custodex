@@ -71,6 +71,7 @@ def _copy_dogfood_tree(dst: Path) -> Path:
     shutil.copytree(_ROOT / "config", dst / "config")
     shutil.copytree(_ROOT / "templates", dst / "templates")
     shutil.copy2(_ROOT / "README.md", dst / "README.md")
+    shutil.copy2(_ROOT / "DEPLOY.md", dst / "DEPLOY.md")
     # The `tests` unit (FEAT-CONFIGV2-017) mirrors test files → test-docs: its
     # docs live under test-docs/ and its code_refs point at tests/smoke/, so both
     # trees must come along for the surfaces to resolve on the copy.

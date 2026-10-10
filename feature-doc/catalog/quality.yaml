@@ -111,3 +111,35 @@ features:
     subsystem: quality
     modules: [doctor]
     constraints: [K8]
+
+  - id: FEAT-QUALITY-010
+    title: DEPLOY.md is a managed user-guide doc
+    summary: >-
+      DEPLOY.md is a managed user-guide doc. The deploy unit selects every
+      settings model reachable from Settings, owns custodex/settings.py through a
+      file-valued dir-covered entry, and owns nothing it does not track. Test:
+      tests/system/test_deploy_managed.py,
+      tests/integration/test_dir_covered_file_entry.py.
+    subsystem: quality
+    modules: [settings, config]
+    constraints: [K2, K3, K7]
+
+  - id: FEAT-QUALITY-011
+    title: The deploy runbook's claims match the code, both ways
+    summary: >-
+      The deploy runbook's operational claims match the code, both ways.
+      Covered: env parsing (bools incl. padding, lists, empty overrides, git
+      hosts); the validation sentence; GET /settings and GET /health; the cdx
+      settings sections and secret presence; compose secret guards, fallbacks,
+      DB URL, read-only mount, data volume and user; the KEK claim; the
+      file-scheme scope; worker kinds; the editable install; compose-aware
+      hardening; every prose port naming **server.port**. The TL;DR and upgrade
+      blocks are executed. The TL;DR writes .env once and never after a failed
+      generation, and .env is ignored by git and Docker. Narrative statements
+      (per-process loop and limiter, sha256 token storage, in-memory fallback
+      warning, no CLI flags) are not pinned. Test:
+      tests/unit/test_deploy_runbook.py,
+      tests/integration/test_deploy_shell_blocks.py.
+    subsystem: quality
+    modules: [settings]
+    constraints: [K2, K8]

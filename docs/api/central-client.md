@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: d976843c8838330e
+  fingerprint: 85aca5a78d82ba2a
   fingerprint_tiers:
-    composite: d976843c8838330e
-    docstring: 55784ccc96e3158e
-    signature: 0f7e1c0cf6e7e6cf
+    composite: 85aca5a78d82ba2a
+    docstring: 6bbe406ba71b8438
+    signature: ed1230796b09a53d
   region_anchors:
     symbols:
     - 00de68c42ed3a556
@@ -19,6 +19,7 @@ cdm:
     - 0a12e5898c92bfc6
     - 0a12e5898c92bfc6
     - 0a4b2d8421fb3e6f
+    - 0b6016bd6f1000a3
     - 0cf76e8b50602fd2
     - 0e93a13c25171bb5
     - 16678eb7552b38fc
@@ -43,6 +44,7 @@ cdm:
     - 6b106f395eb759a0
     - 6c12e786ac594147
     - 6d995553fb5a085d
+    - 7313e64ffa1b58a8
     - 75e0f149c69a5371
     - 777eb60b7980348c
     - 77ea7995f5e3605a
@@ -53,6 +55,7 @@ cdm:
     - 809fa29da7d76bd3
     - 858fb6a6bc250158
     - 86103aa2719b5725
+    - 8a499bbe02f5393c
     - 8d25a42a4acb138e
     - 9409a8869affba4d
     - 97491570c6a4d935
@@ -75,6 +78,8 @@ cdm:
     - b9b7c5a29a40857b
     - b9f412f8be74e488
     - bad0711074f2b6ae
+    - bae262a5331f4077
+    - bc7300c8c17b0dd4
     - c0486c1ad2d78921
     - c2c6b590df54ba8b
     - c3981046dd7878b3
@@ -98,8 +103,9 @@ cdm:
     - f2e94a23e5cbff82
     - f43f8cb24a1add81
     - f90c11e7613a8c7a
+    - fb66005d011b7209
   region_hashes:
-    symbols: 832739c2b8a504d7
+    symbols: 8f8aac2135ed98c3
   schema_version: 1.0.0
   symbol_sigs:
     00de68c42ed3a556: f6e4f7e6eb782954
@@ -107,6 +113,7 @@ cdm:
     061e25d0726f9341: bd410a8a7c7b2c31
     0a12e5898c92bfc6: 73646d29304739ea
     0a4b2d8421fb3e6f: 8c914a6de6a0885a
+    0b6016bd6f1000a3: 63855d71bd550b22
     0cf76e8b50602fd2: 2c213d5f414af724
     0e93a13c25171bb5: ee9494e53db959ad
     16678eb7552b38fc: 4101a19da73410cf
@@ -131,6 +138,7 @@ cdm:
     6b106f395eb759a0: ffe3a5f979565038
     6c12e786ac594147: cfcde816ab9bff91
     6d995553fb5a085d: b537e646d90d8803
+    7313e64ffa1b58a8: d30563f669e6f64e
     75e0f149c69a5371: ee24f5759d853136
     777eb60b7980348c: 0f70f828ac57eba3
     77ea7995f5e3605a: bf46a3c4fa2302a9
@@ -141,6 +149,7 @@ cdm:
     809fa29da7d76bd3: 5c10b53c0f0eec5a
     858fb6a6bc250158: c4e38c8c76cd90b6
     86103aa2719b5725: 3d7762f21c9e2bd2
+    8a499bbe02f5393c: bf0d628d65f3dcb0
     8d25a42a4acb138e: 580ab188348534d8
     9409a8869affba4d: aeed923d11535fbb
     97491570c6a4d935: 257a51d88579a1d1
@@ -158,11 +167,13 @@ cdm:
     ad17b68aed2d1623: fbeaf4d3402e6de4
     addc40895047fddd: cf9443a0691e0ffa
     afffd6e22916e9dd: f4beda67bbd523b3
-    b33f818fec911bb6: 3d8dfa04dff1b822
+    b33f818fec911bb6: cef71d4b7bd28cec
     b8bc4141d02b5d64: 133c2107d6497fcc
     b9b7c5a29a40857b: b3822550876f5feb
     b9f412f8be74e488: 3a800225f7d4d1e0
     bad0711074f2b6ae: c00580639f539c33
+    bae262a5331f4077: 00da9ccd4463e2fe
+    bc7300c8c17b0dd4: b6ccb66e0a6cf65d
     c0486c1ad2d78921: 85db44b842bee5c6
     c2c6b590df54ba8b: 16c1704499175564
     c3981046dd7878b3: 9f9af77f69a306de
@@ -182,10 +193,11 @@ cdm:
     e6bb1a9edaaaca7e: 9aec45afd4378221
     ee45145bb013f44b: ffdee75cfb5e72ca
     f19080767e4f6aa5: 538cc3cfb39157b5
-    f1cffdeb5c7f494a: 7873e30e5107d98b
+    f1cffdeb5c7f494a: 1b24ceedb4f773fc
     f2e94a23e5cbff82: d86f67633e8f02db
     f43f8cb24a1add81: f805dd1fb3a0a4b3
     f90c11e7613a8c7a: 5769a44b35d40dbf
+    fb66005d011b7209: ff9ee5630a718ad3
 ---
 # central-client
 
@@ -237,6 +249,8 @@ cdm:
 | SyncResult.documents | variable | documents: tuple[ConfigDocument, ...] |
 | SyncResult.model_config | variable | model_config = _MODEL_CONFIG |
 | SyncResult.run | variable | run: SyncRun |
+| _BEARER_CHARSET | variable | _BEARER_CHARSET = frozenset((chr(c) for c in range(33, 127))) |
+| _BEARER_RULE | variable | _BEARER_RULE = ... |
 | _CONFIG_SUBDIR | variable | _CONFIG_SUBDIR = ('config', 'cdmon') |
 | _Cloner | class | class _Cloner(Protocol) |
 | _Cloner.clone | method | def clone(self, spec: RemoteSpec, secret: str \| None, dest: Path) -> None |
@@ -254,6 +268,7 @@ cdm:
 | _MODES | variable | _MODES = ('git', 'local') |
 | _NONCE_BYTES | variable | _NONCE_BYTES = 12 |
 | _PROVIDER_USERS | variable | _PROVIDER_USERS: dict[str, str] = {'github': 'x-access-token', 'gitlab': 'oauth2'} |
+| _REDACTED | variable | _REDACTED = '***' |
 | _RegisterHttp | class | class _RegisterHttp(Protocol) |
 | _RegisterHttp.request | method | def request(self, method: str, url: str, *, body: dict \| None, token: str) -> dict |
 | _TokenExchangeHttp | class | class _TokenExchangeHttp(Protocol) |
@@ -270,22 +285,25 @@ cdm:
 | _b64url | function | def _b64url(raw: bytes) -> str |
 | _build_clone_argv | function | def _build_clone_argv(spec: RemoteSpec, dest: Path, *, secret: str \| None) -> list[str] |
 | _build_rows | function | def _build_rows(bundle: object, repo_id: str, *, mode: str, ref: str \| None, now: str) -> tuple[tuple[ConfigDocument, ...], tuple[ConfigCodeRef, ...]] |
+| _check_token_request | function | def _check_token_request(*, auth_env: str \| None, auth_token: str \| None, rotate: bool, default_transport: bool) -> None |
 | _clone_url | function | def _clone_url(spec: RemoteSpec, secret: str \| None) -> str |
 | _coverage_report | function | def _coverage_report(bundle: object, config_dir: Path) -> coverage_mod.CoverageReport |
 | _default_run_git | function | def _default_run_git(args: list[str], cwd: Path) -> str |
 | _drift_summary | function | def _drift_summary(report: DriftReport, coverage_percent: float) -> dict |
-| _git_info | function | def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> GitInfo |
+| _git_info | function | def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> tuple[GitInfo, GitFacts] |
 | _open_repo | function | @contextmanager def _open_repo(local_path: Path, *, mode: str, branch: str, run_git: _GitRunner) -> Iterator[tuple[object, Path, GitInfo]] |
 | _scrub | function | def _scrub(text: str, secret: str \| None) -> str |
+| bearer_token_problem | function | def bearer_token_problem(token: str) -> str \| None |
 | cloned_repo | function | @contextmanager def cloned_repo(spec: RemoteSpec, secret: str \| None, *, cloner: _Cloner \| None = None, clone_timeout: int \| None = None) -> Iterator[Path] |
 | github_app_jwt | function | def github_app_jwt(app_id: str, private_key_pem: str, *, now: int) -> str |
 | mint_github_installation_token | function | def mint_github_installation_token(app_id: str, private_key_pem: str, installation_id: str, *, now: int, http: _TokenExchangeHttp \| None = None, api_url: str = 'https://api.github.com') -> str |
 | mint_gitlab_oauth_token | function | def mint_gitlab_oauth_token(token_url: str, *, client_id: str, client_secret: str, refresh_token: str, http: _TokenExchangeHttp \| None = None) -> str |
 | mint_provider_token | function | def mint_provider_token(provider_kind: str, secret_material: str, *, now: int, http: _TokenExchangeHttp \| None = None) -> str |
 | read_config_at | function | def read_config_at(local_path: Path, *, mode: str, branch: str, now: str, run_git: _GitRunner = _default_run_git) -> tuple[object, Path, GitInfo] |
-| register_repo | function | def register_repo(identity: RepoIdentity, *, url: str, auth_env: str \| None = None, transport: RegisterTransport \| None = None, dry_run: bool = False, default_branch: str \| None = None, description: str \| None = None, auth_token: str \| None = None) -> dict \| None |
+| register_repo | function | def register_repo(identity: RepoIdentity, *, url: str, auth_env: str \| None = None, transport: RegisterTransport \| None = None, dry_run: bool = False, default_branch: str \| None = None, description: str \| None = None, auth_token: str \| None = None, rotate: bool = False) -> dict \| None |
 | repo_identity_from_config | function | def repo_identity_from_config(cfg: CentralConfig) -> RepoIdentity |
 | run_sync | function | def run_sync(local_path: Path, repo_id: str, *, mode: str, default_branch: str = 'main', now: str, run_git: _GitRunner = _default_run_git) -> SyncResult |
 | secret_box_from_env | function | def secret_box_from_env(env: Mapping[str, str] \| None = None) -> SecretBox |
 | sync_repo_remote | function | def sync_repo_remote(repo_id: str, *, mode: str, url: str, auth_env: str \| None = None, transport: HttpSyncTransport \| None = None) -> dict |
+| token_from_env | function | def token_from_env(var: str, *, what: str = 'the bearer token') -> str |
 <!-- CDM:END symbols -->

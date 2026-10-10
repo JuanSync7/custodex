@@ -46,6 +46,14 @@ unlisted-engine-module-is-a-gap case).
 | `test_tiered_still_closes_a_pure_addition_beside_a_collision` | **[jarvis-contribution-key-identity]** | control: a pure addition beside a collision still closes mechanically, and a second run is a no-op (K7) |
 | `test_tiered_still_closes_after_a_same_name_deletion_left_the_stamp_over_counting` | **[jarvis-contribution-key-identity]** | liveness: after a real same-name deletion is resolved on a doc whose declared `symbols` region is absent, the anchor stamp over-counts; the stored signature tier proves it stale, so a later pure addition still closes mechanically (no phantom "-1") and a second run is a no-op (K7) (break-it documented) |
 
+### `test_owners_join_parser_parity.py` — the coverage join agrees with both readers
+| Case | Lesson | Invariant |
+|------|--------|-----------|
+| `test_owners_join_matches_the_graded_surface[9 cases]` | **[COVLANG-DOCMAP]** | the join equals the public graded surface for `symbols` refs (.py/.sh/.bash suffix, explicit lang, explicit lang over a mapped suffix, symbols/lines/class/names selectors) |
+| `test_owners_join_matches_the_coverage_resolver[9 cases]` | **[COVLANG-DOCMAP]** | the join equals the public symbols `resolve_coverage` marks documented, for normal-form ref paths (whole file, each selector, arg_signature only, records/switches refs with and without selectors) |
+
+Every case asserts a non-empty owned set. A `./`-prefixed ref path is a known divergence (coverage matches the raw path), pinned in tests/unit/test_docmap_lang.py.
+
 ### `test_corpus_contracts.py` — schema / transport / learning contracts
 | Case | Lesson | Invariant |
 |------|--------|-----------|
@@ -66,6 +74,11 @@ unlisted-engine-module-is-a-gap case).
 | `test_dogfood_docs_are_in_sync` | **[CDM-07]** | the checked-in docs match the checked-in code (in-sync re-assertion) |
 | `test_dogfood_docs_conform_to_layout_standard` | **[CDM-08]** | the checked-in docs satisfy the machine-checked Layout Standard |
 | `test_dogfood_self_heals_on_a_copy` | **[CDM-07]** | the full self-heal LOOP works on the real project (on a temp copy) |
+
+### `test_surface_golden.py` — the frozen-surface golden (FPW wave)
+| Case | Lesson | Invariant |
+|------|--------|-----------|
+| `test_surface_golden.py` (the whole file) | **[FPW-FIXTURES]** | the surface an existing doc tree was stamped against must not move silently; only a [WAVE] slice re-pins (golden --repin + repins-keyed rows) |
 
 ## "Break-it" provenance
 

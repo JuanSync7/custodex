@@ -1,0 +1,46 @@
+{
+  "capture_python": [3, 11],
+  "config_name": "cdmon.yaml",
+  "body_tier_line": "fingerprint_body_tier: false",
+  "encodings": {
+    "enc1": {
+      "commit": "5f3f891857df9cea87d61e9aa45a3320f8b4fd36",
+      "engine_tree": "f4e8c848a949503dee4edf11c9999984c09c26a3"
+    },
+    "enc2": {
+      "commit": "ddc368d288f89dcf18104fbad526e0ebff4b7c32",
+      "engine_tree": "3c459ae887f606e621e2a51bd1f753acff230828"
+    }
+  },
+  "variants": {"body-off": false, "body-on": true},
+  "synthetic_variants": {"body-off": false, "body-on": true},
+  "golden_encoding": "enc2",
+  "now": "2026-06-01T00:00:00Z",
+  "hand_edits": [
+    {
+      "doc": "docs/model.md",
+      "region": "overview",
+      "body": "Hand-written overview: an `Item` carries a price, and a `Widget` can be\nresized through its `size` property."
+    },
+    {
+      "doc": "docs/cli.md",
+      "region": "symbols",
+      "body": "| symbol | note |\n|--------|------|\n| sync_all | the `sync-all` command |\n| config_path | cached config lookup (edited by hand) |"
+    },
+    {
+      "doc": "docs/helpers.md",
+      "region": "api",
+      "body": "| Name | Signature |\n|------|-----------|\n| normalise | both files define it; see the table above |"
+    }
+  ],
+  "pre_p2_docs": ["docs/legacy.md"],
+  "wave_slices": [
+    "FPW-D",
+    "FPW-B",
+    "FPW-C",
+    "FPW-A",
+    "PF-SHELL",
+    "FPW-REENCODE",
+    "REL-DECLARE"
+  ]
+}
