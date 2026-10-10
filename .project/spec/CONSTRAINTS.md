@@ -12,6 +12,26 @@ tickets, commits, and the STATUS log.
   subpackage) is the one optional, opt-in extra: it adds `langgraph` under the
   `[agent]` extra and is imported lazily, only when that backend is selected, so
   installing without the extra leaves the core dependency surface intact.
+  *No hard-coded values:* every install-time or tunable value (a URL, a
+  timeout, a branch, a path, a label, a threshold, an environment-variable
+  name) comes from config, never from a literal in code. Its shipped default is
+  a field default on a config model: `IndexFile` / `MonitorConfig` for the repo
+  config, `Settings` for config/settings.yaml (`server.*`), `SpMirrorConfig` for
+  config/spmirror.yaml (`spmirror.*`). Code reads that field and never restates
+  the value. (`IndexFile` and `MonitorConfig` still declare `root` and `version`
+  with different defaults; declaring each repo-config default once waits on the
+  lift of `IndexFile` into `MonitorConfig`.) Protocol constants, kept convention
+  names and per-invocation CLI flags are not knobs; the ones the hard-coded
+  sweep found are `keep` rows, with their reason, in
+  `.project/problems/HC-AUDIT.md`, the frozen inventory of the remaining
+  literals and their owning slices.
+  Docs may quote a shipped value only by naming the key that owns it, in one of
+  the forms that `tests/smoke/test_config_quotes.py` lists (`QUOTE_FORMS`), for
+  example (default `apply_tiered: false`), a backend timeout of 120 seconds
+  (`backend.timeout_s`), or `docdeps.transitive`, default OFF. That test checks
+  every such quote against the model default and fails loudly (K8) on an
+  unknown key or a wrong value. Other phrasings are not checked, so use one of
+  the listed forms.
 - **K1 — Detect-only `check`.** `cdx check` and the `drift` module never mutate
   files or call a backend. Detection is pure and side-effect free.
 - **K2 — Single source of truth = the code.** A document's machine-managed
