@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: b72ce9596782d4f8
+  fingerprint: 104a405a1cae338a
   fingerprint_tiers:
-    composite: b72ce9596782d4f8
-    docstring: 5875d48749f01a5a
-    signature: d630cbc632812b91
+    composite: 104a405a1cae338a
+    docstring: a392984da13edbbc
+    signature: 8834736e77f6a3fe
   region_anchors:
     symbols:
     - 00acc6baaa0ad625
@@ -73,6 +73,8 @@ cdm:
     - 270a3fd076b9cd84
     - 270ea06c38c4f851
     - 27904c30572353e6
+    - 27aa3c9cb0a20c42
+    - 27c59d909445bb00
     - 2807293d21f09748
     - 28b5e36b04212582
     - 2940596e7459cadb
@@ -116,6 +118,7 @@ cdm:
     - 3aa4ced457069278
     - 3adf537f9d4ef790
     - 3c03a2c3d6b27f9a
+    - 3c801c0404621427
     - 3d490067767e2b14
     - 3da8acf3a2f59c20
     - 3e185410a0648049
@@ -175,6 +178,7 @@ cdm:
     - 550988527d9b6ea0
     - 552611634a975a2f
     - 569ea65b553d1083
+    - 5706ddc1f2cf718f
     - 57b14c6818236f2b
     - 57f3d76d1c75e4b2
     - 581557c8ffdfff4b
@@ -255,6 +259,7 @@ cdm:
     - 77a49c9a8c63382b
     - 7882122864e73f70
     - 78df2c8be6f240d3
+    - 79504e0afa7c5146
     - 7a8eda9f0a5f3bf7
     - 7b47361aad19bb48
     - 7b9d81ce7f569c8e
@@ -337,6 +342,7 @@ cdm:
     - a83ac069488da82c
     - a84e7c78f9968ec9
     - aa17eba8a81232d1
+    - abb70ea561e917b9
     - abb903669fd3f39a
     - ac764180c2b6f360
     - acdea12ce8eabbf3
@@ -345,6 +351,7 @@ cdm:
     - aeb16220de90518c
     - af5da3c0ad99fd01
     - afa9b5b0d69b82b4
+    - afafa432b8faa168
     - afde7da6abcaaee0
     - b0089c3ea8ac6a97
     - b0621470d5ce4290
@@ -484,7 +491,7 @@ cdm:
     - fdd885da94c500a5
     - ffb1bba6232a6ba9
   region_hashes:
-    symbols: 52fff63dd612567e
+    symbols: 84247484d624c0bf
   schema_version: 1.0.0
   symbol_sigs:
     00acc6baaa0ad625: 32dd520fe1c678a4
@@ -548,6 +555,8 @@ cdm:
     270a3fd076b9cd84: 81a6eb9e95356dd1
     270ea06c38c4f851: 9057f2a0df7d91fb
     27904c30572353e6: cc58f81424895402
+    27aa3c9cb0a20c42: 8a9b0d34ef3959ce
+    27c59d909445bb00: 8924f7f613e5a3ab
     2807293d21f09748: 5924fd1cf17f9851
     28b5e36b04212582: e9fe84d9807eba20
     2940596e7459cadb: 48d08f3ce39e2b3a
@@ -591,6 +600,7 @@ cdm:
     3aa4ced457069278: d3fdd8789b677323
     3adf537f9d4ef790: 28950c0dfe70ca41
     3c03a2c3d6b27f9a: 6d65a81f658a4a3e
+    3c801c0404621427: dce741e3e82e5fd8
     3d490067767e2b14: aeb4be8018bf1d38
     3da8acf3a2f59c20: 2bddbf2907994455
     3e185410a0648049: 9af9700338d38514
@@ -650,6 +660,7 @@ cdm:
     550988527d9b6ea0: a8ec59cbcadc35eb
     552611634a975a2f: ae17c5f99dca6db2
     569ea65b553d1083: 9fa82257b2e27147
+    5706ddc1f2cf718f: 56e1ac4f7466dfb3
     57b14c6818236f2b: 949bf903b444ed58
     57f3d76d1c75e4b2: fe5756990dff7d98
     581557c8ffdfff4b: 364cd1caf1c91cec
@@ -730,6 +741,7 @@ cdm:
     77a49c9a8c63382b: f1a967940380520f
     7882122864e73f70: 0f005f543f1afab8
     78df2c8be6f240d3: b574c3213c7685b6
+    79504e0afa7c5146: 320dc767ea0434ce
     7a8eda9f0a5f3bf7: a8bfb3218861ce10
     7b47361aad19bb48: 8ea9166cb2a43c5d
     7b9d81ce7f569c8e: 97986be1a195b963
@@ -812,6 +824,7 @@ cdm:
     a83ac069488da82c: bd9b419cb4890bee
     a84e7c78f9968ec9: 5e34548a8e781bf9
     aa17eba8a81232d1: 1e4f73b704cb68a6
+    abb70ea561e917b9: eb959c9867c8b5d2
     abb903669fd3f39a: bc6a4f6c01d65a72
     ac764180c2b6f360: f3fc411836278392
     acdea12ce8eabbf3: a145ff616eb1802c
@@ -820,6 +833,7 @@ cdm:
     aeb16220de90518c: f48ec1dcec39e2ae
     af5da3c0ad99fd01: 615b580b78c3cab8
     afa9b5b0d69b82b4: 18e1faaa477e57e9
+    afafa432b8faa168: e867eb964e348f1b
     afde7da6abcaaee0: fc460f36ca6c6ce6
     b0089c3ea8ac6a97: 4fb265f0fc206596
     b0621470d5ce4290: d3cbf8d7d4a88fb2
@@ -1163,6 +1177,7 @@ cdm:
 | InMemoryStore.repo_token_hash | method | def repo_token_hash(self, repo_id: str) -> str \| None |
 | InMemoryStore.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | InMemoryStore.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| InMemoryStore.set_repo_token_hash | method | def set_repo_token_hash(self, repo_id: str, token_hash: str \| None) -> bool |
 | InMemoryStore.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | InMemoryStore.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
 | InMemoryStore.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
@@ -1294,6 +1309,7 @@ cdm:
 | SqlStore.resolutions_for | method | def resolutions_for(self, record_id: str) -> list[ResolutionRecord] |
 | SqlStore.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | SqlStore.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| SqlStore.set_repo_token_hash | method | def set_repo_token_hash(self, repo_id: str, token_hash: str \| None) -> bool |
 | SqlStore.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | SqlStore.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
 | SqlStore.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
@@ -1325,6 +1341,7 @@ cdm:
 | Store.repo_token_hash | method | def repo_token_hash(self, repo_id: str) -> str \| None |
 | Store.resolutions_for_repo | method | def resolutions_for_repo(self, repo_id: str, record_id: str \| None = None) -> list[ResolutionRecord] |
 | Store.set_provider_secret | method | def set_provider_secret(self, repo_id: str, sealed: bytes) -> None |
+| Store.set_repo_token_hash | method | def set_repo_token_hash(self, repo_id: str, token_hash: str \| None) -> bool |
 | Store.suggestions_for | method | def suggestions_for(self, repo_id: str, *, include_closed: bool = False) -> list[StoredSuggestion] |
 | Store.sync_runs_for | method | def sync_runs_for(self, repo_id: str, sync_kind: str \| None = None) -> list[SyncRun] |
 | Store.sync_suggestions | method | def sync_suggestions(self, repo_id: str, suggestions: Sequence[Any], *, now: str) -> None |
@@ -1394,6 +1411,10 @@ cdm:
 | SyncRunRow.repo_id | variable | repo_id: Mapped[str] = mapped_column(String, index=True) |
 | SyncRunRow.run | variable | run: Mapped[dict] = mapped_column(_json_type()) |
 | SyncRunRow.sync_kind | variable | sync_kind: Mapped[str] = mapped_column(String, index=True) |
+| TokenResetRequest | class | class TokenResetRequest(BaseModel) |
+| TokenResetRequest.auth_token | variable | auth_token: str \| None = None |
+| TokenResetRequest.model_config | variable | model_config = ConfigDict(extra='forbid', frozen=True) |
+| TokenResetRequest.open | variable | open: StrictBool = False |
 | WIKI_SECTIONS | variable | WIKI_SECTIONS = ... |
 | _CONFIG_EDIT_ADAPTER | variable | _CONFIG_EDIT_ADAPTER: TypeAdapter[ConfigEdit] = TypeAdapter(ConfigEdit) |
 | _CONFIG_SUBDIR | variable | _CONFIG_SUBDIR = ('config', 'cdmon') |

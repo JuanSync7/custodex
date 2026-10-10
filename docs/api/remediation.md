@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 6bff4d2c93ae72ab
+  fingerprint: 9dbc0ad47716d722
   fingerprint_tiers:
-    composite: 6bff4d2c93ae72ab
-    docstring: d252afb06cdeafed
-    signature: 9b3373c4ab833a1f
+    composite: 9dbc0ad47716d722
+    docstring: bf90bbfd2db223b0
+    signature: a6a0a5dec5fc6399
   region_anchors:
     symbols:
     - 000f066b671bb0ba
@@ -281,7 +281,7 @@ cdm:
     - fdba46c8e7e43c8b
     - fe9d46d6cc2990f0
   region_hashes:
-    symbols: 77844fe7ebbf02bb
+    symbols: e971b2982e7dca6d
   schema_version: 1.0.0
   symbol_sigs:
     000f066b671bb0ba: 399a8507aeaea974
@@ -473,7 +473,7 @@ cdm:
     ae091177c08a97a0: a07d02e26f93e338
     ae2c81c23afc62ef: 61d23b0ef363cca9
     ae524b54d9b5acbe: 5c32f720ac665217
-    af97b52edf8ed587: 9ff408168fe756d6
+    af97b52edf8ed587: 0fec6ce47665e1cd
     b08f821c395d4fbe: a44a3782ed9200b5
     b0ac5625172e2009: ffc70878145a1a8a
     b1799414c5b8f1dd: 8444308e9e422f56
@@ -661,7 +661,7 @@ cdm:
 | Monitor | class | class Monitor |
 | Monitor.__init__ | method | def __init__(self, config: MonitorConfig, config_dir: Path, *, backend: Backend \| None = None, sink: Sink \| None = None, now: Callable[[], str] \| None = None, log_path: Path \| None = None, source_sha: str \| None = None, use_exemplars: bool = False, resolutions_path: Path \| None = None, exemplar_top_n: int = DEFAULT_EXEMPLAR_TOP_N, rules: tuple[PromotionRule, ...] = (), doc_style: DocStyleMap \| None = None) -> None |
 | Monitor._closures | method | @staticmethod def _closures(closed: dict[str, list[tuple[Drift, str, bool, bool]]], remaining: tuple[Drift, ...]) -> tuple[ClosureRecord, ...] |
-| Monitor._doc_text | method | def _doc_text(self, drift: Drift, doc_path: Path) -> str |
+| Monitor._doc_text | method | def _doc_text(self, drift: Drift, doc_file: Path) -> str |
 | Monitor._engine_result | method | def _engine_result(self, drift: Drift, spec: DocumentSpec, surface: DocumentSurface, doc_text: str) -> BackendResult |
 | Monitor._handle_suspect_links | method | def _handle_suspect_links(self, effective_apply: bool, handled: list[HandledDrift], records: list[ReviewRecord]) -> None |
 | Monitor._modes_for | method | def _modes_for(self, spec: DocumentSpec) -> dict[str, RegionMode] |

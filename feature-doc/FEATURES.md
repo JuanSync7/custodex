@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**268 features** across 35 subsystems.
+**282 features** across 35 subsystems.
 
 ## agent
 
@@ -184,7 +184,7 @@ A FixRequest carries additive authoring inputs — `context_refs` glance-through
 
 ### `FEAT-CLI-016` — Promotion candidates (cdx promotions)
 
-`cdx promotions` lists read-only promotion CANDIDATES via `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose resolved records (≥ `--min-count`) unanimously share one decision resolution and could become a deterministic rule. `--json` for machine output.
+`cdx promotions` lists read-only promotion CANDIDATES via `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose distinct resolved decisions (resolved record_ids, ≥ `--min-count`) unanimously share one decision resolution and could become a deterministic rule. `--json` for machine output.
 
 ### `FEAT-CLI-017` — Doc coverage (cdx coverage)
 
@@ -227,7 +227,7 @@ codeindex.build_code_index folds the EXACT `cdx coverage` universe (coverage.inc
 
 ### `FEAT-CODEINDEX-002` — `cdx impact` — the diff→docs surgical join
 
-codeindex.impact_report answers "I changed the tree — which docs are affected, through which symbols?" WITHOUT a full check: it diffs the stored code index against the current tree (built in memory, writing nothing — K1) and joins every changed symbol to the docs covering it. `direct` uses the docmap.symbol_owners public entity join for surviving symbols and an honest file-level fallback for added/removed ones (selection-aware attribution needs a surface that no longer, or does not yet, exist). `via_callers` extends the blast radius ONE xref hop through .cdmon/xrefs.json when present — never transitive (the `deps --transitive` advisory precedent); callers_available=False states plainly that an absent artifact means unknown callers, not no callers. Informational like `report`: exit 0 whenever the join runs; the one loud failure is a missing stored index (K8). Pure and sorted (K10).
+codeindex.impact_report answers "I changed the tree — which docs are affected, through which symbols?" WITHOUT a full check: it diffs the stored code index against the current tree (built in memory, writing nothing — K1) and joins every changed symbol to the docs covering it. `direct` uses the docmap.symbol_owners public entity join (which honours each code_ref's `symbols`/`lines`/`names` selection) for every changed symbol it owns; a changed symbol the join does not own falls back to a file-level join (any doc whose `code_refs` name the file) only when it was ADDED or REMOVED. Known asymmetry: an added public symbol that a narrowed ref does not select is over-attributed to that doc through the fallback, while a modified unselected one is not attributed (restricting the fallback to removed symbols is queued). `via_callers` extends the blast radius ONE xref hop through .cdmon/xrefs.json when present — never transitive (the `deps --transitive` advisory precedent); callers_available=False states plainly that an absent artifact means unknown callers, not no callers. Informational like `report`: exit 0 whenever the join runs; the one loud failure is a missing stored index (K8). Pure and sorted (K10).
 
 ## config
 
@@ -316,6 +316,8 @@ errors.py defines a single CodeDocMonitorError base carrying a human message plu
 | `FEAT-CONFIGV2-016` | README / narrative-document monitoring | config, drift, layout | K0, K2, K3, K5, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-017` | Test → test-doc mirror | config, extract, heal | K0, K2, K5, K7, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-018` | Every index global is lifted onto MonitorConfig | config | K8, K9 | — | — | implemented |
+| `FEAT-CONFIGV2-019` | One doc formula — the converted lanes name a doc by doc_path(root, path) | config, drift, okf, index, docdeps, workers, entities, build, docwriter, monitor, syncpr, pr, generate | K1, K7, K8, K10 | — | — | implemented |
+| `FEAT-CONFIGV2-020` | resolve_within — fail-closed containment gate for untrusted configs | config | K8, K10 | — | — | implemented |
 
 ### `FEAT-CONFIGV2-001` — Multi-file config/cdmon directory layout
 
@@ -388,6 +390,14 @@ Test files are monitored exactly like source files: a config/cdmon unit whose co
 ### `FEAT-CONFIGV2-018` — Every index global is lifted onto MonitorConfig
 
 The merge lift is the one silent plumbing step in the config directory form: a new global declared on the index file but never carried into MonitorConfig loads without error and is simply ignored — the knob exists in the schema, the adopter sets it, and nothing happens. A guard asserts that every index-file field except the four that are structurally index-only names a real MonitorConfig field, so the next global cannot be half-plumbed.
+
+### `FEAT-CONFIGV2-019` — One doc formula — the converted lanes name a doc by doc_path(root, path)
+
+A managed doc's file is normpath(root / path), lexical and never symlink-followed. check, okf, monitor, docdeps, index, the entity lane, cdx build, write-doc, sync_pr, the docs-PR plan and the editor writers all grade, heal, export, render and commit that ONE file, and patch/diff headers name it too, so a dotdot spelling (`x/../docs/g.md`) cannot split them or reach a file outside the repo through a symlink. A committed symlink traversed without `..` is gated by resolve_within once CI-TRUST adopts it. cdx lint, lint --fix, new-doc and onboard are a queued follow-up.
+
+### `FEAT-CONFIGV2-020` — resolve_within — fail-closed containment gate for untrusted configs
+
+resolve_within(root, rel) returns the lexical in-repo path or None, and never raises. It refuses absolute paths, climbs, a root or rel the OS cannot name (NUL, lone surrogate), symlink escapes and loops, the root itself, sibling-prefix tricks and any location it cannot prove. It is the gate writers acting on configs they do not own will call.
 
 ## coverage
 
@@ -511,6 +521,7 @@ docdeps.propagate_suspect surfaces the EAGER transitive blast radius of the dire
 | `FEAT-DOCMAP-001` | Provenance-tiered doc↔doc edge suggestions from the mention layer | docmap, cli | K1, K6, K10, K11 | — | — | implemented |
 | `FEAT-DOCMAP-002` | `docdeps.baseline: body|prose` — reheals stop tripping dependents | docmap, docdeps, config | K6, K7, K10 | — | — | implemented |
 | `FEAT-DOCMAP-003` | `cdx link` — accept (comment-preserving splice) / reject (durable verdict) | docmap, cli | K7, K8, K10, K11 | — | — | implemented |
+| `FEAT-DOCMAP-004` | Coverage join follows the graded surface and the ref selection | docmap | K0, K1, K2, K8, K10 | — | — | implemented |
 
 ### `FEAT-DOCMAP-001` — Provenance-tiered doc↔doc edge suggestions from the mention layer
 
@@ -523,6 +534,10 @@ The suspect-baseline knob (additive K6, default `body` = byte-identical to the p
 ### `FEAT-DOCMAP-003` — `cdx link` — accept (comment-preserving splice) / reject (durable verdict)
 
 The missing human verbs for the suggestion loop (K11 — agents suggest, humans apply). ACCEPT: `cdx link DOWN UP [--type]` validates through the loaded models (unknown ids / self-edge / duplicate → loud ConfigError, K8) then declares the edge by a TARGETED TEXTUAL SPLICE of the unit YAML — inserting or extending the `depends_on:` block under the matching `- id:` entry and bumping the frontmatter `updated:` line — never a model re-serialization (dump_unit_file would destroy the 30+ load-bearing comment lines hand-maintained units carry; the regenerate_index textual-surgery precedent), self-validates the spliced config (reverting on failure), then stamps the new edge's baseline via stamp_edges(only=UP) so it arrives REVIEWED (no UNSTAMPED noise; `cdx check` stays green, K7); the churn note is echoed before writing so the decision is informed. REJECT: `cdx link --reject DOWN UP [--by][--note]` appends a durable EdgeRejection verdict to `.cdmon/edge-rejections.jsonl` (append-only, injected timestamp — the reviewlog precedent) which suggest_edges excludes forever — the repo-side rejection memory the review demanded (a declined suggestion never re-surfaces; the Dosu lesson with an audit trail). `cdx deps` gains the REAL infer_from_links behaviour: when true, ONE advisory summary line (count + how to review), never the full list — terminal-noise control; JSON shapes unchanged.
+
+### `FEAT-DOCMAP-004` — Coverage join follows the graded surface and the ref selection
+
+symbol_owners (the doc→symbol ownership behind `cdx deps --suggest` SHARED_SYMBOL, the `cdx graph` DOCUMENTS edges and centrality, the DOCUMENT_GAP feed and the `cdx impact` direct join) reads an `extract: symbols` code_ref through the extractor registry (explicit `lang`, then the suffix map, then python) — the routing the drift surface is graded with — and narrows every ref with the coverage selector rule (`symbols`/`lines`/`names` via extract._select). A covered shell function is now owned by its doc, and a narrowed ref no longer claims its whole file. `arg_signature` narrows the graded surface, not ownership; ownership is audience-agnostic. A missing, non-file, unparseable or unregistered-language ref is skipped, but any other extractor error propagates (K8). Shell symbols reach suggestions and ranking only when `coverage.include` selects `.sh` files, and `cdx impact` still reports 0 docs for a shell change until the code index carries shell symbols (the inventory half of NEW-COV-LANG, COV-DENOM).
 
 ## docwriter
 
@@ -787,6 +802,8 @@ kgraph.build_graph folds everything Custodex already knows into ONE typed graph 
 | `FEAT-LAYOUT-007` | Per-region authority state surface | layout | K1, K10 | — | — | implemented |
 | `FEAT-LAYOUT-008` | Dependency-free Markdown renderer | build | K0, K10 | — | — | implemented |
 | `FEAT-LAYOUT-009` | HTML-twin build orchestration | build, layout | K0, K10 | — | — | implemented |
+| `FEAT-LAYOUT-010` | Front-matter splice — an engine write rewrites only what changed | manifest, layout, heal, docdeps, docwriter, spmirror | K7, K8, K10 | — | — | implemented |
+| `FEAT-LAYOUT-011` | Deterministic fresh front-matter dump | manifest | K6, K10 | — | — | implemented |
 
 ### `FEAT-LAYOUT-001` — Document Layout Standard conformance lint
 
@@ -824,6 +841,14 @@ render_markdown turns a managed doc body into an HTML fragment with no third-par
 
 build renders every `html: true` document under config_dir/config.root to its .html twin, wrapping render_markdown output in a styled page with a sidebar nav (grouped by nav_section, labelled by nav_label/title) and embedding the body's md_source_hash in a code-doc-md-sha256 meta tag so lint_html_twin recognises the twin as derived and current. Missing source docs are skipped; it returns the written paths.
 
+### `FEAT-LAYOUT-010` — Front-matter splice — an engine write rewrites only what changed
+
+render_doc(meta, body, source=) splices meta into the front matter the doc already carries. A data-equal meta (exact types, NaN-safe, tuple equals its list) returns the stored block byte for byte. Otherwise each unchanged top-level entry keeps its exact bytes (comments, quoting, flow style, folding, anchors), a changed entry is re-dumped in place (losing the comments inside it) and keeps the comment lines after it, a new entry lands where meta puts it, a ... marker and the comments after it stay last, and a re-dumped cdm block has its keys sorted. The splice applies to a column-0 block mapping with no duplicate top-level key, << merge key, aliased key or flow root, and only when the result parses back to exactly meta (so not when an alias points into an entry the write changes); any other layout gets the fresh dump (FEAT-LAYOUT-011). Front matter in source that is malformed YAML or not a mapping raises DriftError. All seven managed-doc writers pass the text they parsed as source.
+
+### `FEAT-LAYOUT-011` — Deterministic fresh front-matter dump
+
+With no source fence (or when the splice is refused) render_doc dumps the front matter in one call, keeping meta's key order and sorting only the cdm block. Non-ASCII text is written literally (allow_unicode), with an escaped re-dump when a character would not round-trip (U+0085). Set members are sorted (by repr when their types do not compare) so the output does not depend on the hash seed, and every anchor is unique. A doc with empty meta and no fence keeps its body verbatim.
+
 ## learn
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -834,6 +859,8 @@ build renders every `html: true` document under config_dir/config.root to its .h
 | `FEAT-LEARN-004` | Promotion detector for recurring resolved drift shapes | promotion | K0, K10 | — | — | implemented |
 | `FEAT-LEARN-005` | Decision-only auto-promotion guard | promotion | K10 | — | — | implemented |
 | `FEAT-LEARN-006` | Deterministic rule synthesis and matching | promotion | K4, K10 | — | — | implemented |
+| `FEAT-LEARN-007` | Promotion counts distinct human decisions | promotion | K8, K10 | — | — | implemented |
+| `FEAT-LEARN-008` | Per-shape distinct-decision scoping | promotion | K3, K10 | — | — | implemented |
 
 ### `FEAT-LEARN-001` — Deterministic similarity retrieval over resolved drifts
 
@@ -849,7 +876,7 @@ The frozen Exemplar model pairs a past resolved ReviewRecord with its Resolution
 
 ### `FEAT-LEARN-004` — Promotion detector for recurring resolved drift shapes
 
-detect_promotions groups resolved records by the generalizable shape (doc_id, drift_kind, audience) — NOT surface_hash — and emits a PromotionCandidate per shape whose resolved records unanimously share one decision >= min_count times; orphan resolutions are ignored and output is deterministically sorted. Pure, no I/O, no wall-clock.
+detect_promotions groups resolved records by the generalizable shape (doc_id, drift_kind, audience) — NOT surface_hash — and emits a PromotionCandidate per shape whose DISTINCT resolved decisions (resolved record_ids, at least min_count of them) unanimously share one decision; orphan resolutions are ignored and output is deterministically sorted. Pure, no I/O, no wall-clock.
 
 ### `FEAT-LEARN-005` — Decision-only auto-promotion guard
 
@@ -858,6 +885,14 @@ Only the content-free DECISION resolutions in PROMOTABLE_RESOLUTIONS (invalidate
 ### `FEAT-LEARN-006` — Deterministic rule synthesis and matching
 
 rule_from_candidate maps a PromotionCandidate to a frozen PromotionRule (both promotable decisions yield the INVALIDATE verdict), and rule_for returns the first rule whose (doc_id, drift_kind, audience) shape matches a Drift (else None) — enabling opt-in, additive rule application that resolves a matched drift with zero backend calls.
+
+### `FEAT-LEARN-007` — Promotion counts distinct human decisions
+
+detect_promotions counts DISTINCT resolved record_ids per shape (one human decision each, last-write-wins via resolved_index), never review-log lines: a record_id shared by several drifts under one injected clock, a duplicated log line, a re-ingested hub record and a retried resolve each count once, so one resolve can never promote a shape by itself. min_count below one is a loud ConfigError, even on an empty log. One code event can still mint several ids (a per-record clock, or repeated runs over an unchanged surface), a pinned residual.
+
+### `FEAT-LEARN-008` — Per-shape distinct-decision scoping
+
+The distinct-decision count, the min_count threshold and unanimity are all scoped to one (doc_id, drift_kind, audience) shape: a record_id spanning the HASH and REGION drifts of one doc counts once in EACH shape, a dissent in one shape never blocks another, different audiences of one doc are separate shapes, a non-promotable decision (overridden/accepted) on any id blocks the shape, and deduplication is keyed by record_id exactly so it can never overwrite a dissenting decision, whatever the input order.
 
 ## manifest
 
@@ -907,17 +942,22 @@ stored_region_anchors reads cdm.region_anchors[region_id] as a tuple (None on a 
 
 ### `FEAT-MANIFEST-009` — Standard-meta stamp and re-render
 
-stamp_standard_meta sets the Layout Standard static keys cdm.schema_version and cdm.audience while preserving every other cdm key, and render_doc re-emits front matter plus body to one string (body verbatim when meta is empty, sorted-key YAML fence otherwise).
+stamp_standard_meta sets the Layout Standard static keys cdm.schema_version and cdm.audience while preserving every other cdm key, and render_doc re-emits front matter plus body as one string. The body comes back verbatim when meta is empty and the doc had no fence. With a source fence, meta is spliced into the stored block (FEAT-LAYOUT-010); otherwise the block is dumped fresh in meta's order with the cdm block sorted (FEAT-LAYOUT-011).
 
 ## mcp
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
 |----|---------|---------|-------------|-------|-------|--------|
 | `FEAT-MCP-001` | the MCP read surface: `custodex_status` overview + seven per-domain read tools (MCP-00/01) | mcp, cli | K0, K1, K2, K3, K4, K5, K6, K7, K8, K10, K11 | — | — | implemented |
+| `FEAT-MCP-002` | `custodex_status` degrades the drift pillar when a code ref cannot be extracted (MCP-STATUS) | mcp | K1, K6, K7, K8, K10 | — | — | implemented |
 
 ### `FEAT-MCP-001` — the MCP read surface: `custodex_status` overview + seven per-domain read tools (MCP-00/01)
 
 The opt-in `[mcp]` extra + `custodex/mcp/` subpackage that stands up a Model Context Protocol server over Custodex with NO change to the engine (K0; the `[server]` extra precedent — `import custodex` pulls in nothing from here, the SDK is imported lazily and pinned `mcp>=1.8,<2` until the 2026-07-28 v2 rework). A two-layer split tighter than `[server]`'s: the PURE `tools` module (core deps only, no SDK — so its projection logic imports and tests even in a core-only install) holds `load_repo_bundle` (resolve a repo's config the way the CLI does — `config/cdmon/index.yaml` then `cdmon.yaml`, loud `McpError` if neither, K8), `resolve_repo_id`, and `status_summary` (run the SAME detect `cdx check` runs via `Monitor.check` and fold the `DriftReport` into a shaped `StatusSummary` — clean flag + drift totals split code↔doc vs doc↔doc; pure, no clock/mutation/network, K1/K2/K10); the `server` module (imports the SDK) builds a `FastMCP` instance whose curated tools are thin wrappers over `tools` that RELOAD the bundle per call and return `model_dump(mode="json")` (shaped output, NOT a 1:1 wrap of 37 verbs, NOT raw blobs — the 2026 MCP best practice). MCP-00 registers the `custodex_status` overview (the progressive-disclosure entrypoint: "is this repo in sync?"). `cdx mcp-serve [--repo-root]` launches it over stdio (how an MCP client runs it as a subprocess) — a missing extra is a loud `install custodex[mcp]` hint and a config-less repo is refused at launch (K8); the `cdx-mcp` entry point mirrors `cdx-server`. All logic lives in the import-safe builder + pure tools, so the stdio transport is a thin `# pragma: no cover` leaf tests never open (the `_run_uvicorn` precedent). MCP-01 adds the seven `custodex_*`-prefixed per-domain read tools — each the pure projection of a detector `cdx` already runs (K1/K2, SHAPED + CAPPED + deterministically sorted, K10): `custodex_drift` (the per-drift detail list, filterable by kind/audience — K3), `custodex_coverage` (doc-coverage % + capped symbol gaps), `custodex_ownership` (unowned gaps + roster-gated orphans), `custodex_staleness` (review-SLA grading, as-of an INJECTED `now` — K10), `custodex_worklist` (the prioritised ownership+SLA+ doc↔doc join), `custodex_doc_graph` (the doc↔doc graph with per-edge suspect status — richer than the hub's graph-only view since the bodies are local, K2), and `custodex_records` (the local `.cdmon` review-log audit, newest first — K5). MCP-01 also ENRICHES `custodex_status` with the coverage / ownership / staleness headline counts (additive, K6). MCP-02 adds the three GATED WRITE tools — the first mutating tools in the layer, each driving an existing engine write seam behind a K11 gate ("agents suggest; humans apply"): `custodex_remediate` (drives `Monitor.run` — proposes fixes, recording a ReviewRecord per handled drift whatever the verdict, K5; `apply=False` default writes NO doc, so an agent never triggers a configured auto-apply — where the user's agent-chaining idea lands as a tool), `custodex_resolve` (records a human `Resolution` outcome via `reviewlog.append_resolution`, append-only, loud on an unknown record-id or resolution — K8), and `custodex_sync_docs` (a unified-diff preview of the doc heal via `syncpr.sync_pr`, `dry_run` by default so the working tree is restored byte-for-byte — K1; `apply=True` heals for real). The gate is TWO layers: each tool's advisory `apply=False` default PLUS a per-server `read_only` switch (`cdx mcp-serve --read-only`) that refuses to mount the write tools at all — an operator's provable no-write surface for an untrusted agent. K7 holds (once `apply=True` heals a drift, a re-run detects nothing); output stays SHAPED + CAPPED (never the raw heavy `MonitorResult`), and the clock is INJECTED (K10). Streamable-HTTP on the hub is MCP-03; the SDK v2 migration is MCP-04.
+
+### `FEAT-MCP-002` — `custodex_status` degrades the drift pillar when a code ref cannot be extracted (MCP-STATUS)
+
+When the drift detect raises an `ExtractionError` (a missing or unparseable code ref, an unregistered `lang`, `extract: records` without `json_records`, or an adopter extractor's `ExtractionError`), `custodex_status` still answers instead of failing: `drift_available=false`, `drift_error` (the message verbatim, or the error's bare class name when the message is blank), `-1` for `drift_total` / `code_doc_drift` / `suspect_link_drift` (unknown, NOT zero), `clean=false`, and the summary `drift unavailable — <drift_error>`. Ownership, staleness and coverage still answer; `custodex_drift` raises the same error (the drill-down is where the failure itself is reported, K8). Every other error still fails the status call: a malformed front matter (`DriftError`), a `ConfigError` from an adopter extractor, and a bad `reviewed` date (`ConfigError` from the staleness fold). The first two are masked only when an `ExtractionError` is met first inside the same detect (first-error-wins, as `cdx check`). The `reviewed` date is never masked, because the degrade does not return early: the ownership / staleness folds always run. The schema change is additive (K6: both fields are optional on input, with `drift_available` true and `drift_error` null when absent), and a two-direction validator rejects a `-1` sentinel without its flag, and the flag without the sentinels. Pure read (K1/K7), clock injected (K10).
 
 ## monitor
 
@@ -1074,6 +1114,8 @@ The live demo (scripts/seed_demo.py → :33333) seeds the central roster with th
 | `FEAT-PR-009` | Jira-style DriftTicket artifact | ticket | K6, K8, K10 | — | — | implemented |
 | `FEAT-PR-010` | Pure deterministic ticket builder | ticket | K1, K10 | — | — | implemented |
 | `FEAT-PR-011` | Ticket status from human resolution | ticket | K1 | — | — | implemented |
+| `FEAT-PR-012` | One git work-tree probe, loud when a repo is expected | forge, configsync | K0, K4, K7, K8, K10 | — | — | implemented |
+| `FEAT-PR-013` | GitFacts — prefix, config id and a managed-doc-aware baseline HEAD | forge | K7, K8, K10 | — | — | implemented |
 
 ### `FEAT-PR-001` — Doc-patch producer (sync_pr)
 
@@ -1119,6 +1161,14 @@ build_ticket derives every DriftTicket field from a handled drift, its verdict/c
 
 ticket_status maps a human ResolutionRecord outcome to a TicketStatus: None to PROPOSED, accepted to VALIDATED, overridden to CHANGES_REQUESTED, and rejected or invalidated both to REJECTED.
 
+### `FEAT-PR-012` — One git work-tree probe, loud when a repo is expected
+
+forge is the git work-tree probe that git-aware callers share, and default_git_probe is its subprocess leaf (not every git call: the server-side clone in gitfetch and the CLI's user.name lookup still run git themselves). The leaf runs git under LC_ALL=C, decodes stdout as UTF-8 with surrogateescape (lossless, so a non-UTF-8 path round-trips to the filesystem) and stderr as UTF-8 with replacement, and returns a non-zero exit as a GitOutcome for the caller to judge. An OSError is a SyncError: one that says to install git when the git executable is missing or not executable, and one naming the cwd for anything else. forge.git_facts treats a .git entry (directory, gitdir file or dangling symlink) at the root or any ancestor as a promise of a work tree. Any failure to read it, including a missing binary, dubious ownership, a broken gitdir pointer or any non-zero rev-parse exit, is a SyncError carrying git's exit code and stderr. A HEAD that does not resolve counts as unborn only when proven: symbolic-ref must name a branch with no ref file at its loose path (absent, or a branch directory such as an orphan feat beside feat/x, which git also calls unborn), so a corrupt ref is loud, not "no baseline". Only a KNOWN-absent .git is silent: a directory that cannot be searched for one is a SyncError too. With no .git anywhere, git is never run and the result is the non-git GitFacts. Every SyncError message shows paths and git output through forge.printable, so it is valid UTF-8. configsync runs its git calls through this leaf and refuses a local_path outside any work tree.
+
+### `FEAT-PR-013` — GitFacts — prefix, config id and a managed-doc-aware baseline HEAD
+
+git_facts(root, config_path=, doc_paths=) returns a frozen GitFacts: in_work_tree, the root's prefix inside its work tree (rev-parse --show-prefix of the physical path), config_id (the config file or directory's toplevel-relative POSIX path, such as config/cdmon, cdmon.yaml or demo/config/cdmon), and head. head is HEAD only while `git --no-optional-locks status --porcelain -z --untracked-files=no` exits 0 and lists no path other than a managed doc (normpath(prefix + doc.path), so ./docs/a.md and ../README.md match), counting both paths of a rename or copy. It is None for a zero-commit repo or orphan branch (proven unborn, see FEAT-PR-012) or any other tracked change; any non-zero status exit, or porcelain that is not exactly (XY SP path NUL [origin NUL])*, is a SyncError. A root and config in different work trees, such as a nested or vendored repo, are a SyncError. The probe is read-only and never refreshes .git/index. configsync's git mode takes its subdir from this prefix. prefix and config_id are filesystem-lossless, not JSON-safe: show them through forge.printable or hash their surrogateescape bytes.
+
 ## quality
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -1132,6 +1182,8 @@ ticket_status maps a human ResolutionRecord outcome to a TicketStatus: None to P
 | `FEAT-QUALITY-007` | Byte-stable .rpt render / parse round-trip | report | K7, K8, K10 | — | — | implemented |
 | `FEAT-QUALITY-008` | cdx doctor offline adoption preflight | doctor | K1, K4, K10 | — | — | implemented |
 | `FEAT-QUALITY-009` | WARN-vs-FAIL doctor grading philosophy | doctor | K8 | — | — | implemented |
+| `FEAT-QUALITY-010` | DEPLOY.md is a managed user-guide doc | settings, config | K2, K3, K7 | — | — | implemented |
+| `FEAT-QUALITY-011` | The deploy runbook's claims match the code, both ways | settings | K2, K8 | — | — | implemented |
 
 ### `FEAT-QUALITY-001` — Four-category writing-style map
 
@@ -1168,6 +1220,14 @@ run_checks answers "is this repo wired up correctly enough to run cdx and report
 ### `FEAT-QUALITY-009` — WARN-vs-FAIL doctor grading philosophy
 
 Each Check carries a CheckStatus where only FAIL fails the gate: a merely absent prereq (no `claude` CLI, unset $ANTHROPIC_API_KEY, missing langgraph extra, an unset central token, an unresolved code ref) is a WARN because the config is valid, while a structurally broken config (an `http` central sink missing its url or repo_id) is a FAIL.
+
+### `FEAT-QUALITY-010` — DEPLOY.md is a managed user-guide doc
+
+DEPLOY.md is a managed user-guide doc. The deploy unit selects every settings model reachable from Settings, owns custodex/settings.py through a file-valued dir-covered entry, and owns nothing it does not track. Test: tests/system/test_deploy_managed.py, tests/integration/test_dir_covered_file_entry.py.
+
+### `FEAT-QUALITY-011` — The deploy runbook's claims match the code, both ways
+
+The deploy runbook's operational claims match the code, both ways. Covered: env parsing (bools incl. padding, lists, empty overrides, git hosts); the validation sentence; GET /settings and GET /health; the cdx settings sections and secret presence; compose secret guards, fallbacks, DB URL, read-only mount, data volume and user; the KEK claim; the file-scheme scope; worker kinds; the editable install; compose-aware hardening; every prose port naming **server.port**. The TL;DR and upgrade blocks are executed. The TL;DR writes .env once and never after a failed generation, and .env is ignored by git and Docker. Narrative statements (per-process loop and limiter, sha256 token storage, in-memory fallback warning, no CLI flags) are not pinned. Test: tests/unit/test_deploy_runbook.py, tests/integration/test_deploy_shell_blocks.py.
 
 ## record
 
@@ -1317,6 +1377,8 @@ scip.read_scip decodes a SCIP protobuf index with the standard library alone —
 | `FEAT-SERVER-017` | Client-side `cdx register` | registry | K0, K4, K6, K8 | — | — | implemented |
 | `FEAT-SERVER-018` | Client-side remote sync trigger | registry | K0, K4, K8 | — | — | implemented |
 | `FEAT-SERVER-019` | Feature-wiki endpoint | server | K0, K4, K8, K10 | — | — | implemented |
+| `FEAT-SERVER-020` | Admin repo-token reset | server | K6, K7, K8, K10 | — | — | implemented |
+| `FEAT-SERVER-021` | `cdx register` token set and rotate | registry, cli | K0, K4, K6, K7, K8 | — | — | implemented |
 
 ### `FEAT-SERVER-001` — Optional central FastAPI service
 
@@ -1393,6 +1455,14 @@ sync_repo_remote POSTs {mode} to <url>/repos/{repo_id}/sync through an injected 
 ### `FEAT-SERVER-019` — Feature-wiki endpoint
 
 GET /wiki serves the committed EPIC-R wikis — the Feature Reference, Traceability Matrix, Test Wiki and Source Wiki — rendered to HTML via the engine's OWN dependency-free render_markdown (no new dep), as {"sections":[{"id","title","html"}...]} in the deterministic WIKI_SECTIONS order; it is GLOBAL and public (no auth, like /config/templates), a missing section file is omitted, and an absent feature-doc/ degrades to an empty payload rather than crashing.
+
+### `FEAT-SERVER-020` — Admin repo-token reset
+
+POST /admin/repos/{repo_id}/token/reset replaces ONLY the named repo's bearer-token hash through Store.set_repo_token_hash (both stores). It needs the GLOBAL admin token, checked before the repo lookup, and it fails closed (403) when the server has no admin token configured; an unknown repo is a 404 before any body check. The body names exactly one intent: a new auth_token, or open true (a strict JSON boolean; 1, "yes" or "on" is a 422) that clears protection. An empty body, a null token, open false, or both at once (an empty token with open true included) is a loud 400, so a reset never opens a repo implicitly. So is a token outside the shared bearer charset (printable ASCII, no whitespace). A reset to the stored value reports changed false, and the token is never echoed. An admin token outside the same charset stops the server (and cdx serve) from starting.
+
+### `FEAT-SERVER-021` — `cdx register` token set and rotate
+
+cdx register --auth-token-env VAR registers the repo token-protected with the token in $VAR, which must be exactly the token central.auth_env holds (the bearer this config's next register and http sink present), so the config never locks the repo out of those writes. When it does not hold it, the error says why (unset, padded or different) and names both remedies. --rotate-to-env VAR sends the new token while presenting the token central.auth_env holds (the server checks it only when the repo is already protected) and says to update central.auth_env's variable; re-running it after that converges as a verified no-op re-register. The two flags are mutually exclusive. An unset, empty, padded or non-printable-ASCII token is a loud SchemaError, never an open register; a dry run still validates the tokens and redacts the token to "***".
 
 ## settings
 
