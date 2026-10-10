@@ -47,7 +47,7 @@ from .config import (
 )
 from .entities import EntityKind, corpus_entities
 from .errors import ConfigError, ExtractionError, SchemaError
-from .extract import extract_file
+from .extract import _select, _symbol_language, extract_file, get_extractor
 
 __all__ = [
     "SuggestionTier",
@@ -109,10 +109,30 @@ class EdgeRejection(BaseModel):
 def symbol_owners(config: MonitorConfig, root: Path) -> dict[str, set[str]]:
     """Map a SYMBOL entity id (``symbol <path>#<name>``) → covering doc ids.
 
-    Per-(doc, code_ref) extraction through the audience-agnostic
-    :func:`~custodex.extract.extract_file` path; resilient — a missing or
-    unparseable ref is skipped, never fatal (an advisory scan must survive
-    arbitrary repos).
+    The doc→symbol COVERAGE join behind the SHARED_SYMBOL rule, the kgraph
+    DOCUMENTS edges and the ``codeindex.impact_report`` direct join. Per
+    (doc, code_ref) it owns the PUBLIC symbols of
+    ``_select(full, ref.symbols, ref.lines, ref.names)`` — the
+    :func:`~custodex.coverage.resolve_coverage` ownership rule for EVERY ref
+    kind (``arg_signature`` narrows a graded surface, not ownership; several
+    refs to one file own the union of their selections) — where ``full`` is:
+
+    * ``extract: symbols`` — the file read by the extractor the registry names
+      for the ref (:func:`~custodex.extract._symbol_language`: explicit
+      ``lang`` > suffix map > ``python``), the graded surface's own rule,
+      looked up at CALL time so a later ``register_extractor`` flows through
+      with no edit here (K0);
+    * ``extract: switches``/``records`` — the pre-routing Python read: such a
+      ref's ``lang`` names a switch/record parser, not a symbol extractor, so
+      it is never routed and a non-Python switch table owns nothing (COVLANG
+      step 2 / COV-DENOM decides non-symbols ownership).
+
+    Audience-agnostic and resilient: a missing or non-file, unparseable or
+    unregistered-language ref is skipped, never fatal (an advisory scan must
+    survive arbitrary repos). Only ``ExtractionError`` is a skip: any other
+    error an extractor raises propagates (K8). The read and the key both use
+    the ref's lexical ``normpath``; values are doc-id sets (callers sort —
+    K10).
     """
     owners: dict[str, set[str]] = {}
     for spec in config.documents:
@@ -122,10 +142,13 @@ def symbol_owners(config: MonitorConfig, root: Path) -> dict[str, set[str]]:
             if not target.is_file():
                 continue
             try:
-                symbols = extract_file(target)
+                if ref.extract == "symbols":
+                    full = get_extractor(_symbol_language(ref)).extract(target)
+                else:
+                    full = extract_file(target)
             except ExtractionError:
                 continue
-            for sym in symbols:
+            for sym in _select(full, ref.symbols, ref.lines, ref.names):
                 if not sym.is_public:
                     continue
                 owners.setdefault(f"symbol {path}#{sym.name}", set()).add(spec.id)
