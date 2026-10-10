@@ -104,8 +104,13 @@ def test_custodex_status_tool_returns_enriched_summary(tmp_path: Path) -> None:
         "docs_unowned",
         "docs_needing_review",
         "summary",
+        # MCP-STATUS (additive, K6): the drift pillar's availability + reason.
+        "drift_available",
+        "drift_error",
     }
     assert structured["coverage_available"] is True
+    assert structured["drift_available"] is True
+    assert structured["drift_error"] is None
 
 
 def test_custodex_drift_tool_returns_shaped_list(tmp_path: Path) -> None:
