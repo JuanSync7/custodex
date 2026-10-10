@@ -1,0 +1,61 @@
+# FPW-FIXTURES seed: one mini repo carrying every fingerprint-wave shape.
+# capture.py stamps it with each pinned engine; the body-on variant flips the
+# fingerprint_body_tier line below (and only that line).
+version: "1.0.0"
+root: "."
+fingerprint_body_tier: true
+
+region_templates:
+  api:
+    source: symbols
+    columns:
+      - {header: Name, field: name}
+      - {header: Signature, field: signature}
+
+documents:
+  # pydantic fields + a property getter/setter; `symbols: llm` is renderer-backed,
+  # `overview: llm` has no renderer (hand prose after the last heal).
+  - id: model
+    path: docs/model.md
+    audience: eng-guide
+    region_keys: [symbols, overview]
+    region_modes: {symbols: llm, overview: llm}
+    code_refs:
+      - path: pkg/models.py
+
+  # a decorated function + a named command; `symbols: human`, hand-edited after
+  # its last heal.
+  - id: cli
+    path: docs/cli.md
+    audience: eng-guide
+    region_keys: [symbols]
+    region_modes: {symbols: human}
+    code_refs:
+      - path: pkg/cli.py
+
+  # same-name functions in two files; one unlocked and one locked llm-seeded region.
+  - id: helpers
+    path: docs/helpers.md
+    audience: eng-guide
+    region_keys: [symbols, api]
+    region_modes: {symbols: llm-seeded, api: llm-seeded}
+    code_refs:
+      - path: pkg/helpers.py
+      - path: pkg/util.py
+
+  # no wave feature at all.
+  - id: neutral
+    path: docs/neutral.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/neutral.py
+
+  # composite-only (pre-P2): capture.py strips every cdm key but the fingerprint.
+  - id: legacy
+    path: docs/legacy.md
+    audience: user-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/neutral.py
+        symbols: [greet]
