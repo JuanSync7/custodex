@@ -25,7 +25,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .config import Audience, DocEdgeType, MonitorConfig
+from .config import Audience, DocEdgeType, MonitorConfig, doc_path
 from .errors import DriftError
 from .manifest import (
     Doc,
@@ -169,7 +169,7 @@ def detect_suspect_links(
     def _current(upstream_id: str) -> str | None:
         if upstream_id not in _cache:
             up_spec = specs_by_id[upstream_id]
-            up_path = root / up_spec.path
+            up_path = doc_path(root, up_spec.path)
             _cache[upstream_id] = (
                 upstream_fingerprint(
                     parse_doc(up_path), baseline=config.docdeps.baseline
@@ -183,9 +183,10 @@ def detect_suspect_links(
     for spec in config.documents:
         if not spec.depends_on:
             continue
-        down_path = root / spec.path
+        down_path = doc_path(root, spec.path)
         if not down_path.is_file():
-            # The downstream's own MISSING_DOC drift covers it; nothing to stamp.
+            # The downstream's own MISSING_DOC drift covers it — `detect` reads
+            # the same `doc_path` (X-CONTAIN), so a skip here is never silent.
             continue
         stamps = stored_upstream_hashes(parse_doc(down_path))
         for edge in spec.depends_on:
@@ -241,7 +242,7 @@ def infer_edges_from_links(
     out: list[InferredEdge] = []
     seen: set[tuple[str, str]] = set()
     for spec in config.documents:
-        down_path = root / spec.path
+        down_path = doc_path(root, spec.path)
         if not down_path.is_file():
             continue
         declared = {edge.doc for edge in spec.depends_on}
@@ -410,7 +411,7 @@ def stamp_edges(
     spec = next((d for d in config.documents if d.id == downstream_id), None)
     if spec is None:
         raise DriftError(f"unknown document id {downstream_id!r}")
-    down_path = root / spec.path
+    down_path = doc_path(root, spec.path)  # the file detect grades (X-CONTAIN)
     if not down_path.is_file():
         raise DriftError(
             f"document {downstream_id!r} file {spec.path!r} is missing — "
@@ -424,7 +425,7 @@ def stamp_edges(
     for edge in spec.depends_on:
         if only is not None and edge.doc != only:
             continue
-        up_path = root / specs_by_id[edge.doc].path
+        up_path = doc_path(root, specs_by_id[edge.doc].path)
         if not up_path.is_file():
             continue  # cannot baseline a missing upstream
         current = upstream_fingerprint(

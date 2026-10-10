@@ -21,6 +21,7 @@ audience.
 from __future__ import annotations
 
 import difflib
+import posixpath
 from collections import Counter
 from collections.abc import Collection, Sequence
 from enum import Enum
@@ -29,7 +30,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from .blocks import REGION_KEYS, expected_region, known_region_ids
-from .config import Audience, MonitorConfig, RegionMode, resolve_repo_root
+from .config import Audience, MonitorConfig, RegionMode, doc_path, resolve_repo_root
 from .docdeps import detect_suspect_links
 from .extract import DocumentSurface, SurfaceFingerprint, build_document_surface
 from .index import render_index
@@ -472,15 +473,19 @@ def docs_closable_by(
     # carries that document's own ``doc_path``, so a doc blocked by its own drift
     # is always blocked by its own file too. A separate ``blocked_ids`` set was
     # therefore dead weight — mutation testing proved it an equivalent mutant.
-    blocked_paths = {d.doc_path for d in actionable if d.apply_tier not in wanted}
+    #
+    # The FILE is compared NORMALISED (X-CONTAIN): detect and the writers name a doc by
+    # ``doc_path(root, path)`` = ``normpath(root / path)``, so ``shared.md`` and
+    # ``ghost/../shared.md`` are ONE file and must block each other.
+    blocked_paths = {
+        posixpath.normpath(d.doc_path) for d in actionable if d.apply_tier not in wanted
+    }
     qualified = (
-        {(d.doc_id, d.doc_path) for d in actionable}
+        {(d.doc_id, posixpath.normpath(d.doc_path)) for d in actionable}
         if require_actionable
-        else {(d.doc_id, d.doc_path) for d in report.drifts}
+        else {(d.doc_id, posixpath.normpath(d.doc_path)) for d in report.drifts}
     )
-    return frozenset(
-        doc_id for doc_id, doc_path in qualified if doc_path not in blocked_paths
-    )
+    return frozenset(doc_id for doc_id, file in qualified if file not in blocked_paths)
 
 
 def mechanical_docs(report: DriftReport) -> frozenset[str]:
@@ -726,8 +731,12 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
 
     The repo root is ``resolve_repo_root(config_dir, config.root)`` (N-06: the
     ONE shared formula = ``normpath(config_dir / root)``). Doc and code paths are
-    resolved under that root. Returns a :class:`DriftReport`; the file system is
-    never mutated.
+    resolved under that root; a doc is read at ``doc_path(root, spec.path)``
+    (X-CONTAIN: the ONE lexical formula the converted lanes and writers share, so
+    ``ghost/../docs/x.md`` grades the file the bundle exports, heal writes and a
+    docs PR commits). Unconfined: an owner's ``../shared/x.md`` doc is graded,
+    never refused. Returns a :class:`DriftReport`; the file system is never
+    mutated.
     """
     root = resolve_repo_root(config_dir, config.root)
     templates = config.region_templates
@@ -736,9 +745,9 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
 
     for spec in config.documents:
         surface = build_document_surface(spec, root)
-        doc_path = root / spec.path
+        doc_file = doc_path(root, spec.path)
 
-        if not doc_path.is_file():
+        if not doc_file.is_file():
             tier, evidence = classify_apply_tier(
                 DriftKind.MISSING_DOC, ChangeSeverity.UNKNOWN, healable=True
             )
@@ -756,7 +765,7 @@ def detect(config: MonitorConfig, config_dir: Path) -> DriftReport:
             )
             continue
 
-        doc = parse_doc(doc_path)
+        doc = parse_doc(doc_file)
 
         stored = stored_fingerprint(doc)
         current_fp = surface.fingerprint(include_body=config.fingerprint_body_tier)

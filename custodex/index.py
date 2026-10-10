@@ -24,7 +24,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .config import DocumentSpec, MonitorConfig, RegionTemplate
+from .config import DocumentSpec, MonitorConfig, RegionTemplate, doc_path
 from .layout import html_twin_path
 from .manifest import parse_doc
 
@@ -71,7 +71,7 @@ def _fields(
 ) -> dict[str, str]:
     """The synthetic per-doc fields available to an index column."""
     body = ""
-    target_path = root / target.path
+    target_path = doc_path(root, target.path)  # the file detect grades
     if target_path.is_file():
         body = parse_doc(target_path).body
     title, summary = _title_and_summary(body)
