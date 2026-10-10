@@ -138,7 +138,7 @@ def _corrected(
     # can later tell a surviving symbol's in-place signature change from an addition.
     # After set_fingerprint (which copied the cdm map); additive, survives heals (K7).
     meta = set_symbol_sigs(meta, fp.sig_by_anchor or {})
-    return render_doc(meta, body)
+    return render_doc(meta, body, source=doc.raw)
 
 
 def render_corrected(
@@ -235,7 +235,7 @@ def _stamp_region_hashes(text: str, modes: _Modes) -> str:
             # to the human body would falsely unlock the region).
             continue
         meta = set_region_hash(meta, region_id, region_body_hash(body))
-    return render_doc(meta, doc.body)
+    return render_doc(meta, doc.body, source=text)
 
 
 def apply_fix(

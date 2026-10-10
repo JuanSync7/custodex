@@ -122,7 +122,7 @@ def _author_overview(
     body, _changed = set_region(
         parse_text(doc_text).body, OVERVIEW_REGION, result.fix.new_region_body
     )
-    return render_doc(parse_text(doc_text).meta, body)
+    return render_doc(parse_text(doc_text).meta, body, source=doc_text)
 
 
 def draft_document(

@@ -434,7 +434,9 @@ def stamp_edges(
             meta = set_upstream_hash(meta, edge.doc, current)
             changed.append(edge.doc)
     if changed:
-        down_path.write_text(render_doc(meta, doc.body), encoding="utf-8")
+        down_path.write_text(
+            render_doc(meta, doc.body, source=doc.raw), encoding="utf-8"
+        )
     return tuple(sorted(changed))
 
 
