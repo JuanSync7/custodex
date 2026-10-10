@@ -86,6 +86,11 @@ them in commits/PRs):
   no slice breaks a previous slice's tests; coverage ≥ 90%.
 - **K10** — Determinism: sorted keys, normalized whitespace, no wall-clock in
   hashes; timestamps are injected, not read from the clock inside pure functions.
+  In front matter the `cdm:` block is written key-sorted whenever the engine
+  rewrites it (an unchanged one keeps its bytes); the author's other entries
+  keep their bytes and order (column-0 block mapping with no duplicate,
+  `<<` or aliased key and no alias into a changed entry; any other layout gets a
+  data-exact, fixed-order fresh dump — see `manifest.render_doc`).
 
 ## Repository layout
 

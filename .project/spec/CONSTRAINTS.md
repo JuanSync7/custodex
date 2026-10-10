@@ -72,7 +72,14 @@ tickets, commits, and the STATUS log.
 - **K10 — Determinism.** Hashes and serialized output are stable across runs
   (sorted keys, normalized whitespace, no wall-clock in hashes). Timestamps live
   only in review records and are injected, not read from the clock inside pure
-  functions (so tests are reproducible).
+  functions (so tests are reproducible). Front matter is the one place where
+  "sorted keys" is scoped: the engine-written `cdm:` block is always dumped with
+  its keys sorted, but the author's other front-matter entries keep their own
+  bytes and order (the `manifest.render_doc` splice) when the block is a
+  column-0 block mapping with no duplicate top-level key, no `<<` merge key, no
+  aliased key and no alias into an entry the write changes. Any other layout is
+  refused and gets a data-exact, fixed-order fresh dump instead: `meta`'s key
+  order, `cdm` sorted, sets sorted, independent of the hash seed.
 - **K11 — Agents suggest; humans apply.** (Minted by EPIC AGT.) Any
   agent/worker-produced proposal — an inferred doc↔doc edge, a generated config
   plan, a doc draft, a fix/what-to-document suggestion — is **advisory data**
