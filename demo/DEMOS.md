@@ -534,7 +534,7 @@ Features: FEAT-AGENT-007, FEAT-MONITOR-008, FEAT-LEARN-001, FEAT-LEARN-002, FEAT
 
 ### DEMO-039 — Promotion: recurring resolved drifts → a deterministic rule
 **What it shows.** `cdx promotions` lists read-only promotion CANDIDATES: each
-`(doc_id, drift_kind, audience)` shape whose resolved records (≥ min-count)
+`(doc_id, drift_kind, audience)` shape whose distinct resolved decisions (resolved record_ids, ≥ min-count)
 unanimously share one DECISION resolution (only the content-free `invalidated` /
 `rejected` auto-promote; `overridden`/`accepted` are excluded). A candidate maps to
 a frozen `PromotionRule`, and at run time `rule_for` resolves a matching drift with
@@ -1937,3 +1937,147 @@ sorted-by-doc / facets-sorted-not-encounter-ordered), `test_monitor_docdeps.py` 
 suspect link does NOT un-verify a clean close — else the alarm becomes noise), and
 `tests/system/test_cli.py` (each marker asserted verbatim, so the alarm is killable).
 Features: FEAT-RECORD-014
+
+### DEMO-128 — the coverage join sees shell functions and honours ref selectors
+1. Give a doc a code_ref `{path: scripts/deploy.sh, extract: symbols}` that defines `deploy_app()` and `rollback()`. Run `cdx graph`: both functions now carry a DOCUMENTS edge from that doc. Before this change there was none.
+2. The suggestion and ranking views need `**/*.sh` in `coverage.include`. With it, `cdx deps --suggest` proposes an edge between two docs that share a shell function, and a shell function no doc covers ranks as an undocumented gap. Under the default `**/*.py` scope, only the DOCUMENTS edges appear.
+3. Narrow a Python ref with `symbols: [Verdict]`. Only `Verdict` and its members are owned, and the rest of the file is no longer claimed by this doc (`cdx coverage` already graded it that way). `arg_signature` narrows the graded surface, not ownership.
+4. Limitation: `cdx impact` still reports 0 affected docs for an edit to a `.sh` file, because the code index is built from the Python-only inventory. This lifts when COV-DENOM lands.
+Features: FEAT-DOCMAP-004
+
+### DEMO-129 — the deploy runbook drifts with the settings it documents
+Change a settings default and run `cdx check`: DEPLOY.md is flagged. `cdx monitor --apply --no-tiered` restamps it and writes a ReviewRecord, and `cdx check` is clean. The runbook content test (tests/unit/test_deploy_runbook.py) stays red until the settings block shows the new default. A comment-only change in settings.py is not flagged (user-guide audience).
+Features: FEAT-QUALITY-010, FEAT-QUALITY-011
+
+### DEMO-130 — a lint fix that leaves the author's front matter alone
+**What it shows.** A doc whose front matter belongs to another tool is stamped by `cdx lint --fix`. The house block has a head comment, an inline comment, a flow list, a folded summary, a quoted date, an OpenWiki `verified.at: 2026-09-25T08:09:49.344Z` and `canonical: yes`. Before, the fix re-dumped the whole block, which sorted keys, dropped comments, turned `yes` into `true` and rewrote the timestamp. Now only the engine's block changes. It is written key-sorted because the engine rewrote it:
+```
+cdm:
+  audience: eng-guide
+  schema_version: <LAYOUT_VERSION>
+```
+Every other line keeps its exact bytes, a closing `...` marker stays last, and a second `lint --fix` writes nothing. An unchanged `cdm:` block is kept byte for byte, so the engine never re-sorts one it did not rewrite.
+
+**How to observe.** Stamp any doc whose front matter is a column-0 block mapping, then `git diff`: only the `cdm:` lines move. Comments you put inside the `cdm:` block are not kept when the engine rewrites it, because the block is machine-managed. The same holds for:
+- an engine heal (the mock backend, or the engine's HASH close in `cdx monitor --apply`);
+- `docdeps` edge stamps;
+- a SharePoint mirror re-sync.
+
+A real backend's whole-document fix is written as the backend returned it.
+
+Some layouts the splice refuses and re-dumps data-exact instead (same data, not the same bytes):
+- a flow or indented root;
+- a `<<` merge key, an aliased key, or a duplicate top-level key;
+- an alias that points into the `cdm` entry.
+
+A doc with no front matter gets a fresh block that writes `résumé` literally rather than as `é`.
+
+**Pinned by.** `tests/integration/test_foreign_frontmatter.py` covers stamp, second stamp, CLI monitor --apply, stamp_edges and mirror re-sync. `tests/unit/test_fm_splice.py` includes a 400-layout property test, a test that the comments inside a changed `cdm:` are lost, and an AST test that every managed-doc writer passes `source=` to `manifest.render_doc`.
+Features: FEAT-LAYOUT-010, FEAT-LAYOUT-011
+
+### DEMO-131 — the overview that stays answerable over an unreadable code ref
+**What it shows.** `custodex_status` is the "call first" entrypoint, so one dead code ref
+must not blank out the whole overview. Set up a repo whose config has one eng-guide doc,
+`docs/api.md`, citing `src/gone.py`, which does not exist, and call the `custodex_status`
+MCP tool:
+```
+drift_available: false
+drift_error: "Code reference not found ..."
+drift_total: -1   code_doc_drift: -1   suspect_link_drift: -1
+clean: false
+summary: "drift unavailable — Code reference not found ..."
+doc_count: 1   docs_unowned: 1   coverage_available: true
+```
+The `-1` counts mean **unknown, not zero**, and `clean` is false. Now call `custodex_drift`:
+it fails with the same message (K8), because the drill-down is where the failure itself is
+reported. Create `src/gone.py` and call `custodex_status` again: `drift_available` is back to
+`true`, `drift_error` is `null`, and the counts are real.
+**How to observe.** Only an `ExtractionError` degrades. A malformed front matter
+(`DriftError`) still fails the call, unless an unextractable ref comes at or before that doc
+in config order: then the extraction error is reported first (first-error-wins inside the
+detect, as `cdx check`). A bad `reviewed` date always fails the call, even behind a dead ref,
+because the degrade does not return early and the staleness fold always runs. Pinned by
+`tests/unit/test_mcp_status_degrade.py` (dead / unparseable / mistyped-`lang` /
+records-without-`json_records` refs degrade; verbatim and bare-class-name `drift_error`;
+loud `DriftError` / `ConfigError` / reviewed date; the two-direction validator) and
+`tests/smoke/test_mcp_status_degrade_server.py` (over the real FastMCP server).
+Features: FEAT-MCP-002
+
+### DEMO-132 — one human decision counts once
+**What it shows.** Promotion turns ≥ N unanimous human decisions into a deterministic rule, so N must count DECISIONS. Before this, one `custodex_resolve` of a doc with three managed regions counted as three: under one injected clock the doc's four drifts (1 HASH + 3 REGION) share one `record_id`, and the detector counted log lines. Now the unit is a distinct resolved `record_id` per shape. A retried resolve, a re-ingested hub record and a repeated same-clock preview each count once, and a shared id counts once in EACH shape it spans.
+**How to observe.** Change a public signature in a 3-region doc. Run `custodex_remediate`, then `custodex_resolve` on the one returned id, then `cdx promotions --min-count 1`. The candidate lines end `HASH -> invalidated (x1)` and `REGION -> invalidated (x1)`. Before the fix, REGION showed `(x3)`, enough to promote at the default threshold (the `detect_promotions(min_count=)` / `cdx promotions --min-count` default). Three separate code events, each resolved once, give `(x3)` for both. (`--json` prints the same number as `"count"`.)
+**Known residual.** One code event can still mint several ids:
+- `cdx monitor`'s per-record clock gives one run's regions distinct ids;
+- re-running `custodex_remediate` on an unchanged surface mints a fresh id per call.
+
+Resolving each of those ids counts once per id. Both cases are pinned in `tests/integration/test_promotion_distinct.py`: `test_cli_same_run_resolves_count_per_id_known_residual` and `test_repeated_mcp_runs_of_one_code_event_count_per_run_known_residual`.
+Features: FEAT-LEARN-007, FEAT-LEARN-008
+
+### DEMO-133 — the lost token that no longer bricks a repo, and the reset that can't open one
+**What it shows.** A repo registered with a bearer token locks its writes to that token. Lose it and, until now, the repo was stuck: a tokenless re-register keeps the old hash. Now an admin can reset it, and the reset is built so it can never become a way in:
+- It needs the GLOBAL admin token, and it is refused outright when the server has none configured.
+- It must say what it wants: a new token, or an explicit `{"open": true}`. An empty body is a 400, never a silent unlock, and so is an empty token sent together with open.
+
+On the client side, `cdx register` sends a token and refuses one this config could not present on its next write. With `central.auth_env: CDMON_CENTRAL_TOKEN` in the config:
+```
+$ export CDMON_CENTRAL_TOKEN=first
+$ cdx register --auth-token-env CDMON_CENTRAL_TOKEN
+registered acme/widget with https://hub.example (token-protected)
+$ NEW=second cdx register --auth-token-env NEW
+error: a token-protected register would lock the repo out of its own writes: ... holds a different token. For a NEW repo, put this token in $CDMON_CENTRAL_TOKEN ...; to CHANGE an already-protected repo's token, keep its CURRENT token in $CDMON_CENTRAL_TOKEN and rotate instead with --rotate-to-env VAR (VAR holding the new token)
+$ NEW=second cdx register --rotate-to-env NEW
+registered acme/widget with https://hub.example (registered with the new token; set $CDMON_CENTRAL_TOKEN to it)
+$ export CDMON_CENTRAL_TOKEN=second
+$ NEW=second cdx register --rotate-to-env NEW      # re-run converges
+registered acme/widget with https://hub.example (registered with the new token, which $CDMON_CENTRAL_TOKEN already presents)
+$ POST /admin/repos/acme/widget/token/reset  {}        # admin bearer
+400 a token reset never opens a repo implicitly: send a new auth_token, or {"open": true} to clear its protection
+```
+**How to observe.** `tests/integration/test_repo_token.py` runs over both stores and shows:
+- the repo token is a 403 on the reset route, and with no admin token configured every reset is a 403;
+- after a reset the old token gets 403 and the new one 202;
+- with two repos, resetting one leaves the other working;
+- resetting twice to the same token reports `changed: false`;
+- `{"open": 1}` is a 422, and `{"auth_token": "", "open": true}` is a 400.
+
+`tests/system/test_register_token_cli.py` drives the real CLI against the real app over TestClient: set, then rotate, then the config's http sink still lands, then a re-run of the rotation converges, and the lock-out hint leads to a working rotation.
+Features: FEAT-SERVER-020, FEAT-SERVER-021
+
+### DEMO-134 — A dotdot doc path names one file (FEAT-CONFIGV2-019, FEAT-CONFIGV2-020)
+1. Point a document at `nope/../docs/guide.md` in `cdmon.yaml`, with `html: true`.
+2. Run `cdx check`, then `cdx monitor --apply`, `cdx okf` and `cdx build`. All of them act on `docs/guide.md`:
+   - check grades it;
+   - monitor heals it;
+   - okf exports it with its verification history;
+   - build writes `docs/guide.html` ("built 1 HTML twin(s)").
+3. `cdx sync-pr --dry-run` shows `--- a/docs/guide.md` / `+++ b/docs/guide.md` headers.
+4. Replace `nope` with a symlink `link -> /elsewhere/sub` that has a decoy at `/elsewhere/docs/guide.md`. `cdx open-docs-pr` commits `docs/guide.md` (normalised) with the healed repo text, `cdx build` writes no page next to the decoy, and the decoy is untouched.
+5. In Python:
+   - `resolve_within(repo, "link/../../etc/passwd")` returns None;
+   - `resolve_within(repo, "escape/x")` returns None (escape is a symlink out of the repo);
+   - `resolve_within(repo, "docs/\ud800.md")` returns None;
+   - `resolve_within(repo, "docs/./guide.md")` returns `repo/docs/guide.md`.
+
+Features: FEAT-CONFIGV2-019, FEAT-CONFIGV2-020
+
+### DEMO-135 — the git probe that refuses to guess
+**What it shows.** There is one way Custodex asks git where a repo stands: `forge.git_facts(root, config_path=…, doc_paths=…)`. It sits on the probe's subprocess leaf, `forge.default_git_probe` (`LC_ALL=C`). Two other git calls are outside the probe: the server-side clone and the CLI's `user.name` lookup.
+
+The rule is that a `.git` means a work tree was promised. When git cannot read it (git is missing from the image, a container checkout has `dubious ownership`, a `gitdir:` pointer is broken, or the branch ref is corrupt), the result is a typed `SyncError` that carries git's exit code and its own stderr. It never quietly becomes "not a repo" or "no commits yet". The non-git answer comes only when a `.git` is KNOWN to be absent, and then git is never run.
+
+The facts are:
+- the root's `prefix`;
+- the config's toplevel-relative `config_id` (`config/cdmon`, `cdmon.yaml`, `demo/config/cdmon`);
+- a baseline `head`. It is kept while the only tracked changes are the managed docs passed as `doc_paths`. It is `None` for any other tracked change, and for a zero-commit repo or orphan branch once it is proven unborn.
+
+Config sync goes through the same probe. On an image without git, `cdx sync` prints `error: git is required: … install git in the job image`.
+
+**How to observe.** From the repo root on a clean checkout, run:
+`python -c "from pathlib import Path; from custodex.forge import git_facts; print(git_facts(Path('demo'), config_path=Path('demo/config/cdmon')))"`
+
+- It prints `in_work_tree=True prefix='demo/' config_id='demo/config/cdmon' head='<sha>'`, where `<sha>` equals `git rev-parse HEAD`.
+- Modify any tracked file and `head` becomes `None`. This command passes no `doc_paths`, so every change counts, even a docs edit.
+- Run it from a copy of `demo/` outside any repo and it prints `in_work_tree=False prefix='' config_id='config/cdmon' head=None` without running git.
+
+Pinned by `tests/unit/test_forge_git.py` (the dubious-ownership, no-binary, unsearchable-root, dangling-`.git`, zero-commit, orphan-branch, corrupt-ref and rename/copy cases) and `tests/integration/test_configsync_gitfacts.py`.
+Features: FEAT-PR-012, FEAT-PR-013

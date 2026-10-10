@@ -74,3 +74,26 @@ features:
     modules: [docmap, cli]
     constraints: [K7, K8, K10, K11]
     status: implemented
+
+  - id: FEAT-DOCMAP-004
+    title: "Coverage join follows the graded surface and the ref selection"
+    summary: >-
+      symbol_owners (the doc→symbol ownership behind `cdx deps --suggest`
+      SHARED_SYMBOL, the `cdx graph` DOCUMENTS edges and centrality, the
+      DOCUMENT_GAP feed and the `cdx impact` direct join) reads an
+      `extract: symbols` code_ref through the extractor registry (explicit
+      `lang`, then the suffix map, then python) — the routing the drift surface
+      is graded with — and narrows every ref with the coverage selector rule
+      (`symbols`/`lines`/`names` via extract._select). A covered shell function
+      is now owned by its doc, and a narrowed ref no longer claims its whole
+      file. `arg_signature` narrows the graded surface, not ownership; ownership
+      is audience-agnostic. A missing, non-file, unparseable or
+      unregistered-language ref is skipped, but any other extractor error
+      propagates (K8). Shell symbols reach suggestions and ranking only when
+      `coverage.include` selects `.sh` files, and `cdx impact` still reports 0
+      docs for a shell change until the code index carries shell symbols (the
+      inventory half of NEW-COV-LANG, COV-DENOM).
+    subsystem: docmap
+    modules: [docmap]
+    constraints: [K0, K1, K2, K8, K10]
+    status: implemented

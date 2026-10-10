@@ -60,7 +60,7 @@ any of this — just `cdx serve`.)
 # Generates the three secrets into .env on the first run only; a later run
 # keeps them. Compose reads .env on every start.
 [ -e .env ] || (umask 077 &&
-  admin=$(openssl rand -hex 32) &&
+  admin=$(openssl rand -hex 32) &&  # gates the GLOBAL admin routes (roster + repo-token reset)
   kek=$(openssl rand -base64 32) &&
   db=$(openssl rand -hex 16) &&
   printf '%s\n' "CDMON_ADMIN_TOKEN=$admin" "CDMON_SECRET_KEY=$kek" \
@@ -151,7 +151,7 @@ the same secret presence.
 
 | Env var               | Purpose                                                         |
 |-----------------------|-----------------------------------------------------------------|
-| `CDMON_ADMIN_TOKEN`   | Bearer token for the GLOBAL roster routes (`POST /admin/roster*`). **Unset = those routes are OPEN** — the server warns loudly on a persistent store. Always set it in a shared deployment. |
+| `CDMON_ADMIN_TOKEN`   | Bearer token for the GLOBAL admin routes: roster (`POST /admin/roster*`) and repo-token reset (`POST /admin/repos/{repo_id}/token/reset`). **Unset = roster routes OPEN and the token reset DISABLED (403).** It must be printable ASCII 0x21–0x7E with no whitespace (`openssl rand -hex 32` passes). A padded value (such as a secret file's trailing newline) can never match because the server strips the presented bearer; inner whitespace, control and non-ASCII characters are refused by policy. Either stops the server (and `cdx serve`) from starting with a ConfigError. |
 | `CDMON_DATABASE_URL`  | A `postgresql+psycopg` URL with user, password, host and database — selects the persistent store and runs migrations. The compose file sets it for you. |
 | `CDMON_SECRET_KEY`    | base64 32-byte KEK that AES-256-GCM-seals per-repo git provider credentials at rest. |
 | `CDMON_DB_PASSWORD`   | Compose only: the bundled Postgres password, which the compose file also writes into the database URL. It falls back to a placeholder when unset, so set it for any real deployment. |
@@ -164,7 +164,13 @@ run inside the database. A new `CDMON_SECRET_KEY` cannot open the git provider
 credentials sealed with the old one, so each repo's credentials must be registered
 again.
 
-Per-repo write tokens are passed at registration and stored only as sha256 hashes.
+Per-repo write tokens are passed at registration (`cdx register --auth-token-env VAR`, rotated with `--rotate-to-env VAR`) and stored only as sha256 hashes.
+
+**Lost a repo token?** An admin resets it with `POST /admin/repos/{repo_id}/token/reset`, header `Authorization: Bearer $CDMON_ADMIN_TOKEN`:
+- `{"auth_token": "<new>"}` sets a new token and revokes the old one;
+- `{"open": true}` clears protection.
+
+Any other body is refused (400/422). Afterwards, set the variable named by auth_env in the repo config's `central:` block to the new token.
 
 ## Hardening checklist (production)
 

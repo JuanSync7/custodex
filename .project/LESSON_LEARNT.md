@@ -3004,3 +3004,155 @@ Three smaller rules from the same lane:
   change). Measure a cost over the whole population in both directions, too: the
   tie-reorder cost went from "~0" on one hand-picked module to 25/344 insertions
   (a lower bound) and 6/110 removals.
+
+## [X-GATE] Pin a CI workflow by equality to a source-derived model, not by membership
+A membership check ("these commands appear somewhere in the workflow") never converges. Every review round finds another way for a present command to be neutered: an env var, `continue-on-error`, a `GITHUB_ENV`/`GITHUB_PATH` write, `|| true`, an `if:`, a checkout of another ref, a narrowed trigger, an extra install that pins tools down. The fix is to build the ENTIRE expected workflow from the repo's own sources and require exact, type-strict equality. Any addition is then a diff, and the catalogue of fail-open edits becomes evidence rather than the mechanism.
+Five corollaries:
+(1) Know exactly how your reader differs from the consumer's, and make every difference fail closed. PyYAML (YAML 1.1) reads `on:`/`yes`/`On` as booleans and keeps the last duplicate key. Overriding the bool resolver and raising on duplicates fixes those, but YAML 1.1 numbers remain. The pin stays sound only because every expected leaf is a string or True, and that property is itself pinned with fault injection. "Stricter than GitHub, any divergence rejected" is the true claim; "reads it the way GitHub does" was false.
+(2) A source reader is only as loud as the multiplicity it enforces. "One ref" was not "one step": two steps with the same ref and different `with` silently read the first. Enforce agreement on exactly the fields you consume.
+(3) A folding or optional shape is a second product. Run every check in both shapes, or the "folds when X" claim is true only for the builder function.
+(4) A refusal list (a character class, an allowlist) needs one kill per member. Testing `|` alone left `&`, which backgrounds the gate and exits 0. Pin the payload set to EQUAL the class, so that adding or removing a member without a case fails.
+(5) Draw the scope boundary explicitly in the pin's docstring. A workflow pin cannot close committed shadow configs.
+Transfers to: any "this pipeline runs X" guard (GitLab CI, Makefiles, pre-commit, hooks), and any reader of config files written for another parser.
+
+## [CI-SPEC] A claim about the record needs its own checker, outside the thing it vouches for
+
+(a) "The STATUS row records X" is itself a claim and needs a checker. The r4 MAJOR was a spec sentence promising a STATUS row content that nobody checked. Fix: the row text lives in a file that a status check parses against the spec's own list of checkers.
+(b) A check that reports on itself cannot vouch for itself. premise --harness-deferred printed its own deferred list. A contract script outside it (deferred_contract) is what catches a regression from deferred to passed (mutants C6 and C6b).
+(c) A default written as prose ("the guarded apt-get line") cannot be compared with the value the template declares. Quote the literal value in the config table, so a binding check (K18b) can compare the two.
+(d) A pattern that only searches for a phrase passes when the condition is widened. Match the whole sentence (K16 strict).
+
+## [HC-INVENTORY] Pin a ledger to the commit its line numbers mean
+- What happened: the first audit lint checked late rows' cited lines at HEAD. That is a tripwire: the moment the owner slice lands and removes the literal, the audit goes red for doing the right thing. Frozen rows were checked nowhere, and 12 of 70 literal cells did not quote the code at a cited line.
+- What we do now: freeze rows in batches, each naming the commit its line numbers refer to, and verify cited lines there with `git show`. Lint only unfrozen rows in the working tree, and make a test print the exact batch to add, so nothing stays unfrozen. Require every cited site, not just one, to hold a backticked span of the literal.
+- A git-backed check needs two guards: a visible skip (no git, or a shallow clone) and a guard test proving it runs in a full clone. Otherwise an inverted probe skips it everywhere and stays green.
+- A doc-quote checker needs a closed grammar that the rule itself names. An open "default `k: v`" regex missed all six real phrasings, and a loose "N words (`key`)" form read "section 4" as a value, so exclude reference nouns before the number.
+- A knob's home must be readable before the knob is needed. The hub's per-repo config path cannot be a repo-config key, because the hub reads it to find the repo config. Check a proposed knob's home against the order in which things are loaded, not just its name.
+- Transfer: any ledger that cites code lines (traceability, audit, review records) should store its base commit per entry and verify there, never at HEAD.
+
+## [FM-SPLICE] a byte-preserving splice needs two equality guards and two gates, and its claim needs one closed list of exceptions
+**What happened.** Splicing a changed `cdm` block into house front matter looked like a span-replace problem. The hard part turned out to be deciding "unchanged". Python's `1 == True` and `1 == 1.0` mean a `==` fast path would keep `flag: 1` when meta says `True`, so exact types were needed. NaN breaks `==` the other way: a `.nan` value is never equal to itself, so the doc would be rewritten on every pass and K7 would break. An alias fan-out of 7 levels × 10 makes naive recursive equality exponential, and a self-reference makes it infinite.
+
+**The fix that transfers.**
+1. Use one equality, `_same`: exact types, NaN==NaN, list~tuple, memoised on (id, id) pairs, treating an in-progress pair as equal. It serves BOTH the no-change fast path and the post-splice parse-back check.
+2. Gate the splice twice, and know what each gate can see:
+   - The structural bails (column 0, merge key, aliased key, duplicate key, flow root) guarantee every entry can be cut out by span.
+   - The parse-back guarantees the data.
+
+   The round-2 review proved the first claim, "the parse-back is the real contract", false. `yaml.safe_load` accepts duplicate keys (last wins), so a mis-cut span that re-spells a key plus junk that still reads as a plain scalar parses back to exactly meta. With the aliased-key bail removed, an alias key naming a node inside an earlier value (`*v :` after `a: {&v x: 1}`) did exactly that. The bails are load-bearing, and each has a killing test.
+
+   Hardening the parse-back (counting top-level entries) was considered and rejected. While the bails hold it is unreachable: an instrumented assert never fired over the property test. It would have been an equivalent-mutant guard.
+
+**The claim lesson.**
+- **Round 1:** the first cut spliced duplicate keys "last wins". That kept some foreign lines and silently deleted others, a third, undocumented category. Keep exactly two outcomes, each with a crisp test: spliced (every foreign line kept) or refused (data-exact fresh dump). List the refused layouts once and quote that list everywhere. Where a case can be made byte-preserving cheaply, do it instead of adding an exception. A `...` trailer cut off before the splice and appended after it is 10 lines.
+- **Round 2:** "a changed entry loses only its inline comment" was understated. A re-dumped multi-line entry loses every comment inside it, and the entry every engine write changes is `cdm`. Likewise, "`cdm` is always sorted" was false for an unchanged block, which is kept byte for byte (K7). State each behaviour at the granularity the code actually works at, which here is the whole entry span, and pin the unflattering half with a test.
+
+**Equivalent-mutant lesson.** A survivor meant "missing test" 8 times and "wrong rationale or redundant code" 4 times: a tuple representer, a non-scalar-key check, a `max` over end marks the scanner already orders, and an `entry >= 0` guard whose only effect is overwritten by later tokens. Probing YAML's real behaviour (`yaml.safe_dump((1, 2))`, `yaml.safe_load("[a, b]: 1")`, a token-order sweep) decided which in seconds. Remove the redundant code and leave a comment citing the invariant, rather than keep a vacuous guard.
+
+**Claim discipline.** "Heal rewrites only cdm" is true only for engine writes. A real backend's whole-doc fix is written as returned (HEAL-FMCARRY), so every user-facing text says "an engine heal (mock backend / engine HASH close)" and carries the layout qualifier.
+
+## [FPW-FIXTURES] A golden guard must say who may move it, and its self-tests must not read the thing they guard
+
+- Compare views (the parsed meta and only the golden-owned keys), not bytes, so that additive [SW] stamp keys do not trip the guard.
+- Key engine-move expectations by the golden's repins tuple, so a [WAVE] slice has one explicit update route.
+- Self-tests of a write tool must build their own isolated input. Here, ids taken from the live golden made the repin tests silently vacuous (6 repins) and then crash (7 repins) as the wave advanced.
+- A conditional guard such as `if pending:` inside a test is a vacuous pass waiting to happen; assert the precondition instead.
+- Regex extractors also match comments in fixture source. "getopts is authoritative" yielded the switches -i and -s.
+
+## [SRV-TOKEN] A recovery route inherits the WORST default of the guard it reuses — fail it closed
+The plan said "gate the reset via `_verify_admin`". That guard is open when no admin token is configured, which is right for the roster routes in dev. For a token RESET it is a takeover primitive: anyone could replace any protected repo's token. The fix is a keyword-only `required=True` that turns "unconfigured" into 403.
+
+Related rules from the same slice:
+- **A secret the verifier normalises must be validated wherever it is SET, and the stated reason must be true in ship shape.** The verifiers strip the presented bearer, so a padded token can never match, and CR/LF, NUL and non-latin-1 characters cannot be sent. Inner whitespace and latin-1 non-ASCII CAN be presented (the stdlib client sends them and the server matches); we refuse them as POLICY, one RFC 6750-style grammar. The first draft claimed they "cannot be presented"; a live probe disproved that. One shared rule (`bearer_token_problem`) now guards the reset route, `token_from_env`, `register_repo` and the admin token at startup.
+- **A write that sets a credential must leave its own client able to present it.** A protected register whose `central.auth_env` holds a different value locks out the config's own next register and HttpSink report. Check the round trip (set, then present), not just the set. When the guard refuses, its hint must name a remedy that works in every state: on an already-protected repo, only a rotation works.
+- **A "change it" command must converge on re-run.** The first `--rotate-to-env` refused "nothing to rotate" once the operator followed its own next step (set auth_env to the new token), so every second provisioning run failed. The desired state was already reached, so the re-run is now a verified no-op re-register. Report what was SENT, not what you hope happened: an open or unknown repo has no old token, so "rotated" overclaimed.
+- **"Clear" must be an explicit intent, never an absent field or a truthy stand-in, and "both intents" is about presence, not truthiness.** `{}`, `auth_token: null` and `open: false` are each a 400. A lax pydantic `bool` would let `1`/"yes"/"on" clear the token, so `open` is a `StrictBool`. The contradiction check must use `is not None`: a truthiness test lets `{"auth_token": "", "open": true}` slip through as a clear. That mutant survived every test until a test pinned it.
+
+## [X-CONTAIN] follow the path VALUE, not the join shape
+- **What happened.** The slice was scoped as "detect and okf disagree on a dotdot doc path". Grepping `root / spec.path` found 3 sites. Following where the doc-path STRING flows found 12 modules, and later rounds found more: the build twin name and the diff/patch headers.
+- **Why it mattered.** The join that slipped in the first pass (sync_pr/pr) was the exploitable one.
+- **Lesson.** When you change how a value is interpreted, grep the CONSUMERS of the value (every `.path` / `doc_path` / `changed_paths` / header / derived name such as `html_twin_path(spec.path)`), not the syntax of the old join. Then grep again for the residue, and name it in the docs instead of writing "every".
+- **Second lesson.** Unifying two spellings into one file creates new aliasing cases. Blocking, dedup, should_sync and header naming must normalise in EVERY branch, and share ONE formula: `_norm`'s backslash swap would have made patch headers disagree with commit paths.
+- **Third lesson.** A "skip if missing, check's MISSING_DOC covers it" comment encodes a cross-module invariant. When the slice changed what check reads, every such comment became false at once.
+- **Fourth lesson.** A guard on the realpath of the root was vacuous, because realpath never returns a link. Mutation testing found it.
+- **Fifth lesson.** "Fails closed, never raises" must be tested against what realpath raises. Its error for unnameable paths is ValueError (NUL, a lone surrogate), not OSError.
+- **Sixth lesson.** Claim only what you closed. The dotdot fix was written up as "closes the committed-symlink exploit", but a no-dotdot symlink still works. Pin the remaining gap as a strict xfail that flips when its owning slice lands.
+
+## [CI-HARNESS] Layered tripwires need one assertion per layer
+The shim has several layers of network tripwire (urlopen, then connect/connect_ex, then getaddrinfo). A test that matched only the shared mark let the urlopen layer be deleted without any failure, because the call also made a name lookup and the getaddrinfo layer raised the same mark. The fix:
+- give each layer its own message and assert on that message;
+- drive the connect layers with a raw socket.connect / connect_ex;
+- have the tripwire print one unwrapped stderr line, because a rich traceback wraps long messages and a product `except Exception` could swallow the AssertionError.
+
+Transfer: wherever guards overlap, a passing test says nothing about the outer guard until a mutant that removes ONLY that guard is killed. Likewise, an evaluator-only `||` mutant is equivalent (the tokenizer already refuses `||`).
+
+## [CI-HARNESS] A "refuse anything unmodelled" claim must cover values, not just keys
+The harness refused unknown KEYS everywhere, but it read `on:` as a list of trigger names. So `on.push.branches/paths/tags` (a value under a known key) was silently ignored, and a filtered workflow "ran" on a branch where GitHub would not trigger it. In the same way, `needs` was an allowed GitHub job key with no consumer, and a job-level `when: never` passed a key check that GitLab itself rejects. The same applies to names: a GitHub env: entry for GITHUB_SHA passed the key check, and the template's value won over the platform's.
+
+Transfer: for a closed-vocabulary model, audit every allowed key for (a) a consumer and (b) a value check. An allowed key with no consumer is a silent skip. Model platform-provided defaults (GITHUB_TOKEN) as always present, and make adopter-provided ones (CDMON_*) explicit, otherwise the harness nudges templates the wrong way.
+
+## [CI-HARNESS] Model a platform's status machine from its source, not from intuition
+The first pipeline model followed one intuitive rule: a skipped or manual predecessor means skipped. That rule broke in three ways:
+- a blocking manual job really leaves its successors waiting;
+- a stage job really runs past a skipped job;
+- a `when: always` DAG job really runs over an optional manual need.
+
+The suite had pinned the wrong behaviour, so it stayed green. GitLab decides in two steps. First it combines the predecessors' statuses (Ci::Status::Composite), with a separate path for DAG jobs. Then it compares the result with the statuses that job's `when:` accepts. The fix models those two steps in GitLab's own order, and it pins the order with a test where both a skipped need and a blocking-manual need are present.
+
+Transfer: when a harness imitates a platform, write each rule's test from the platform's code or documentation, citing the class or method, never from how the harness behaves now. A test that pins current behaviour can lock in a bug.
+
+## [X-GITFACTS] Message hygiene is a per-field rule, not a per-message one.
+A lossless surrogateescape path or git output carries a non-UTF-8 byte as a lone surrogate. Any f-string that interpolates one raw (a path, an argv label, a ref name, stdout) makes an exception that no UTF-8 terminal or JSON body can encode. Push every field through one public `printable` helper, and test it with a parametrized "every SyncError site, reached with a non-UTF-8 input" table. Mutation round 3 found two message sites (the git-path label and the inspect path) that only that table caught.
+
+## [X-GITFACTS] An exit code can conflate a benign state with a corrupt one: prove the benign reading, and prove it the way the tool does.
+`git rev-parse --verify --quiet HEAD` exits 1 with no stderr for an unborn branch AND for a corrupt loose ref. Reading exit 1 as "unborn" silently turned malformed input into "no baseline" (a K8 violation). The fix asks for positive evidence: symbolic-ref names a branch with no ref FILE at its loose path. The first version of that proof equated "something exists at the path" with "a ref file exists". It then called an orphan `feat` beside `feat/x` corrupt, because the path is a directory, while git, and our own packed-refs path, called it unborn. A fail-closed check can still be wrong: cross-check the benign reading against the tool's own verdict, and against every storage variant (loose vs packed), with real-tool tests. Transfers to any tool whose "not found" exit also covers "unreadable".
+
+## [MCP-STATUS] Degrade on the error class, and make the sentinel and the flag a single fact
+
+- What happened: we wanted `custodex_status` to stay answerable when one code ref cannot be read. Five things went wrong along the way:
+  - The first draft gave "config errors stay loud" as the reason for the narrow catch. A review probe showed two config typos (an unknown `lang`, records without `json_records`) are deferred to extraction, so they degrade.
+  - The first validator checked only one direction: -1 counts with `drift_available=True` and `clean=True` validated, which is a silent degrade.
+  - A planning text claimed a dead ref masks a bad `reviewed` date "as cdx check". It does not, and `cdx check` never grades `reviewed`.
+  - The fix for that claim then credited the wrong cause ("the staleness check runs after the detect"). Hoisting the checks above the detect survived every test. The real cause is that the degrade branch does not return early (an early-return mutant is killed).
+  - A mutant that swapped `__name__` for `__qualname__` was marked "equivalent". A nested adopter error class reaches the wire through `register_extractor`, so the two names do differ.
+- What transfers:
+  1. Key a degrade on the error CLASS, then work out from the source which concrete inputs raise that class. The rationale must describe what the catch actually catches, not the category it sounds like.
+  2. When a sentinel stands in for "unknown", validate the sentinel and its flag in both directions. Pin every individual field (all three counts, -2 as well as 0), or a partial check survives mutation.
+  3. For every "so" in a rationale, mutate the stated cause. If the mutant survives, the cause is wrong. Name the mechanism a killed mutant proves, here "no early return" rather than "runs after".
+  4. Before calling a mutant equivalent, check every input the public extension points can deliver, not only the shapes this repo uses.
+
+## [PROMO-DISTINCT] Count the unit the threshold means, not the rows that carry it.
+Promotion's threshold means "N independent human decisions", but the detector counted review-log lines. One injected clock gives a doc's drifts one `record_id`, and every resolve and ingest path appends, so one decision read as 3, 9 or 18.
+  - Before choosing a dedupe key, write down what the KEY MERGES and what it SPLITS. Splitting re-inflates the count. Merging is worse: depending on input order, it lets one decision silently overwrite a dissenting one.
+  - Then list EVERY writer that can still produce too-fine keys and pin each one as a named residual test. The first draft named only the CLI clock; review found that repeated MCP runs over an unchanged surface mint ids too, and that a run id would not close that case.
+  - A pinned residual is only a promise if a SCHEDULED slice closes it before the consumer it would break; here that consumer is D06-WIRE.
+
+## [PROMO-DISTINCT] A shared scratch path is a shared mutable store.
+Two subagents both used `scratchpad/mut`. An `rm -rf` plus `cp -a` race swapped the test suite under a running mutation loop. Use a unique, slice-named scratch directory that did not exist before, and have each mutant run assert the expected test COUNT and file set. A run that adds up to the wrong number of tests is INVALID, not KILLED. The same applies to a re-used mutation directory: rsync without --delete left stale gap tests behind.
+
+## [PROMO-DISTINCT] Hand off an out-of-scope bug as a strict xfail that asserts only the behaviour that matters.
+Use `xfail(strict=True, raises=AssertionError)` and assert, for example, no uncaught exception, a non-zero exit and the option named. Do not assert one exact exit code or message, or a legitimate alternative fix leaves it XFAIL forever. Prove the flip in a scratch copy for EVERY plausible fix.
+
+## [COVLANG-DOCMAP] A join that shadows two readers must agree with both, and the guard needs selector-bearing inputs
+The coverage join (`docmap.symbol_owners`) was a third, private reading of the code_refs. It used the Python-only `extract_file` and ignored selectors, so it disagreed with the graded surface (a shell `symbols` ref was graded but never owned) and with `cdx coverage` (a narrowed ref claimed its whole file). The fix delegates to the two owners of the rules: `_symbol_language` plus `get_extractor` for routing, and `_select` for narrowing. Do not re-derive either rule. What transfers:
+1. Pin parity against each authoritative reader separately. They apply different rules: routing applies only to `symbols` refs, while `_select` applies to every kind.
+2. A parity test without selectors proves agreement exactly where the bug cannot show, so feed it selector-bearing refs.
+3. Assert a non-empty owned set, because a parity over zero items passes vacuously.
+4. "Routes through the registry" is not "applies to every ref". Routing an explicit-lang `switches` ref would have let a shell switch table "document" functions.
+5. Fixing the join is not fixing every consumer of it. `cdx impact` and the DOCUMENT_GAP advice were written for a join that ignored selectors. Pin each consumer through its real builder, and pin a known limitation as a test that turns red when it is lifted.
+6. Fixtures mask guards. Every in-tree extractor raises on a missing path or a directory, which hid the `is_file` pre-check. Every fixture put its private symbol last, which hid `continue` changed to `break`. A guard is only tested by an input that reaches it.
+7. "Parity" claims inherit the other reader's quirks: `resolve_coverage` matches the raw `ref.path`, so a `./` ref diverges. State the domain of the claim and pin the divergence.
+
+## [DEPLOY-MANAGED] Run a runbook's shell blocks; don't just read them
+Run a runbook's shell blocks; don't just read them. The upgrade block passed an order-only test while it aborted for every operator who had edited the tracked settings file, and then went on building the old checkout, because the lines were not chained. A test that runs the block in bash against a throwaway release repo (real git; only network and host tools stubbed) found both bugs. The same goes for generators: a quick start that creates secrets must be safe to re-run (`[ -e .env ] ||`). That guard has a trap of its own: it locks in a broken file forever, so write the file only after every value was generated. Do that with an explicit `&&` chain, not `set -e`. Bash ignores errexit in a subshell that is not the last command of an `&&`/`||` list, and the guard plus `&& docker compose up` is exactly that shape; the failure test caught this. Secrets written inside a checkout need an ignore rule, not a 'never commit it' sentence. Also: a flag's doc must claim only what the flag gates, tested in both directions. When a vocabulary is private, probe it from the source literals. A mutant that drops one of several equivalent lines is equivalent; mutate the whole unit the test observes.
+
+## [TEST-WIKI-HYGIENE] A restore-after fixture is still a write: run write-mode tests on a copy, and detect writes by ctime
+- **What happened.** R-08's `restore_wikis` fixture let three system tests run `cdx wiki` in write mode on the real repo, and put the four wikis' text back in `finally`. The bytes came back, but the tree WAS written: for the length of the test, a concurrent reader, an editor or a killed run saw the corrupted wiki. Every run also changed all four files' ctimes, which happened in this slice when the old module was run by accident.
+- **Rule.** A test that writes repo files runs on a private copy (`tests._wikirepo.copy_wiki_repo`), never on the real tree followed by a restore. Derive what to copy from the code under test (`_wiki_repo_dirs` reads every `_*_DIR` constant and target, and fails loudly on one outside the repo or on zero dirs). Also prove the copy is faithful, because an input the derivation cannot see fails quietly otherwise.
+- **A faithfulness check must run each side the way its consumer runs it.** Comparing render(copy) with render(real) from one shared cwd is blind to a cwd-relative input, while the copy-based tests run with the copy as the cwd. chdir into each side before rendering it (a reviewer's cwd-relative mutant survived the shared-cwd form and is killed by the per-side form).
+- **Detect writes by ctime, not by bytes or mtime.** `shutil.copy2` restores both bytes and mtime, so a guard on those is fooled. User space cannot set ctime. Record directories too, including the root itself: a file created and then deleted bumps its directory's ctime. ctime has jiffy resolution, so a unit test must wait for a clock tick after its snapshot (92 of 300 restores were missed without the wait). That wait is anti-flake code, and a mutant that weakens it is killed only statistically. On an NFS basetemp, probe transients with a directory, not a file: an unlinked file can leave a short-lived `.nfsXXXX` entry that a snapshot races.
+- **Make the guard independent of the tree's state.** On a FRESH real tree, a write-mode run writes nothing, so a guard that watches the real tree is blind in CI's normal state. Run the module in a child pytest against a scratch repo whose wikis are deliberately STALE: any write-mode run then shows up, and the freshness gate flips from FAILED to PASSED. Pin that the gate exists, or the guard can lose that second detector silently.
+- **Give a child pytest an allowlisted env, never os.environ.** PYTEST_ADDOPTS, PY_COLORS and FORCE_COLOR each broke the guard in the prior run. Require EXACT outcomes, not a list of required names: a skip prints `SKIPPED [n]` with no nodeid, and a run that never started prints no summary at all.
+- **Pin an order with enough items to make chance irrelevant.** A sort over 3 items is killed only by some hash seeds; 27 items make it deterministic.
+- **A `pytest.raises(match=...)` on a name can pass for the wrong reason.** A fallback error whose message reprs the whole object also contains the name. Match the specific message (mutant R10 survived until that was fixed).
+- **Supersedes** the bullet "System tests that touch the real tree MUST snapshot+restore." (LESSON_LEARNT.md:1784, under `## R-08 — \`cdx wiki\` regeneration + freshness gate (EPIC R close-out)`): write-mode tests now run on a `copy_wiki_repo` copy instead.
