@@ -21,18 +21,23 @@ Two modes:
   disturbed. ``fully_synced`` is ``no drift at <default>`` (the central
   baseline).
 
-Git is the only side effect and it is reached through ONE injected runner
-(:data:`_run_git`, mirroring :mod:`custodex.backends`' injected
-subprocess seam) so tests drive a real temp git repo and the failure path stays
-testable. Every failure — a missing ``local_path``, an unknown ``mode``, or a
-git subprocess error — is a loud, typed :class:`SyncError` (K8). The clock is
-injected via ``now`` (K10).
+Git is the only side effect. The work-tree gate is
+:func:`custodex.forge.git_facts` (X-GITFACTS, ``baseline=False``: sync pins its
+own ref): no ``.git`` at ``local_path`` or a parent is a :class:`SyncError` ("not
+in a git work tree"), and a ``.git`` git cannot read, or a ``config/cdmon`` in a
+different (nested / submodule) work tree, is loud. The HEAD / branch / worktree
+verbs go through ONE injected runner (``run_git``) whose default wraps
+:func:`custodex.forge.default_git_probe` (``LC_ALL=C``; no git binary is a
+:class:`SyncError`, never a raw ``FileNotFoundError``). ``run_git`` does NOT cover
+the gate, which always runs forge's own leaf. Every failure — a missing
+``local_path``, an unknown ``mode``, or a git error — is a loud, typed
+:class:`SyncError` (K8). The clock is injected via ``now`` (K10).
 """
 
 from __future__ import annotations
 
+import os
 import shutil
-import subprocess
 import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
@@ -45,6 +50,7 @@ from . import inventory
 from .config import effective_coverage, load_bundle, resolve_repo_root
 from .drift import DriftReport, detect
 from .errors import SyncError
+from .forge import GitFacts, default_git_probe, git_facts, printable
 from .ownership import resolve_accountable_durable
 from .server.store import (
     ConfigCodeRef,
@@ -69,31 +75,29 @@ _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
 
 
 def _default_run_git(args: list[str], cwd: Path) -> str:
-    """Run ``git <args>`` in ``cwd`` and return stdout (the real subprocess leaf).
+    """Run ``git <args>`` in ``cwd`` and return stdout (wraps forge's probe leaf).
 
-    The ONLY place that shells out (mirrors
-    :func:`custodex.backends._default_process_runner`): tests run this
-    against a REAL temp git repo, so it is exercised — but the seam stays
-    injectable for the failure path. A non-zero exit is a loud :class:`SyncError`
-    (K8) carrying git's stderr.
+    Delegates to :func:`custodex.forge.default_git_probe` (``LC_ALL=C``; a
+    missing / non-executable git is a typed :class:`SyncError`). A non-zero exit
+    is a loud :class:`SyncError` (K8) carrying git's stderr. stdout here is
+    JSON-bound metadata (a sha, a branch name, a count), so it is
+    replacement-decoded: a non-UTF-8 branch name can never put a lone surrogate
+    on the wire. The failure message shows the verb and cwd through
+    :func:`custodex.forge.printable` for the same reason.
     """
-    result = subprocess.run(  # noqa: S603 (argv is fixed git verbs, no shell)
-        ["git", *args],
-        cwd=str(cwd),
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
+    outcome = default_git_probe(args, cwd)
+    if outcome.returncode != 0:
         raise SyncError(
-            f"git {' '.join(args)} failed in {cwd} "
-            f"(exit {result.returncode}): {result.stderr.strip()}"
+            f"git {printable(' '.join(args))} failed in {printable(cwd)} "
+            f"(exit {outcome.returncode}): {outcome.stderr.strip()}"
         )
-    return result.stdout
+    return outcome.stdout.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
 
 
 #: The injected git runner — ``(args, cwd) -> stdout``. Production uses the real
 #: subprocess; a test may swap it, but the suite drives a real temp repo so this
-#: default IS covered.
+#: default IS covered. It does NOT cover the work-tree gate
+#: (:func:`custodex.forge.git_facts`), which always runs forge's own leaf.
 _GitRunner = Callable[[list[str], Path], str]
 
 
@@ -133,14 +137,32 @@ class SyncResult(BaseModel):
     coverage: dict | None = None
 
 
-def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> GitInfo:
+def _git_info(
+    local_path: Path, default_branch: str, *, run_git: _GitRunner
+) -> tuple[GitInfo, GitFacts]:
     """Collect HEAD / default-branch / commits-ahead facts for the working tree.
+
+    First the work-tree gate, :func:`custodex.forge.git_facts` (always forge's
+    own leaf, never ``run_git``): no ``.git`` at ``local_path`` or a parent is a
+    loud :class:`SyncError` BEFORE any HEAD probe, and a ``config/cdmon`` in a
+    different work tree is refused. ``baseline=False``: sync pins its own ref,
+    so a tree whose ``git status`` fails (a broken submodule) still syncs.
 
     Pure reads (``rev-parse`` / ``rev-list``): never mutates the tree (K1). The
     default branch may not exist (a brand-new repo with only a feature branch);
     in that case ``main_commit`` is ``None`` and ``commits_ahead`` is 0 — there
     is no baseline to be ahead of.
     """
+    facts = git_facts(
+        local_path,
+        config_path=local_path.joinpath(*_CONFIG_SUBDIR),
+        baseline=False,
+    )
+    if not facts.in_work_tree:
+        raise SyncError(
+            f"repo local_path {printable(local_path)} is not in a git work tree "
+            "(no .git at it or any parent)"
+        )
     head_commit = run_git(["rev-parse", "HEAD"], local_path).strip()
     branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"], local_path).strip()
 
@@ -158,13 +180,14 @@ def _git_info(local_path: Path, default_branch: str, *, run_git: _GitRunner) -> 
             ["rev-list", "--count", f"{default_branch}..HEAD"], local_path
         ).strip()
         commits_ahead = int(ahead or "0")
-    return GitInfo(
+    info = GitInfo(
         ref=head_commit,
         branch=branch,
         head_commit=head_commit,
         main_commit=main_commit,
         commits_ahead=commits_ahead,
     )
+    return info, facts
 
 
 def _coverage_report(bundle: object, config_dir: Path) -> coverage_mod.CoverageReport:
@@ -216,15 +239,19 @@ def _open_repo(
     * **local** — yields against the working tree's ``config/cdmon/`` in place; no
       checkout, nothing to clean up.
     * **git** — materializes ``branch`` in a throwaway worktree of the git
-      TOPLEVEL (``git worktree add --detach``) and yields against
-      ``<worktree>/<rel>``, where ``rel`` is ``local_path`` relative to the
-      toplevel — so a config that lives in a SUBDIR of the repo (e.g. the demo
-      under ``demo/``) resolves correctly, and ``rel == "."`` (the config at the
-      toplevel) behaves exactly as a top-level checkout. The lazily-read source
-      files (drift detection + coverage read files off disk) resolve to the
-      default-branch content. On exit — success OR error — the worktree is
-      removed (``git worktree remove --force``) and the temp dir is deleted, so
-      the user's tree is never disturbed and no stray worktree leaks. If
+      TOPLEVEL (``git worktree add --detach``, run from ``local_path``; the
+      worktree is registered in the shared git dir) and yields against
+      ``<worktree>/<rel>``, where ``rel`` is git's own ``--show-prefix`` of the
+      physical ``local_path`` (:attr:`GitFacts.prefix`, re-encoded with
+      ``os.fsdecode`` so a symlinked or non-ASCII subdir resolves under any
+      filesystem encoding) — so a config that lives in a SUBDIR of the repo
+      (e.g. the demo under ``demo/``) resolves correctly, and ``rel == "."``
+      (the config at the toplevel) behaves exactly as a top-level checkout. The
+      lazily-read source files (drift detection + coverage read files off disk)
+      resolve to the default-branch content. On exit — success OR error — the
+      worktree is removed (``git worktree remove --force``) and the temp dir is
+      deleted, so the user's tree is never disturbed and no stray worktree
+      leaks. If
       ``<branch>`` does not carry ``<rel>/config/cdmon`` (the config isn't
       committed to the default branch yet), a loud :class:`SyncError` is raised
       (K8) — the caller treats git as best-effort and skips.
@@ -241,7 +268,7 @@ def _open_repo(
             f"repo local_path does not exist or is not a directory: {local_path}"
         )
 
-    git = _git_info(local_path, branch, run_git=run_git)
+    git, facts = _git_info(local_path, branch, run_git=run_git)
 
     if mode == "local":
         config_dir = local_path.joinpath(*_CONFIG_SUBDIR)
@@ -252,17 +279,18 @@ def _open_repo(
 
     # git mode: a READ-ONLY checkout of <branch> in a tmp worktree, removed after.
     # The config may live in a SUBDIR of the git repo (e.g. the demo lives under
-    # `demo/` of the outer repo). Resolve the git TOPLEVEL and the path of
-    # `local_path` relative to it, materialize the toplevel at <branch>, then read
-    # the config from `<worktree>/<rel>/config/cdmon` with repo_root at
-    # `<worktree>/<rel>`. When `local_path` IS the toplevel, `rel == "."` and this
-    # is identical to a top-level checkout.
-    toplevel = Path(run_git(["rev-parse", "--show-toplevel"], local_path).strip())
-    rel = local_path.resolve().relative_to(toplevel.resolve())
+    # `demo/` of the outer repo). git's own prefix of the physical `local_path`
+    # is that subdir (right through symlinks by construction); it is UTF-8 +
+    # surrogateescape text, so re-encode it to the raw bytes and let the
+    # filesystem encoding name the directory. `git worktree add` materializes the
+    # whole TOPLEVEL at <branch>; the config is read from
+    # `<worktree>/<rel>/config/cdmon` with repo_root at `<worktree>/<rel>`. When
+    # `local_path` IS the toplevel, `rel == "."`.
+    rel = Path(os.fsdecode(facts.prefix.encode("utf-8", "surrogateescape")))
 
     tmp_root = tempfile.mkdtemp(prefix="cdmon-sync-")
     worktree = Path(tmp_root) / "wt"
-    run_git(["worktree", "add", "--detach", str(worktree), branch], toplevel)
+    run_git(["worktree", "add", "--detach", str(worktree), branch], local_path)
     try:
         subroot = worktree / rel
         config_dir = subroot.joinpath(*_CONFIG_SUBDIR)
@@ -281,8 +309,9 @@ def _open_repo(
     finally:
         # Always tear the worktree down so we never leave a stray entry behind
         # (K1) — even if load/detect raised on a malformed config at <branch>.
-        # The worktree was registered against the TOPLEVEL, so remove it there.
-        run_git(["worktree", "remove", "--force", str(worktree)], toplevel)
+        # The worktree is registered in the shared git dir, so any cwd inside the
+        # work tree (here `local_path`) can remove it.
+        run_git(["worktree", "remove", "--force", str(worktree)], local_path)
         shutil.rmtree(tmp_root, ignore_errors=True)
 
 
