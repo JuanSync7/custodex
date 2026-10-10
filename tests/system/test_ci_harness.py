@@ -18,6 +18,8 @@ cannot pass vacuously:
 
 from __future__ import annotations
 
+import contextlib
+import errno
 import inspect
 import json
 import os
@@ -2086,6 +2088,41 @@ def test_fake_forge_tree_sha_ignores_entry_order(ff: forge.FakeForge) -> None:
 # --------------------------------------------------------------------------- #
 
 
+class _FamilyOnly:
+    """A ``.family``-only socket stand-in, for a host whose kernel lacks a family.
+
+    The connect guards read nothing but ``self.family``, so driving the PATCHED
+    class methods through this stand-in pins the same layer a real socket would.
+    Unpatched, the real C methods reject it with a TypeError, so the trip
+    assertions still fail when a guard (or one family in it) is removed.
+    """
+
+    def __init__(self, family: socket.AddressFamily) -> None:
+        self.family = family
+
+    def connect(self, address: Any) -> None:
+        socket.socket.connect(self, address)  # type: ignore[arg-type]
+
+    def connect_ex(self, address: Any) -> int:
+        return socket.socket.connect_ex(self, address)  # type: ignore[arg-type]
+
+
+def _inet_socket(
+    family: socket.AddressFamily, stack: contextlib.ExitStack
+) -> socket.socket | _FamilyOnly:
+    """A real stream socket of ``family``, or a stand-in where it is unsupported.
+
+    Batch-farm nodes can run with IPv6 disabled in the kernel, so
+    ``socket(AF_INET6)`` raises EAFNOSUPPORT there. Only that errno falls back.
+    """
+    try:
+        return stack.enter_context(socket.socket(family, socket.SOCK_STREAM))
+    except OSError as exc:
+        if exc.errno != errno.EAFNOSUPPORT:
+            raise
+        return _FamilyOnly(family)
+
+
 def test_shim_tripwires_in_process(tmp_path: Path) -> None:
     from custodex import pr, registry, sinks
 
@@ -2108,7 +2145,8 @@ def test_shim_tripwires_in_process(tmp_path: Path) -> None:
             (socket.AF_INET, ("192.0.2.1", 443)),
             (socket.AF_INET6, ("2001:db8::1", 443, 0, 0)),
         ):
-            with socket.socket(family, socket.SOCK_STREAM) as sock:
+            with contextlib.ExitStack() as stack:
+                sock = _inet_socket(family, stack)
                 with trip(r"socket\.connect\("):
                     sock.connect(addr)
                 with trip(r"socket\.connect_ex\("):
