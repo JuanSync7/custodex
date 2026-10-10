@@ -40,3 +40,24 @@ documents:
     region_keys: ["symbols"]
     code_refs:
       - path: tests/smoke/test_smoke.py
+
+  - id: test-smoke-hc-audit
+    path: test-docs/smoke/test_hc_audit.md
+    audience: eng-guide
+    region_keys: ["symbols"]
+    code_refs:
+      - path: tests/smoke/test_hc_audit.py
+
+  - id: test-smoke-config-quotes
+    path: test-docs/smoke/test_config_quotes.md
+    audience: eng-guide
+    region_keys: ["symbols"]
+    code_refs:
+      - path: tests/smoke/test_config_quotes.py
+
+  - id: test-smoke-mcp-status-degrade-server
+    path: test-docs/smoke/test_mcp_status_degrade_server.md
+    audience: eng-guide
+    region_keys: ["symbols"]
+    code_refs:
+      - path: tests/smoke/test_mcp_status_degrade_server.py

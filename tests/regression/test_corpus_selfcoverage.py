@@ -51,6 +51,7 @@ def _copy_dogfood_tree(dst: Path) -> Path:
     shutil.copytree(_ROOT / "config", dst / "config")
     shutil.copytree(_ROOT / "templates", dst / "templates")
     shutil.copy2(_ROOT / "README.md", dst / "README.md")
+    shutil.copy2(_ROOT / "DEPLOY.md", dst / "DEPLOY.md")
     shutil.copytree(_ROOT / "test-docs", dst / "test-docs")
     shutil.copytree(_ROOT / "tests" / "smoke", dst / "tests" / "smoke")
     return dst / "config" / "cdmon"
