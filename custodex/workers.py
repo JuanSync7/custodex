@@ -41,6 +41,7 @@ never reaches a key (K10). Output is sorted by key (K10).
 from __future__ import annotations
 
 import hashlib
+import posixpath
 from enum import Enum
 from pathlib import Path
 
@@ -241,9 +242,26 @@ def suggest_docs_tick(
     out: list[Suggestion] = []
 
     # DOCUMENT_GAP — one per mentioned-but-undocumented symbol (STANDING).
+    # The coverage join honours each ref's selectors, so a gap can sit in a
+    # file some doc's code_ref already names (unselected): the next verb is
+    # then "widen that doc's selector", never a second whole-file doc.
+    naming: dict[str, set[str]] = {}
+    for spec in config.documents:
+        for ref in spec.code_refs:
+            naming.setdefault(posixpath.normpath(ref.path), set()).add(spec.id)
     g = build_graph(config, root)
     for node_id, count in rank_centrality(g, undocumented_only=True):
-        path = node_id.split(" ", 1)[1].split("#", 1)[0]
+        path, name = node_id.split(" ", 1)[1].split("#", 1)
+        namers = sorted(naming.get(path, ()))
+        if namers:
+            listed = ", ".join(f"`{d}`" for d in namers)
+            verb = "names" if len(namers) == 1 else "name"
+            advice = (
+                f"{listed} already {verb} {path} in a code_ref but none selects "
+                f"`{name}` — widen that code_ref's selector, not a new doc"
+            )
+        else:
+            advice = f"draft a doc with `cdx write-doc {path}`"
         out.append(
             Suggestion(
                 key=_key(SuggestionKind.DOCUMENT_GAP, node_id),
@@ -252,7 +270,7 @@ def suggest_docs_tick(
                 target=node_id,
                 detail=(
                     f"{node_id} is mentioned by {count} doc(s) but covered by "
-                    f"none — draft a doc with `cdx write-doc {path}`"
+                    f"none — {advice}"
                 ),
                 evidence=(f"{count} mentioning doc(s)",),
                 severity=_severity(SuggestionKind.DOCUMENT_GAP),
