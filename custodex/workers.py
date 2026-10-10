@@ -46,7 +46,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .config import MonitorConfig, resolve_repo_root
+from .config import MonitorConfig, doc_path, resolve_repo_root
 from .docdeps import SuspectStatus, detect_suspect_links, upstream_fingerprint
 from .docmap import read_rejections, suggest_edges
 from .drift import DriftKind, detect
@@ -170,7 +170,7 @@ def suggest_fixes_tick(
         upstream_spec = doc_by_id.get(link.upstream_id)
         fingerprint = "missing"
         if upstream_spec is not None:
-            upstream_path = root / upstream_spec.path
+            upstream_path = doc_path(root, upstream_spec.path)
             if upstream_path.is_file():
                 doc = parse_text(
                     upstream_path.read_text(encoding="utf-8"), upstream_path

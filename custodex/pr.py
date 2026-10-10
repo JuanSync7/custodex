@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
+from .config import doc_path
 from .errors import TransportError
 from .syncpr import SyncResult
 
@@ -424,6 +426,17 @@ def _branch_name(patch: str, prefix: str) -> str:
     return f"{prefix}-{digest}"
 
 
+def _repo_path(rel: str) -> str:
+    """The repo path a changed doc is COMMITTED at: ``normpath(rel)`` (X-CONTAIN).
+
+    The same lexical formula as :func:`custodex.config.doc_path`, so the commit
+    lands on the file monitor healed and the content was read from. A provider
+    tree path has no ``..``/``.`` segments, so a config spelling such as
+    ``ghost/../docs/x.md`` is committed (and listed) as ``docs/x.md``.
+    """
+    return posixpath.normpath(rel)
+
+
 def _description(changed_paths: tuple[str, ...], ref: str | None) -> str:
     """A bot-generated MR body listing every changed doc path."""
     lines = [
@@ -434,7 +447,7 @@ def _description(changed_paths: tuple[str, ...], ref: str | None) -> str:
         lines.append(f"Source ref: `{ref}`.")
         lines.append("")
     lines.append("Changed documents:")
-    lines.extend(f"- `{path}`" for path in changed_paths)
+    lines.extend(f"- `{_repo_path(path)}`" for path in changed_paths)
     return "\n".join(lines) + "\n"
 
 
@@ -453,11 +466,17 @@ def plan_docs_pr(
     healed file contents are read from their CURRENT on-disk state under ``root``
     (the caller heals first via ``sync_pr``), so the commit carries exactly what a
     reviewer will see. The branch name is derived from a hash of the patch (K10).
+
+    Each file is read at ``doc_path(root, rel)`` and committed at
+    ``normpath(rel)`` — the file monitor healed (X-CONTAIN). A raw ``root / rel``
+    let a cloned repo's committed symlink (``link/../x``) resolve PHYSICALLY to a
+    host file and put its bytes in the PR.
     """
     if not sync.patch:
         return None
     files = tuple(
-        (rel, (root / rel).read_text(encoding="utf-8")) for rel in sync.changed_paths
+        (_repo_path(rel), doc_path(root, rel).read_text(encoding="utf-8"))
+        for rel in sync.changed_paths
     )
     title = "docs: sync" if ref is None else f"docs: sync to {ref}"
     return MergeRequestPlan(

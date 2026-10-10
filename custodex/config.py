@@ -93,6 +93,10 @@ __all__ = [
     "effective_coverage",
     # CONFIG-V2 (N-06): the ONE repo-root resolver shared by every consumer.
     "resolve_repo_root",
+    # X-CONTAIN: the ONE doc-path formula (readers + the owner's writers) and
+    # the containment gate for writers acting on a config they do not own.
+    "doc_path",
+    "resolve_within",
 ]
 
 #: Default env var the HTTP sink reads the central bearer token from (G-01).
@@ -1550,6 +1554,102 @@ def resolve_repo_root(config_dir: Path, root: str) -> Path:
     paths all resolve against the same directory.
     """
     return Path(os.path.normpath(Path(config_dir) / root))
+
+
+def doc_path(root: Path | str, rel: str) -> Path:
+    """The ONE formula naming a managed file: ``normpath(root / rel)`` (X-CONTAIN).
+
+    Lexical, unconfined and pure: it never touches the disk and never follows a
+    link, so ``ghost/../docs/x.md`` and ``link/../docs/x.md`` both name
+    ``<root>/docs/x.md`` — the file a reader of the config means, and the file
+    the OKF bundle has always exported. A leading ``..`` climbs from ``root`` AS
+    NAMED, exactly like :func:`resolve_repo_root` (N-06), and an absolute ``rel``
+    is taken as given: the config's owner may point a doc anywhere.
+
+    The converted readers (``detect`` and its index/suspect-link lanes, the
+    bundle, the entity lane, ``build``, the workers) and writers acting on their
+    owner's own config (``monitor``, ``stamp_edges``, ``sync_pr``, the docs-PR
+    commit, the editor writers, ``write_and_register``) use it, so detect, heal,
+    diff and commit agree on ONE file. (The ``cdx lint``/``lint --fix`` and
+    ``new-doc`` lanes still join raw: a queued follow-up.) A raw
+    ``root / rel`` join lets the kernel resolve ``link/..`` PHYSICALLY (another
+    tree) and fail ``ghost/..`` outright — two files behind one doc id.
+    A writer acting on a config it does NOT own gates on
+    :func:`resolve_within` instead.
+    """
+    return Path(os.path.normpath(Path(root) / rel))
+
+
+def _still_linked(real: str) -> bool:
+    """True if ``real`` (a non-strict ``realpath`` result) still holds a link.
+
+    ``os.path.realpath`` gives up on a symlink LOOP and returns a path that
+    still contains the looping link; such a location is not provable.
+    """
+    path = Path(real)
+    return any(os.path.islink(p) for p in (path, *path.parents))
+
+
+def _strictly_inside(real: str, real_root: str) -> bool:
+    """Component-wise proper-descendant test (``repo-evil`` is not in ``repo``)."""
+    return os.path.commonpath([real, real_root]) == real_root and real != real_root
+
+
+def _os_nameable(path: Path | str) -> bool:
+    """True if the OS can name ``path``: it encodes to bytes and has no NUL.
+
+    A lone UTF-16 surrogate (PyYAML's ``"\\uD800"``, a JSON body) does not
+    encode, and a NUL ends a C string; both make ``realpath`` raise a
+    ``ValueError`` rather than an ``OSError``.
+    """
+    try:
+        return b"\x00" not in os.fsencode(path)
+    except UnicodeEncodeError:
+        return False
+
+
+def resolve_within(root: Path | str, rel: str) -> Path | None:
+    """The writer's containment gate: ``doc_path(root, rel)`` or ``None`` (X-CONTAIN).
+
+    For a writer acting on a config it does not own (a cloned repo, a template
+    root, a remote request). Returns the LEXICAL path — what the writer was
+    asked to write — only when it is provably a PROPER descendant of ``root``:
+
+    * lexically — ``rel`` (normalised) is relative and does not climb (``..``,
+      ``../x``; a name merely starting with dots, ``..notes/x.md``, is fine);
+    * physically — with every link resolved on BOTH sides, the target lies
+      strictly inside the resolved root (component-wise, never a string prefix).
+
+    ``root`` is judged as NAMED: it is normalised before it is resolved, so
+    ``repo/link/..`` means ``repo``. Fails CLOSED with ``None`` — never raises —
+    for an empty rel or the root itself, a ``root`` or ``rel`` the OS cannot
+    name (a NUL byte, a lone surrogate), a symlink loop, or a location the OS
+    cannot resolve (a relative root under a deleted cwd). Parents
+    need not exist yet (a writer creates new docs), and a dangling link is
+    judged by where it would land. Pure: it only reads link targets.
+
+    Readers and the config owner's own writers use :func:`doc_path`, which is
+    unconfined; detect never raises on an escaping path. A check-then-write
+    still races a concurrent link swap (TOCTOU) — this is a policy gate, not a
+    sandbox.
+    """
+    if not (_os_nameable(rel) and _os_nameable(root)):
+        return None
+    base = os.path.normpath(root)
+    norm = os.path.normpath(rel)
+    if os.path.isabs(norm) or norm == os.pardir or norm.startswith(os.pardir + os.sep):
+        return None
+    candidate = doc_path(Path(base), norm)
+    try:
+        real = os.path.realpath(candidate)
+        real_root = os.path.realpath(base)
+    except OSError:
+        return None
+    if _still_linked(real):
+        return None
+    if not _strictly_inside(real, real_root):
+        return None
+    return candidate
 
 
 def _resolve_repo_root(config_dir: Path, root: str) -> Path:
