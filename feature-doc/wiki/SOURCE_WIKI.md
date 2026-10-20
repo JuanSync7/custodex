@@ -2,7 +2,7 @@
 
 Generated from the package inventory crossed against the golden catalog — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate.
 
-**55 public modules**, 0 without a catalogued feature.
+**58 public modules**, 0 without a catalogued feature.
 
 ## `_v2base`
 
@@ -37,8 +37,14 @@ Generated from the package inventory crossed against the golden catalog — **do
 ## `cli`
 
 - Path: `cli.py`
-- Public symbols: `app`, `build`, `check`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `index`, `init`, `link`, `lint`, `main`, `mcp_serve`, `monitor`, `new_doc`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `serve`, `settings`, `should_sync_cmd`, `sp_sync`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
-- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-MCP-001`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SETTINGS-008`, `FEAT-SPMIRROR-003`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
+- Public symbols: `app`, `build`, `check`, `codeindex`, `coverage`, `deps`, `doctor`, `entities`, `graph`, `impact`, `index`, `init`, `link`, `lint`, `main`, `mcp_serve`, `monitor`, `new_doc`, `okf`, `onboard`, `open_docs_pr_cmd`, `ownership`, `promotions`, `register`, `report`, `resolve`, `rpt`, `schema`, `scip`, `serve`, `settings`, `should_sync_cmd`, `sp_sync`, `staleness`, `suggest`, `surface`, `surface_gaps`, `sync`, `sync_pr_cmd`, `trace`, `wiki`, `worklist`, `write_doc`
+- Implemented by: `FEAT-CLI-001`, `FEAT-CLI-002`, `FEAT-CLI-003`, `FEAT-CLI-004`, `FEAT-CLI-005`, `FEAT-CLI-006`, `FEAT-CLI-007`, `FEAT-CLI-008`, `FEAT-CLI-009`, `FEAT-CLI-010`, `FEAT-CLI-011`, `FEAT-CLI-012`, `FEAT-CLI-013`, `FEAT-CLI-014`, `FEAT-CLI-015`, `FEAT-CLI-016`, `FEAT-CLI-017`, `FEAT-CLI-018`, `FEAT-CLI-019`, `FEAT-CLI-020`, `FEAT-CLI-021`, `FEAT-CLI-022`, `FEAT-CODEINDEX-001`, `FEAT-CODEINDEX-002`, `FEAT-DOCDEPS-005`, `FEAT-DOCDEPS-009`, `FEAT-DOCDEPS-010`, `FEAT-DOCMAP-001`, `FEAT-DOCMAP-003`, `FEAT-DOCWRITER-001`, `FEAT-ENTITIES-003`, `FEAT-KGRAPH-002`, `FEAT-MCP-001`, `FEAT-OKF-001`, `FEAT-ONBOARD-001`, `FEAT-ONBOARD-002`, `FEAT-OWNERSHIP-004`, `FEAT-SCIP-001`, `FEAT-SETTINGS-008`, `FEAT-SPMIRROR-003`, `FEAT-STALENESS-004`, `FEAT-WORKERS-001`, `FEAT-WORKLIST-001`
+
+## `codeindex`
+
+- Path: `codeindex.py`
+- Public symbols: `CODE_INDEX_PATH`, `CodeIndex`, `CodeIndexDiff`, `DocImpact`, `FileDelta`, `GENERATED_BY`, `ImpactReport`, `IndexedFile`, `IndexedSymbol`, `UNREADABLE_DIGEST`, `__all__`, `build_code_index`, `diff_code_index`, `file_digests`, `impact_report`, `index_in_sync`, `read_code_index`, `stale_paths`, `unsynced_paths`, `write_code_index`
+- Implemented by: `FEAT-CODEINDEX-001`, `FEAT-CODEINDEX-002`
 
 ## `config`
 
@@ -164,7 +170,7 @@ Generated from the package inventory crossed against the golden catalog — **do
 
 - Path: `kgraph.py`
 - Public symbols: `EdgeKind`, `EdgeTier`, `GraphEdge`, `GraphNode`, `KnowledgeGraph`, `NodeKind`, `__all__`, `build_graph`, `graph_neighbors`, `rank_centrality`, `render_graph_text`
-- Implemented by: `FEAT-KGRAPH-001`, `FEAT-KGRAPH-002`
+- Implemented by: `FEAT-KGRAPH-001`, `FEAT-KGRAPH-002`, `FEAT-SCIP-001`
 
 ## `layout`
 
@@ -189,6 +195,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Path: `monitor.py`
 - Public symbols: `DEFAULT_EXEMPLAR_TOP_N`, `DEFAULT_LOG_PATH`, `HandledDrift`, `Monitor`, `MonitorResult`, `RULE_CAUSE_PREFIX`, `__all__`
 - Implemented by: `FEAT-DOCDEPS-006`, `FEAT-DRIFT-011`, `FEAT-MONITOR-001`, `FEAT-MONITOR-002`, `FEAT-MONITOR-003`, `FEAT-MONITOR-004`, `FEAT-MONITOR-005`, `FEAT-MONITOR-006`, `FEAT-MONITOR-007`, `FEAT-MONITOR-008`, `FEAT-MONITOR-009`
+
+## `okf`
+
+- Path: `okf.py`
+- Public symbols: `DISPUTING_RESOLUTIONS`, `OKF_DIR`, `OKF_VERSION`, `OkfExportResult`, `VERIFYING_RESOLUTIONS`, `__all__`, `check_okf`, `export_okf`, `okf_type_for`, `pending_verifications`, `render_bundle`
+- Implemented by: `FEAT-OKF-001`
 
 ## `onboard`
 
@@ -237,6 +249,12 @@ Generated from the package inventory crossed against the golden catalog — **do
 - Path: `schema.py`
 - Public symbols: `ProposedFix`, `Resolution`, `ResolutionRecord`, `ReviewRecord`, `Verdict`, `__all__`, `new_record_id`, `resolution_record_schema`, `review_record_schema`
 - Implemented by: `FEAT-DRIFT-011`, `FEAT-RECORD-001`, `FEAT-RECORD-002`, `FEAT-RECORD-003`, `FEAT-RECORD-004`, `FEAT-RECORD-005`, `FEAT-RECORD-006`
+
+## `scip`
+
+- Path: `scip.py`
+- Public symbols: `IMPACT_REMEDY`, `ScipDocument`, `ScipIndex`, `ScipOccurrence`, `XREFS_PATH`, `XrefEdge`, `XrefSet`, `__all__`, `build_xrefs`, `caller_currency_note`, `read_scip`, `read_xrefs`, `scip_symbol_to_dotted`, `unknown_caller_files`, `write_xrefs`
+- Implemented by: `FEAT-SCIP-001`
 
 ## `secrets`
 

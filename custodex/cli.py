@@ -33,6 +33,18 @@ from . import coverage as coverage_mod
 from . import inventory
 from .backends import make_backend
 from .build import build as build_twins
+from .codeindex import (
+    CODE_INDEX_PATH,
+    CodeIndex,
+    build_code_index,
+    file_digests,
+    impact_report,
+    index_in_sync,
+    read_code_index,
+    stale_paths,
+    unsynced_paths,
+    write_code_index,
+)
 from .config import (
     DEFAULT_CENTRAL_TOKEN_ENV,
     Audience,
@@ -73,9 +85,9 @@ from .docwriter import (
     unit_snippet,
     write_and_register,
 )
-from .drift import DriftKind
+from .drift import DriftKind, detect
 from .entities import corpus_entities, render_entities_text
-from .errors import CodeDocMonitorError, SchemaError
+from .errors import CodeDocMonitorError, ExtractionError, SchemaError
 from .extract import build_document_surface
 from .featurecatalog import load_catalog
 from .issues import (
@@ -93,6 +105,7 @@ from .layout import (
 )
 from .manifest import parse_doc
 from .monitor import DEFAULT_LOG_PATH, Monitor
+from .okf import OKF_DIR, check_okf, export_okf, pending_verifications
 from .onboard import analyze_repo, apply_plan, propose_config, render_plan_text
 from .ownership import (
     OwnershipStatus,
@@ -120,6 +133,15 @@ from .reviewlog import (
     summarize_with_resolutions,
 )
 from .schema import Resolution, ResolutionRecord, Verdict, review_record_schema
+from .scip import (
+    IMPACT_REMEDY,
+    build_xrefs,
+    caller_currency_note,
+    read_scip,
+    read_xrefs,
+    unknown_caller_files,
+    write_xrefs,
+)
 from .settings import Settings, resolve_settings, secret_presence
 from .spmirror import (
     DEFAULT_SPMIRROR_PATH,
@@ -1366,6 +1388,186 @@ def _coverage_lines(report: coverage_mod.CoverageReport) -> list[str]:
     return lines
 
 
+@app.command()
+def codeindex(
+    config: Path = _CONFIG_OPTION,
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Write .cdmon/code-index.json (idempotent, stamp-blind — K7).",
+    ),
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="Exit 1 when the stored index is stale against the tree.",
+    ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the freshly built index as round-trippable JSON.",
+    ),
+    ref: str | None = typer.Option(
+        None,
+        "--ref",
+        "--source-sha",
+        help="Provenance SHA stamped on the artifact (else $CI_COMMIT_SHA).",
+    ),
+) -> None:
+    """Persist the code surface as a diffable artifact (CIX-01).
+
+    Read-only by default (K1): builds the index in memory over the COVERAGE
+    universe (``coverage.include``/``exclude`` — the exact ``cdx coverage``
+    scan) and prints a summary. ``--write`` is the one mutating mode: it
+    writes ``.cdmon/code-index.json`` idempotently — identical content under
+    a new provenance stamp writes nothing and the stored ``source_sha``
+    survives as "content unchanged since" (K7, the N-06 analog). ``--check``
+    compares the STORED artifact against the tree stamp-blind and exits 1
+    when stale. The stamp is injected (``--ref`` else ``$CI_COMMIT_SHA``),
+    never read from git inside the builder (K10).
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        source_sha = ref if ref is not None else os.environ.get("CI_COMMIT_SHA")
+        idx = build_code_index(cfg, root, source_sha=source_sha)
+        stored = read_code_index(config_dir / ".cdmon") if check else None
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    target = config_dir / ".cdmon" / "code-index.json"
+    if check:
+        if stored is None:
+            typer.echo(
+                f"{target}: MISSING — run `cdx codeindex --write` first", err=True
+            )
+            raise typer.Exit(code=1)
+        if index_in_sync(stored, idx):
+            typer.echo(f"{target}: in sync")
+            raise typer.Exit(code=0)
+        typer.echo(
+            f"{target}: STALE — run `cdx codeindex --write` to refresh", err=True
+        )
+        raise typer.Exit(code=1)
+
+    if write:
+        changed = write_code_index(idx, config_dir / ".cdmon")
+        typer.echo(f"{target}: wrote" if changed else f"{target}: unchanged")
+
+    if json_out:
+        typer.echo(json.dumps(idx.model_dump(mode="json"), indent=2, sort_keys=True))
+    elif not write:
+        symbol_count = sum(len(f.symbols) for f in idx.files)
+        public_count = sum(1 for f in idx.files for s in f.symbols if s.is_public)
+        by_language: dict[str, int] = {}
+        for f in idx.files:
+            by_language[f.language] = by_language.get(f.language, 0) + 1
+        typer.echo(
+            f"{len(idx.files)} file(s), {symbol_count} symbol(s) "
+            f"({public_count} public)"
+        )
+        for language in sorted(by_language):
+            typer.echo(f"  {language}: {by_language[language]} file(s)")
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def impact(
+    config: Path = _CONFIG_OPTION,
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the full ImpactReport as round-trippable JSON.",
+    ),
+) -> None:
+    """Which docs does the current tree change affect? (CIX-03, read-only).
+
+    Diffs the STORED code index (`cdx codeindex --write`) against the
+    current tree — building the current surface in memory, writing NOTHING
+    (K1) — and joins every changed symbol to the docs covering it (`direct`)
+    and, when a `.cdmon/xrefs.json` artifact exists, to the docs covering
+    its CALLERS (`via_callers`, one hop). When the xrefs' input pin does
+    not cover the stored index (files changed, added or never indexed since
+    `cdx scip --write`, or stale when it ran), and for EVERY file the diff
+    modifies (its outgoing references are not in the stored xrefs, whether
+    or not the edit changed one), it prints "caller data unknown for N
+    file(s)" and reports `callers_available: false` + `callers_unknown`.
+    The note's remedy keeps the baseline: re-run the indexer and `cdx scip
+    --write` — never `cdx codeindex --write` before the impact is reviewed
+    (it resets the baseline). Informational like `report`: exit 0 whenever
+    the join runs; the one loud failure is a missing stored index (K8).
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        stored = read_code_index(config_dir / ".cdmon")
+        if stored is None:
+            typer.echo(
+                "error: no stored code index — run `cdx codeindex --write` first",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        current = build_code_index(cfg, root)
+        xrefs = read_xrefs(config_dir / ".cdmon")
+        report = impact_report(cfg, root, stored, current, xrefs)
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if json_out:
+        typer.echo(json.dumps(report.model_dump(mode="json"), indent=2, sort_keys=True))
+        raise typer.Exit(code=0)
+    if not report.deltas:
+        typer.echo("# tree matches the stored code index — no impact")
+        raise typer.Exit(code=0)
+    changed_symbols = sum(
+        len(d.symbols_added)
+        + len(d.symbols_removed)
+        + len(d.sigs_changed)
+        + len(d.docs_changed)
+        + len(d.bodies_changed)
+        for d in report.deltas
+    )
+    typer.echo(
+        f"# {len(report.deltas)} changed file(s), "
+        f"{changed_symbols} changed symbol(s), "
+        f"{len(report.docs)} affected doc(s)"
+    )
+    for delta in report.deltas:
+        buckets = []
+        if delta.symbols_added:
+            buckets.append(f"+{len(delta.symbols_added)}")
+        if delta.symbols_removed:
+            buckets.append(f"-{len(delta.symbols_removed)}")
+        if delta.sigs_changed:
+            buckets.append(f"sig:{len(delta.sigs_changed)}")
+        if delta.docs_changed:
+            buckets.append(f"doc:{len(delta.docs_changed)}")
+        if delta.bodies_changed:
+            buckets.append(f"body:{len(delta.bodies_changed)}")
+        detail = f" ({', '.join(buckets)})" if buckets else " (surface unchanged)"
+        typer.echo(f"  {delta.status}: {delta.path}{detail}")
+    for doc in report.docs:
+        typer.echo(f"doc {doc.doc_id}:")
+        for entity_id in doc.direct:
+            typer.echo(f"  direct: {entity_id}")
+        for entity_id in doc.via_callers:
+            typer.echo(f"  via caller: {entity_id}")
+    if xrefs is None:
+        typer.echo(
+            "# no xrefs artifact — caller impact unknown (run `cdx scip --write`)"
+        )
+    elif not report.callers_available:
+        # Stale or unpinned xrefs: say so instead of presenting the
+        # via-caller column as complete (⟨R⟩3 honesty).
+        note = caller_currency_note(
+            None if xrefs.input_digests is None else report.callers_unknown,
+            remedy=IMPACT_REMEDY,
+        )
+        typer.echo(f"# {note}")
+    raise typer.Exit(code=0)
+
+
 @app.command(name="surface-gaps")
 def surface_gaps(
     config: Path = _CONFIG_OPTION,
@@ -2099,14 +2301,33 @@ def graph(
     coverage (DOCUMENTS), doc↔doc dependencies (DEPENDS_ON), prose mentions
     and links (MENTIONS/LINKS_TO — the AGT-01 layer), sections (PART_OF) and
     accountability (OWNED_BY), with per-doc unresolved-mention counts as the
-    rot signal. Pure and offline (K1/K4/K10); `--write` touches only the
-    regenerable `.cdmon/graph.json` artifact.
+    rot signal — plus symbol→symbol REFERENCES edges when a `.cdmon/xrefs.json`
+    artifact exists (`cdx scip --write`, CIX-02). When the xrefs' input pin
+    no longer matches the tree it says "caller data unknown for N file(s)"
+    (text views; the artifact's `warnings`; stderr under `--focus --json`).
+    Pure and offline (K1/K4/K10); `--write` touches only the regenerable
+    `.cdmon/graph.json` artifact.
     """
     try:
         cfg, config_dir = _load(config)
         root = resolve_repo_root(config_dir, cfg.root)
         unit_owner = _unit_owner_map(config_dir)
-        g = build_graph(cfg, root, unit_owner=unit_owner)
+        stored_xrefs = read_xrefs(config_dir / ".cdmon")
+        xref_edges = stored_xrefs.edges if stored_xrefs is not None else ()
+        xref_note = (
+            None
+            if stored_xrefs is None
+            else caller_currency_note(
+                unknown_caller_files(stored_xrefs, file_digests(cfg, root))
+            )
+        )
+        g = build_graph(
+            cfg,
+            root,
+            unit_owner=unit_owner,
+            xrefs=xref_edges,
+            xref_notes=() if xref_note is None else (xref_note,),
+        )
         if focus is not None:
             # Discoverability: a bare managed-doc ID is shorthand for its
             # `doc <path>` node — every other cdx command addresses docs by
@@ -2128,8 +2349,12 @@ def graph(
                         sort_keys=True,
                     )
                 )
+                if xref_note is not None:  # stderr: stdout stays pure JSON
+                    typer.echo(f"warning: {xref_note}", err=True)
             else:
                 typer.echo(render_graph_text(g, focus=focus))
+                if xref_note is not None:
+                    typer.echo(f"# {xref_note}")
             return
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -2166,6 +2391,212 @@ def graph(
         typer.echo(json.dumps(g.model_dump(mode="json"), indent=2, sort_keys=True))
     else:
         typer.echo(render_graph_text(g))
+        if xref_note is not None:
+            typer.echo(f"# {xref_note}")
+
+
+@app.command()
+def scip(
+    index_file: Path = typer.Argument(
+        ...,
+        metavar="INDEX_FILE",
+        help="A .scip index produced by an external indexer (e.g. scip-python).",
+    ),
+    config: Path = _CONFIG_OPTION,
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Write .cdmon/xrefs.json (idempotent, stamp-blind — K7).",
+    ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the xref set as round-trippable JSON.",
+    ),
+    ref: str | None = typer.Option(
+        None,
+        "--ref",
+        "--source-sha",
+        help="Provenance SHA stamped on the artifact (else $CI_COMMIT_SHA).",
+    ),
+) -> None:
+    """Project a SCIP index into symbol→symbol reference edges (CIX-02).
+
+    SCIP is a CONSUMED format: a human runs the indexer (e.g. `scip-python
+    index . --project-name=x`) and hands the file to this verb — custodex
+    never shells out to an indexer (K11). The decode is stdlib-only (K0);
+    edges join the existing entity universe (`symbol <path>#<name>`, public
+    endpoints) via the STORED code index when present (run `cdx codeindex
+    --write` first for stability) else an in-memory build. A stored index
+    is checked against a FRESH in-memory build, entry by entry (symbols and
+    spans, not just bytes); when the tree does not extract, against its
+    content alone (no extraction). Files it disagrees on are named in a
+    STALE warning on stderr and left out of the input pin (their spans can
+    drop or misattribute references), so `impact`/`graph` report their
+    caller data as unknown. Read-only by
+    default (K1); `--write` persists `.cdmon/xrefs.json` idempotently (K7).
+    The `coverage` map, the `unmapped`/`unattributed` counts and the input
+    pin travel with the artifact so absent edges are never misread as
+    absent calls.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        scip_index = read_scip(index_file)
+        stored_index = read_code_index(config_dir / ".cdmon")
+        # The stored index's SPANS attribute every reference, so the join
+        # vouches only for files whose stored entry is what the tree gives:
+        # the whole entry against a fresh build, or — when the tree does not
+        # extract — its content alone (an in-memory build IS the tree).
+        fresh: CodeIndex | None = None
+        tree: dict[str, tuple[str, str]] | None = None
+        stale: tuple[str, ...] = ()
+        if stored_index is None:
+            code_index = build_code_index(cfg, root)
+        else:
+            code_index = stored_index
+            try:
+                fresh = build_code_index(cfg, root)
+                stale = unsynced_paths(stored_index, fresh)
+            except ExtractionError:
+                tree = file_digests(cfg, root)
+                stale = stale_paths(stored_index, tree)
+        source_sha = ref if ref is not None else os.environ.get("CI_COMMIT_SHA")
+        xrefs = build_xrefs(
+            scip_index,
+            code_index,
+            source_sha=source_sha,
+            tree_digests=tree,
+            tree_index=fresh,
+        )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if stale:
+        typer.echo(
+            f"warning: {config_dir / CODE_INDEX_PATH}: STALE against the tree "
+            f"for {len(stale)} file(s): {', '.join(stale)} — references are "
+            "attributed through its spans, so their edges may be dropped "
+            "(counted as unattributed) or misattributed, and their caller "
+            "data is left unpinned (reported unknown); run `cdx codeindex "
+            "--write` once any pending `cdx impact` is reviewed (it resets "
+            "that baseline), then re-run the indexer and `cdx scip`",
+            err=True,
+        )
+    if write:
+        target = config_dir / ".cdmon" / "xrefs.json"
+        changed = write_xrefs(xrefs, config_dir / ".cdmon")
+        typer.echo(f"{target}: wrote" if changed else f"{target}: unchanged")
+    if json_out:
+        typer.echo(json.dumps(xrefs.model_dump(mode="json"), indent=2, sort_keys=True))
+    elif not write:
+        typer.echo(
+            f"{len(xrefs.edges)} reference edge(s) from {xrefs.tool}, "
+            f"{xrefs.unmapped} unmapped target(s), "
+            f"{xrefs.unattributed} unattributed reference(s)"
+        )
+        for language, producer in sorted(xrefs.coverage.items()):
+            typer.echo(f"  coverage: {language} ← {producer}")
+    raise typer.Exit(code=0)
+
+
+@app.command()
+def okf(
+    config: Path = _CONFIG_OPTION,
+    out: Path | None = typer.Option(
+        None,
+        "--out",
+        help=f"Bundle directory (default {OKF_DIR} beside the config).",
+    ),
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="Exit 1 listing stale/missing bundle files instead of writing.",
+    ),
+    json_out: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit the export accounting as JSON.",
+    ),
+) -> None:
+    """Project the managed docs into an OKF v0.2 bundle (OKF-01).
+
+    Follows the `cdx wiki` precedent: the DEFAULT run writes the bundle — a
+    regenerable, deliberately clock-free projection (OKF v0.2 makes
+    `generated.at` optional, so the bytes are deterministic, K10) written
+    with per-file compare-skip (K7). `--check` is the read-only gate. The
+    bundle carries a `custodex:` extension block per concept (doc_id,
+    audience, fingerprint) — the round-trip tag back to the cdm contract —
+    and `verified` events joined from the review + resolutions logs (K5).
+    A doc verifies only while it has NO outstanding drift (`cdx check`'s pure
+    detect, K1) and no CURRENT review disputes it — a record's LAST
+    resolution, graded against the doc's stored fingerprint and recorded
+    at or after the doc's newest record, that rejects it (or overrides it
+    with `--text` not yet in the doc). It then carries one event per current
+    accept (or landed override) with a recorded `--by`. That binds
+    `verified` to the CODE surface, not the content — any change that moves
+    no code surface and writes no review record keeps the claim (a prose
+    edit, or a `cdx new-doc --force` rewrite). Drift is detected (and code
+    extracted) only when some doc would verify if drift-free, i.e. only
+    when a verification is at stake.
+    """
+    try:
+        cfg, config_dir = _load(config)
+        root = resolve_repo_root(config_dir, cfg.root)
+        doc_style = _doc_style_for(config_dir)
+        records = read_all(config_dir / DEFAULT_LOG_PATH)
+        resolutions = read_resolutions(config_dir / DEFAULT_RESOLUTIONS_PATH)
+        at_stake = pending_verifications(
+            cfg, root, records=records, resolutions=resolutions
+        )
+        drift_report = detect(cfg, config_dir) if at_stake else None
+        out_dir = out if out is not None else config_dir / OKF_DIR
+        if check:
+            stale = check_okf(
+                cfg,
+                root,
+                out_dir=out_dir,
+                doc_style=doc_style,
+                records=records,
+                resolutions=resolutions,
+                drift_report=drift_report,
+            )
+        else:
+            result = export_okf(
+                cfg,
+                root,
+                out_dir=out_dir,
+                doc_style=doc_style,
+                records=records,
+                resolutions=resolutions,
+                drift_report=drift_report,
+            )
+    except CodeDocMonitorError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    if check:
+        if stale:
+            for rel_path in stale:
+                typer.echo(
+                    f"{out_dir / rel_path}: STALE — run `cdx okf` to regenerate",
+                    err=True,
+                )
+            raise typer.Exit(code=1)
+        typer.echo(f"{out_dir}: in sync")
+        raise typer.Exit(code=0)
+
+    if json_out:
+        typer.echo(json.dumps(result.model_dump(mode="json"), indent=2, sort_keys=True))
+    else:
+        typer.echo(
+            f"{out_dir}: wrote {len(result.written)} file(s), "
+            f"{len(result.unchanged)} unchanged"
+        )
+        for doc_id in result.skipped:
+            typer.echo(f"  skipped {doc_id}: source doc missing", err=True)
+    raise typer.Exit(code=0)
 
 
 @app.command()

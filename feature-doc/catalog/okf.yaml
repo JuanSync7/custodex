@@ -1,0 +1,37 @@
+features:
+  - id: FEAT-OKF-001
+    title: The OKF v0.2 bundle projection — `cdx okf`
+    summary: >-
+      okf.export_okf projects the managed doc set into a Google Open
+      Knowledge Format v0.2 bundle (.cdmon/okf by default) — a PROJECTION of
+      existing truths (config + doc bytes + the local review and resolutions
+      logs + the pure drift report), never a storage format: deleting it
+      changes nothing and regenerating is
+      byte-idempotent because the bundle is deliberately clock-free (v0.2
+      makes generated.at optional; we emit generated:{by} only — K10, plain
+      per-file compare-skip K7). Each concept carries the one REQUIRED type
+      field (doc-style document-type mapped to a display name, audience
+      fallback), title/description/resource/tags, sources[] from code_refs,
+      verified[] events with the spec-MUST human: prefix under ONE verdict
+      per doc — only while the doc has no outstanding drift and no CURRENT
+      review (a record's last-write resolution, graded against the doc's
+      stored fingerprint and recorded at or after its newest record) rejects
+      it or holds an override whose text is not yet in the body
+      byte-for-byte; then one event per current accept or landed override
+      with a recorded resolver, never human:unrecorded; the claim is bound
+      to the code surface, not the content, and `cdx okf` runs drift
+      detection only when some doc would verify — and a custodex: extension
+      block (doc_id, audience,
+      fingerprint) — the round-trip tag back to the cdm contract, legal per
+      the v0.2 extensions clause. Bodies are byte-verbatim minus the cdm:
+      front matter; the bundle mirrors spec.path so relative links survive;
+      the bundle-root index.md carries okf_version "0.2" and nothing else;
+      a doc NAMED index.md is emitted frontmatter-less as its directory's
+      index file, while a log.md doc, a bundle-root index.md doc, a path
+      escaping the bundle root or two doc ids on one bundle path is a loud
+      ConfigError (K8). `cdx okf` follows the `cdx wiki` precedent (default
+      writes, --check gates, --out overrides); foreign files under --out are
+      never pruned.
+    subsystem: okf
+    modules: [okf, cli]
+    constraints: [K0, K1, K6, K7, K8, K10]

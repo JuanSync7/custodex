@@ -2,7 +2,7 @@
 
 Generated from the golden catalog crossed against inline `Feature:` tags in `tests/` + `demo/` — **do not hand-edit**. Run `cdx trace` (R-07 `cdx wiki`) to regenerate.
 
-**252 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
+**256 features** — COMPLETE (every feature needs >=1 test AND >=1 demo).
 
 | Feature | Tests | Demos |
 |---------|-------|-------|
@@ -44,6 +44,8 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-CLI-020` | system/test_ci_templates.py, system/test_cli.py, system/test_system.py | DEMOS.md |
 | `FEAT-CLI-021` | system/test_cli.py | DEMOS.md |
 | `FEAT-CLI-022` | system/test_cli.py, system/test_system.py | DEMOS.md |
+| `FEAT-CODEINDEX-001` | regression/test_fingerprint_stability_codeindex.py, system/test_codeindex_cli.py, unit/test_codeindex.py | DEMOS.md |
+| `FEAT-CODEINDEX-002` | system/test_impact_cli.py, unit/test_impact.py | DEMOS.md |
 | `FEAT-CONFIG-001` | integration/test_config.py | DEMOS.md |
 | `FEAT-CONFIG-002` | integration/test_config.py, system/test_example_multilang.py, system/test_system.py | DEMOS.md |
 | `FEAT-CONFIG-003` | integration/test_generate.py, system/test_demo_e2e.py, system/test_dogfood.py, unit/test_context_refs.py | DEMOS.md |
@@ -168,6 +170,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-MONITOR-007` | integration/test_monitor.py, regression/test_corpus_contracts.py | DEMOS.md |
 | `FEAT-MONITOR-008` | integration/test_monitor.py | DEMOS.md |
 | `FEAT-MONITOR-009` | integration/test_agent_style.py | DEMOS.md |
+| `FEAT-OKF-001` | system/test_okf_cli.py, unit/test_okf.py | DEMOS.md |
 | `FEAT-ONBOARD-001` | system/test_onboard_cli.py, unit/test_onboard.py | DEMOS.md |
 | `FEAT-ONBOARD-002` | system/test_onboard_cli.py, unit/test_onboard.py, unit/test_templates.py | DEMOS.md |
 | `FEAT-OWNERSHIP-001` | unit/test_ownership.py | DEMOS.md |
@@ -219,6 +222,7 @@ Generated from the golden catalog crossed against inline `Feature:` tags in `tes
 | `FEAT-REFERENCE-005` | unit/test_srcindex.py | DEMOS.md |
 | `FEAT-REFERENCE-006` | unit/test_srcindex.py | DEMOS.md |
 | `FEAT-REFERENCE-007` | system/test_wiki_cli.py, unit/test_wiki.py | DEMOS.md |
+| `FEAT-SCIP-001` | system/test_scip_cli.py, unit/test_scip.py | DEMOS.md |
 | `FEAT-SERVER-001` | integration/test_server.py, system/test_demo_e2e.py, system/test_example_external.py, system/test_server_launch.py, system/test_standalone.py | DEMOS.md |
 | `FEAT-SERVER-002` | integration/test_server.py, integration/test_server_store_parity.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_server_launch.py | DEMOS.md |
 | `FEAT-SERVER-003` | integration/test_provider_secret.py, integration/test_server.py, integration/test_server_gitsync.py, integration/test_server_store_parity.py, system/test_demo_gitsync_e2e.py, system/test_e2e_ticket_coverage.py, system/test_example_external.py, system/test_server_launch.py | DEMOS.md |

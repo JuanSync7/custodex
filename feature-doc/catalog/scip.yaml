@@ -1,0 +1,25 @@
+features:
+  - id: FEAT-SCIP-001
+    title: The stdlib SCIP reader — `cdx scip` → `.cdmon/xrefs.json` → REFERENCES edges
+    summary: >-
+      scip.read_scip decodes a SCIP protobuf index with the standard library
+      alone — varint + LEN walking, packed AND unpacked repeated int32, the
+      deprecated range/enclosing_range fields AND the typed range fields
+      8–11 (typed wins) — no protobuf dependency (K0); malformed wire bytes
+      are a loud ExtractionError (K8) while odd SYMBOLS (locals, parameters,
+      unresolvable targets) are data that tally into XrefSet.unmapped, the
+      honesty counter. scip_symbol_to_dotted parses the full symbol grammar
+      (double-space escapes, doubled backticks, every descriptor suffix) and
+      build_xrefs projects references onto the EXISTING entity universe:
+      target resolution by longest module split with a unique-suffix match
+      (the scip-python project-root-relative quirk), source attribution by
+      narrowest containing code-index span, public endpoints only,
+      self-edges dropped, occurrence counts as provenance weight. SCIP is a
+      CONSUMED format: a human runs the indexer and hands the file to `cdx
+      scip` — custodex never shells out (K11). kgraph folds the persisted
+      edges in additively as REFERENCES/indexed (schema_version 1.1.0, K6);
+      the per-language coverage map travels with the artifact so an absent
+      edge is never misread as an absent call.
+    subsystem: scip
+    modules: [scip, kgraph, cli]
+    constraints: [K0, K1, K6, K7, K8, K10, K11]

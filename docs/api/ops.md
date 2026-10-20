@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 95972c620fe4a27e
+  fingerprint: 77bbc2b63bcfc7e2
   fingerprint_tiers:
-    composite: 95972c620fe4a27e
-    docstring: 03966c2fede143a2
-    signature: c46397f78a180935
+    composite: 77bbc2b63bcfc7e2
+    docstring: f5779aa4106217f4
+    signature: 64eb4bccf8e25fa9
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -18,6 +18,7 @@ cdm:
     - 0d6e4079e36703eb
     - 0dad8198442ebc15
     - 12a435ec8454c6d1
+    - 184fb63b58524248
     - 1a4e31eebbd1771e
     - 1bc04b5291c26a46
     - 1d3c8aff2168435b
@@ -27,6 +28,7 @@ cdm:
     - 2a07ca57ed083879
     - 2c6c03ca07d1b881
     - 2cc497857559ff85
+    - 2e058c51303d1f55
     - 44575cf5b28512d7
     - 484de142f352dff3
     - 49e9627e39c92dd0
@@ -38,6 +40,7 @@ cdm:
     - 663f896d732e2207
     - 6aa02816300e85df
     - 6eb2db11cfd447e6
+    - 6f61f46c23a66607
     - 7022c89609e06451
     - 706a95d834379a05
     - 72f4be89d6ebab14
@@ -76,6 +79,7 @@ cdm:
     - df2a20195d34af2d
     - e31271f86c854de9
     - e62f7af7ce023782
+    - e7c6abb0f612da82
     - eafe895eb8119e6e
     - eb2554c8c13b73f9
     - edcc4b4214b84e54
@@ -85,7 +89,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: b7eef2ab02e14a46
+    symbols: a104a114ce68ef22
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 2557e4d98b703179
@@ -98,6 +102,7 @@ cdm:
     0d6e4079e36703eb: 14346d3eb68974a0
     0dad8198442ebc15: 7778f05ebf2516e7
     12a435ec8454c6d1: a2ca2be3282d0600
+    184fb63b58524248: 2122a88f4f75b611
     1a4e31eebbd1771e: 7bd3f0f4e54746a8
     1bc04b5291c26a46: 76a6557de9f6049e
     1d3c8aff2168435b: 7f757c94419dec88
@@ -107,6 +112,7 @@ cdm:
     2a07ca57ed083879: 8faa07d8fc6c7c1d
     2c6c03ca07d1b881: 5a4a02b022bccca2
     2cc497857559ff85: 6724a3e462f7b17d
+    2e058c51303d1f55: 44e675789f8b7feb
     44575cf5b28512d7: deba6b00c018c6ab
     484de142f352dff3: 1cc66be4e6718295
     49e9627e39c92dd0: b0cee0ff8f060823
@@ -118,6 +124,7 @@ cdm:
     663f896d732e2207: 28d51fc52e99427c
     6aa02816300e85df: a142792c2addee3d
     6eb2db11cfd447e6: f16bdd54bea272d8
+    6f61f46c23a66607: dec820ee752ae454
     7022c89609e06451: 407c3e26ff00f036
     706a95d834379a05: e06b473a8e4f7ffc
     72f4be89d6ebab14: 82cdb795b1cfefb7
@@ -156,6 +163,7 @@ cdm:
     df2a20195d34af2d: e7547f090ffd00e5
     e31271f86c854de9: aabc8b4ca7ed96f6
     e62f7af7ce023782: d6db45284c125e58
+    e7c6abb0f612da82: aa0b80d67b1abad2
     eafe895eb8119e6e: 2492d10714d01761
     eb2554c8c13b73f9: 34e432f7557b73ab
     edcc4b4214b84e54: 1fc512bec079aec4
@@ -213,11 +221,13 @@ cdm:
 | app | variable | app = ... |
 | build | function | def build(config: Path = _CONFIG_OPTION) -> None |
 | check | function | def check(config: Path = _CONFIG_OPTION) -> None |
+| codeindex | function | def codeindex(config: Path = _CONFIG_OPTION, write: bool = typer.Option(False, '--write', help='Write .cdmon/code-index.json (idempotent, stamp-blind — K7).'), check: bool = typer.Option(False, '--check', help='Exit 1 when the stored index is stale against the tree.'), json_out: bool = typer.Option(False, '--json', help='Emit the freshly built index as round-trippable JSON.'), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Provenance SHA stamped on the artifact (else $CI_COMMIT_SHA).')) -> None |
 | coverage | function | def coverage(config: Path = _CONFIG_OPTION, json_out: bool = typer.Option(False, '--json', help='Emit the full CoverageReport as round-trippable JSON.'), fail_under: float \| None = typer.Option(None, '--fail-under', help='Exit 1 if public-symbol coverage is below this percent (informational — always exits 0 — when omitted).'), write: bool = typer.Option(False, '--write', help=f'Write a deterministic coverage manifest (payload + owner suggestions) to PATH (default {_DEFAULT_MANIFEST}); idempotent (K7).'), manifest_path: Path \| None = typer.Argument(None, metavar='[PATH]', help=f'Manifest destination for --write (default {_DEFAULT_MANIFEST}).')) -> None |
 | deps | function | def deps(config: Path = _CONFIG_OPTION, suspect: bool = typer.Option(False, '--suspect', help='Show only edges that need review (hide OK edges).'), suggest: bool = typer.Option(False, '--suggest', help='Infer edges from Markdown cross-links between managed docs and print paste-ready `depends_on` config (the low-tedium authoring aid). Read-only.'), impact: str \| None = typer.Option(None, '--impact', metavar='DOC', help='Show the blast radius of changing DOC — the documents that (transitively) depend on it and would need re-review. Read-only.'), transitive: bool = typer.Option(False, '--transitive', help='Also show the EAGER transitive-suspect advisory (PROP-01): documents whose upstream is itself pending review. Advisory only — never gates `cdx check`. Applies to the default suspect listing (ignored with --impact, which is already transitive, and with --suggest).'), as_json: bool = typer.Option(False, '--json', help='Emit the dependency graph / suggestions as JSON.')) -> None |
 | doctor | function | def doctor(config: Path = _CONFIG_OPTION) -> None |
 | entities | function | def entities(doc_id: str \| None = typer.Argument(None, metavar='[DOC_ID]', help='Limit the report to one managed document (default: every doc).'), config: Path = _CONFIG_OPTION, unresolved: bool = typer.Option(False, '--unresolved', help='Show only UNRESOLVED mentions — the graph-rot signal (a mention whose referent no longer exists, or never did).'), as_json: bool = typer.Option(False, '--json', help='Emit the per-document mention lists as JSON.')) -> None |
 | graph | function | def graph(config: Path = _CONFIG_OPTION, focus: str \| None = typer.Option(None, '--focus', metavar='NODE_ID', help='Show the edges around one node (e.g. "doc docs/api/drift.md" or "symbol custodex/drift.py#detect_drift").'), rank: bool = typer.Option(False, '--rank', help='Rank symbols by MENTIONS in-degree with no covering doc — the best-justified what-to-document gaps.'), write: bool = typer.Option(False, '--write', help='Write the graph artifact to .cdmon/graph.json (regenerable, idempotent; the sphinx-needs needs.json pattern).'), as_json: bool = typer.Option(False, '--json', help='Emit the whole graph as JSON.')) -> None |
+| impact | function | def impact(config: Path = _CONFIG_OPTION, json_out: bool = typer.Option(False, '--json', help='Emit the full ImpactReport as round-trippable JSON.')) -> None |
 | index | function | def index(config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='The config/cdmon directory whose index.yaml to regenerate.'), check: bool = typer.Option(False, '--check', help='Read-only: exit 1 if the on-disk index differs from a freshly regenerated one (CI gate), 0 when in sync. Writes nothing.')) -> None |
 | init | function | def init(path: Path = typer.Option(Path('cdmon.yaml'), '--path', help='Where to write the config template.'), force: bool = typer.Option(False, '--force', help='Overwrite an existing config file.'), central: str \| None = typer.Option(None, '--central', metavar='URL', help='Wire `central:` for HTTP reporting to this central-server URL (sink=http). Without it, the offline template is written unchanged.'), repo_id: str \| None = typer.Option(None, '--repo-id', help='Stable repo identifier the central system keys on (required for --central; defaults to the current directory name).'), token_env: str = typer.Option(DEFAULT_CENTRAL_TOKEN_ENV, '--token-env', metavar='VAR', help=f'Env var the HTTP sink reads the central bearer token from (default {DEFAULT_CENTRAL_TOKEN_ENV}).'), repo_url: str \| None = typer.Option(None, '--repo-url', help="This repo's clone/browse URL, recorded on each reported record (only with --central)."), v2: bool = typer.Option(False, '--v2', help='Scaffold the multi-file config/cdmon/ layout (index + example unit + ignore + doc-style) instead of the single-file template.'), config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='Where to scaffold the config/cdmon/ directory (only with --v2).'), repo: str \| None = typer.Option(None, '--repo', help='Repo id/name written into the scaffolded index.yaml (only with --v2; defaults to the current directory name).')) -> None |
 | link | function | def link(downstream: str = typer.Argument(..., metavar='DOWN', help='The dependent doc.'), upstream: str = typer.Argument(..., metavar='UP', help='The doc it depends on.'), edge_type: str = typer.Option('depends', '--type', help='Edge role: depends \| refines \| implements \| verifies.'), reject: bool = typer.Option(False, '--reject', help="Record a durable REJECTION instead: the suggested edge never returns from `cdx deps --suggest` (the human 'no' — K11)."), by: str \| None = typer.Option(None, '--by', help='Who decided (audit trail).'), note: str \| None = typer.Option(None, '--note', help='Why (audit trail).'), config: Path = _CONFIG_OPTION) -> None |
@@ -226,6 +236,7 @@ cdm:
 | mcp_serve | function | def mcp_serve(repo_root: Path = typer.Option(Path('.'), '--repo-root', help='Repo whose Custodex config to serve (default: the current directory).'), read_only: bool = typer.Option(False, '--read-only', help="Serve ONLY the read tools — do not mount the write tools (remediate/resolve/sync-docs). The operator's provable no-write surface for an untrusted agent (K11).")) -> None |
 | monitor | function | def monitor(config: Path = _CONFIG_OPTION, apply: bool \| None = typer.Option(None, '--apply/--no-apply', help="Auto-apply FIX verdicts (defaults to the config's apply_default)."), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Source code ref/commit to stamp on every review record (provenance, C-05). Precedence: this flag, else $CI_COMMIT_SHA, else none. The same ref can flow to `open-docs-pr --ref` (one source of truth).')) -> None |
 | new_doc | function | def new_doc(doc_id: str = typer.Argument(..., help='The document id from the config.'), config: Path = _CONFIG_OPTION, force: bool = typer.Option(False, '--force', help='Overwrite an existing doc file.')) -> None |
+| okf | function | def okf(config: Path = _CONFIG_OPTION, out: Path \| None = typer.Option(None, '--out', help=f'Bundle directory (default {OKF_DIR} beside the config).'), check: bool = typer.Option(False, '--check', help='Exit 1 listing stale/missing bundle files instead of writing.'), json_out: bool = typer.Option(False, '--json', help='Emit the export accounting as JSON.')) -> None |
 | onboard | function | def onboard(path: Path = typer.Option(Path('.'), '--path', help='The repo root to onboard (default: cwd).'), repo: str \| None = typer.Option(None, '--repo', help='Repo name for the config (default: the dir name).'), owner: str \| None = typer.Option(None, '--owner', help="Accountable unit owner (default: git user.name, else 'unassigned')."), apply: bool = typer.Option(False, '--apply', help='WRITE the proposed config/cdmon/, scaffold the docs, heal, and self-validate (arrive-green). Default is a DRY-RUN plan (K11).'), force: bool = typer.Option(False, '--force', help='With --apply: replace an existing config/cdmon/ directory.')) -> None |
 | open_docs_pr_cmd | function | def open_docs_pr_cmd(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the MR plan WITHOUT mutating the tree or opening an MR (uses a dry sync, so NOTHING is written, and never builds a transport).'), target: str = typer.Option('main', '--target', help="The MR target branch (default 'main')."), ref: str \| None = typer.Option(None, '--ref', help='Source ref to record in the MR title/description (provenance).')) -> None |
 | ownership | function | def ownership(config: Path = _CONFIG_OPTION, roster: Path \| None = typer.Option(None, '--roster', help='An offline roster YAML (identities: [...]) to cross-check owners against; without it the command just lists assignments.'), as_json: bool = typer.Option(False, '--json', help='Emit {owners, findings} as round-trippable JSON.'), fail_on_orphan: bool = typer.Option(False, '--fail-on-orphan', help='Exit 1 if any document is an orphan (its accountable owner has departed). Requires --roster; UNOWNED docs do NOT trip it (that is a coverage gap, not a departure).')) -> None |
@@ -236,6 +247,7 @@ cdm:
 | rpt | function | def rpt(config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='The config/cdmon directory to build the coverage report from.'), write: bool = typer.Option(False, '--write', help='Write config/cdmon/coverage.rpt (idempotent, K7). Default prints to stdout and writes nothing (read-only, K1).'), ref: str \| None = typer.Option(None, '--ref', help='Branch/commit the report reflects (provenance, stamped in the frontmatter). Left null when omitted; a later sync slice fills it.')) -> None |
 | run_checks | function | def run_checks(config: MonitorConfig, config_dir: Path) -> list[Check] |
 | schema | function | def schema(out: Path \| None = typer.Option(None, '--out', help='Write the schema to this file instead of stdout.')) -> None |
+| scip | function | def scip(index_file: Path = typer.Argument(..., metavar='INDEX_FILE', help='A .scip index produced by an external indexer (e.g. scip-python).'), config: Path = _CONFIG_OPTION, write: bool = typer.Option(False, '--write', help='Write .cdmon/xrefs.json (idempotent, stamp-blind — K7).'), json_out: bool = typer.Option(False, '--json', help='Emit the xref set as round-trippable JSON.'), ref: str \| None = typer.Option(None, '--ref', '--source-sha', help='Provenance SHA stamped on the artifact (else $CI_COMMIT_SHA).')) -> None |
 | serve | function | def serve(host: str = typer.Option('127.0.0.1', '--host', help='Host/interface to bind the standalone server to.'), port: int = typer.Option(0, '--port', help='Port to bind (0 = let the OS pick a free port).'), repo_id: str \| None = typer.Option(None, '--repo-id', help="Repo id for the standalone view. Defaults to the bundle's index `repo` field (else the current directory name)."), no_open: bool = typer.Option(False, '--no-open', help='Do not open a browser tab (accepted for parity; never auto-opens).')) -> None |
 | settings | function | def settings(settings_path: Path = typer.Option(Path('config/settings.yaml'), '--settings', help='Path to the operator settings YAML.'), as_json: bool = typer.Option(False, '--json', help='Emit the resolved settings + secret presence as JSON.')) -> None |
 | should_sync_cmd | function | def should_sync_cmd(files: list[str] = typer.Argument(None, metavar='[FILES...]', help='Changed file paths to test. If omitted, read newline-separated paths from stdin (e.g. `git diff --name-only \| cdx should-sync`).'), config: Path = _CONFIG_OPTION) -> None |

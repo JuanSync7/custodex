@@ -2437,6 +2437,36 @@ agent trigger an auto-apply implicitly. The per-server layer is
 refusal inside a still-mounted tool is weaker). Test both: assert a `read_only`
 server's `list_tools()` is `disjoint` from the write-tool names, and that the
 `apply=True` path is exercised end-to-end (else a hardcoded default survives).
+
+## [OKF-01] Dogfood the export before pinning the guard — a "loud error" can be a spec feature wearing a defect's clothes
+
+The OKF-01 slice spec pinned "a doc PATH ending in index.md → loud
+ConfigError" (reserved-filename protection). The FIRST dogfood run of `cdx
+okf` on custodex itself refused to export: our own `api-index` doc lives at
+`docs/api/index.md` — a landing page, exactly the kind of doc real adopters
+have. The correct reading was in the spec all along: OKF reserves `index.md`
+*for directory indexes*, and a landing-page doc IS one — so the fix was to
+emit its body frontmatter-less as the per-directory index file (never as a
+concept), keeping only `log.md` loud. Two durable rules: (1) run every new
+export/projection against the dogfood config BEFORE trusting its guards —
+custodex's own tree is adversarial enough to break "obviously correct"
+validation within the hour; (2) when input collides with a reserved name,
+first ask whether the spec gives the collision a MEANING before refusing it
+(K8 loudness is for malformed input, not for input the spec has a slot for).
+
+## [CIX-01] Stamps are provenance, never identity — the stamp-blind writer
+
+`.cdmon/code-index.json` carries `source_sha`/`generated_by` but the
+idempotent writer compares `files` content ONLY: an unchanged tree under a
+new SHA writes zero bytes and the STORED stamp survives, giving the artifact
+its meaning — "content unchanged since <sha>" (the `index.yaml updated:`
+N-06 analog, generalized to any regenerable artifact). The dual rule from
+SP-RF1 still holds (skip-keys must be content hashes, never mtime); this adds
+the converse: provenance fields must never enter the skip-key, or the
+artifact self-invalidates on every commit and K7 dies. Golden fingerprints
+were captured from `main` BEFORE any code change (the P-01 capture) and are
+pinned in `tests/regression/test_fingerprint_stability_codeindex.py`.
+
 ## [DOC-STYLE] Generic templates carry generic rules; the adopter's repo carries its own
 
 Two documentation charters were folded into `templates/writing/**`: an external
@@ -2519,4 +2549,120 @@ TEXT, not only the parsers, and run them all together on the exact tree that wil
 be committed. Say which fixture each measurement ran on and which local state (a
 generated file, a cache) a green verdict depends on. Prove "blocks" by fixing
 everything else first.
+
+## [CIX-03b] A derived artifact joined onto another must pin the input it could VOUCH for
+
+`.cdmon/xrefs.json` joins a SCIP index onto `.cdmon/code-index.json` spans but
+recorded neither, so every consumer read stale caller edges as complete (critic
+1.17). What the pin needed:
+
+1. **A provenance stamp is not a pin.** Record per-file content digests and put
+   them in the idempotent writer's compare. Compare "everything but the named
+   stamps", and pin that FIELD BY FIELD with a census test so a new field cannot
+   slip out of it.
+2. **Pin only what the join could vouch for, and persist the honesty.** A file
+   whose stored index entry disagrees with a fresh build is left out of the pin; a
+   stderr warning is not a substitute for the artifact saying so.
+3. **A vouch compares what the join USES (spans and symbols), not a proxy
+   (bytes).** Fall back to the proxy only when the exact check cannot run, and keep
+   the fallback reachable: an untyped error on the exact path bypasses it. Untyped
+   errors come from rendering too — a file that parses can still make
+   `ast.unparse` raise `ValueError` (a hex literal past the int-to-str digit
+   limit). Type at the per-file boundary, and test with a real input as well as an
+   emulated one.
+4. **Record the scope at build time** (the covered languages); never re-derive it
+   from paths that may have moved.
+5. **A read-only currency check must be total** — a sentinel
+   (`UNREADABLE_DIGEST`) that can never equal a real digest, never an abort.
+6. **An honesty set must be closed over everything the artifact can show**,
+   deleted edge sources included, and "counted, not lost" must cover every drop
+   path.
+7. **A verb's remedy must not destroy the verb's own input.** `cdx impact` diffs
+   the STORED code index, so advising `cdx codeindex --write` before the impact is
+   reviewed resets its own baseline.
+
+## [CIX-03b] A precision heuristic over missing data is the bug — stop patching it and state the honest rule
+
+Rounds 1–5 of the xref lane tried to exempt edits made after the join: "a symbol
+digest witnesses the edit, so its doc surfaces as `direct` anyway". The argument
+took four forms — per tier; a residual digest over the lines no tier witnesses
+(`IndexedFile.residual_digest`); keyed by the attribution owner; then with
+shared-line and class-header rules — and every version shipped a reproduced silent
+under-report: class bodies, decorators, elided values, rebinding and reordered
+imports, re-indentation, `;` lines, one-line classes, a field continuing its class
+header's line, a statement moved across a shadowing import, a PEP 695 bound.
+
+The stored xrefs simply do not hold an edited file's current outgoing references.
+A heuristic cannot recover data that was never recorded; it can only guess where
+the guess is usually right, and each patch moved the hole rather than closing it.
+Round 6 deleted the residual witness and its helpers and adopted the honest rule:
+every modified covered file is "caller data unknown", worded as exactly that —
+"not in the stored xrefs … listed whether or not a reference changed". The three
+open review majors closed by construction. Over-reporting is the accepted cost:
+`callers_available` is now false on almost every real impact run.
+
+The rule: **when a heuristic needs a fifth patch to approximate data you do not
+have, stop claiming.** The contrast is RTE-03g's stale-stamp discharge, which also
+narrows a report, but only on a byte-for-byte PROOF against data the doc already
+stores: a proof can be exact, an inference over absent data cannot. Also: a
+surviving mutant may be equivalent (E2 — an added path can never be in the
+baseline projection); prove it from the code, never assume it.
+
+## [OKF-01b] An attestation needs positive evidence for every premise, and ONE verdict per subject
+
+The OKF exporter published `verified: human:alice` over a fix alice REJECTED, and
+`cdx okf --check` said "in sync". Each review round then found the same over-claim
+at a finer grain: a hash match that holds before the fix lands; a later heal, or a
+revert, re-matching an old accept; a sibling record's REJECT ignored because the
+gates ran per RECORD while the claim is about the DOC; and finally two doc ids on
+one bundle path, where the later concept silently overwrote the earlier one and
+its REJECT.
+
+- **Join where the binding data live.** The function that renders a claim takes
+  the raw inputs (both logs plus the drift report). A pre-joined parameter
+  (`verified_by_doc=`) hid the join from every test.
+- **Every premise needs POSITIVE evidence**: the drift is gone (a detect report —
+  `None` means no claim), nothing happened since (no later record), the human's
+  words are on disk (the override text, byte for byte). Absence of a
+  counter-signal is not evidence.
+- **Decide at the grain the claim is about.** The doc has one verdict, so one
+  current dissent withdraws every attestation on it.
+- **Compare instants as datetimes**, and pin it with stamps whose STRING order
+  differs from their instant order — a string-max "newest" survived every UTC-only
+  fixture.
+- **Key a projection's writes the way its readers key them.** A bundle keyed by
+  output path must refuse two inputs that map to one path, or last-write-wins over
+  a FILE silently drops a verdict.
+- **Vary exactly the axis a rule names**: drift kind AND verdict AND the later
+  record's own resolution; ids that do not mirror their paths; a case change, a
+  doubled space, a mid-line substring, text found only in the stripped front
+  matter. Each of "ANY later record", "verbatim" and "in the body" survived a
+  mutant until its axis varied.
+
+## [OKF-01b] Pin every named limit, and make each pin flip for exactly one follow-up
+
+The okf docstring names seven limits (presumption, code surface, recorded
+instants, record grain, containment, writer channel, local logs). All but the last
+are pinned by a ship-shape test that flips when its follow-up lands. Two things
+made those pins trustworthy:
+
+- **Name a limit by its MECHANISM, not its most familiar instance.** "A prose edit
+  keeps the claim" hid custodex's OWN `cdx new-doc --force`. State the class, grep
+  for every writer in it, and pin one in ship shape. A limit that is structural
+  (the inputs simply lack the data, as with hub-only resolutions) says so instead
+  of claiming a pin.
+- **Pins must be INDEPENDENT, proven with one liveness probe each** — including a
+  probe that closes only the NEIGHBOURING limit. The first recorded-instants pin
+  accepted an OLD dry-run proposal, so a run-id gate that closed only the
+  presumption (P5) flipped it too; the rewritten pin resolves the MCP call's OWN
+  record mid-call and flips only under a receipt-like stamp (P1). Route the
+  premises a pin is not about through a path that will not change (human
+  resolutions through `cdx resolve` with its clock seam patched, not MCP
+  `resolve_drift`).
+
+And a naming rule: **take a follow-up's label from the backlog that owns it, and
+check it against STATUS before shipping it.** "D-06" was already a DONE slice
+(promotion rules); the backlog item is OKF-CHANNEL. A limit the program decided to
+keep (MCP grain (A)) is a STANDING limit pointing at its problem note, not a new
+slice.
 
