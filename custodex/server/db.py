@@ -486,6 +486,20 @@ class SqlStore:
                 select(RepoRow.token_hash).where(RepoRow.repo_id == repo_id)
             ).first()
 
+    def set_repo_token_hash(self, repo_id: str, token_hash: str | None) -> bool:
+        """REPLACE one repo row's ``token_hash`` (SRV-TOKEN); True iff it changed.
+
+        Same value -> no write, False (K7). Unknown repo -> False, no row created.
+        """
+        with self._session() as session, session.begin():
+            row = session.scalars(
+                select(RepoRow).where(RepoRow.repo_id == repo_id)
+            ).first()
+            if row is None or row.token_hash == token_hash:
+                return False
+            row.token_hash = token_hash
+            return True
+
     def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
         """Store the SEALED git provider credential bytes on the repo row (GIT-02).
 

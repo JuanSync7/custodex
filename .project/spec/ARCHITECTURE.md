@@ -635,7 +635,36 @@ def set_region_anchors(meta: dict, region_id: str, anchors: tuple[str, ...]) -> 
 # `{}` when stamped-but-symbol-less. Stamped by heal AND layout.scaffold_doc (parity).
 def stored_symbol_sigs(doc: Doc) -> dict[str, str] | None
 def set_symbol_sigs(meta: dict, sigs: dict[str, str]) -> dict   # sorted keys, additive under cdm
+# FM-SPLICE — the ONE managed-doc writer. Every writer passes the text it parsed as
+# source= (scaffold_doc passes None: a new doc). Keyword-only, additive (K6).
+def render_doc(meta: dict, body: str, *, source: str | None = None) -> str
+#   source opens with a fence → parse_text(source).meta (DriftError on malformed /
+#   non-mapping FM, K8) → _splice_front_matter; None from it → the fresh dump.
+#   No fence + empty meta → body.
+def _splice_front_matter(fm_text: str, meta: dict, parsed: dict) -> str | None
+#   _same(meta, parsed) → fm_text verbatim. Else cut a `...` trailer off
+#   (_split_document_end); BEFORE: structural bails in _entry_spans (column-0 block
+#   mapping, no `<<`, no aliased key, no duplicate top-level key, no flow root) —
+#   part of the contract, since safe_load accepts the duplicate key a mis-cut span
+#   leaves; unchanged entry = its span bytes; changed = dump + old tail (every
+#   comment INSIDE the entry is lost, the comment/blank lines after it stay);
+#   new = dump at meta's position; absent = dropped; trailer appended last;
+#   AFTER: the result must safe_load back _same as meta (data guard: an alias into
+#   a changed entry, clashing anchors), else None.
+def _split_document_end(fm_text: str) -> tuple[str, str]   # (entries, `...` + rest)
+def _entry_spans(fm_text: str, root: yaml.MappingNode) -> tuple[str, dict[Any, tuple[int, int, int]]] | None
+#   (head, {key: (start, content_end, end)}); content_end = end of the line holding
+#   the entry's last yaml.scan token (BlockEnd/StreamEnd excluded), rstripped.
+def _same(a, b, seen: set[tuple[int, int]] | None = None) -> bool
+#   exact scalar types (1 is not True), NaN==NaN, list~tuple; id-pair memo (linear on
+#   alias fan-out, terminates on cycles).
+def _sorted_tree(value, memo: dict[int, Any] | None = None) -> Any   # cycle-safe sorted copy
+def _dump_mapping(mapping: dict) -> str   # ONE yaml.dump (unique anchors), meta order,
+#   allow_unicode=True; re-dump escaped when the result does not round-trip (U+0085)
+def _dump_entry(key, value) -> str        # cdm entry sorted via _sorted_tree
+class _FrontMatterDumper(yaml.SafeDumper) # !!set members sorted (repr fallback): K10
 ```
+The writers (pinned by tests/unit/test_fm_splice.py::test_every_writer_goes_through_render_doc): heal._corrected(source=doc.raw), heal._stamp_region_hashes(source=text), layout.stamp_doc_meta(source=doc.raw), layout.scaffold_doc(source=None), docwriter._author_overview(source=doc_text), spmirror._write_body_preserving_meta(source=existing.raw), docdeps.stamp_edges(source=doc.raw). okf._render_concept builds its own fence for OKF export concepts, which are not managed docs.
 DIG-01 `drift.classify_change_severity(drifted_tiers, anchors_added, anchors_removed,
 sigs_changed=())` gains a 4th param: a non-empty `sigs_changed` (SURVIVING symbols whose
 signature digest moved, from `cdm.symbol_sigs`) → `BREAKING` ABOVE the addition rule, so a
@@ -854,21 +883,33 @@ class PromotionCandidate(BaseModel):     # frozen, extra="forbid"
     drift_kind: str
     audience: Audience
     resolution: Resolution               # the UNANIMOUS human decision for this shape
-    count: int                           # how many RESOLVED records support it (>= min_count)
+    count: int                           # DISTINCT resolved record_ids (one human decision each), >= min_count
 
 def detect_promotions(
     records: list[ReviewRecord],
     resolutions: list[ResolutionRecord],
     *, min_count: int = 3,
 ) -> list[PromotionCandidate]
+# raises ConfigError if min_count < 1 (K8)
 ```
 - **Shape key = `(doc_id, drift_kind, audience)` — GENERALIZABLE, NOT `surface_hash`.**
   `surface_hash` is the EXACT code state (similar.py's dominant feature) and never
   recurs across edits, so it cannot ground a recurring rule. The shape is the
   audience-scoped doc+kind that DOES recur. Population = RESOLVED records only (a
-  record whose `record_id` is in `reviewlog.resolved_index`, last-write-wins). A shape
-  QUALIFIES iff ≥ `min_count` of its resolved records share ONE resolution (unanimous
-  among that shape's resolved records — a single dissenting resolution disqualifies it).
+  record whose `record_id` is in `reviewlog.resolved_index`, last-write-wins).
+
+  The unit counted is a **DISTINCT resolved `record_id` per shape** (one human decision; `resolved_index` keeps one decision per id), never a review-log line. A shape QUALIFIES iff ≥ `min_count` of those distinct decisions share ONE resolution. It must be unanimous within the shape: a single dissenting decision disqualifies it, INCLUDING a non-promotable one (`overridden`/`accepted`). The shape is `(doc_id, drift_kind, audience)`, so different audiences of one doc are separate shapes (K3).
+
+  Under one injected clock (MCP `custodex_remediate`, the hub docs-PR stamp), `new_record_id(doc_id, surface_hash, detected_at)` gives every drift of a doc ONE id. Retried resolves, sink re-POSTs and hub re-ingests repeat lines. Each of these counts once. A shared id that spans two shapes counts once in EACH shape.
+
+  Why exactly `record_id`: a key that SPLITS an id re-inflates the count; a key that MERGES ids lets one decision overwrite another and hides a dissent depending on input order; widening the key with the id's own inputs changes nothing. `min_count < 1` raises `ConfigError` (K8), even on an empty log.
+
+  **Known residual: one code event can still mint several ids, and each resolved id counts.**
+  - The CLI's per-record clock (`_default_now`) gives one run's drifts distinct ids.
+  - Repeated runs over an UNCHANGED surface each mint a fresh id, because every MCP `custodex_remediate` call injects a fresh `now`.
+
+  Both are pinned: `test_cli_same_run_resolves_count_per_id_known_residual` and `test_repeated_mcp_runs_of_one_code_event_count_per_run_known_residual`. A run id (OKF-RUNID) closes only the first. Closing both needs a code-event unit, or writer-side reuse of the open record's id. That is a proposed follow-up slice (working name PROMO-RUN, not yet in the step-1 plan), which must land before D06-WIRE, or the residual must be explicitly accepted for D-06.
+
 - **Promotable = DECISION-shaped resolutions only: `invalidated` and `rejected`.** These
   carry NO content (a pure human decision), so automating them is safe + content-free.
   `overridden` carries human prose (`resolved_text`) that rarely generalizes — it is
@@ -968,14 +1009,66 @@ def repo_identity_from_config(cfg: CentralConfig) -> RepoIdentity
     # repo_id/name/url + commit (cfg.repo_commit else $CI_COMMIT_SHA). Loud
     # SchemaError (K8) if repo_id is missing. make_sink reuses it.
 
+def bearer_token_problem(token: str) -> str | None
+    # SRV-TOKEN: the ONE bearer-token charset rule, applied wherever a bearer is SET:
+    # token_from_env, register_repo, the server's POST /admin/repos/{id}/token/reset
+    # and create_app's admin-token check.
+    # Forced part: the verifiers strip the presented bearer, so padding can never
+    # match, and HTTP clients cannot send CR/LF, NUL or non-latin-1 characters.
+    # POLICY part: inner whitespace and other non-ASCII CAN be presented but are
+    # refused, so every token fits one RFC 6750-style grammar.
+    # Returns None when OK. Otherwise returns a phrase ("is empty (or only
+    # whitespace)" / "has leading/trailing whitespace" / "contains whitespace,
+    # control or non-ASCII characters") ending with the rule "a bearer token must be
+    # printable ASCII with no whitespace (0x21-0x7E) ...". Never quotes the token.
+
+def token_from_env(var: str, *, what: str = "the bearer token") -> str
+    # SRV-TOKEN: read a bearer token from $var.
+    #   unset (None) -> SchemaError "{what} is read from ${var}, which is not set";
+    #   set but fails bearer_token_problem (an empty string included) ->
+    #     SchemaError "{what} in ${var} {problem}" (K8).
+    # Asking for a token must never degrade to an OPEN register.
+
 def register_repo(identity: RepoIdentity, *, url: str, auth_env: str | None = None,
                   transport: RegisterTransport | None = None,
                   dry_run: bool = False, default_branch: str | None = None,
-                  description: str | None = None) -> dict | None
+                  description: str | None = None, auth_token: str | None = None,
+                  rotate: bool = False) -> dict | None
     # Build RegistrationPayload(repo=identity, ...). dry_run -> return the payload
     # dict WITHOUT calling the transport. Else submit via transport (lazily built
     # HttpRegisterTransport when None) and return the server response. Loud
     # SchemaError (K8) if url is missing/empty.
+    # SRV-TOKEN preconditions. Each is a SchemaError raised BEFORE anything is sent
+    # (dry_run too):
+    #   - a supplied auth_token must pass bearer_token_problem (any transport);
+    #   - rotate=True: auth_token required; auth_env set; token_from_env(auth_env) OK.
+    #     When $auth_env already == auth_token, the rotation is done and the call is
+    #     an ordinary protected re-register (K7: a re-run converges; the server still
+    #     verifies that bearer). The server checks the presented bearer only when
+    #     the repo is already protected (an open or unknown repo just becomes
+    #     protected);
+    #   - rotate=False with auth_token and the DEFAULT transport (transport is None):
+    #     $auth_env must hold EXACTLY auth_token (no stripping). That is the bearer this
+    #     config's next register and HttpSink present; otherwise the repo locks out its
+    #     own writes. The error says why ($auth_env not set / its bearer_token_problem /
+    #     "holds a different token") and names both remedies: for a NEW repo, put the
+    #     token in $auth_env (--auth-token-env <auth_env>); to CHANGE a protected repo's
+    #     token, keep the current one there and use --rotate-to-env VAR. An injected
+    #     transport owns its bearer, so this check is skipped.
+    # dry_run returns a supplied auth_token as "***" (a rotation too). Every register
+    # re-sends the whole registration.
+# cli `cdx register` gains two options:
+#   --auth-token-env VAR  register protected with $VAR, which must equal $central.auth_env;
+#   --rotate-to-env VAR   register_repo(rotate=True); the current bearer comes from
+#                         central.auth_env.
+# They are mutually exclusive (SchemaError, exit 1). --dry-run still needs no url,
+# but with a token flag it validates the tokens (so $central.auth_env must be set,
+# as for a real run). The success line says what was SENT, never "rotated":
+#   " (token-protected)";
+#   " (registered with the new token; set $<auth_env> to it)";
+#   " (registered with the new token, which $<auth_env> already presents)" when the
+#     rotation had already converged.
+# With no flag the output is unchanged.
 ```
 
 ## `server/`  (central FastAPI service — optional `[server]` extra, E-03 — K0/K4/K6/K10)
@@ -1149,6 +1242,37 @@ def create_app(store: Store | None = None, *, static_dir=None, clock=_default_no
 #   def coverage_for(repo_id) -> list[dict]
 #   def repo_token_hash(repo_id) -> str | None
 #   add_repo gains the token_hash side-write (from RegistrationPayload.auth_token)
+#
+# --- SRV-TOKEN: admin repo-token reset (BL SERVER-READ-AUTH steps 1-2; PD-47) ---
+# Store Protocol GAINS (InMemoryStore + SqlStore):
+#   def set_repo_token_hash(repo_id: str, token_hash: str | None) -> bool
+#     REPLACE the named repo's stored hash ONLY (a hash_token digest, or None = clear).
+#     Returns True iff it changed; the same value returns False (K7). An unknown repo
+#     returns False and creates no row or dangling hash.
+# create_app: an effective admin token ($CDMON_ADMIN_TOKEN / admin_token) that fails
+#   registry.bearer_token_problem -> ConfigError at build time, naming the source,
+#   never the token. A padded one could never match (the verifier strips); inner
+#   whitespace/non-ASCII is refused by policy. An empty value is still "not
+#   configured". This applies to every create_app caller: cdx-server, `cdx serve`,
+#   scripts/seed_demo.py, scripts/demo_as_git.py.
+# _verify_admin(authorization, *, required: bool = False)
+#   required=True FAILS CLOSED: no admin token configured -> 403 (route disabled).
+# class TokenResetRequest(BaseModel):   # server/app.py, frozen, extra="forbid" (422)
+#     auth_token: str | None = None      # NEW write-only plaintext, hashed on arrival
+#     open: StrictBool = False           # the ONLY way to clear protection: JSON literal true
+# POST /admin/repos/{repo_id:path}/token/reset -> 200 {"repo_id", "protected", "changed"}
+#   0. a schema-invalid body is FastAPI's 422, raised before the handler
+#      (it reveals the body schema, never whether a repo exists)
+#   1. _verify_admin(required=True): none configured 403 / missing 401 / wrong 403.
+#      Checked BEFORE the repo lookup.
+#   2. unknown repo -> 404 (before ANY body check)
+#   3. open AND auth_token is not None -> 400 "not both" (presence, not truthiness:
+#      {"auth_token": "", "open": true} is still a contradiction, never a clear);
+#      neither -> 400 "never opens a repo implicitly";
+#      bearer_token_problem(auth_token) -> 400
+#   4. store.set_repo_token_hash(repo_id, hash_token(t) or None only when open)
+#   The token is never echoed. Read gating (step 3) and the console UI (step 4) are deferred.
+#
 # F-04 promotes `add_resolution(resolution)` onto the Store Protocol (both stores
 # already implement it; InMemoryStore as a list, SqlStore as a row). _compute_health
 # reads via the existing records_for / resolutions_for_repo — no new aggregation
@@ -1560,6 +1684,44 @@ A `--ping` connectivity probe is explicitly OUT of G-02 (future: an injected tra
 default doctor is offline). `cli.py` gets a `doctor [--config]` command: loads the config
 (loud K8 on a malformed one — that is the one path where doctor exits 1 BEFORE running
 checks), runs `run_checks`, prints `STATUS  name — detail` per check, exits 0 unless any FAIL.
+
+## `forge.py` — the git work-tree probe  (X-GITFACTS, W0-1 — K0/K4/K7/K8/K10)
+
+forge is THE git work-tree PROBE that git-aware callers share, and the default runner behind configsync. It is not every git call. Two callers still run git themselves:
+- `custodex.gitfetch._GitCloner` (the server-side clone);
+- `custodex.cli._git_user_name` (reads `git config user.name`).
+
+```python
+GitProbe = Callable[[Sequence[str], Path], GitOutcome]
+
+class GitOutcome(NamedTuple):
+    returncode: int
+    stdout: str
+    stderr: str
+
+class GitFacts(BaseModel):  # frozen, extra="forbid"
+    in_work_tree: bool
+    prefix: str
+    config_id: str
+    head: str | None
+
+def default_git_probe(args: Sequence[str], cwd: Path) -> GitOutcome: ...
+def git_facts(root: Path, *, config_path: Path, doc_paths: tuple[str, ...] = (),
+              baseline: bool = True, probe: GitProbe = default_git_probe) -> GitFacts: ...
+def printable(value: object) -> str: ...
+```
+
+- **default_git_probe**: runs `git <args>` under `LC_ALL=C`.
+  - stdout is decoded UTF-8 with surrogateescape (lossless); stderr is decoded UTF-8 with replacement.
+  - A non-zero exit is RETURNED for the caller to judge.
+  - An OSError becomes SyncError: "git is required … install git in the job image" only when `exc.filename == "git"`, otherwise "could not run `git …` in <cwd>: <exc>".
+- **GitFacts text fields** (`prefix`, `config_id`) are filesystem-lossless, NOT JSON-safe: a non-UTF-8 byte is carried as a lone surrogate. Consumers either encode with `("utf-8", "surrogateescape")` (for example to hash the bytes) or show the field through `printable`.
+- **printable**: str → surrogateescape-encode → UTF-8 replace-decode. Valid text is unchanged and the function is idempotent. Every SyncError message field (paths, labels, git output) goes through it (K8).
+- **Unborn proof**: `rev-parse --verify --quiet HEAD` exit 1 is "no baseline" only when it is PROVEN unborn:
+  1. `symbolic-ref -q HEAD` names one ref (a non-zero exit is loud);
+  2. that ref's loose path (`rev-parse --git-path <ref>`, re-encoded for the host filesystem) holds no ref file. lstat raises ENOENT or ENOTDIR, or the path is a real directory: a branch namespace, as with an orphan `feat` beside `feat/x`, which git itself calls unborn. A symlink there is still a ref file.
+  - Any other existing entry gives a loud "corrupt ref, not an unborn branch". Any other OSError gives a loud "cannot inspect". Output that is not one line gives a loud "unexpected output".
+  - packed-refs needs no check: a malformed line is already exit 128, and a well-formed one resolves.
 
 ## `configsync.py`  (Y-02 — server-side config-sync engine; git/local, READ-ONLY — K1/K8/K10)
 ```python
@@ -2424,6 +2586,142 @@ reference, its demo/test 1:1 mappings, and the source/test wikis all regenerate
 from one source each and are gated against drift — cdmon's own discipline applied
 to cdmon's own documentation.
 
+### TEST-WIKI-HYGIENE — write-mode wiki tests run on a private repo copy (test infrastructure, no product signature)
+
+```
+tests/_wikirepo.py:
+  WIKI_REPO_DIRS: tuple[str, ...]        # = _wiki_repo_dirs(custodex.wiki)
+  def _wiki_repo_dirs(module: Any) -> tuple[str, ...]
+      # every module-level `_<NAME>_DIR` plus the WIKI_TARGETS keys, sorted.
+      # raises ValueError on a non-Path constant, on a constant or key that is
+      # absolute, empty or contains `..`, or on zero dirs.
+  def copy_wiki_repo(dst: Path, *, src: Path = REPO_ROOT) -> Path
+      # refuses an existing dst; follows symlinks and skips dangling ones.
+```
+
+## `.github/workflows/ci.yml` — the pull-request gate  (X-GATE, W0-1 — every PR to main runs the full gate; pinned by equality to a source-derived model)
+
+Trigger `on: pull_request: branches: [main]` only (no types/paths filter, never pull_request_target). `permissions: contents: read`; `concurrency: {group: ci-${{ github.ref }}, cancel-in-progress: true}`. Jobs on ubuntu-latest (branch protection requires these names):
+- `gate`: checkout, then setup-python (the gate version, cache pip, keyed on pyproject.toml), then `id: install` running the GitLab gate install as `python -m pip install ...`, then one guarded step per gate command.
+- `floor`: the same setup on the floor version, then a guarded `pytest`. The job is omitted when floor == gate (§7.2(b)). A floor above the gate is an error, because the gate job could not install the package. Every pin check holds in both shapes.
+- `frontend`: `defaults.run.working-directory: <deploy-pages npm-install dir>`, checkout, setup-node (deploy-pages' `with`), `id: install` running deploy-pages' npm install, then one guarded `npx <part>` per `&&` part of package.json `build` and `test:run`. A part holding any of `| ; & $ < > ` ( ) \` or a newline is refused.
+
+Guard on every post-install step: `${{ !cancelled() && steps.install.outcome == 'success' }}`.
+
+Gate command order is GitLab `tests:offline` + `docs:gate` scripts (after their single, identical `.venv/bin/pip install`, `.venv/bin/` stripped, one command per script entry, the install entry included), then `cdx check --config <c>` for each git-tracked shipped config (`cdmon.yaml`/`cdmon.json` files and `config/cdmon/` dirs, top-level `tests/` excluded), then `cdx index --check`, deduplicated keeping first occurrence.
+
+Pin (tests/system/test_ci_workflow.py):
+- `_sources(root) -> _Sources(gate_python, floor_python, py_install, gitlab_gate, configs, checkout, setup_python, setup_node, node_with, frontend_dir, npm_install, frontend_gates)`. Each field has one source, each reader raises ValueError when it cannot read it, and `_version(floor) > _version(gate)` raises.
+- `_floor_python` reads `[project] requires-python` with tomllib (tomli on 3.10).
+- `_action_ref` (exact action name; every step uses one ref) and `_action_with` (every step passes one mapping `with`; applied only where `with` is read).
+- `_cdx_problems(lines) -> list[str]`: every cdx gate line must name a real subcommand and options; it has its own fault-injection test.
+- `_expected_workflow(src) -> dict`
+- `_diff(actual, expected) -> list[str]`: type-strict, closed set.
+- `_shaped(src, shape)`: builds the floor-below-gate (gate minor - 1; loud at minor 0) and floor-folded variants.
+- `_WorkflowLoader`: a SafeLoader subclass where only lowercase true/false are booleans and duplicate constructed keys raise. YAML 1.1 numbers stay, which is safe because every expected key and leaf is a string or True (pinned, with fault injection).
+
+Scope: the pin covers the workflow file only. Committed repo content that changes what a gate command does (conftest, pytest/coverage/npm config, fail_under, package.json script bodies) is code review's job.
+
+## K0 hard-coded-values guards  (HC-INVENTORY, W0-1 — tests-only contracts; no engine module)
+
+- HC-INVENTORY adds no `custodex/` module. Its contract lives in two smoke tests:
+  - `tests/smoke/test_hc_audit.py`:
+    - `audit_problems(text, repo_root, *, batches, roster_pin, notes_sha256) -> list[str]`
+    - `base_problems(text, batches, read_at) -> list[str]`
+    - `next_freeze(text, head, batches, roster_pin) -> Freeze | None`
+    - `git_skip_reason() -> str | None`
+    - `git_read_at(base, path) -> list[str] | None` (raises LookupError on a missing base)
+  - `tests/smoke/test_config_quotes.py`:
+    - `QUOTE_FORMS`
+    - `ROUTES` / `REPO_CONFIG`
+    - `find_quotes(text, path) -> list[Quote]` (skips a number that follows `_REFERENCE_NOUN`)
+    - `check_quote(Quote) -> str | None`
+- `.project/problems/HC-AUDIT.md` is the ledger. Its "Changing this file" section is the procedure.
+
+## X-CONTAIN — one lexical doc formula + the containment gate  (`config.doc_path` / `config.resolve_within`, W0-1)
+
+### `config.py`
+```python
+def doc_path(root: Path | str, rel: str) -> Path
+```
+X-CONTAIN. The doc-file formula is `Path(os.path.normpath(Path(root) / rel))`.
+- It is lexical and pure, and never follows symlinks.
+- It is deliberately UNCONFINED, because an owner's doc may live outside the repo (`../shared/x.md`).
+- Converted consumers: drift.detect, okf, index, docdeps, workers, entities.corpus_entities, build.build, monitor, syncpr, pr, generate (apply_record_fix, apply_edits_to_disk) and docwriter.write_and_register.
+- Still on the raw `root / spec.path` join, queued as X-CONTAIN-2:
+  - layout.py: `_index_coverage_issues`, `lint_config`, `config_region_states`, and the `lint_html_twin` twin path at :385;
+  - cli.py: `onboard`, `lint` (--fix), `new_doc`;
+  - the index.py:58 html href (`html_twin_path(target.path)`).
+
+```python
+def resolve_within(root: Path | str, rel: str) -> Path | None
+```
+X-CONTAIN. The fail-closed containment gate for writers acting on configs they do NOT own. It returns the LEXICAL candidate `doc_path(normpath(root), normpath(rel))` only when all of these hold:
+- the OS can name both root and rel: `os.fsencode` succeeds and there is no NUL byte (private `_os_nameable`);
+- normpath(rel) is not absolute, not `..` and has no `../` prefix;
+- the realpath of the candidate and of the root both resolve (an OSError returns None);
+- the real candidate is not still a link (a loop) at the leaf or on any parent;
+- the real candidate is strictly inside the real root (a component-wise commonpath check, not equal to the root).
+
+Otherwise it returns None and never raises; callers raise their own typed K8 error. It has no caller yet; AF-1a, CI-TRUST and X-TPLROOT will adopt it.
+
+### `drift.py`
+- detect grades `doc_path(root, spec.path)`.
+- docs_closable_by compares `posixpath.normpath(d.doc_path)` in blocked_paths and in BOTH qualified branches (require_actionable True/False).
+
+### `okf.py`
+- `_doc_sources` reads `doc_path(root, spec.path)`.
+
+### `index.py`
+- `_fields` reads `doc_path(root, target.path)`.
+
+### `docdeps.py`
+- `_current`, `detect_suspect_links`, `infer_edges_from_links` and `stamp_edges` (both up and down) read `doc_path(root, ...)`.
+
+### `workers.py`
+- RESOLVE_EDGE reads the upstream at `doc_path(root, upstream_spec.path)`.
+
+### `entities.py`
+- `corpus_entities` reads each doc at `doc_path(root, spec.path)`.
+- A missing file is skipped exactly when detect raises MISSING_DOC.
+- `DocEntities.doc_path` keeps the config spelling.
+
+### `build.py`
+- `build` reads the source at `doc_path(root, spec.path)` and writes the twin at `doc_path(root, _twin(spec))`.
+- The private `_twin(spec) = html_twin_path(posixpath.normpath(spec.path))` also names both `_nav` hrefs.
+
+### `docwriter.py`
+- `write_and_register` guards (refuse to overwrite), writes and returns `doc_path(root, spec.path)`.
+
+### `monitor.py`
+- `doc_file = doc_path(self.root, spec.path)` names the doc for `_doc_text`, the tiered-engine apply_fix and the backend apply_fix.
+
+### `syncpr.py`
+- `_norm(path) = posixpath.normpath(path.replace("\\", "/"))`, used by should_sync only.
+- sync_pr snapshots, re-reads and restores `doc_path(monitor.root, spec.path)`.
+- The `_diff_one` headers are `a/` and `b/` + `posixpath.normpath(spec.path)`, the same formula as `pr._repo_path`.
+- `changed_paths` keeps the config spelling.
+
+### `pr.py`
+- `_repo_path(rel) = posixpath.normpath(rel)`.
+- plan_docs_pr commits `(_repo_path(rel), doc_path(root, rel).read_text())`.
+- The MR description lists `_repo_path(path)`.
+
+### `generate.py`
+- apply_record_fix and apply_edits_to_disk write `doc_path(root, path)`.
+- The apply_record_fix diff headers are `posixpath.normpath(record.doc_path)`.
+- `ApplyFixResult.doc_path` keeps `record.doc_path`.
+
+## DEPLOY-MANAGED — the `deploy` unit: DEPLOY.md is a monitored user-guide doc  (W0-1 — config only; no engine module)
+
+config/cdmon/deploy.yaml: unit `deploy`, dir-covered [custodex/settings.py] (a FILE-valued entry, attributed by the component-wise deepest-ancestor rule), doc `deploy` -> DEPLOY.md (audience user-guide, whole-doc fingerprint), code_ref custodex/settings.py symbols [Settings, ServerSettings, CorsSettings, RateLimitSettings, GitSettings, WorkerSettings].
+Invariants:
+- deploy selects every pydantic model reachable from Settings (one code_ref per defining module);
+- deploy owns settings.py and only files it has a code_ref for;
+- the runbook's TL;DR and upgrade blocks are executable and are run by tests/integration/test_deploy_shell_blocks.py;
+- the TL;DR writes `.env` once, and only after every secret was generated;
+- `.env` is ignored by git and by the Docker build context.
+
 ## `GET /wiki` + dashboard Wiki page  (EPIC R, R-09 — the wikis in the console)
 
 Surfaces the EPIC-R wikis inside the dashboard. The server gains a GLOBAL, public
@@ -3157,7 +3455,28 @@ def declare_edge(config_dir, downstream_id, upstream_id, *, type=DocEdgeType.DEP
     # located textually.
 def reject_edge(cdmon_dir, downstream_id, upstream_id, *, by, now, note=None) -> Path
 def read_rejections(cdmon_dir) -> tuple[EdgeRejection, ...]   # .cdmon/edge-rejections.jsonl
+def symbol_owners(config: MonitorConfig, root: Path) -> dict[str, set[str]]:
+    # COVLANG-DOCMAP (BL NEW-COV-LANG step 3). The doc->symbol coverage join
+    # (keys "symbol <normpath>#<name>", values doc ids; union across refs).
+    # Per code_ref:
+    #  * extract == "symbols": get_extractor(_symbol_language(ref)).extract(file)
+    #    — the SAME routing build_document_surface grades with (explicit lang >
+    #    live suffix map > python fallback), looked up at call time;
+    #  * any other extract kind: extract_file(file) (Python read, unchanged
+    #    pending COV-DENOM);
+    #  * then extract._select(full, ref.symbols, ref.lines, ref.names) for EVERY
+    #    ref kind — the SAME rule coverage.resolve_coverage applies;
+    #  * arg_signature narrows the graded surface, NOT ownership;
+    #  * audience-agnostic; public symbols only (a private symbol skips itself,
+    #    not the ref); a missing or non-file path (is_file pre-check) /
+    #    ExtractionError (incl. unregistered language) -> skip that ref; any
+    #    OTHER extractor exception propagates (K8); K10 deterministic; pure (K1).
+    # Known limits: codeindex.build_code_index still indexes via the
+    # Python-only inventory, so the impact_report direct join cannot see shell
+    # symbols yet; resolve_coverage matches the RAW ref.path, so parity with
+    # `cdx coverage` holds only for normal-form ref paths.
 ```
+Imports: `from .extract import _select, _symbol_language, extract_file, get_extractor`.
 
 ⟨R⟩ **The suspect-baseline knob** (the heal-path-churn decision): new
 `DocDepsConfig.baseline: Literal["body", "prose"] = "body"`. `"body"` = today's
@@ -3555,6 +3874,20 @@ additive; new wrapper models are frozen `extra=forbid` too):
   (K6 additive): the existing drift fields + `coverage_file_pct: float`,
   `coverage_symbol_pct: float`, `docs_unowned: int`, `docs_needing_review: int`
   — the 4-pillar health headline in one call. Now takes `now` (staleness fold).
+- ⟨MCP-STATUS⟩ `StatusSummary` gains two fields (ADDITIVE, K6): `drift_available: bool = True` and `drift_error: str | None = None`. A `model_validator(mode="after")` ties the -1 sentinel to the flag in BOTH directions:
+  - `drift_available=True` requires `drift_error is None` and `drift_total`, `code_doc_drift` and `suspect_link_drift` all >= 0.
+  - `drift_available=False` requires a non-blank `drift_error`, `clean=False`, and all three drift counts == -1 exactly.
+  - On the available side it does not re-derive `clean` or the count split; the producer computes both from one DriftReport.
+  - Sentinels: `_UNAVAILABLE_COUNT = -1` and `_UNAVAILABLE_PCT = -1.0` are module constants and wire contract, not config.
+- ⟨MCP-STATUS⟩ `status_summary` keeps its signature `(cfg, config_dir, *, repo_id, now)`. It wraps `Monitor.check()` in `except ExtractionError` (subclasses included; nothing wider).
+  - On that error: `drift_available=False`; `drift_error` = `str(exc)` verbatim, or `type(exc).__name__` (the bare class name, never `__qualname__`) when blank; counts -1; `clean=False`; summary `drift unavailable — <drift_error>`.
+  - The degrade branch does NOT return early: ownership, staleness and coverage are always computed.
+  - Loud (K8): DriftError; ConfigError (ownership/staleness checks, adopter extractors); BackendError/SchemaError (Monitor constructor); `drift_detail` (custodex_drift) still raises the ExtractionError.
+  - ⟨R⟩ What keeps the non-extraction errors loud is the narrow catch TYPE, not where the constructor sits relative to the `try`.
+  - ⟨R⟩ `ExtractionError` means "this code ref could not be turned into a surface". That covers a missing or unparseable file and a per-ref setting that is checked only at extraction time: an unregistered `lang`, or `extract: records` without `json_records`. config.py deliberately defers both to extraction. The overview stays answerable and reports exactly why drift is unknown.
+  - ⟨R⟩ A broken doc (DriftError) and a ConfigError are not a statement about one code ref, so the overview refuses to answer.
+  - ⟨R⟩ First-error-wins applies ONLY to errors raised inside the drift detect (DriftError, and a ConfigError from an adopter extractor). `drift.detect` builds a doc's surface before it parses that doc's front matter, so an ExtractionError on the same doc, or on an earlier doc in config order, masks those errors until the ref is fixed. This is identical to `cdx check`.
+  - ⟨R⟩ A bad `reviewed` date always fails the status call, even behind a dead ref. The cause is that the degrade branch does not return early, so the ownership/staleness checks always run. Their order relative to the detect is NOT the cause and is not a contract: which of two loud errors surfaces when both are present is unspecified. `cdx check` does not grade `reviewed` at all.
 - `drift_detail(cfg, config_dir, *, repo_id, limit=50, kind=None, audience=None)
   -> DriftDetail` — the per-drift LIST (`custodex_status` only counts). Runs
   `Monitor(cfg, config_dir).check()`, filters by `kind`/`audience` (K3), sorts
@@ -3755,6 +4088,7 @@ tags the feature; `tools.py`/`server.py` stay coverage-waived (edits).
 - **MCP-03** — streamable-HTTP transport mounted on the central hub (remote,
   multi-repo, over the existing `_verify_token` auth).
 - **MCP-04** — migrate to the `mcp` SDK v2 (post-2026-07-28).
+- MCP-STATUS (W0-1/W1, D131 MCP-002/003): `custodex_status` degrades the drift pillar on ExtractionError (drift_available / drift_error, -1 sentinels, two-direction validator, no early return); `custodex_drift` stays loud. Files: custodex/mcp/tools.py, tests/smoke/test_mcp_server.py, tests/unit/test_mcp_status_degrade.py, tests/smoke/test_mcp_status_degrade_server.py.
 
 ## EPIC CIX — the persisted code index, cross-references, and impact  (`custodex/codeindex.py`, `custodex/scip.py` — K0/K1/K6/K7/K8/K10/K11)
 
@@ -4752,3 +5086,72 @@ skipping a preserved region, `heal._corrected` stamping only regions present in
 the body, and `heal.apply_fix`'s whole-doc branch (a live-LLM FIX). Any completion
 of `region_anchors` — S1-E4's third writer included — must complete anchors +
 `fingerprint_tiers` + `symbol_sigs` ATOMICALLY, never anchors alone.
+
+## FPW wave — frozen legacy fixtures + the surface golden  (FPW-FIXTURES, W0-1 — tests-only; no engine module)
+
+- tests/fixtures/fpwave_legacy/capture.py is the capture CLI for the frozen enc1/enc2 trees and the surface golden.
+  - Subcommands: trees --write|--check, manifest, golden --init|--check|--repin <WAVE-ID>, and the internal _stamp.
+  - load_golden(): the keys are exactly {repins, trees}, and repins must be distinct [WAVE] ids from SETTINGS["wave_slices"] in plan order. Otherwise it raises CaptureError (rc 2).
+  - document_stamps(): the composite, tiers and symbol_sigs equal what heal._corrected stamps. region_anchors is a SUPERSET covering every REGION_KEYS region, so consumers check heal's stamped regions against it, never the reverse.
+  - _run_stamp(): runs in a subprocess with PYTHONPATH = the engine alone. Its cwd is the scratch dir, which guards against stray relative writes and does not affect imports.
+- tests/regression/test_surface_golden.py:
+  - _GOLDEN_OWNED = (fingerprint, fingerprint_tiers, symbol_sigs, region_anchors).
+  - Current-engine tests compare per-doc views (body, parsed non-cdm meta, owned cdm keys), so [SW] slices need no edit.
+  - _GOLDEN_DIGESTS[repins] holds the golden sha. _ENGINE_MOVES[repins][check][variant] holds the docs the engine moves, for the checks "restamp enc1", "restamp enc2" and "fresh stamp".
+  - The repin self-tests run on an isolated golden built by --init and take ids from wave_slices, so they stay live after every re-pin.
+  - [WAVE] route: run capture.py golden --repin <ID>, then add the _GOLDEN_DIGESTS and _ENGINE_MOVES rows keyed by the new repins tuple.
+  - The synthetic tree covers python symbols, decorators, properties, pydantic and dataclass fields, the names/lines/arg_signature selectors, argparse/python/shell-case/getopts/tcl switches, JSON records, the code index and coverage.
+- FPW-D: test_frozen_fpwave_fixtures_are_intact lives in tests/regression/test_surface_golden.py. tests/regression/test_fpwave_upgrade.py (S1-FPWAVE.md:780) must import or reuse it, not duplicate it. Also correct the FPW-FIXTURES slice text, which says tests/test_fpwave_upgrade.py.
+
+## S1-CITPL — the docs-MR CI job (step 1)
+
+The step-1 docs-MR CI job (spec: `.project/slices/S1-CITPL.md`). Each owner
+slice pins its §3a lines here, in its own `### <SLICE>` subsection, before its
+TDD loop (S1-CITPL §3a, §8 F45). Lines marked RTE-05 in §3a are not pinned in
+step 1.
+
+Note for the `_echo_run` owners (OPS-CLOSE births it, CI-OPEN re-pins it; F53):
+the lifted body is cli.py:639-676 and :684-696 plus the :683 error echo, and
+the advisory computation :677-682 stays in `monitor`.
+
+### CI-HARNESS
+
+Test helpers, not product surface.
+
+```text
+tests/_ci_exec.py — the executed-CI harness
+  class NotModelled(Exception)
+  ZERO_SHA, FAKE_NOW_DEFAULT, STUB_EXIT=97, LOUD_STUBS, SERVER_LAUNCHERS, DEFAULT_GITLAB_GIT_DEPTH=20, DEFAULT_GITHUB_FETCH_DEPTH=1, GITHUB_PLATFORM_SECRET="GITHUB_TOKEN", INSTALL_LINE (re.Pattern)
+  @dataclass(frozen) CiStep(kind, name, run=None, env={}, always=False, with_={}, fetch_depth=None, shell=(), skipped_install=())
+  @dataclass(frozen) CiJob(provider, name, head, branch, steps, predefined, stage, when, allow_failure, preds, uses_needs, variables, project, protected, secrets, env, git_depth, services, selected)
+  @dataclass(frozen) CiRun(exit_code, stdout, stderr, requests, central, workspace, run_dir, steps, cache_events)
+  @dataclass(frozen) CiPipelineRun(status, runs, order, allowed_failures)
+  @dataclass(frozen) AdopterRepo(repo, A, B, C, B_prime)
+  gitlab_pipeline(template, *, source, branch, default_branch, head, before, variables=None, secrets=None, ref=None) -> tuple[CiJob, ...]
+  gitlab_job(template, job, *, head, branch, before, variables=None, secrets=None, default_branch="main", ref=None, source="push") -> CiJob
+  github_job(template, job, *, head, branch, repository=..., secrets=None, before=None, event_name="push", default_branch="main") -> CiJob
+    (GITHUB_PLATFORM_SECRET is always present. Only a bare `on: push` is modelled. Push filters, `needs:`, a non-integer fetch-depth and an env: entry that sets a predefined, GITHUB_* or RUNNER_* name all raise NotModelled.)
+  run_ci_job(job, repo, *, tmp, forge_state, strip_git=False, fake_env=None, workspace=None) -> CiRun
+  run_ci_pipeline(jobs, repo, *, tmp, forge_state, strip_git=False, fake_env=None) -> CiPipelineRun
+    Pipeline status rules, from GitLab's Ci::Status::Composite and the statuses each `when:` accepts:
+    - A DAG job with a skipped need, or an optional-manual need, is skipped. If it is `when: always`, it runs instead.
+    - A job with a blocked predecessor, or a blocking-manual one, is blocked, whatever its `when:`.
+    - A `when: always` job runs.
+    - A hard failure (`allow_failure: false`) skips the job.
+    - Otherwise the job runs.
+    - A stage job ignores skipped and optional-manual predecessors.
+  install_lines(template); job_env_names(job); product_env_names(); clear_ci_env(monkeypatch); provider_token_env(provider)
+  build_adopter_repo(dest); copy_adopter_repo(src, dest); copy_repo(src, dest)
+tests/_fake_forge.py — stateful GitLab + GitHub fake (id != iid)
+  GITLAB_SERVER_URL/API_URL/PROJECT_PATH/PROJECT_ID/PROJECT_URL, GITHUB_SERVER_URL/API_URL/REPOSITORY
+  class FakeForgeHTTPError(TransportError) (.status)
+  seed_forge(state_path, repo, heads=None) -> None
+  class FakeForge(state_path, *, log_path=None): request(method, url, *, body, token); page_limits(provider); branch_head(provider, name); merge_requests(provider); mr(provider, number); close(provider, number); human_commit(provider, number) -> sha
+  (An open MR/PR's head sha follows every write to its source branch: GitLab commits, GitHub ref updates and human_commit.)
+tests/_cdx_ci_shim.py — the `cdx` on a job's PATH
+  TRIPWIRE_MARK; ENV_FORGE_STATE/HTTP_LOG/CENTRAL_LOG/NOW/DECLINE/SALT
+  install(env) -> restore;  installed(env) (contextmanager);  main(argv=None) -> int
+  declined(doc_path, spec) -> bool;  salt_line(salt) -> str;  assert_custodex_origin(modules=None) -> None
+```
+
+Contract: the job env is an allowlist, and harness-owned names are refused in templates. They also lose at run time, because the harness values are applied last. Everything outside the modelled subset raises NotModelled. Every network or LLM call trips with a per-layer message. `monitor.apply_fix` is the write seam.

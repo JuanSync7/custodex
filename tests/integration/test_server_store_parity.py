@@ -842,3 +842,32 @@ def test_graph_auth_matrix(client: TestClient) -> None:
     assert ok.status_code == 202
     unknown_get = client.get("/repos/ghost/graph")
     assert unknown_get.status_code == 404
+
+
+# --------------------------------------------------------------------------- #
+# SRV-TOKEN: the admin repo-token reset (FEAT-SERVER-020)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize("kind", ["memory", "sql"])
+def test_admin_token_reset_round_trips_through_either_store(
+    kind: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Set → revoke → clear, over the HTTP↔store boundary of each backend."""
+    monkeypatch.delenv("CDMON_ADMIN_TOKEN", raising=False)
+    store = _make_store(kind)
+    with TestClient(create_app(store, admin_token="adm")) as client:
+        _register(client)
+        path = f"/admin/repos/{_REPO}/token/reset"
+        reset = client.post(path, json={"auth_token": "rotated"}, headers=_auth("adm"))
+        assert reset.status_code == 200, reset.text
+        assert reset.json() == {"repo_id": _REPO, "protected": True, "changed": True}
+        env = _envelope(_record())
+        assert client.post("/ingest", json=env, headers=_auth()).status_code == 403
+        assert (
+            client.post("/ingest", json=env, headers=_auth("rotated")).status_code
+            == 202
+        )
+        cleared = client.post(path, json={"open": True}, headers=_auth("adm"))
+        assert cleared.json() == {"repo_id": _REPO, "protected": False, "changed": True}
+        assert store.repo_token_hash(_REPO) is None
+        listed = client.get("/repos").json()
+        assert [r["repo"]["repo_id"] for r in listed] == [_REPO]

@@ -399,6 +399,18 @@ class Store(Protocol):
 
     def repo_token_hash(self, repo_id: str) -> str | None: ...
 
+    def set_repo_token_hash(self, repo_id: str, token_hash: str | None) -> bool:
+        """REPLACE the named repo's bearer-token hash (SRV-TOKEN admin reset).
+
+        ``token_hash`` is a :func:`hash_token` digest, or ``None`` to CLEAR the
+        repo's protection (the route only passes ``None`` for an explicit
+        ``{"open": true}``). Touches ONLY ``repo_id``. Returns True iff the stored
+        value changed — setting the value already stored is a no-op that returns
+        False (K7). An unknown repo returns False and creates no row (parity with
+        :meth:`set_provider_secret`).
+        """
+        ...
+
     def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
         """Persist the SEALED (opaque) git provider credential for a repo (GIT-02).
 
@@ -623,6 +635,14 @@ class InMemoryStore:
 
     def repo_token_hash(self, repo_id: str) -> str | None:
         return self._token_hashes.get(repo_id)
+
+    def set_repo_token_hash(self, repo_id: str, token_hash: str | None) -> bool:
+        # Only for a registered repo (parity with SqlStore): no dangling hash.
+        if repo_id not in self._repos:
+            return False
+        changed = self._token_hashes.get(repo_id) != token_hash
+        self._token_hashes[repo_id] = token_hash
+        return changed
 
     def set_provider_secret(self, repo_id: str, sealed: bytes) -> None:
         # Only for a registered repo (parity with SqlStore, which updates an

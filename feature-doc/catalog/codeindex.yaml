@@ -29,10 +29,15 @@ features:
       affected, through which symbols?" WITHOUT a full check: it diffs the
       stored code index against the current tree (built in memory, writing
       nothing — K1) and joins every changed symbol to the docs covering it.
-      `direct` uses the docmap.symbol_owners public entity join for
-      surviving symbols and an honest file-level fallback for added/removed
-      ones (selection-aware attribution needs a surface that no longer, or
-      does not yet, exist). `via_callers` extends the blast radius ONE xref
+      `direct` uses the docmap.symbol_owners public entity join (which
+      honours each code_ref's `symbols`/`lines`/`names` selection) for every
+      changed symbol it owns; a changed symbol the join does not own falls
+      back to a file-level join (any doc whose `code_refs` name the file)
+      only when it was ADDED or REMOVED. Known asymmetry: an added public
+      symbol that a narrowed ref does not select is over-attributed to that
+      doc through the fallback, while a modified unselected one is not
+      attributed (restricting the fallback to removed symbols is queued).
+      `via_callers` extends the blast radius ONE xref
       hop through .cdmon/xrefs.json when present — never transitive (the
       `deps --transitive` advisory precedent); callers_available=False
       states plainly that an absent artifact means unknown callers, not no

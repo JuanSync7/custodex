@@ -40,3 +40,6 @@ frontend/.astro/
 # never tracked source assets). Root-anchored so it can't shadow images that
 # legitimately live in subdirs (docs/, feature-doc/, …).
 /*.png
+
+# Compose secrets written by the DEPLOY.md TL;DR: never committed
+.env

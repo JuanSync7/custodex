@@ -1,10 +1,10 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: 94fd70cf904e2625
+  fingerprint: 9c8fef98d4b1f3e0
   fingerprint_tiers:
-    composite: 94fd70cf904e2625
-    signature: 94fd70cf904e2625
+    composite: 9c8fef98d4b1f3e0
+    signature: 9c8fef98d4b1f3e0
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 0e5acad85d2de80e
@@ -31,7 +31,7 @@ cdm:
     79e1ad65cf059761: 8eb0c397430343e9
     7de97367c9cdc3c6: 6df30132cbec7876
     845e91831319e89c: 522b070f7cfff2b0
-    87780fa5de684e87: d1e94fefe6065146
+    87780fa5de684e87: 13450ffb0667246e
     9185806e77b1178b: f4c5785e6b444f65
     a172cedcae47474b: c411ee4fd4d39f0a
     a1c1adc663fbd6f0: 8e54d58174db15c8
@@ -143,7 +143,7 @@ cdx should-sync [FILES...]  # loop-safety guard: exit 0 to proceed / 1 to skip a
 # --- review log & learning ---
 cdx report               # summarize the review log + resolved/unresolved counts (--verdict ESCALATE lists those records)
 cdx resolve REC --resolution accepted [--by NAME] [--text ...] [--note ...]  # record a human outcome (accepted|overridden|rejected|invalidated) as a separate append-only event linked to a review record; the review log stays immutable (K5)
-cdx promotions           # list promotion candidates: shapes (doc_id,drift_kind,audience) whose ≥N resolved records ALL share one DECISION (invalidated|rejected) — promotable to a deterministic rule the monitor applies with ZERO backend calls (--min-count N; --json) (D-05/D-06)
+cdx promotions           # list promotion candidates: shapes (doc_id,drift_kind,audience) whose ≥N distinct resolved decisions (record_ids) ALL share one DECISION (invalidated|rejected) — promotable to a deterministic rule the monitor applies with ZERO backend calls (--min-count N; --json) (D-05/D-06)
 
 # --- coverage ---
 cdx coverage             # doc-coverage % + gaps/waivers (--json; --fail-under N gates)
@@ -152,7 +152,7 @@ cdx rpt [--write]        # build the config/cdmon dir-layout coverage report; pr
 cdx surface-gaps [--dry-run] [--provider gitlab|github]  # turn undocumented-public-symbol coverage gaps into a tracker issue (grouped by suggested owner); no gaps is a no-op; --dry-run prints the deterministic IssuePlan JSON without building/calling a transport; else opens the issue via the provider's stdlib-urllib transport (from CI env; loud if unset) (H-04)
 
 # --- central server ---
-cdx register [--dry-run] # announce this repo to the central server: POST its identity (RegistrationPayload) to <central url>/repos (bearer from central.auth_env; stdlib only); --dry-run prints the payload without any network call (E-02)
+cdx register [--dry-run] [--auth-token-env VAR | --rotate-to-env VAR] # announce this repo to the central server: POST its identity (RegistrationPayload) to <central url>/repos (bearer from central.auth_env; stdlib only); --dry-run prints the payload without any network call (no url needed; a token flag still validates the tokens; a token shows as ***) (E-02); --auth-token-env registers it token-protected with $VAR (must hold the same token as central.auth_env), --rotate-to-env sends $VAR as the new token presenting the current one from central.auth_env; a re-run after updating central.auth_env converges (SRV-TOKEN)
 cdx sync [--mode local|git] [--remote URL --repo-id ID]  # run a config sync. LOCAL (no --remote): read-only against the cwd, prints drift+coverage+commits-ahead (or --json). REMOTE: POST {mode} to <URL>/repos/{ID}/sync (bearer from --token-env) and print the server's run summary
 cdx serve [--host H --port P]  # serve THIS repo's standalone console + API locally over the built Astro frontend — no central access (L-01); needs a config/cdmon/ layout (run `cdx init --v2` first)
 cdx mcp-serve [--repo-root .] [--read-only]  # NEW: serve Custodex as a Model Context Protocol server over stdio so an external agent (Claude Code / any MCP client) can query AND act on this repo via curated tools instead of shelling out — READ: custodex_status (the 4-pillar health headline) + the per-domain drill-downs custodex_drift/coverage/ownership/staleness/worklist/doc_graph/records; WRITE (gated, K11 "agents suggest; humans apply"): custodex_remediate/resolve/sync_docs, all advisory (apply=False) by default, with `--read-only` refusing to mount the write tools at all; opt-in `[mcp]` extra, lazily imported (K0); a missing extra or config-less repo is a loud install/config hint (EPIC MCP)

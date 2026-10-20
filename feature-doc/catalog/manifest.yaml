@@ -94,8 +94,10 @@ features:
     summary: >-
       stamp_standard_meta sets the Layout Standard static keys cdm.schema_version
       and cdm.audience while preserving every other cdm key, and render_doc
-      re-emits front matter plus body to one string (body verbatim when meta is
-      empty, sorted-key YAML fence otherwise).
+      re-emits front matter plus body as one string. The body comes back verbatim
+      when meta is empty and the doc had no fence. With a source fence, meta is
+      spliced into the stored block (FEAT-LAYOUT-010); otherwise the block is
+      dumped fresh in meta's order with the cdm block sorted (FEAT-LAYOUT-011).
     subsystem: manifest
     modules: [manifest]
     constraints: [K7, K10]

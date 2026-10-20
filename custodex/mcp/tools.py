@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from ..config import (
     Audience,
@@ -36,7 +36,7 @@ from ..config import (
 from ..coverage import resolve_coverage
 from ..docdeps import SuspectLink, SuspectStatus, detect_suspect_links
 from ..drift import DriftKind
-from ..errors import CodeDocMonitorError, McpError
+from ..errors import CodeDocMonitorError, ExtractionError, McpError
 from ..inventory import discover_files, discover_symbols
 from ..monitor import DEFAULT_LOG_PATH, Monitor
 from ..ownership import (
@@ -110,6 +110,12 @@ _DEFAULT_FIX_PREVIEW = 2000
 # Bound the sync_docs unified-diff on the wire (a large diff must not swamp context).
 _DEFAULT_PATCH_CAP = 20000
 
+# The "unknown" sentinels a degraded ``custodex_status`` pillar reports. They are
+# part of the WIRE contract, not settings: a count or a percentage can never be
+# negative, so ``-1`` tells a client "unknown" (never "zero") with no lookup.
+_UNAVAILABLE_COUNT = -1
+_UNAVAILABLE_PCT = -1.0
+
 
 def load_repo_bundle(repo_root: Path) -> tuple[MonitorConfig, Path]:
     """Resolve ``repo_root``'s Custodex config to ``(cfg, config_dir)`` (K8).
@@ -176,6 +182,21 @@ class StatusSummary(BaseModel):
     and ``doc↔doc`` (``suspect_link_drift``). The enrichment counts mirror the
     dedicated tools (``custodex_coverage``/``custodex_ownership``/
     ``custodex_staleness``) so the overview and the drill-downs agree.
+
+    MCP-STATUS (ADDITIVE, K6): ``drift_available`` / ``drift_error`` say whether
+    the drift pillar could be computed. Both default to the available shape
+    (``True`` / ``None``), so a producer that predates them still validates. The
+    model ties the ``-1`` sentinel to the flag in BOTH directions:
+
+    * ``drift_available=True`` needs ``drift_error is None`` (None, not merely
+      falsy) and no negative drift count, so the sentinel never appears without
+      its flag (no silent degrade);
+    * ``drift_available=False`` needs a non-blank ``drift_error``,
+      ``clean=False`` (unknown drift is never clean) and exactly ``-1`` for all
+      three drift counts.
+
+    On the available side it does NOT re-derive ``clean`` or the count split:
+    :func:`status_summary` computes both from one ``DriftReport``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -192,6 +213,32 @@ class StatusSummary(BaseModel):
     docs_unowned: int
     docs_needing_review: int
     summary: str
+    drift_available: bool = True
+    drift_error: str | None = None
+
+    @model_validator(mode="after")
+    def _drift_pair_is_coherent(self) -> StatusSummary:
+        counts = (self.drift_total, self.code_doc_drift, self.suspect_link_drift)
+        if self.drift_available:
+            if self.drift_error is not None:
+                raise ValueError(
+                    "drift_error must be None while drift_available is True"
+                )
+            if min(counts) < 0:
+                raise ValueError(
+                    "drift counts must be non-negative while drift_available is True "
+                    f"({_UNAVAILABLE_COUNT} is the unavailable sentinel)"
+                )
+            return self
+        if self.drift_error is None or not self.drift_error.strip():
+            raise ValueError("drift_available=False needs a non-blank drift_error")
+        if self.clean:
+            raise ValueError("an unavailable drift pillar is never clean")
+        if counts != (_UNAVAILABLE_COUNT,) * 3:
+            raise ValueError(
+                "drift counts must be the -1 sentinel while drift_available is False"
+            )
+        return self
 
 
 def status_summary(
@@ -213,10 +260,43 @@ def status_summary(
     honest partial (``coverage_available=False``, sentinel ``-1.0`` percentages) —
     the dedicated ``custodex_coverage`` tool still surfaces the parse error loudly
     (K8). This mirrors the ``roster_checked=False`` honest-partial precedent.
+
+    MCP-STATUS: the drift pillar degrades the same way, keyed on the error CLASS.
+    ONLY an :class:`~custodex.errors.ExtractionError` (or a subclass) from the
+    drift detect is caught. That class covers a code ref the extractor cannot
+    read or parse (a missing file, a syntax error) AND a per-ref extraction
+    setting rejected at extraction time (an unregistered ``lang``,
+    ``extract: records`` with no ``json_records``), plus any adopter extractor
+    registered via ``register_extractor`` that raises one. The degraded result:
+    ``drift_available=False``; ``drift_error`` = the message VERBATIM (edge
+    whitespace included), or the error's bare class name (``__name__``, never
+    ``__qualname__``) when the message is blank;
+    ``-1`` for the three drift counts; ``clean=False``; summary
+    ``drift unavailable — <drift_error>``. Ownership, staleness and coverage still
+    answer, and a coverage-only failure leaves drift available.
+
+    Everything else stays loud (K8): a ``DriftError`` (malformed front matter or
+    region markers) from the same detect; a ``ConfigError`` from the ownership /
+    staleness folds (e.g. a bad ``reviewed`` date; no roster is checked here) or
+    from an adopter extractor; a ``BackendError`` / ``SchemaError`` from the
+    ``Monitor`` constructor. What keeps them loud is the narrow catch TYPE, not
+    where the constructor sits relative to the ``try``. The degrade branch does
+    not return early: the ownership / staleness folds ALWAYS run, so a dead ref
+    never masks a bad ``reviewed`` date. (Which of two loud errors surfaces when
+    both are present is not a contract.) Inside the guarded detect the FIRST
+    error met wins, exactly
+    as ``cdx check`` does, and it extracts a doc's code refs before it parses that
+    doc's front matter, so an ``ExtractionError`` met first degrades the overview
+    and the ``DriftError`` surfaces once the ref is fixed. The ``custodex_drift``
+    drill-down (:func:`drift_detail`) raises the same ``ExtractionError``.
     """
-    report = Monitor(cfg, config_dir).check()
-    total = len(report.drifts)
-    suspect = sum(1 for d in report.drifts if d.kind is DriftKind.SUSPECT_LINK)
+    monitor = Monitor(cfg, config_dir)
+    drift_error: str | None = None
+    try:
+        report = monitor.check()
+    except ExtractionError as exc:
+        message = str(exc)
+        drift_error = message if message.strip() else type(exc).__name__
     own = ownership_summary(cfg, config_dir, repo_id=repo_id)
     stale = staleness_summary(cfg, config_dir, repo_id=repo_id, now=now)
     try:
@@ -226,21 +306,33 @@ def status_summary(
         coverage_symbol_pct = cov.percent_public_symbols
     except CodeDocMonitorError:
         coverage_available = False
-        coverage_file_pct = -1.0
-        coverage_symbol_pct = -1.0
+        coverage_file_pct = _UNAVAILABLE_PCT
+        coverage_symbol_pct = _UNAVAILABLE_PCT
+    if drift_error is not None:
+        clean = False
+        total = code_doc = suspect = _UNAVAILABLE_COUNT
+        summary = f"drift unavailable — {drift_error}"
+    else:
+        clean = report.ok
+        total = len(report.drifts)
+        suspect = sum(1 for d in report.drifts if d.kind is DriftKind.SUSPECT_LINK)
+        code_doc = total - suspect
+        summary = report.summary()
     return StatusSummary(
         repo_id=repo_id,
-        clean=report.ok,
+        clean=clean,
         doc_count=len(cfg.documents),
         drift_total=total,
-        code_doc_drift=total - suspect,
+        code_doc_drift=code_doc,
         suspect_link_drift=suspect,
         coverage_available=coverage_available,
         coverage_file_pct=coverage_file_pct,
         coverage_symbol_pct=coverage_symbol_pct,
         docs_unowned=own.unowned_count,
         docs_needing_review=stale.needs_review_total,
-        summary=report.summary(),
+        summary=summary,
+        drift_available=drift_error is None,
+        drift_error=drift_error,
     )
 
 

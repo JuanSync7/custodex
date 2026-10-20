@@ -528,7 +528,7 @@ def scaffold_doc(
             meta = set_region_anchors(
                 meta, key, tuple(s.anchor_id for s in surface.symbols)
             )
-    return render_doc(meta, "\n".join(parts))
+    return render_doc(meta, "\n".join(parts), source=None)  # a brand-new doc
 
 
 def stamp_doc_meta(doc: Doc, spec: DocumentSpec) -> str:
@@ -536,10 +536,13 @@ def stamp_doc_meta(doc: Doc, spec: DocumentSpec) -> str:
 
     The front-matter auto-fix behind ``cdx lint --fix``: sets
     ``cdm.schema_version`` and ``cdm.audience`` (preserving ``fingerprint`` and
-    the body). Cannot fix structural issues (title/purpose/regions/html) — those
-    need authoring.
+    the body). Only the ``cdm`` entry is rewritten: every other front-matter
+    line keeps its bytes when the block is a column-0 block mapping (see
+    :func:`custodex.manifest.render_doc` for the layouts that are re-dumped
+    instead), and a second stamp is a no-op (K7). Cannot fix structural issues
+    (title/purpose/regions/html) — those need authoring.
     """
     meta = stamp_standard_meta(
         doc.meta, schema_version=LAYOUT_VERSION, audience=spec.audience.value
     )
-    return render_doc(meta, doc.body)
+    return render_doc(meta, doc.body, source=doc.raw)

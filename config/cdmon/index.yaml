@@ -3,7 +3,7 @@
 cdmon-config-version: "2.0.0"
 repo: "custodex"
 generated-by: cdx
-updated: "2026-09-29T05:03:43.744993+00:00"
+updated: "2026-10-10T03:15:45.079916+00:00"
 ---
 # custodex's own configuration (dir layout) — it monitors ITS OWN source
 # against its own engineering docs (dogfooding the CONFIG-V2 multi-file layout).
@@ -159,6 +159,7 @@ entities:
 units:
   - file: agent.yaml
   - file: core.yaml
+  - file: deploy.yaml
   - file: server.yaml
   - file: tests.yaml
 # Pointers to the ignore + doc-style files.

@@ -1,0 +1,6 @@
+{
+  "flags": [
+    {"flag": "--fast", "action": "enable", "comment": "skip the slow checks"},
+    {"flag": "--safe", "action": "disable"}
+  ]
+}

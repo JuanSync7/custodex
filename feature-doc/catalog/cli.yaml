@@ -171,8 +171,7 @@ features:
     summary: >-
       `cdx promotions` lists read-only promotion CANDIDATES via
       `detect_promotions`: each `(doc_id, drift_kind, audience)` shape whose
-      resolved records (≥ `--min-count`) unanimously share one decision
-      resolution and could become a deterministic rule. `--json` for machine output.
+      distinct resolved decisions (resolved record_ids, ≥ `--min-count`) unanimously share one decision resolution and could become a deterministic rule. `--json` for machine output.
     subsystem: cli
     modules: [cli]
     constraints: [K1, K10]

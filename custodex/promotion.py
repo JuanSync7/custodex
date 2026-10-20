@@ -10,8 +10,11 @@ resolutions log for a **generalizable** shape ``(doc_id, drift_kind, audience)``
 — NOT ``surface_hash``. ``surface_hash`` is the EXACT code state (similar.py's
 dominant feature) and never recurs across edits, so it cannot ground a recurring
 rule; the audience-scoped doc+kind is the shape that DOES recur. A shape
-qualifies iff >= ``min_count`` of its RESOLVED records share ONE **decision**
-resolution.
+qualifies iff >= ``min_count`` DISTINCT resolved decisions (distinct resolved
+``record_id`` values, one human decision each) unanimously share ONE **decision**
+resolution. Review-log LINES are not decisions: under one injected clock every
+drift of a document shares one ``record_id``, and log or hub retries repeat lines,
+so counting lines let ONE resolve promote a shape by itself (PROMO-DISTINCT).
 
 Only DECISION-shaped resolutions auto-promote: ``invalidated`` and ``rejected``
 carry NO content (a pure human judgement), so automating them is safe and
@@ -33,6 +36,7 @@ from pydantic import BaseModel, ConfigDict
 
 from .config import Audience
 from .drift import Drift
+from .errors import ConfigError
 from .reviewlog import resolved_index
 from .schema import Resolution, ResolutionRecord, ReviewRecord, Verdict
 
@@ -66,7 +70,11 @@ _RESOLUTION_VERDICT: dict[Resolution, Verdict] = {
 
 
 class PromotionCandidate(BaseModel):
-    """A generalizable shape whose resolved records unanimously share one decision."""
+    """A generalizable shape whose distinct resolved decisions unanimously agree.
+
+    A decision is one resolved ``record_id`` (its last-write-wins resolution), not
+    one review-log line.
+    """
 
     model_config = _MODEL_CONFIG
 
@@ -74,7 +82,7 @@ class PromotionCandidate(BaseModel):
     drift_kind: str
     audience: Audience
     resolution: Resolution  # the UNANIMOUS human decision for this shape
-    count: int  # how many RESOLVED records support it (>= min_count)
+    count: int  # DISTINCT resolved record_ids (one human decision each), >= min_count
 
 
 class PromotionRule(BaseModel):
@@ -98,30 +106,51 @@ def detect_promotions(
 
     Shape key = ``(doc_id, drift_kind, audience)`` (GENERALIZABLE, NOT
     ``surface_hash``). Population = RESOLVED records only (``record_id`` in
-    :func:`~custodex.reviewlog.resolved_index`, last-write-wins). A shape
-    QUALIFIES iff >= ``min_count`` of its resolved records share ONE
-    :data:`PROMOTABLE_RESOLUTIONS` decision (unanimous among that shape's resolved
-    records — a single differing resolution disqualifies it). Orphan resolutions
+    :func:`~custodex.reviewlog.resolved_index`, last-write-wins). The unit counted
+    is a DISTINCT resolved ``record_id`` per shape (one human decision), never a
+    review-log line: a ``record_id`` shared by several drifts of one shape, a
+    duplicated log line and a retried resolve each count ONCE. A ``record_id``
+    that spans two shapes (the HASH and REGION drifts of one doc under one clock)
+    counts once in EACH. A shape QUALIFIES iff >= ``min_count`` of those distinct
+    decisions share ONE :data:`PROMOTABLE_RESOLUTIONS` decision (unanimous within
+    the shape — a single differing decision disqualifies it). Orphan resolutions
     (a ``record_id`` not in ``records``) are ignored so they cannot inflate a count.
     Output is sorted by ``(doc_id, drift_kind, audience, resolution)`` for
     determinism (K10). Pure: no I/O, no wall-clock.
+
+    Raises :class:`~custodex.errors.ConfigError` when ``min_count < 1`` (K8): a
+    threshold below one decision is malformed input, not a silent "always".
     """
+    if min_count < 1:
+        raise ConfigError(f"min_count must be >= 1 (one decision), got {min_count}")
     index = resolved_index(resolutions)
 
-    # Group the RESOLUTIONS of each shape's resolved records.
-    by_shape: dict[tuple[str, str, Audience], list[Resolution]] = defaultdict(list)
+    # Each shape's DISTINCT resolved decisions, keyed by record_id. The key is
+    # exactly record_id because resolved_index holds one decision per record_id:
+    # - a key that SPLITS an id (e.g. record_id + drift_detail) re-counts one
+    #   decision once per drift line and re-inflates the count;
+    # - a key that MERGES ids (e.g. drift_detail alone, a run id) lets one id's
+    #   decision overwrite another's, which can hide a dissent depending on input
+    #   order;
+    # - widening it with the fields the id is hashed from (doc_id, surface_hash,
+    #   detected_at) changes nothing.
+    # Known residual (PROMO-RUN): ONE code event can still mint several ids, each
+    # counted - a per-record clock (the CLI's _default_now) within one run, and
+    # repeated runs over an unchanged surface (a fresh `now` per MCP call) across
+    # runs. A run id closes only the first; the unit must be the code event.
+    by_shape: dict[tuple[str, str, Audience], dict[str, Resolution]] = defaultdict(dict)
     for record in records:
         resolution = index.get(record.record_id)
         if resolution is None:
             continue  # unresolved record is not part of the population
         key = (record.doc_id, record.drift_kind, record.audience)
-        by_shape[key].append(resolution.resolution)
+        by_shape[key][record.record_id] = resolution.resolution
 
     candidates: list[PromotionCandidate] = []
-    for (doc_id, drift_kind, audience), outcomes in by_shape.items():
-        if len(outcomes) < min_count:
-            continue  # too few resolved records for this shape
-        unique = set(outcomes)
+    for (doc_id, drift_kind, audience), decisions in by_shape.items():
+        if len(decisions) < min_count:
+            continue  # too few distinct decisions for this shape
+        unique = set(decisions.values())
         if len(unique) != 1:
             continue  # not unanimous -> does not generalize to one rule
         (decision,) = unique
@@ -133,7 +162,7 @@ def detect_promotions(
                 drift_kind=drift_kind,
                 audience=audience,
                 resolution=decision,
-                count=len(outcomes),
+                count=len(decisions),
             )
         )
 

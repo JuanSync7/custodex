@@ -628,9 +628,6 @@ def test_okf_detects_drift_from_the_config_dir_when_root_differs(
     ("old", "new"),
     [
         pytest.param(
-            "path: docs/guide.md", "path: nope/../docs/guide.md", id="unnormalized"
-        ),
-        pytest.param(
             "code_refs: [{path: src/lib.py}]\n",
             "code_refs: [{path: src/lib.py}]\n"
             "  - id: guide\n    path: docs/gone.md\n    audience: user-guide\n",
@@ -641,11 +638,12 @@ def test_okf_detects_drift_from_the_config_dir_when_root_differs(
 def test_a_missing_doc_drift_on_the_id_blocks_its_verification(
     tmp_path: Path, monkeypatch, old: str, new: str
 ) -> None:
-    """Review r2 gap R2-08: the MISSING_DOC arm of the drift gate is live. Two
-    configs the single-file loader accepts render a doc that `cdx check`
-    reports MISSING: a non-normalized path (`detect` tests the raw
-    `root / spec.path`, the bundle normalizes it) and a duplicate doc id
-    whose twin is missing. `cdx check` failing must keep the claim off."""
+    """Review r2 gap R2-08: the MISSING_DOC arm of the drift gate is live. A
+    config the single-file loader accepts renders a doc that `cdx check`
+    reports MISSING: a duplicate doc id whose twin is missing. `cdx check`
+    failing must keep the claim off. (A non-normalized path was the other
+    case until X-CONTAIN put detect and the bundle on ONE formula,
+    `doc_path`; its agreement is pinned in tests/system/test_containment_cli.py.)"""
     # Feature: FEAT-OKF-001
     monkeypatch.chdir(tmp_path)
     record_id = _managed_fixture(tmp_path)

@@ -57,7 +57,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from .config import EntitiesConfig, MonitorConfig
+from .config import EntitiesConfig, MonitorConfig, doc_path
 from .errors import DriftError, ExtractionError
 from .extract import _SYMBOL_LANG_BY_SUFFIX, get_extractor
 from .inventory import _matches_any, _translate, discover_files
@@ -617,8 +617,10 @@ def corpus_entities(
     """Extract mentions for every managed doc (or one), sorted by doc id.
 
     Builds the registry once (or reuses a caller-provided one — AGT-03's graph
-    builder shares a single scan). A managed doc whose FILE is missing is
-    skipped (its ``MISSING_DOC`` drift covers it — the docdeps precedent). An
+    builder shares a single scan). Each doc is read at
+    :func:`custodex.config.doc_path` — the file ``detect`` grades — so a doc
+    whose FILE is missing is skipped exactly when its ``MISSING_DOC`` drift
+    covers it (the docdeps precedent). An
     unknown ``doc_id`` raises :class:`DriftError` (K8).
     """
     if doc_id is not None and all(d.id != doc_id for d in config.documents):
@@ -629,7 +631,7 @@ def corpus_entities(
     for spec in sorted(config.documents, key=lambda d: d.id):
         if doc_id is not None and spec.id != doc_id:
             continue
-        path = root / spec.path
+        path = doc_path(root, spec.path)
         if not path.is_file():
             continue
         out.append(

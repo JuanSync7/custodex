@@ -1,0 +1,52 @@
+---
+# Frontmatter (REQUIRED): traceability metadata. `unit` MUST equal this file's
+# stem ("deploy"), or load_unit_file raises a loud ConfigError (K8).
+cdmon-config-version: "2.0.0"
+unit: deploy
+title: "custodex hub deployment runbook"
+owner: cdmon-team
+created: "2026-10-10"
+updated: "2026-10-10"
+---
+# Body: the operator runbook and the settings surface it documents.
+
+# This unit owns ONE file: the operator settings module. A file-valued
+# dir-covered entry is attributed by the same deepest-ancestor rule as a
+# directory, so this nests under `core` (which covers `custodex`) and claims
+# custodex/settings.py alone.
+dir-covered:
+  - custodex/settings.py
+
+# Only .py files count toward coverage under dir-covered.
+source-files-format:
+  - ".py"
+
+documents:
+  # The repo-root operator runbook. A user-guide doc with NO managed region (the
+  # README shape): it is tracked by the whole-doc fingerprint over the settings
+  # models below, so a new settings key or a changed default drifts it, while a
+  # comment-only change does not (K3).
+  #
+  # `cdx monitor --apply` closes that drift by restamping the fingerprint and
+  # writing a ReviewRecord for the human (K5). With the offline mock backend the
+  # prose is left as it was; a real backend is sent the whole doc to fix. Either
+  # way the stamp alone does not prove the body is current: the content checks in
+  # tests/unit/test_deploy_runbook.py fail on a stale settings block or `# env:`
+  # comment, secret row, worker-kind list or install line until the prose is fixed,
+  # and tests/integration/test_deploy_shell_blocks.py runs the TL;DR and upgrade
+  # blocks for real.
+  #
+  # Every model reachable from `Settings` must be listed here (the system test
+  # derives the set from the model graph), so a new nested model needs a symbol.
+  - id: deploy
+    path: DEPLOY.md
+    audience: user-guide
+    code_refs:
+      - path: custodex/settings.py
+        symbols:
+          - Settings
+          - ServerSettings
+          - CorsSettings
+          - RateLimitSettings
+          - GitSettings
+          - WorkerSettings

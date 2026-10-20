@@ -1,0 +1,117 @@
+# FPW-FIXTURES synthetic tree: golden-only (never frozen). Each document carries a
+# selector or record shape the frozen trees do not, so a change to selection,
+# records, the code index or coverage moves the surface golden.
+version: "1.0.0"
+root: "."
+fingerprint_body_tier: false
+
+coverage:
+  include: ["**/*.py", "**/*.sh", "**/*.json"]
+  waive:
+    - path: pkg/legacy_api.py
+      reason: deprecated shim
+
+region_templates:
+  options:
+    source: records
+    kind: option
+    columns:
+      - {header: Option, field: name}
+      - {header: Default, field: default}
+  switches:
+    source: records
+    kind: switch
+    columns:
+      - {header: Switch, field: name}
+  flags:
+    source: records
+    columns:
+      - {header: Flag, field: name}
+      - {header: Action, field: action}
+
+documents:
+  # dataclass fields through class-member expansion.
+  - id: shapes
+    path: docs/shapes.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/shapes.py
+        symbols: [Point]
+
+  # same-name tie (same name AND line in two files); the private helper is
+  # dropped for a user guide (K3).
+  - id: tie
+    path: docs/tie.md
+    audience: user-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/text_a.py
+      - path: pkg/text_b.py
+
+  # multi-entry `names:` (a private variable, and a function it must not pick).
+  - id: settings
+    path: docs/settings.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/settings.py
+        names: [DEFAULT_TIMEOUT, _SECRET, ping]
+
+  # symbols + lines in one ref (line 15 is on_post's last line, 18 is on_delete's
+  # first), and arg_signature (Router.dispatch) in a second ref on the same file.
+  - id: multi-entry
+    path: docs/multi-entry.md
+    audience: eng-guide
+    region_keys: [symbols]
+    code_refs:
+      - path: pkg/handlers.py
+        symbols: [ping, on_get]
+        lines: [[15, 15], [18, 18]]
+      - path: pkg/handlers.py
+        arg_signature: [self, request, context]
+
+  # argparse records and python switches over one file.
+  - id: mixed-records
+    path: docs/mixed-records.md
+    audience: user-guide
+    region_keys: [options, switches]
+    code_refs:
+      - path: pkg/cli_args.py
+        extract: records
+      - path: pkg/cli_args.py
+        extract: switches
+
+  # JSON records.
+  - id: flags
+    path: docs/flags.md
+    audience: user-guide
+    region_keys: [flags]
+    code_refs:
+      - path: data/flags.json
+        extract: records
+        json_records: "*"
+        record_name_field: flag
+
+  # a shell `lines` ref and shell case-arm switches.
+  - id: shell
+    path: docs/shell.md
+    audience: eng-guide
+    region_keys: [symbols, switches]
+    code_refs:
+      - path: tools/build.sh
+        lines: [[9, 12]]
+      - path: tools/deploy.sh
+        extract: switches
+
+  # tcl switches (a switch -regexp block and a regexp class) and a getopts
+  # optstring that outranks the script's case arms.
+  - id: tooling
+    path: docs/tooling.md
+    audience: eng-guide
+    region_keys: [switches]
+    code_refs:
+      - path: tools/run.tcl
+        extract: switches
+      - path: tools/opts.sh
+        extract: switches

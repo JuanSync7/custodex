@@ -116,7 +116,12 @@ from .ownership import (
 )
 from .pr import GitLabTransport, open_docs_pr
 from .promotion import detect_promotions
-from .registry import register_repo, repo_identity_from_config, sync_repo_remote
+from .registry import (
+    register_repo,
+    repo_identity_from_config,
+    sync_repo_remote,
+    token_from_env,
+)
 from .report import (
     build_coverage_rpt,
     render_rpt,
@@ -867,7 +872,26 @@ def register(
         False,
         "--dry-run",
         help="Print the registration payload as JSON WITHOUT calling the server "
-        "(no url/token required).",
+        "(no url required; without a token flag, no token either; a token flag "
+        "still validates the tokens).",
+    ),
+    auth_token_env: str | None = typer.Option(
+        None,
+        "--auth-token-env",
+        metavar="VAR",
+        help="Register the repo token-protected with the token in $VAR. It must be "
+        "the token $central.auth_env holds (the bearer the next register and the "
+        "http sink present). To CHANGE a protected repo's token use "
+        "--rotate-to-env instead.",
+    ),
+    rotate_to_env: str | None = typer.Option(
+        None,
+        "--rotate-to-env",
+        metavar="VAR",
+        help="Rotate the repo token to the one in $VAR, presenting the current "
+        "token from $central.auth_env (the server checks it when the repo is "
+        "already protected). Then set $central.auth_env to the new token; "
+        "re-running it after that is a no-op re-register.",
     ),
 ) -> None:
     """Announce this repo to the central server (POST its identity to /repos, E-02).
@@ -879,15 +903,40 @@ def register(
     ``central.url`` is missing). ``--dry-run`` prints the payload it WOULD send and
     makes no network call (K4) — handy to inspect identity/commit before wiring up
     the server.
+
+    SRV-TOKEN: ``--auth-token-env VAR`` registers the repo token-protected (``$VAR``
+    must equal ``$central.auth_env``, or the repo would lock out its own writes);
+    ``--rotate-to-env VAR`` rotates to ``$VAR`` presenting the current token. The
+    two are mutually exclusive; an unusable token is a loud error before anything
+    is sent (a ``--dry-run`` with a token flag still validates the tokens, so it
+    needs ``$central.auth_env`` set as a real run would), and a dry run shows the
+    token as ``***``.
     """
     try:
+        if auth_token_env is not None and rotate_to_env is not None:
+            raise SchemaError(
+                "--auth-token-env and --rotate-to-env are mutually exclusive: "
+                "set a token with the first, change a protected repo's token "
+                "with the second"
+            )
         cfg, _config_dir = _load(config)
         identity = repo_identity_from_config(cfg.central)
+        auth_token: str | None = None
+        if auth_token_env is not None:
+            auth_token = token_from_env(
+                auth_token_env, what="the repo token (--auth-token-env)"
+            )
+        elif rotate_to_env is not None:
+            auth_token = token_from_env(
+                rotate_to_env, what="the new repo token (--rotate-to-env)"
+            )
         response = register_repo(
             identity,
             url=cfg.central.url or "",
             auth_env=cfg.central.auth_env,
             dry_run=dry_run,
+            auth_token=auth_token,
+            rotate=rotate_to_env is not None,
         )
     except CodeDocMonitorError as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -896,7 +945,20 @@ def register(
     if dry_run:
         typer.echo(json.dumps(response, indent=2, sort_keys=True))
         return
-    typer.echo(f"registered {identity.repo_id} with {cfg.central.url}")
+    # Say what was SENT, never "rotated": an open or unknown repo has no old token
+    # for the server to check (it does not report which case it was).
+    suffix = ""
+    if rotate_to_env is not None:
+        presenter = cfg.central.auth_env
+        if os.environ.get(presenter or "") == auth_token:
+            suffix = (
+                f" (registered with the new token, which ${presenter} already presents)"
+            )
+        else:
+            suffix = f" (registered with the new token; set ${presenter} to it)"
+    elif auth_token_env is not None:
+        suffix = " (token-protected)"
+    typer.echo(f"registered {identity.repo_id} with {cfg.central.url}{suffix}")
 
 
 def _sync_run_lines(run: dict) -> list[str]:

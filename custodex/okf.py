@@ -152,7 +152,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict
 
 from .codeindex import GENERATED_BY
-from .config import Audience, DocumentSpec, MonitorConfig
+from .config import Audience, DocumentSpec, MonitorConfig, doc_path
 from .docstyle import DocStyleMap
 from .drift import DriftReport
 from .errors import ConfigError, SchemaError
@@ -455,7 +455,10 @@ def _doc_sources(
             )
         placed.append((spec, rel_path))
     for spec, rel_path in placed:
-        source = root / rel_path
+        # The ONE doc formula (X-CONTAIN): the file detect grades, under a root
+        # normalised as named — `root / rel_path` would let an unnormalised
+        # root (`repo/link/..`) cross the link PHYSICALLY.
+        source = doc_path(root, spec.path)
         yield spec, rel_path, source if source.is_file() else None
 
 

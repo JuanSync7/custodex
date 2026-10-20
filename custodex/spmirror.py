@@ -740,7 +740,7 @@ def _write_body_preserving_meta(target: Path, body: str) -> bool:
         existing = parse_text(target.read_text(encoding="utf-8"), target)
         if existing.body == body:
             return False
-        new_text = render_doc(existing.meta, body)
+        new_text = render_doc(existing.meta, body, source=existing.raw)
     else:
         new_text = body
     target.parent.mkdir(parents=True, exist_ok=True)

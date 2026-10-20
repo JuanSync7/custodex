@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: f084ff49d50c5a46
+  fingerprint: 4f7f7ad47c8a018e
   fingerprint_tiers:
-    composite: f084ff49d50c5a46
-    docstring: a2e885240b531bc6
-    signature: fbe17a7373f647a4
+    composite: 4f7f7ad47c8a018e
+    docstring: 366cc14973a20e7e
+    signature: be3c092d0022929d
   region_anchors:
     symbols:
     - 051af376199dec21
@@ -26,6 +26,7 @@ cdm:
     - 32466863d59a837d
     - 3263bf02338e3642
     - 32b4643f68a7fb0c
+    - 342c3dcd77b4e213
     - 39f44ada4b1c867f
     - 3a7cbd5bda112527
     - 3ab6a08bf4e47322
@@ -86,7 +87,7 @@ cdm:
     - fb63866c577db827
     - fe988deeef5014be
   region_hashes:
-    symbols: cac2e9680f935dee
+    symbols: bbe183a0f6e4c702
   schema_version: 1.0.0
   symbol_sigs:
     051af376199dec21: e7ddc1e5f8554f01
@@ -105,6 +106,7 @@ cdm:
     32466863d59a837d: 2ea2c008c54a3b67
     3263bf02338e3642: c68c7939618df60a
     32b4643f68a7fb0c: 2ff15c91b5920613
+    342c3dcd77b4e213: d557ec9ea70428c7
     39f44ada4b1c867f: 886ec693a7f551d2
     3a7cbd5bda112527: d04608f3e00fa797
     3ab6a08bf4e47322: 48be7be1732435ca
@@ -238,6 +240,7 @@ cdm:
 | _split_row | function | def _split_row(line: str) -> list[str] |
 | _structure_issues | function | def _structure_issues(spec: DocumentSpec, body: str) -> list[LayoutIssue] |
 | _title_and_summary | function | def _title_and_summary(body: str) -> tuple[str, str] |
+| _twin | function | def _twin(spec: DocumentSpec) -> str |
 | build | function | def build(config: MonitorConfig, config_dir: Path) -> list[Path] |
 | config_region_states | function | def config_region_states(config: MonitorConfig, config_dir: Path) -> list[RegionState] |
 | embedded_md_hash | function | def embedded_md_hash(html: str) -> str \| None |

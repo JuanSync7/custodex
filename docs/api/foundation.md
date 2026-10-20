@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: 22fcf5f75caaad70
+  fingerprint: 80656e6113dde7d6
   fingerprint_tiers:
-    composite: 22fcf5f75caaad70
-    docstring: ede959f59bea7c6c
-    signature: a4c7f90d1f053f0a
+    composite: 80656e6113dde7d6
+    docstring: f5e9f2c68a20ecc7
+    signature: 55d86fc6a4254463
   region_anchors:
     symbols:
     - 00652c5f721d5ef6
@@ -26,6 +26,7 @@ cdm:
     - 062d452c2e93db44
     - 064f36088122f505
     - 067229ae0b78c261
+    - 06e48124ac6fca67
     - 0719bcf21690d405
     - 0757a148212f2018
     - 083c4cd04ae0a9e0
@@ -121,6 +122,7 @@ cdm:
     - 582b027d421386db
     - 58695cf24ac2b4f3
     - 5a017577d39d7107
+    - 5a5ef62a50cd7a68
     - 5b1936277077dd23
     - 5b907f302215518c
     - 5c4c5ccabaf45fe2
@@ -158,6 +160,7 @@ cdm:
     - 75694f3fe0d8b961
     - 75980bcff09a9a40
     - 777f723045f6ec52
+    - 779d2715ed70bd1a
     - 7914c7e171d41f25
     - 7d82e91153d4e0db
     - 7dd64be7a6dca134
@@ -200,6 +203,7 @@ cdm:
     - 9c205065b544c730
     - 9d5e684dda879595
     - 9e6d7a8a18fb7792
+    - a153b6d72c30e942
     - a1d58d6c3628366a
     - a296a735a048dacd
     - a335b1932a6a66b9
@@ -262,6 +266,7 @@ cdm:
     - d31f855d5547d0fb
     - d40dde1c951616c4
     - d44082bccab4ddaa
+    - d4a9edf467e8a6a3
     - d51a1c2ad604ab2c
     - d575c3484f1c7b53
     - d64571b73123f484
@@ -334,7 +339,7 @@ cdm:
     - ff51b2032355ac8b
     - ffc7c0c343a702d1
   region_hashes:
-    symbols: b2f90675577f287b
+    symbols: b831f70249e22456
   schema_version: 1.0.0
   symbol_sigs:
     00652c5f721d5ef6: 7148212130f198af
@@ -351,6 +356,7 @@ cdm:
     062d452c2e93db44: c49789ef91c0111d
     064f36088122f505: c907f519e6cdf3a0
     067229ae0b78c261: 10e5e52ef37e31b0
+    06e48124ac6fca67: a3dfa41e8a338666
     0719bcf21690d405: 200333da6c73dd84
     0757a148212f2018: 59135f04d49fca3d
     083c4cd04ae0a9e0: 9ea4b2dc77349541
@@ -445,6 +451,7 @@ cdm:
     582b027d421386db: 80b1503dbdc3302d
     58695cf24ac2b4f3: 9cbdf588e505b117
     5a017577d39d7107: bc221380da573213
+    5a5ef62a50cd7a68: dd8c281a67acf390
     5b1936277077dd23: 8dc27f949cdbe5b4
     5b907f302215518c: 28799c23fb2f5e50
     5c4c5ccabaf45fe2: c811e7c028345d41
@@ -482,6 +489,7 @@ cdm:
     75694f3fe0d8b961: 5dc5ba8511a74350
     75980bcff09a9a40: 3369cba7bf9dfc6f
     777f723045f6ec52: 73bc327804c95506
+    779d2715ed70bd1a: 7980bce476b0e4d7
     7914c7e171d41f25: 6f351ec58781d9fb
     7d82e91153d4e0db: 5f83649cd1a7abbf
     7dd64be7a6dca134: bf1b45bcb8183594
@@ -524,6 +532,7 @@ cdm:
     9c205065b544c730: 4cd8e2e109cc5413
     9d5e684dda879595: bb2614d7fd97fafb
     9e6d7a8a18fb7792: ccc18c31076699e1
+    a153b6d72c30e942: 04485793ff30b85f
     a1d58d6c3628366a: d5b87bb3772e2860
     a296a735a048dacd: 24411cf810cea2e3
     a335b1932a6a66b9: ca7721d3cbe9f80b
@@ -586,6 +595,7 @@ cdm:
     d31f855d5547d0fb: 52070d63d0903703
     d40dde1c951616c4: c274c8d2a5896e20
     d44082bccab4ddaa: 7fbdfa3c463905f2
+    d4a9edf467e8a6a3: 056fb2ee2419ae8b
     d51a1c2ad604ab2c: c89af9ec8600b556
     d575c3484f1c7b53: b94c360600ae9800
     d64571b73123f484: de207e6bea29b47a
@@ -956,6 +966,7 @@ cdm:
 | _load_v2_yaml | function | def _load_v2_yaml(path: Path) -> tuple[dict, str] |
 | _missing_template_files | function | def _missing_template_files(selection: DocStyleSelection, templates_root: Path, *, where: str) -> list[str] |
 | _now | function | def _now() -> str |
+| _os_nameable | function | def _os_nameable(path: Path \| str) -> bool |
 | _parse_v2_body | function | def _parse_v2_body(body: str, path: Path) -> dict |
 | _render_units_block | function | def _render_units_block(filenames: list[str]) -> str |
 | _replace_documents | function | def _replace_documents(unit: UnitFile, documents: tuple[DocumentSpec, ...]) -> UnitFile |
@@ -963,10 +974,13 @@ cdm:
 | _scan_unit_files | function | def _scan_unit_files(config_dir: Path) -> list[str] |
 | _selection_to_yaml | function | def _selection_to_yaml(selection: DocStyleSelection) -> dict[str, str] |
 | _split_frontmatter | function | def _split_frontmatter(text: str, where: Path) -> tuple[dict, str] |
+| _still_linked | function | def _still_linked(real: str) -> bool |
+| _strictly_inside | function | def _strictly_inside(real: str, real_root: str) -> bool |
 | _yaml_scalar | function | def _yaml_scalar(value: str) -> str |
 | _yaml_scalar | function | def _yaml_scalar(value: str) -> str |
 | add_code_ref | function | def add_code_ref(unit: UnitFile, doc_id: str, ref: CodeRef) -> UnitFile |
 | central_config_template | function | def central_config_template(*, url: str, repo_id: str, token_env: str = DEFAULT_CENTRAL_TOKEN_ENV, repo_url: str \| None = None) -> str |
+| doc_path | function | def doc_path(root: Path \| str, rel: str) -> Path |
 | dump_doc_style | function | def dump_doc_style(doc_style: DocStyleMap, *, now: str) -> str |
 | dump_unit_file | function | def dump_unit_file(unit: UnitFile, *, now: str) -> str |
 | effective_coverage | function | def effective_coverage(bundle: ConfigBundle, repo_root: Path) -> CoverageConfig |
@@ -984,6 +998,7 @@ cdm:
 | remove_code_ref | function | def remove_code_ref(unit: UnitFile, doc_id: str, path: str) -> UnitFile |
 | resolve_repo_root | function | def resolve_repo_root(config_dir: Path, root: str) -> Path |
 | resolve_style_files | function | def resolve_style_files(selection: DocStyleSelection, templates_root: Path) -> dict[str, Path] |
+| resolve_within | function | def resolve_within(root: Path \| str, rel: str) -> Path \| None |
 | scaffold_config_dir | function | def scaffold_config_dir(config_dir: Path, *, repo: str, now: str) -> None |
 | set_context_refs | function | def set_context_refs(unit: UnitFile, doc_id: str, refs: tuple[ContextRef, ...]) -> UnitFile |
 | set_document_owner | function | def set_document_owner(unit: UnitFile, doc_id: str, *, owner: str \| None = None, team: str \| None = None, dri: str \| None = None) -> UnitFile |

@@ -33,6 +33,7 @@ from .config import (
     DocumentSpec,
     MonitorConfig,
     RegionMode,
+    doc_path,
     load_bundle,
 )
 from .drift import Drift, DriftKind
@@ -122,7 +123,7 @@ def _author_overview(
     body, _changed = set_region(
         parse_text(doc_text).body, OVERVIEW_REGION, result.fix.new_region_body
     )
-    return render_doc(parse_text(doc_text).meta, body)
+    return render_doc(parse_text(doc_text).meta, body, source=doc_text)
 
 
 def draft_document(
@@ -244,7 +245,9 @@ def write_and_register(
     frontmatter ``updated:`` stamp, then writes the drafted document. The doc
     is born in-sync (the scaffold stamps its fingerprint from the same
     surface), so the very next ``cdx check`` is green — no separate heal step.
-    Returns the written doc path.
+    The file guarded, written and returned is :func:`custodex.config.doc_path`
+    — the one ``check`` grades — so a dotdot spelling of an existing doc is
+    refused, never scaffolded over. Returns the written doc path.
     """
     bundle: ConfigBundle = load_bundle(config_dir)
     cfg: MonitorConfig = bundle.config
@@ -256,8 +259,8 @@ def write_and_register(
             f"unknown unit {unit!r} — available: {', '.join(sorted(stems))}"
         )
     root = (config_dir / cfg.root).resolve()
-    doc_path = root / spec.path
-    if doc_path.is_file():
+    target = doc_path(root, spec.path)
+    if target.is_file():
         raise ConfigError(
             f"document file {spec.path!r} already exists — refusing to overwrite"
         )
@@ -281,8 +284,8 @@ def write_and_register(
         ) from exc
 
     surface = build_document_surface(spec, root)
-    doc_path.parent.mkdir(parents=True, exist_ok=True)
-    doc_path.write_text(
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
         draft_document(
             spec,
             surface,
@@ -292,4 +295,4 @@ def write_and_register(
         ),
         encoding="utf-8",
     )
-    return doc_path
+    return target

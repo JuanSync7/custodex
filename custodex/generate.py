@@ -29,6 +29,7 @@ via ``now`` (no wall-clock read).
 from __future__ import annotations
 
 import difflib
+import posixpath
 import re
 from pathlib import Path
 
@@ -41,6 +42,7 @@ from .config import (
     RegionMode,
     UnitFile,
     add_code_ref,
+    doc_path,
     dump_unit_file,
     load_bundle,
     load_unit_file,
@@ -142,7 +144,7 @@ class ApplyFixResult(BaseModel):
     ``diff``, K7). ``doc_path`` is the repo-relative document path the fix targeted;
     ``diff`` is a stdlib :func:`difflib.unified_diff` of the doc text before→after
     (empty string when unchanged), so a human (or the UI) can see exactly what the
-    LLM's fix changed.
+    LLM's fix changed; its headers name the file written, ``normpath(doc_path)``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -166,8 +168,9 @@ def apply_record_fix(
        carries no applicable fix — ``record.fix is None`` or its ``verdict`` is not
        a FIX-shaped verdict (only an applicable fix can be applied);
     2. resolve ``config/cdmon`` under ``local_path``, :func:`load_bundle`, and
-       :func:`resolve_repo_root` → the repo root; the doc path is ``repo_root /
-       record.doc_path`` (loud K8 if the doc file is missing);
+       :func:`resolve_repo_root` → the repo root; the doc is
+       ``doc_path(repo_root, record.doc_path)`` — the file detect grades and
+       ``cdx monitor`` heals (X-CONTAIN) — loud K8 if the doc file is missing;
     3. find the matching :class:`DocumentSpec` (by ``doc_id``) to derive the
        human-owned ``preserve`` set + per-region ``modes`` EXACTLY as
        :meth:`custodex.monitor.Monitor.run` does for ``--apply`` (B-02/B-03
@@ -207,10 +210,10 @@ def apply_record_fix(
             f"under {config_dir}"
         )
 
-    doc_path = repo_root / record.doc_path
-    if not doc_path.is_file():
+    doc_file = doc_path(repo_root, record.doc_path)
+    if not doc_file.is_file():
         raise CodeDocMonitorError(
-            f"cannot apply fix: document file {doc_path} does not exist"
+            f"cannot apply fix: document file {doc_file} does not exist"
         )
 
     # Mirror Monitor.run's --apply preserve/modes derivation EXACTLY (B-02/B-03):
@@ -222,18 +225,21 @@ def apply_record_fix(
     )
     modes = {rid: spec.mode_for(rid) for rid in spec.region_keys}
 
-    before = doc_path.read_text(encoding="utf-8")
-    apply_fix(doc_path, record.fix, preserve=preserve, modes=modes)
-    after = doc_path.read_text(encoding="utf-8")
+    before = doc_file.read_text(encoding="utf-8")
+    apply_fix(doc_file, record.fix, preserve=preserve, modes=modes)
+    after = doc_file.read_text(encoding="utf-8")
 
     diff = ""
     if after != before:
+        # Headers name the file written (X-CONTAIN), as sync_pr's patch and the
+        # docs-PR commit do; ApplyFixResult.doc_path keeps the record spelling.
+        repo_path = posixpath.normpath(record.doc_path)
         diff = "".join(
             difflib.unified_diff(
                 before.splitlines(keepends=True),
                 after.splitlines(keepends=True),
-                fromfile=f"a/{record.doc_path}",
-                tofile=f"b/{record.doc_path}",
+                fromfile=f"a/{repo_path}",
+                tofile=f"b/{repo_path}",
             )
         )
 
@@ -439,11 +445,13 @@ def apply_edits_to_disk(
             # A set_doc_style edit may target a doc that no unit declares; nothing
             # on disk to heal for it (the style map change still landed).
             continue
-        doc_path = fresh_root / spec.path
+        # The file detect grades (X-CONTAIN): a raw join conjured `ghost/` and
+        # scaffolded OVER the prose of `ghost/../docs/x.md`'s real doc.
+        doc_file = doc_path(fresh_root, spec.path)
         surface = build_document_surface(spec, fresh_root)
-        if not doc_path.exists():
-            doc_path.parent.mkdir(parents=True, exist_ok=True)
-            doc_path.write_text(
+        if not doc_file.exists():
+            doc_file.parent.mkdir(parents=True, exist_ok=True)
+            doc_file.write_text(
                 scaffold_doc(
                     spec, surface, include_body=fresh.config.fingerprint_body_tier
                 ),
@@ -457,7 +465,7 @@ def apply_edits_to_disk(
         )
         modes = {rid: spec.mode_for(rid) for rid in spec.region_keys}
         regenerate_regions(
-            doc_path,
+            doc_file,
             surface,
             fresh.config.region_templates,
             preserve,

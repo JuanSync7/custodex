@@ -33,12 +33,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictBool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from ..errors import ConfigError
 from ..ownership import (
     EffectiveOwner,
     Identity,
@@ -47,7 +48,7 @@ from ..ownership import (
     detect_orphans,
 )
 from ..promotion import PromotionCandidate, detect_promotions
-from ..registry import RegistrationPayload
+from ..registry import RegistrationPayload, bearer_token_problem
 from ..schema import Resolution, ResolutionRecord, ReviewRecord, Verdict
 from ..settings import GitSettings, Settings, resolve_settings, secret_presence
 from ..sinks import IngestEnvelope
@@ -258,6 +259,22 @@ class DocsPrRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dry_run: bool = False
+
+
+class TokenResetRequest(BaseModel):
+    """The ``POST /admin/repos/{id}/token/reset`` body (SRV-TOKEN, PD-47).
+
+    Exactly ONE intent: a new write-only ``auth_token`` (hashed on arrival, never
+    echoed), or ``open`` = the JSON literal ``true`` to clear the repo's
+    protection. ``open`` is a :class:`~pydantic.StrictBool` so a truthy stand-in
+    (``1``, ``"yes"``, ``"on"``) is a 422, never a silent clear; an absent / null /
+    false intent is the route's 400 — a reset never opens a repo implicitly.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    auth_token: str | None = None
+    open: StrictBool = False
 
 
 class DocumentTree(BaseModel):
@@ -943,6 +960,22 @@ def create_app(
     effective_admin = (
         admin_token if admin_token is not None else os.environ.get("CDMON_ADMIN_TOKEN")
     )
+    if effective_admin:
+        # SRV-TOKEN: the admin token must follow the shared bearer rule. Both
+        # verifiers strip the presented bearer, so a padded admin token (e.g. a
+        # secret file's trailing newline) could never match, and HTTP clients
+        # cannot send CR/LF, NUL or non-latin-1 characters: every admin route,
+        # now including the token reset, would silently refuse all. Inner
+        # whitespace and other non-ASCII are refused by POLICY (one bearer
+        # grammar everywhere), not because they cannot be presented.
+        problem = bearer_token_problem(effective_admin)
+        if problem is not None:
+            source = (
+                "the admin_token argument"
+                if admin_token is not None
+                else "$CDMON_ADMIN_TOKEN"
+            )
+            raise ConfigError(f"the admin token from {source} {problem}")
     admin_hash: str | None = hash_token(effective_admin) if effective_admin else None
     if admin_hash is None:
         # Loud on an insecure prod default (K8 spirit, mirrors store_from_env's
@@ -1102,7 +1135,7 @@ def create_app(
         if not hmac.compare_digest(hash_token(presented), token_hash):
             raise HTTPException(status_code=403, detail="invalid bearer token")
 
-    def _verify_admin(authorization: str | None) -> None:
+    def _verify_admin(authorization: str | None, *, required: bool = False) -> None:
         """Admin-token auth for cross-repo roster mutations (OWN-04).
 
         A roster change is GLOBAL (it re-flags orphans in EVERY repo), so it is gated
@@ -1110,8 +1143,20 @@ def create_app(
         never a per-repo token — a leaked repo token must not grant roster access.
         With no admin token configured the routes stay open (offline/dev, like a
         token-less repo). 401 missing / 403 wrong.
+
+        ``required=True`` (SRV-TOKEN) FAILS CLOSED instead: with no admin token
+        configured the route is disabled (403). A recovery route that replaces a
+        repo's credential must never be open by default.
         """
         if admin_hash is None:
+            if required:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "this admin route is disabled: no admin token is "
+                        "configured (set CDMON_ADMIN_TOKEN)"
+                    ),
+                )
             return
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="missing admin bearer token")
@@ -1284,6 +1329,49 @@ def create_app(
             )
         store.mark_identity_departed(name, at=clock())
         return {"name": name, "departed": True}
+
+    @app.post("/admin/repos/{repo_id:path}/token/reset", status_code=200)
+    def reset_repo_token(
+        repo_id: str,
+        body: TokenResetRequest,
+        store: Store = Depends(get_store),
+        authorization: str | None = Header(default=None),
+    ) -> dict[str, object]:
+        """Replace or clear ONE repo's bearer-token hash (SRV-TOKEN, PD-47).
+
+        The recovery path for a lost repo token. Order: admin auth (REQUIRED, fails
+        closed) → unknown repo 404 (before any body check) → exactly one intent
+        (a new ``auth_token`` passing the bearer rule, or ``{"open": true}``) →
+        write. Returns ``{repo_id, protected, changed}`` — ``changed`` is False for
+        a reset to the stored value (K7); the token is never echoed.
+        """
+        _verify_admin(authorization, required=True)
+        _require_known_repo(store, repo_id)
+        if body.open and body.auth_token is not None:
+            raise HTTPException(
+                status_code=400,
+                detail='send a new auth_token OR {"open": true}, not both',
+            )
+        new_hash: str | None = None
+        if not body.open:
+            if body.auth_token is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "a token reset never opens a repo implicitly: send a new "
+                        'auth_token, or {"open": true} to clear its protection'
+                    ),
+                )
+            problem = bearer_token_problem(body.auth_token)
+            if problem is not None:
+                raise HTTPException(status_code=400, detail=f"auth_token {problem}")
+            new_hash = hash_token(body.auth_token)
+        changed = store.set_repo_token_hash(repo_id, new_hash)
+        return {
+            "repo_id": repo_id,
+            "protected": new_hash is not None,
+            "changed": changed,
+        }
 
     @app.get("/roster")
     def list_roster(store: Store = Depends(get_store)) -> list[Identity]:

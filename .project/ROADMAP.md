@@ -151,8 +151,8 @@ rule is gone; a no-renderer `llm` region is now real backend-authored prose).
 - ☑ **D-05** promotion detector: recurring shape→identical resolution ≥K →
   promotion candidate. *Goal:* 3 identical resolutions emit one candidate. **DONE**
   — `promotion.py` (pure): `detect_promotions(records, resolutions, *, min_count=3)`
-  groups RESOLVED records by the GENERALIZABLE shape `(doc_id, drift_kind, audience)`
-  (NOT `surface_hash`); a shape with ≥K resolved records UNANIMOUSLY sharing ONE
+  groups DISTINCT resolved decisions (record_ids) by the GENERALIZABLE shape `(doc_id, drift_kind, audience)`
+  (NOT `surface_hash`); a shape with ≥K distinct resolved decisions UNANIMOUSLY sharing ONE
   DECISION resolution (`invalidated`/`rejected`) → one `PromotionCandidate`.
   `overridden`/`accepted` excluded; `cdx promotions [--min-count N] [--json]`.
 - ☑ **D-06** rule application: promoted rule resolves that shape with **no

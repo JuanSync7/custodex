@@ -89,7 +89,8 @@ documents:
       - path: custodex/layout.py
 
   # The PR sync loop (EPIC C) + coverage-gap issues (EPIC H): should-sync gate +
-  # docs-PR open/update + the surface-gaps issue transports.
+  # docs-PR open/update + the surface-gaps issue transports, and the git
+  # work-tree probe (forge.py, X-GITFACTS) behind config sync.
   - id: pr-loop
     path: docs/api/pr-loop.md
     audience: eng-guide
@@ -98,6 +99,7 @@ documents:
       - path: custodex/syncpr.py
       - path: custodex/pr.py
       - path: custodex/issues.py
+      - path: custodex/forge.py
 
   # The central-system client (EPIC E/G): repo registry + record envelope, plus
   # the server-side config-sync engine that reads a registered repo read-only.

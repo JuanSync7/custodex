@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: b3ca5e59977050cc
+  fingerprint: b43eed3425ba3e07
   fingerprint_tiers:
-    composite: b3ca5e59977050cc
-    docstring: ca902c245f11b79a
-    signature: 10fcc130734fbecc
+    composite: b43eed3425ba3e07
+    docstring: 7afbc4e4af6872f0
+    signature: 4b878a6d967a83d9
   region_anchors:
     symbols:
     - 01b8016fdce455c4
@@ -96,7 +96,7 @@ cdm:
     - fdf09cdfc26cccf6
     - fe494651a43235a5
   region_hashes:
-    symbols: 70b8b36f7fd7c278
+    symbols: 5d524bc5aac15efb
   schema_version: 1.0.0
   symbol_sigs:
     01b8016fdce455c4: 0e5acad85d2de80e
@@ -150,7 +150,7 @@ cdm:
     7de97367c9cdc3c6: 6df30132cbec7876
     845e91831319e89c: 522b070f7cfff2b0
     85877352f834ad30: b4c547466f9413b4
-    87780fa5de684e87: d1e94fefe6065146
+    87780fa5de684e87: 13450ffb0667246e
     8790ad57e78ac78e: ad31f36f63f1c6dd
     8dcd689ac1fd0270: a7eb5a10b67891e6
     9185806e77b1178b: f4c5785e6b444f65
@@ -262,7 +262,7 @@ cdm:
 | open_docs_pr_cmd | function | @app.command def open_docs_pr_cmd(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Compute + print the MR plan WITHOUT mutating the tree or opening an MR (uses a dry sync, so NOTHING is written, and never builds a transport).'), target: str = typer.Option('main', '--target', help="The MR target branch (default 'main')."), ref: str \| None = typer.Option(None, '--ref', help='Source ref to record in the MR title/description (provenance).')) -> None |
 | ownership | function | @app.command def ownership(config: Path = _CONFIG_OPTION, roster: Path \| None = typer.Option(None, '--roster', help='An offline roster YAML (identities: [...]) to cross-check owners against; without it the command just lists assignments.'), as_json: bool = typer.Option(False, '--json', help='Emit {owners, findings} as round-trippable JSON.'), fail_on_orphan: bool = typer.Option(False, '--fail-on-orphan', help='Exit 1 if any document is an orphan (its accountable owner has departed). Requires --roster; UNOWNED docs do NOT trip it (that is a coverage gap, not a departure).')) -> None |
 | promotions | function | @app.command def promotions(config: Path = _CONFIG_OPTION, min_count: int = typer.Option(3, '--min-count', help='How many resolved records of one shape must unanimously share a decision before it is a promotion candidate.'), as_json: bool = typer.Option(False, '--json', help='Emit the candidates as machine-readable JSON.')) -> None |
-| register | function | @app.command def register(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Print the registration payload as JSON WITHOUT calling the server (no url/token required).')) -> None |
+| register | function | @app.command def register(config: Path = _CONFIG_OPTION, dry_run: bool = typer.Option(False, '--dry-run', help='Print the registration payload as JSON WITHOUT calling the server (no url required; without a token flag, no token either; a token flag still validates the tokens).'), auth_token_env: str \| None = typer.Option(None, '--auth-token-env', metavar='VAR', help="Register the repo token-protected with the token in $VAR. It must be the token $central.auth_env holds (the bearer the next register and the http sink present). To CHANGE a protected repo's token use --rotate-to-env instead."), rotate_to_env: str \| None = typer.Option(None, '--rotate-to-env', metavar='VAR', help='Rotate the repo token to the one in $VAR, presenting the current token from $central.auth_env (the server checks it when the repo is already protected). Then set $central.auth_env to the new token; re-running it after that is a no-op re-register.')) -> None |
 | report | function | @app.command def report(config: Path = _CONFIG_OPTION, verdict: str \| None = typer.Option(None, '--verdict', help='List the individual records with this verdict (e.g. ESCALATE) instead of the aggregate summary.'), as_json: bool = typer.Option(False, '--json', help='Emit machine-readable JSON (records when --verdict is set).')) -> None |
 | resolve | function | @app.command def resolve(record_id: str \| None = typer.Argument(None, help='The ReviewRecord id to record an outcome for.'), resolution: str \| None = typer.Option(None, '--resolution', help='The human outcome: accepted \| overridden \| rejected \| invalidated.'), edge: tuple[str, str] \| None = typer.Option(None, '--edge', help="DOWNSTREAM UPSTREAM: re-confirm one doc↔doc edge after reviewing it (the per-edge ack — re-stamps just that edge's baseline, EPIC B). Use instead of a record_id."), by: str \| None = typer.Option(None, '--by', help='Who resolved it (stored as resolved_by).'), text: str \| None = typer.Option(None, '--text', help="The human's final body when --resolution overridden (resolved_text)."), note: str \| None = typer.Option(None, '--note', help='A free-text note attached to the outcome.'), config: Path = _CONFIG_OPTION, log: Path \| None = typer.Option(None, '--log', help='Resolutions log path (default .cdmon/resolutions.jsonl alongside the review log).')) -> None |
 | rpt | function | @app.command def rpt(config_dir: Path = typer.Option(Path('config') / 'cdmon', '--config-dir', help='The config/cdmon directory to build the coverage report from.'), write: bool = typer.Option(False, '--write', help='Write config/cdmon/coverage.rpt (idempotent, K7). Default prints to stdout and writes nothing (read-only, K1).'), ref: str \| None = typer.Option(None, '--ref', help='Branch/commit the report reflects (provenance, stamped in the frontmatter). Left null when omitted; a later sync slice fills it.')) -> None |

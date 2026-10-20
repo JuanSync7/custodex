@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import html as _html
 import os
+import posixpath
 import re
 from pathlib import Path
 
-from .config import DocumentSpec, MonitorConfig
+from .config import DocumentSpec, MonitorConfig, doc_path
 from .layout import html_twin_path, md_source_hash
 from .manifest import parse_doc
 
@@ -253,6 +254,15 @@ def _doc_title(body: str, fallback: str) -> str:
     return fallback
 
 
+def _twin(spec: DocumentSpec) -> str:
+    """The twin's repo path, named from the NORMALISED doc path (X-CONTAIN).
+
+    Taking the suffix of the raw spelling turned ``docs/g.md/x/..`` (check
+    grades ``docs/g.md``) into ``docs/g.md/x/...html``.
+    """
+    return html_twin_path(posixpath.normpath(spec.path))
+
+
 def _nav(html_docs: list[tuple[DocumentSpec, str]], current: DocumentSpec) -> str:
     """Build a sidebar linking every built doc, relative to ``current``.
 
@@ -260,10 +270,10 @@ def _nav(html_docs: list[tuple[DocumentSpec, str]], current: DocumentSpec) -> st
     grouped under ``nav_section`` headings, preserving config order. When no doc
     declares a section the sidebar is a single flat list (backward compatible).
     """
-    here = os.path.dirname(html_twin_path(current.path))
+    here = os.path.dirname(_twin(current))
 
     def link(spec: DocumentSpec, title: str) -> str:
-        twin = html_twin_path(spec.path)
+        twin = _twin(spec)
         rel = os.path.relpath(twin, start=here) if here else twin
         rel = Path(rel).as_posix()
         label = _html.escape(spec.nav_label or title, quote=False)
@@ -301,8 +311,12 @@ def build(config: MonitorConfig, config_dir: Path) -> list[Path]:
 
     ``root = config_dir / config.root``. Each twin embeds the Markdown body's
     source hash so :func:`custodex.layout.lint_html_twin` recognises it
-    as derived and current. Missing source docs are skipped (``check`` owns
-    existence). Deterministic (K10).
+    as derived and current. Source and twin are named by
+    :func:`custodex.config.doc_path` — the file ``check`` grades — and the twin
+    from the normalised path, so a dotdot doc path neither skips its twin nor
+    publishes a file across a symlink.
+    Missing source docs are skipped (``check`` owns existence). Deterministic
+    (K10).
     """
     root = config_dir / config.root
     specs = [s for s in config.documents if s.html]
@@ -310,7 +324,7 @@ def build(config: MonitorConfig, config_dir: Path) -> list[Path]:
     titled: list[tuple[DocumentSpec, str]] = []
     bodies: dict[str, str] = {}
     for spec in specs:
-        md_path = root / spec.path
+        md_path = doc_path(root, spec.path)
         if not md_path.is_file():
             continue
         body = parse_doc(md_path).body
@@ -326,7 +340,7 @@ def build(config: MonitorConfig, config_dir: Path) -> list[Path]:
             nav=_nav(titled, spec),
             content=render_markdown(body),
         )
-        out_path = root / html_twin_path(spec.path)
+        out_path = doc_path(root, _twin(spec))
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(page, encoding="utf-8")
         written.append(out_path)

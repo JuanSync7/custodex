@@ -1,11 +1,11 @@
 ---
 cdm:
   audience: eng-guide
-  fingerprint: eeda86f5555c69a5
+  fingerprint: 416b98af6a6dd15f
   fingerprint_tiers:
-    composite: eeda86f5555c69a5
-    docstring: a15b68efacd294ee
-    signature: aa4afda9d19e9b65
+    composite: 416b98af6a6dd15f
+    docstring: 76cba537389b0b43
+    signature: 99ef8156ac44f348
   region_anchors:
     symbols:
     - 004e9ebd1915d8c9
@@ -17,14 +17,17 @@ cdm:
     - 051af376199dec21
     - 0712dcd00be0a81f
     - 074762df4f3a44ff
+    - 07a33ab0e3035571
     - 08638cb3cdcf42dc
     - 0a12e5898c92bfc6
     - 0bf8cef39514c73e
+    - 0c0330d173be160a
     - 0c27f67f2c31b80d
     - 0e521d4fec62ad6d
     - 10025d4ecda1075d
     - 113d887bd2c19dd6
     - 136d9c181ab496c9
+    - 1412c5ab59297bf6
     - 159e0d8feb35472d
     - 15bc095714190518
     - 1895c8688854629c
@@ -33,6 +36,7 @@ cdm:
     - 1e07ea56a9427118
     - 1ec4f05521a7e7b1
     - 1ede93272e1a57d4
+    - 24f94dd950c74cae
     - 2555f80e0d364576
     - 270ef1c336073168
     - 288dfcba0083016a
@@ -49,6 +53,7 @@ cdm:
     - 361e732bd9d7bde4
     - 364bbe729c337185
     - 3808bf2494e6a6d5
+    - 3831a7afc7f6e5ca
     - 39abdcbbf673c84a
     - 39e77a39429d0d59
     - 3b0ad2a2d6bcde10
@@ -69,6 +74,7 @@ cdm:
     - 4bd693c8eb73e0b1
     - 4c0e77012c5bd916
     - 4d0f131e6154f657
+    - 4d2b07b56908d235
     - 4d651fed91fab955
     - 4ddbfadee5502368
     - 4e7375ae7fdb9912
@@ -79,6 +85,7 @@ cdm:
     - 52f8f34e1693de4a
     - 54c07a061f4fd73d
     - 55fc83051d88bf5d
+    - 573512ae3b9e7a0f
     - 57c90323dcf86a86
     - 589c039c3fcec020
     - 5943cd04645293aa
@@ -87,6 +94,7 @@ cdm:
     - 5b796a99a6620d75
     - 5bd2d418572469ea
     - 5c782ed8831611b8
+    - 5e80dac2fbb4daee
     - 600ca8c541f775f4
     - 6035b3d7a6bf2f06
     - 64106b8905cc3f50
@@ -107,6 +115,7 @@ cdm:
     - 80e4b8936ff72418
     - 81430bf26368ecb5
     - 8321704f2df523e7
+    - 84c55c1088286246
     - 885465b0a905f535
     - 885ebf8b28869e74
     - 899dae061ed4d088
@@ -114,6 +123,7 @@ cdm:
     - 8b4c82401c9c9ece
     - 8cf2f5b57de3a251
     - 90013b88461d74f4
+    - 9107ba47130b105a
     - 91d9be45ee206114
     - 91da0351cd628564
     - 94b331f386d82287
@@ -124,6 +134,7 @@ cdm:
     - 9bbaff3f7e696fdc
     - 9c539d994525f2c6
     - a0437059f483f15e
+    - a101b506c7fa79c9
     - a22a60c9f0f9ee81
     - a55c42a1f673039a
     - a621340216df5eb0
@@ -154,6 +165,7 @@ cdm:
     - c4d866abae595c15
     - c59d75f794f2c316
     - ca093341ba7e589d
+    - cc338acda4de9eca
     - cc36abe96137112e
     - cd5653449960afec
     - cfa1c5fc66e83838
@@ -171,6 +183,7 @@ cdm:
     - d9d7946672ac11e4
     - da2b2b25df3784d9
     - daa437ec920fd4e8
+    - dbbf8865628eccd4
     - dc6dfac078d0a936
     - e677599d552a8212
     - e7a4f972c13bfd21
@@ -192,7 +205,7 @@ cdm:
     - ff37c21c98f719f1
     - ff6194baacb83320
   region_hashes:
-    symbols: 3c89bb2de3828fcf
+    symbols: f75e08ad1e619b25
   schema_version: 1.0.0
   symbol_sigs:
     004e9ebd1915d8c9: 0b2427314f0d6a54
@@ -201,14 +214,17 @@ cdm:
     051af376199dec21: e7ddc1e5f8554f01
     0712dcd00be0a81f: 8f3d8468eddb45ba
     074762df4f3a44ff: 662d6f015a91af9d
+    07a33ab0e3035571: d74c62f6a06c07f4
     08638cb3cdcf42dc: c882505979dbd4f5
     0a12e5898c92bfc6: 73646d29304739ea
     0bf8cef39514c73e: 0d27b37d0217f6d7
+    0c0330d173be160a: 5cb32b081797d474
     0c27f67f2c31b80d: 6f79b9da25bd52f9
     0e521d4fec62ad6d: 49a9bee754e20719
-    10025d4ecda1075d: 29225a1d0a6890de
+    10025d4ecda1075d: c221fa72d910c19e
     113d887bd2c19dd6: 45a6387a685131d9
     136d9c181ab496c9: 595c5e63aee676b4
+    1412c5ab59297bf6: 767dbda482b529ae
     159e0d8feb35472d: 32516ee4211468a0
     15bc095714190518: e89b62e0a82fb7c7
     1895c8688854629c: d1627051496a337e
@@ -217,6 +233,7 @@ cdm:
     1e07ea56a9427118: ed53dc3c87ac1d9c
     1ec4f05521a7e7b1: 193cd1b7b936c920
     1ede93272e1a57d4: 3a9a91b64214b489
+    24f94dd950c74cae: be1c72312d6d550b
     2555f80e0d364576: e7385bbe4e58c232
     270ef1c336073168: cde8316523b01da1
     288dfcba0083016a: ddebbd8ef453600a
@@ -233,6 +250,7 @@ cdm:
     361e732bd9d7bde4: e7d867a0bed31637
     364bbe729c337185: 3f137956c02962af
     3808bf2494e6a6d5: aa7f81a49d484427
+    3831a7afc7f6e5ca: b9a340f97b98bb06
     39abdcbbf673c84a: 73efa4029814d76a
     39e77a39429d0d59: 812ba0a39a7aec07
     3b0ad2a2d6bcde10: 4ac93eb1da1f5743
@@ -253,6 +271,7 @@ cdm:
     4bd693c8eb73e0b1: 7d877e2be3168bca
     4c0e77012c5bd916: 85ddb9ba634754c8
     4d0f131e6154f657: cebccb0d17ffece3
+    4d2b07b56908d235: fa4d74459d7dc5a3
     4d651fed91fab955: 427d9853b4dee746
     4ddbfadee5502368: 9f2ce919923adc7f
     4e7375ae7fdb9912: 897204e7e502fcd4
@@ -263,6 +282,7 @@ cdm:
     52f8f34e1693de4a: 24e407a3ae8a4a99
     54c07a061f4fd73d: 818459d645d53fc0
     55fc83051d88bf5d: eb345adb883afd91
+    573512ae3b9e7a0f: d26f7aae7d0e5709
     57c90323dcf86a86: 43f20c2c5d480b3d
     589c039c3fcec020: 43f2a322232f37fd
     5943cd04645293aa: 9d35ae38fc65629e
@@ -271,6 +291,7 @@ cdm:
     5b796a99a6620d75: 927f284271ea9ecc
     5bd2d418572469ea: 1c6375374ad2212d
     5c782ed8831611b8: f2e359ab94ec0879
+    5e80dac2fbb4daee: 5c7d23c5d5cddfdb
     600ca8c541f775f4: dafeb4429ba11202
     6035b3d7a6bf2f06: 1b01b63e500febc5
     64106b8905cc3f50: cd77c10d1a799a2b
@@ -291,6 +312,7 @@ cdm:
     80e4b8936ff72418: 437444b65d0f9e2d
     81430bf26368ecb5: 555ce487830f4bdd
     8321704f2df523e7: bcf05a6ac24dd2cf
+    84c55c1088286246: 41639ce1e2e5dbcd
     885465b0a905f535: bf66d3fdb4631ae9
     885ebf8b28869e74: a33397aa0ecb90cb
     899dae061ed4d088: b535dbf724712c91
@@ -298,6 +320,7 @@ cdm:
     8b4c82401c9c9ece: 60490aa9666ceacb
     8cf2f5b57de3a251: 9991431c8554d487
     90013b88461d74f4: ef6b9d6aadb179fc
+    9107ba47130b105a: 7738e1d4acb407ca
     91d9be45ee206114: e526fb8f5216cd49
     91da0351cd628564: ce122e1dd2b84208
     94b331f386d82287: f289b3e1a9ecadba
@@ -308,6 +331,7 @@ cdm:
     9bbaff3f7e696fdc: da193b6b0defa735
     9c539d994525f2c6: ddfc0606b4de34d3
     a0437059f483f15e: 951c156261b394ef
+    a101b506c7fa79c9: f816286c2589f1e9
     a22a60c9f0f9ee81: 5d89f7dc56b2bbf1
     a55c42a1f673039a: 27ff49f5012b88e5
     a621340216df5eb0: 7e9fff657113ef35
@@ -338,6 +362,7 @@ cdm:
     c4d866abae595c15: 64ddd8b4094c8ada
     c59d75f794f2c316: 4ba042545f4b9f06
     ca093341ba7e589d: a6f823a0cb63bba0
+    cc338acda4de9eca: b7772f2506561547
     cc36abe96137112e: 30c0c5a3cf1e4104
     cd5653449960afec: 65444258d7cb91d3
     cfa1c5fc66e83838: 16d2bfcf890c397b
@@ -355,6 +380,7 @@ cdm:
     d9d7946672ac11e4: b5566b60f7e461f7
     da2b2b25df3784d9: 11f3dcfeebde4018
     daa437ec920fd4e8: 2c6a9e4ffc766df2
+    dbbf8865628eccd4: 6252a2603a65652b
     dc6dfac078d0a936: 25435577fef8f145
     e677599d552a8212: 2e6feff327da226a
     e7a4f972c13bfd21: 264eb3f19e7b5678
@@ -476,11 +502,15 @@ cdm:
 | Symbol.signature | variable | signature: str |
 | SymbolKind | variable | SymbolKind = ... |
 | _BEGIN | variable | _BEGIN = re.compile('^<!-- CDM:BEGIN (\\\\S+) -->\\\\s*$') |
+| _CDM_KEY | variable | _CDM_KEY = 'cdm' |
 | _END | variable | _END = re.compile('^<!-- CDM:END (\\\\S+) -->\\\\s*$') |
 | _EXTRACTORS | variable | _EXTRACTORS: dict[str, Extractor] = {'python': PythonAstExtractor()} |
 | _FM_RE | variable | _FM_RE = ... |
+| _FrontMatterDumper | class | class _FrontMatterDumper(yaml.SafeDumper) |
 | _MAX_VALUE_LEN | variable | _MAX_VALUE_LEN = 48 |
+| _MERGE_TAG | variable | _MERGE_TAG = 'tag:yaml.org,2002:merge' |
 | _MODEL_CONFIG | variable | _MODEL_CONFIG = ConfigDict(extra='forbid', frozen=True) |
+| _NON_CONTENT_TOKENS | variable | _NON_CONTENT_TOKENS = (yaml.BlockEndToken, yaml.StreamEndToken) |
 | _SHELL_DEF_RE | variable | _SHELL_DEF_RE = ... |
 | _SH_CASE_SWITCH | variable | _SH_CASE_SWITCH = re.compile('(--?[A-Za-z][\\\\w-]*)(?=[)\|])') |
 | _SH_GETOPTS | variable | _SH_GETOPTS = ... |
@@ -501,6 +531,9 @@ cdm:
 | _const_str | function | def _const_str(node: ast.expr \| None, max_len: int \| None = 80) -> str |
 | _decorator_name | function | def _decorator_name(node: ast.expr) -> str \| None |
 | _decorator_names | function | def _decorator_names(node: ast.FunctionDef \| ast.AsyncFunctionDef) -> tuple[str, ...] |
+| _dump_entry | function | def _dump_entry(key: Any, value: Any) -> str |
+| _dump_mapping | function | def _dump_mapping(mapping: dict[str, Any]) -> str |
+| _entry_spans | function | def _entry_spans(fm_text: str, root: yaml.MappingNode) -> tuple[str, dict[Any, tuple[int, int, int]]] \| None |
 | _extract_python_symbols | function | def _extract_python_symbols(path: Path) -> list[Symbol] |
 | _extract_shell_symbols | function | def _extract_shell_symbols(path: Path) -> list[Symbol] |
 | _format_args | function | def _format_args(args: ast.arguments) -> str |
@@ -513,13 +546,18 @@ cdm:
 | _py_switches | function | def _py_switches(text: str, path: Path) -> set[str] |
 | _record_cell | function | def _record_cell(col: RegionColumn, rec: Record) -> str |
 | _records_for_ref | function | def _records_for_ref(ref: CodeRef, root: Path) -> list[Record] |
+| _represent_set | function | def _represent_set(dumper: yaml.SafeDumper, data: Any) -> yaml.Node |
 | _row | function | def _row(sym: Symbol) -> str |
+| _same | function | def _same(a: Any, b: Any, seen: set[tuple[int, int]] \| None = None) -> bool |
 | _select | function | def _select(symbols: list[Symbol], ref_symbols: tuple[str, ...], ref_lines: tuple[tuple[int, int], ...], ref_names: tuple[str, ...]) -> list[Symbol] |
 | _sh_switches | function | def _sh_switches(text: str) -> set[str] |
 | _shell_block_end | function | def _shell_block_end(lines: list[str], start_idx: int, start_col: int) -> int |
 | _shell_docstring | function | def _shell_docstring(lines: list[str], header_idx: int) -> str \| None |
 | _short_diff | function | def _short_diff(expected: str, actual: str, region_id: str) -> str |
 | _signature_reproduced | function | def _signature_reproduced(surface: DocumentSurface, set_aside: Collection[str], stored_tiers: SurfaceFingerprint) -> bool |
+| _sorted_tree | function | def _sorted_tree(value: Any, memo: dict[int, Any] \| None = None) -> Any |
+| _splice_front_matter | function | def _splice_front_matter(fm_text: str, meta: dict[str, Any], parsed: dict[str, Any]) -> str \| None |
+| _split_document_end | function | def _split_document_end(fm_text: str) -> tuple[str, str] |
 | _stale_stamp_overcounts | function | def _stale_stamp_overcounts(surface: DocumentSurface, current_counts: Counter[str], stored_counts: Counter[str], stored_tiers: SurfaceFingerprint \| None, drifted_tiers: Sequence[str]) -> frozenset[str] |
 | _switch_strings | function | def _switch_strings(node: ast.AST) -> list[str] |
 | _symbol_cell | function | def _symbol_cell(col: RegionColumn, sym: Symbol) -> str |
@@ -528,6 +566,7 @@ cdm:
 | _tcl_switches | function | def _tcl_switches(text: str) -> set[str] |
 | _value_repr | function | def _value_repr(node: ast.expr) -> str |
 | _variable_symbols | function | def _variable_symbols(node: ast.Assign \| ast.AnnAssign, *, qualifier: str = '') -> list[Symbol] |
+| _with_sorted_cdm | function | def _with_sorted_cdm(meta: dict[str, Any]) -> dict[str, Any] |
 | anchor_id | function | def anchor_id(qualified_name: str) -> str |
 | auto_routable_docs | function | def auto_routable_docs(report: DriftReport) -> frozenset[str] |
 | build_document_surface | function | def build_document_surface(doc: DocumentSpec, root: Path) -> DocumentSurface |
@@ -550,7 +589,7 @@ cdm:
 | region_is_locked | function | def region_is_locked(doc: Doc, region_id: str, current_body: str) -> bool |
 | regions | function | def regions(doc: Doc) -> dict[str, str] |
 | register_extractor | function | def register_extractor(extractor: Extractor, *, suffixes: tuple[str, ...] = ()) -> None |
-| render_doc | function | def render_doc(meta: dict[str, Any], body: str) -> str |
+| render_doc | function | def render_doc(meta: dict[str, Any], body: str, *, source: str \| None = None) -> str |
 | render_template | function | def render_template(template: RegionTemplate, surface: DocumentSurface) -> str |
 | set_fingerprint | function | def set_fingerprint(meta: dict[str, Any], value: str) -> dict[str, Any] |
 | set_fingerprint_tiers | function | def set_fingerprint_tiers(meta: dict[str, Any], fp: SurfaceFingerprint) -> dict[str, Any] |

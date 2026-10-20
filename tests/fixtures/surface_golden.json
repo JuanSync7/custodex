@@ -1,0 +1,3489 @@
+{
+  "repins": [],
+  "trees": {
+    "enc2/body-off": {
+      "codeindex": {
+        "files": [
+          {
+            "content_digest": "41bc69cc39390fe1",
+            "language": "python",
+            "path": "pkg/cli.py",
+            "symbols": [
+              {
+                "anchor": "a172cedcae47474b",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 7,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 7,
+                "name": "app",
+                "sig_digest": "21ae03d102cebaec",
+                "signature": "app = typer.Typer()"
+              },
+              {
+                "anchor": "be10dc7c57718568",
+                "body_digest": "0aee9ccb51445633",
+                "doc_digest": "fe98ed9ff6d104f2",
+                "end_lineno": 13,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 11,
+                "name": "config_path",
+                "sig_digest": "73196b797d72ed0c",
+                "signature": "@functools.cache\ndef config_path() -> str"
+              },
+              {
+                "anchor": "e82c1873abb16d6d",
+                "body_digest": "1a49b0398f4503de",
+                "doc_digest": "e37930cb5f2d0af5",
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 17,
+                "name": "sync_all",
+                "sig_digest": "80194cbfeba149c4",
+                "signature": "@app.command\ndef sync_all(dry_run: bool = False) -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "33a0ccedc43a7a46",
+            "language": "python",
+            "path": "pkg/helpers.py",
+            "symbols": [
+              {
+                "anchor": "cc83ddc1b2feeb72",
+                "body_digest": "d769121ddd87c217",
+                "doc_digest": "ba7166aaf8b454cd",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "normalise",
+                "sig_digest": "eaa28af70c0ea458",
+                "signature": "def normalise(text: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "d817216f923c6c14",
+            "language": "python",
+            "path": "pkg/models.py",
+            "symbols": [
+              {
+                "anchor": "652bcc3a47842889",
+                "body_digest": null,
+                "doc_digest": "d80de7e5fdf48983",
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 6,
+                "name": "Item",
+                "sig_digest": "ecd3240014b8e586",
+                "signature": "class Item(BaseModel)"
+              },
+              {
+                "anchor": "4e12cecccbeeec2d",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 9,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 9,
+                "name": "Item.name",
+                "sig_digest": "8b8f8d131dfd51b9",
+                "signature": "name: str"
+              },
+              {
+                "anchor": "6389da0a505a4d0a",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 10,
+                "name": "Item.price",
+                "sig_digest": "27d4123be539b07d",
+                "signature": "price: float = 0.0"
+              },
+              {
+                "anchor": "7dd7a28c2ff9e308",
+                "body_digest": null,
+                "doc_digest": "abccae8c3612877f",
+                "end_lineno": 26,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 13,
+                "name": "Widget",
+                "sig_digest": "10e56c211bb15307",
+                "signature": "class Widget"
+              },
+              {
+                "anchor": "d15ba48afa285e4a",
+                "body_digest": "ccdb80bf145b1f88",
+                "doc_digest": null,
+                "end_lineno": 17,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 16,
+                "name": "Widget.__init__",
+                "sig_digest": "ff556e6f7a54220e",
+                "signature": "def __init__(self, size: int = 1) -> None"
+              },
+              {
+                "anchor": "a6b7e556f733a02c",
+                "body_digest": "411055ff645b3ae2",
+                "doc_digest": "ff1db563b52a173b",
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 20,
+                "name": "Widget.size",
+                "sig_digest": "0654cc90e3cbf7cb",
+                "signature": "@property\ndef size(self) -> int"
+              },
+              {
+                "anchor": "a6b7e556f733a02c",
+                "body_digest": "9b76a3ba73652f40",
+                "doc_digest": null,
+                "end_lineno": 26,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 25,
+                "name": "Widget.size",
+                "sig_digest": "c1d2bf14205fc264",
+                "signature": "@size.setter\ndef size(self, value: int) -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "b535011eeb953004",
+            "language": "python",
+            "path": "pkg/neutral.py",
+            "symbols": [
+              {
+                "anchor": "37a77be39a30e18a",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 3,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 3,
+                "name": "GREETING",
+                "sig_digest": "d2e00f31d95d64fb",
+                "signature": "GREETING = 'hello'"
+              },
+              {
+                "anchor": "231bf89d72682689",
+                "body_digest": "ef97f4594ce27588",
+                "doc_digest": "095951fcbc04ac8a",
+                "end_lineno": 8,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 6,
+                "name": "greet",
+                "sig_digest": "0992006d8d7161b5",
+                "signature": "def greet(name: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "984b6acce45d27e4",
+            "language": "python",
+            "path": "pkg/util.py",
+            "symbols": [
+              {
+                "anchor": "cc83ddc1b2feeb72",
+                "body_digest": "6ebfe4aa01a6daf9",
+                "doc_digest": "8e1c664291c84d51",
+                "end_lineno": 7,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "normalise",
+                "sig_digest": "c8a2663ae76ad63a",
+                "signature": "def normalise(text: str, *, keep_case: bool = False) -> str"
+              }
+            ]
+          }
+        ],
+        "schema_version": "1.0.0"
+      },
+      "coverage": {
+        "files": [
+          {
+            "language": "python",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/helpers.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "legacy",
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/util.py",
+            "waived_reason": null
+          }
+        ],
+        "percent_files": 100.0,
+        "percent_public_symbols": 100.0,
+        "suggestions": [],
+        "symbols": [
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "app",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "config_path",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "sync_all",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "normalise",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/helpers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Item",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Item.name",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Item.price",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Widget",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.__init__",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.size",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.size",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "GREETING",
+            "owners": [
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "greet",
+            "owners": [
+              "legacy",
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "normalise",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/util.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_files": [],
+        "undocumented_symbols": [],
+        "waived_files": [],
+        "waived_symbols": []
+      },
+      "documents": {
+        "cli": {
+          "fingerprint": "424497eca25ddf59",
+          "fingerprint_tiers": {
+            "composite": "424497eca25ddf59",
+            "docstring": "b253c5db9db8b62c",
+            "signature": "72e87f1cdcd9b793"
+          },
+          "path": "docs/cli.md",
+          "region_anchors": {
+            "symbols": [
+              "a172cedcae47474b",
+              "be10dc7c57718568",
+              "e82c1873abb16d6d"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "app",
+                "variable",
+                "app = typer.Typer()"
+              ],
+              [
+                "config_path",
+                "function",
+                "@functools.cache\ndef config_path() -> str"
+              ],
+              [
+                "sync_all",
+                "function",
+                "@app.command\ndef sync_all(dry_run: bool = False) -> None"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "a172cedcae47474b": "21ae03d102cebaec",
+            "be10dc7c57718568": "73196b797d72ed0c",
+            "e82c1873abb16d6d": "80194cbfeba149c4"
+          }
+        },
+        "helpers": {
+          "fingerprint": "96c8b7673d1eff5e",
+          "fingerprint_tiers": {
+            "composite": "96c8b7673d1eff5e",
+            "docstring": "4c6a37927b29a279",
+            "signature": "ea4988cd1f9a1bb1"
+          },
+          "path": "docs/helpers.md",
+          "region_anchors": {
+            "symbols": [
+              "cc83ddc1b2feeb72",
+              "cc83ddc1b2feeb72"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "normalise",
+                "function",
+                "def normalise(text: str) -> str"
+              ],
+              [
+                "normalise",
+                "function",
+                "def normalise(text: str, *, keep_case: bool = False) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "cc83ddc1b2feeb72": "c8a2663ae76ad63a"
+          }
+        },
+        "legacy": {
+          "fingerprint": "08f65ed3825cbdfd",
+          "fingerprint_tiers": {
+            "composite": "08f65ed3825cbdfd",
+            "signature": "08f65ed3825cbdfd"
+          },
+          "path": "docs/legacy.md",
+          "region_anchors": {
+            "symbols": [
+              "231bf89d72682689"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "greet",
+                "function",
+                "def greet(name: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "231bf89d72682689": "0992006d8d7161b5"
+          }
+        },
+        "model": {
+          "fingerprint": "5c1dda59597f4dbd",
+          "fingerprint_tiers": {
+            "composite": "5c1dda59597f4dbd",
+            "docstring": "55a9115d21932dad",
+            "signature": "b745ea25e12a3b12"
+          },
+          "path": "docs/model.md",
+          "region_anchors": {
+            "symbols": [
+              "4e12cecccbeeec2d",
+              "6389da0a505a4d0a",
+              "652bcc3a47842889",
+              "7dd7a28c2ff9e308",
+              "a6b7e556f733a02c",
+              "a6b7e556f733a02c",
+              "d15ba48afa285e4a"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Item",
+                "class",
+                "class Item(BaseModel)"
+              ],
+              [
+                "Item.name",
+                "variable",
+                "name: str"
+              ],
+              [
+                "Item.price",
+                "variable",
+                "price: float = 0.0"
+              ],
+              [
+                "Widget",
+                "class",
+                "class Widget"
+              ],
+              [
+                "Widget.__init__",
+                "method",
+                "def __init__(self, size: int = 1) -> None"
+              ],
+              [
+                "Widget.size",
+                "method",
+                "@property\ndef size(self) -> int"
+              ],
+              [
+                "Widget.size",
+                "method",
+                "@size.setter\ndef size(self, value: int) -> None"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "4e12cecccbeeec2d": "8b8f8d131dfd51b9",
+            "6389da0a505a4d0a": "27d4123be539b07d",
+            "652bcc3a47842889": "ecd3240014b8e586",
+            "7dd7a28c2ff9e308": "10e56c211bb15307",
+            "a6b7e556f733a02c": "c1d2bf14205fc264",
+            "d15ba48afa285e4a": "ff556e6f7a54220e"
+          }
+        },
+        "neutral": {
+          "fingerprint": "b7d0564a692e7934",
+          "fingerprint_tiers": {
+            "composite": "b7d0564a692e7934",
+            "docstring": "b822480ae26e6649",
+            "signature": "49640aee0d57a70a"
+          },
+          "path": "docs/neutral.md",
+          "region_anchors": {
+            "symbols": [
+              "231bf89d72682689",
+              "37a77be39a30e18a"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "GREETING",
+                "variable",
+                "GREETING = 'hello'"
+              ],
+              [
+                "greet",
+                "function",
+                "def greet(name: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "231bf89d72682689": "0992006d8d7161b5",
+            "37a77be39a30e18a": "d2e00f31d95d64fb"
+          }
+        }
+      }
+    },
+    "enc2/body-on": {
+      "codeindex": {
+        "files": [
+          {
+            "content_digest": "41bc69cc39390fe1",
+            "language": "python",
+            "path": "pkg/cli.py",
+            "symbols": [
+              {
+                "anchor": "a172cedcae47474b",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 7,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 7,
+                "name": "app",
+                "sig_digest": "21ae03d102cebaec",
+                "signature": "app = typer.Typer()"
+              },
+              {
+                "anchor": "be10dc7c57718568",
+                "body_digest": "0aee9ccb51445633",
+                "doc_digest": "fe98ed9ff6d104f2",
+                "end_lineno": 13,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 11,
+                "name": "config_path",
+                "sig_digest": "73196b797d72ed0c",
+                "signature": "@functools.cache\ndef config_path() -> str"
+              },
+              {
+                "anchor": "e82c1873abb16d6d",
+                "body_digest": "1a49b0398f4503de",
+                "doc_digest": "e37930cb5f2d0af5",
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 17,
+                "name": "sync_all",
+                "sig_digest": "80194cbfeba149c4",
+                "signature": "@app.command\ndef sync_all(dry_run: bool = False) -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "33a0ccedc43a7a46",
+            "language": "python",
+            "path": "pkg/helpers.py",
+            "symbols": [
+              {
+                "anchor": "cc83ddc1b2feeb72",
+                "body_digest": "d769121ddd87c217",
+                "doc_digest": "ba7166aaf8b454cd",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "normalise",
+                "sig_digest": "eaa28af70c0ea458",
+                "signature": "def normalise(text: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "d817216f923c6c14",
+            "language": "python",
+            "path": "pkg/models.py",
+            "symbols": [
+              {
+                "anchor": "652bcc3a47842889",
+                "body_digest": null,
+                "doc_digest": "d80de7e5fdf48983",
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 6,
+                "name": "Item",
+                "sig_digest": "ecd3240014b8e586",
+                "signature": "class Item(BaseModel)"
+              },
+              {
+                "anchor": "4e12cecccbeeec2d",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 9,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 9,
+                "name": "Item.name",
+                "sig_digest": "8b8f8d131dfd51b9",
+                "signature": "name: str"
+              },
+              {
+                "anchor": "6389da0a505a4d0a",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 10,
+                "name": "Item.price",
+                "sig_digest": "27d4123be539b07d",
+                "signature": "price: float = 0.0"
+              },
+              {
+                "anchor": "7dd7a28c2ff9e308",
+                "body_digest": null,
+                "doc_digest": "abccae8c3612877f",
+                "end_lineno": 26,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 13,
+                "name": "Widget",
+                "sig_digest": "10e56c211bb15307",
+                "signature": "class Widget"
+              },
+              {
+                "anchor": "d15ba48afa285e4a",
+                "body_digest": "ccdb80bf145b1f88",
+                "doc_digest": null,
+                "end_lineno": 17,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 16,
+                "name": "Widget.__init__",
+                "sig_digest": "ff556e6f7a54220e",
+                "signature": "def __init__(self, size: int = 1) -> None"
+              },
+              {
+                "anchor": "a6b7e556f733a02c",
+                "body_digest": "411055ff645b3ae2",
+                "doc_digest": "ff1db563b52a173b",
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 20,
+                "name": "Widget.size",
+                "sig_digest": "0654cc90e3cbf7cb",
+                "signature": "@property\ndef size(self) -> int"
+              },
+              {
+                "anchor": "a6b7e556f733a02c",
+                "body_digest": "9b76a3ba73652f40",
+                "doc_digest": null,
+                "end_lineno": 26,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 25,
+                "name": "Widget.size",
+                "sig_digest": "c1d2bf14205fc264",
+                "signature": "@size.setter\ndef size(self, value: int) -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "b535011eeb953004",
+            "language": "python",
+            "path": "pkg/neutral.py",
+            "symbols": [
+              {
+                "anchor": "37a77be39a30e18a",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 3,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 3,
+                "name": "GREETING",
+                "sig_digest": "d2e00f31d95d64fb",
+                "signature": "GREETING = 'hello'"
+              },
+              {
+                "anchor": "231bf89d72682689",
+                "body_digest": "ef97f4594ce27588",
+                "doc_digest": "095951fcbc04ac8a",
+                "end_lineno": 8,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 6,
+                "name": "greet",
+                "sig_digest": "0992006d8d7161b5",
+                "signature": "def greet(name: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "984b6acce45d27e4",
+            "language": "python",
+            "path": "pkg/util.py",
+            "symbols": [
+              {
+                "anchor": "cc83ddc1b2feeb72",
+                "body_digest": "6ebfe4aa01a6daf9",
+                "doc_digest": "8e1c664291c84d51",
+                "end_lineno": 7,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "normalise",
+                "sig_digest": "c8a2663ae76ad63a",
+                "signature": "def normalise(text: str, *, keep_case: bool = False) -> str"
+              }
+            ]
+          }
+        ],
+        "schema_version": "1.0.0"
+      },
+      "coverage": {
+        "files": [
+          {
+            "language": "python",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/helpers.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "legacy",
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/util.py",
+            "waived_reason": null
+          }
+        ],
+        "percent_files": 100.0,
+        "percent_public_symbols": 100.0,
+        "suggestions": [],
+        "symbols": [
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "app",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "config_path",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "sync_all",
+            "owners": [
+              "cli"
+            ],
+            "path": "pkg/cli.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "normalise",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/helpers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Item",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Item.name",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Item.price",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Widget",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.__init__",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.size",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Widget.size",
+            "owners": [
+              "model"
+            ],
+            "path": "pkg/models.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "GREETING",
+            "owners": [
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "greet",
+            "owners": [
+              "legacy",
+              "neutral"
+            ],
+            "path": "pkg/neutral.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "normalise",
+            "owners": [
+              "helpers"
+            ],
+            "path": "pkg/util.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_files": [],
+        "undocumented_symbols": [],
+        "waived_files": [],
+        "waived_symbols": []
+      },
+      "documents": {
+        "cli": {
+          "fingerprint": "2e645b306d5aebc2",
+          "fingerprint_tiers": {
+            "body": "18d1c6fb3e2d6259",
+            "composite": "2e645b306d5aebc2",
+            "docstring": "b253c5db9db8b62c",
+            "signature": "72e87f1cdcd9b793"
+          },
+          "path": "docs/cli.md",
+          "region_anchors": {
+            "symbols": [
+              "a172cedcae47474b",
+              "be10dc7c57718568",
+              "e82c1873abb16d6d"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "app",
+                "variable",
+                "app = typer.Typer()"
+              ],
+              [
+                "config_path",
+                "function",
+                "@functools.cache\ndef config_path() -> str"
+              ],
+              [
+                "sync_all",
+                "function",
+                "@app.command\ndef sync_all(dry_run: bool = False) -> None"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "a172cedcae47474b": "21ae03d102cebaec",
+            "be10dc7c57718568": "73196b797d72ed0c",
+            "e82c1873abb16d6d": "80194cbfeba149c4"
+          }
+        },
+        "helpers": {
+          "fingerprint": "7feecb1173b36846",
+          "fingerprint_tiers": {
+            "body": "5c416953fe44d4bf",
+            "composite": "7feecb1173b36846",
+            "docstring": "4c6a37927b29a279",
+            "signature": "ea4988cd1f9a1bb1"
+          },
+          "path": "docs/helpers.md",
+          "region_anchors": {
+            "symbols": [
+              "cc83ddc1b2feeb72",
+              "cc83ddc1b2feeb72"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "normalise",
+                "function",
+                "def normalise(text: str) -> str"
+              ],
+              [
+                "normalise",
+                "function",
+                "def normalise(text: str, *, keep_case: bool = False) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "cc83ddc1b2feeb72": "c8a2663ae76ad63a"
+          }
+        },
+        "legacy": {
+          "fingerprint": "08f65ed3825cbdfd",
+          "fingerprint_tiers": {
+            "composite": "08f65ed3825cbdfd",
+            "signature": "08f65ed3825cbdfd"
+          },
+          "path": "docs/legacy.md",
+          "region_anchors": {
+            "symbols": [
+              "231bf89d72682689"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "greet",
+                "function",
+                "def greet(name: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "231bf89d72682689": "0992006d8d7161b5"
+          }
+        },
+        "model": {
+          "fingerprint": "a602acba64b50817",
+          "fingerprint_tiers": {
+            "body": "4c533a965b8558d0",
+            "composite": "a602acba64b50817",
+            "docstring": "55a9115d21932dad",
+            "signature": "b745ea25e12a3b12"
+          },
+          "path": "docs/model.md",
+          "region_anchors": {
+            "symbols": [
+              "4e12cecccbeeec2d",
+              "6389da0a505a4d0a",
+              "652bcc3a47842889",
+              "7dd7a28c2ff9e308",
+              "a6b7e556f733a02c",
+              "a6b7e556f733a02c",
+              "d15ba48afa285e4a"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Item",
+                "class",
+                "class Item(BaseModel)"
+              ],
+              [
+                "Item.name",
+                "variable",
+                "name: str"
+              ],
+              [
+                "Item.price",
+                "variable",
+                "price: float = 0.0"
+              ],
+              [
+                "Widget",
+                "class",
+                "class Widget"
+              ],
+              [
+                "Widget.__init__",
+                "method",
+                "def __init__(self, size: int = 1) -> None"
+              ],
+              [
+                "Widget.size",
+                "method",
+                "@property\ndef size(self) -> int"
+              ],
+              [
+                "Widget.size",
+                "method",
+                "@size.setter\ndef size(self, value: int) -> None"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "4e12cecccbeeec2d": "8b8f8d131dfd51b9",
+            "6389da0a505a4d0a": "27d4123be539b07d",
+            "652bcc3a47842889": "ecd3240014b8e586",
+            "7dd7a28c2ff9e308": "10e56c211bb15307",
+            "a6b7e556f733a02c": "c1d2bf14205fc264",
+            "d15ba48afa285e4a": "ff556e6f7a54220e"
+          }
+        },
+        "neutral": {
+          "fingerprint": "78f765268bc01d85",
+          "fingerprint_tiers": {
+            "body": "2b7ccbbe17d9ee54",
+            "composite": "78f765268bc01d85",
+            "docstring": "b822480ae26e6649",
+            "signature": "49640aee0d57a70a"
+          },
+          "path": "docs/neutral.md",
+          "region_anchors": {
+            "symbols": [
+              "231bf89d72682689",
+              "37a77be39a30e18a"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "GREETING",
+                "variable",
+                "GREETING = 'hello'"
+              ],
+              [
+                "greet",
+                "function",
+                "def greet(name: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "231bf89d72682689": "0992006d8d7161b5",
+            "37a77be39a30e18a": "d2e00f31d95d64fb"
+          }
+        }
+      }
+    },
+    "synthetic/body-off": {
+      "codeindex": {
+        "files": [
+          {
+            "content_digest": "12ac0b8dc6913aec",
+            "language": "unknown",
+            "path": "data/flags.json",
+            "symbols": []
+          },
+          {
+            "content_digest": "468fd03b86495316",
+            "language": "python",
+            "path": "pkg/cli_args.py",
+            "symbols": [
+              {
+                "anchor": "8b92e2ea47ccb0d1",
+                "body_digest": "4d030da50ee7910d",
+                "doc_digest": "e6705bbebe9cb9ba",
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 7,
+                "name": "build_parser",
+                "sig_digest": "ffbefd13cbdcf28e",
+                "signature": "def build_parser() -> argparse.ArgumentParser"
+              },
+              {
+                "anchor": "3f6bd64cda20543a",
+                "body_digest": "832ef01334729142",
+                "doc_digest": "487925b73e171290",
+                "end_lineno": 24,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 22,
+                "name": "legacy_quiet",
+                "sig_digest": "266a45704be8c707",
+                "signature": "def legacy_quiet() -> bool"
+              }
+            ]
+          },
+          {
+            "content_digest": "d6c1d8ef557e89a5",
+            "language": "python",
+            "path": "pkg/handlers.py",
+            "symbols": [
+              {
+                "anchor": "065d8e6c0bf74a69",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 12,
+                "name": "Router",
+                "sig_digest": "1523c0ed54cc9272",
+                "signature": "class Router"
+              },
+              {
+                "anchor": "91216f48b4d961ec",
+                "body_digest": "33723306c9b6efe3",
+                "doc_digest": null,
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 21,
+                "name": "Router.dispatch",
+                "sig_digest": "dd30b13be0129bb2",
+                "signature": "def dispatch(self, request: str, context: dict[str, str]) -> str"
+              },
+              {
+                "anchor": "d08e0253144cb6b9",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 18,
+                "name": "Router.on_delete",
+                "sig_digest": "bc9624558d7f106e",
+                "signature": "def on_delete(self, request: str) -> str"
+              },
+              {
+                "anchor": "74e0c83f8c7ccc87",
+                "body_digest": "70a35c0903ade3bb",
+                "doc_digest": null,
+                "end_lineno": 15,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 13,
+                "name": "Router.on_post",
+                "sig_digest": "590d1c6d547a9943",
+                "signature": "def on_post(self, request: str) -> str"
+              },
+              {
+                "anchor": "7d6b36b03d9d471c",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 9,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 8,
+                "name": "on_get",
+                "sig_digest": "c0cb16f63669a9c3",
+                "signature": "def on_get(request: str) -> str"
+              },
+              {
+                "anchor": "758d61f26a444483",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "ping",
+                "sig_digest": "9e1fe07037a946ed",
+                "signature": "def ping(request: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "bd7434204499197f",
+            "language": "python",
+            "path": "pkg/legacy_api.py",
+            "symbols": [
+              {
+                "anchor": "ecdf80a4ee7f8321",
+                "body_digest": "e3b0c44298fc1c14",
+                "doc_digest": "08e70946c817d940",
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "old_call",
+                "sig_digest": "d36f77b7c08374ae",
+                "signature": "def old_call() -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "a29d30c4b3306faa",
+            "language": "python",
+            "path": "pkg/orphan.py",
+            "symbols": [
+              {
+                "anchor": "1cb0f5a9e3a8e4dd",
+                "body_digest": "4d9e3bd49f1ca0e5",
+                "doc_digest": "8426f2f967730cd4",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "lonely",
+                "sig_digest": "dc810b98719e97a8",
+                "signature": "def lonely() -> int"
+              }
+            ]
+          },
+          {
+            "content_digest": "13bbfebda94c7088",
+            "language": "python",
+            "path": "pkg/settings.py",
+            "symbols": [
+              {
+                "anchor": "b6deb0ad66bcad13",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 3,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 3,
+                "name": "DEFAULT_TIMEOUT",
+                "sig_digest": "eb1cb7062144b3d7",
+                "signature": "DEFAULT_TIMEOUT = 30"
+              },
+              {
+                "anchor": "3072808f082c54aa",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 5,
+                "name": "EXACT_48",
+                "sig_digest": "2a6f1ec6b163378f",
+                "signature": "EXACT_48 = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'"
+              },
+              {
+                "anchor": "f5d3c58628ea83db",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 6,
+                "name": "LONG_49",
+                "sig_digest": "d175eb05484c3587",
+                "signature": "LONG_49 = ..."
+              },
+              {
+                "anchor": "8e89df5fb737c26b",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 4,
+                "is_public": false,
+                "kind": "variable",
+                "lineno": 4,
+                "name": "_SECRET",
+                "sig_digest": "c57216949efc5e80",
+                "signature": "_SECRET = 's3cr3t'"
+              },
+              {
+                "anchor": "758d61f26a444483",
+                "body_digest": "349214c6e59673c6",
+                "doc_digest": "bc2f27ec0507df48",
+                "end_lineno": 11,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 9,
+                "name": "ping",
+                "sig_digest": "b7ecfc59b42b5e3e",
+                "signature": "def ping() -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "2a126f77a3305321",
+            "language": "python",
+            "path": "pkg/shapes.py",
+            "symbols": [
+              {
+                "anchor": "2fc0c524431a9236",
+                "body_digest": null,
+                "doc_digest": "fdbe42c8852992a5",
+                "end_lineno": 16,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 7,
+                "name": "Point",
+                "sig_digest": "3c23a814309591d9",
+                "signature": "class Point"
+              },
+              {
+                "anchor": "10990a6684f63118",
+                "body_digest": "af7991424c95acd0",
+                "doc_digest": "db2824a0559ab7c3",
+                "end_lineno": 16,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 14,
+                "name": "Point.norm",
+                "sig_digest": "93d3c5dc7f178d7c",
+                "signature": "def norm(self) -> float"
+              },
+              {
+                "anchor": "72ac1bc3925871a5",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 12,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 12,
+                "name": "Point.tags",
+                "sig_digest": "d5dcd3c17e7ee4f2",
+                "signature": "tags: list[str] = field(default_factory=list)"
+              },
+              {
+                "anchor": "5d309c0d50f0adb4",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 10,
+                "name": "Point.x",
+                "sig_digest": "3503b3d796dae12f",
+                "signature": "x: float"
+              },
+              {
+                "anchor": "583158842ade8579",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 11,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 11,
+                "name": "Point.y",
+                "sig_digest": "764dc58e81c873d5",
+                "signature": "y: float = 0.0"
+              }
+            ]
+          },
+          {
+            "content_digest": "318c282fada47078",
+            "language": "python",
+            "path": "pkg/text_a.py",
+            "symbols": [
+              {
+                "anchor": "adffe4438783a651",
+                "body_digest": "7300f7b05fd65618",
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": false,
+                "kind": "function",
+                "lineno": 9,
+                "name": "_trim",
+                "sig_digest": "e10157e28abde794",
+                "signature": "def _trim(name: str) -> str"
+              },
+              {
+                "anchor": "3b066804f6d1d077",
+                "body_digest": "0ed35c6b1a69668a",
+                "doc_digest": "d83ff25fa33d2025",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "clean",
+                "sig_digest": "acf71edfd176a89e",
+                "signature": "def clean(name: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "e86112a0ef490ac9",
+            "language": "python",
+            "path": "pkg/text_b.py",
+            "symbols": [
+              {
+                "anchor": "3b066804f6d1d077",
+                "body_digest": "ddcee235b90d705e",
+                "doc_digest": "5245316a19cd9e5b",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "clean",
+                "sig_digest": "a2638df99ee89687",
+                "signature": "def clean(name: str, *, upper: bool = False) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "edd1d621d283a76d",
+            "language": "unknown",
+            "path": "tools/build.sh",
+            "symbols": []
+          },
+          {
+            "content_digest": "c279c250c23af49f",
+            "language": "unknown",
+            "path": "tools/deploy.sh",
+            "symbols": []
+          },
+          {
+            "content_digest": "aa0bd0d44430a805",
+            "language": "unknown",
+            "path": "tools/opts.sh",
+            "symbols": []
+          }
+        ],
+        "schema_version": "1.0.0"
+      },
+      "coverage": {
+        "files": [
+          {
+            "language": "unknown",
+            "owners": [
+              "flags"
+            ],
+            "path": "data/flags.json",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          },
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_b.py",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "shell"
+            ],
+            "path": "tools/build.sh",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "shell"
+            ],
+            "path": "tools/deploy.sh",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "tooling"
+            ],
+            "path": "tools/opts.sh",
+            "waived_reason": null
+          }
+        ],
+        "percent_files": 90.9090909090909,
+        "percent_public_symbols": 80.0,
+        "suggestions": [
+          {
+            "is_new_doc": true,
+            "name": "lonely",
+            "path": "pkg/orphan.py",
+            "reason": "no doc references pkg/orphan.py",
+            "suggested_doc_id": "pkg-orphan"
+          },
+          {
+            "is_new_doc": false,
+            "name": "EXACT_48",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          },
+          {
+            "is_new_doc": false,
+            "name": "LONG_49",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          },
+          {
+            "is_new_doc": false,
+            "name": "ping",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          }
+        ],
+        "symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "build_parser",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "legacy_quiet",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Router",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.dispatch",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.on_delete",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.on_post",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "on_get",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "old_call",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "lonely",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "DEFAULT_TIMEOUT",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "EXACT_48",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "LONG_49",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": false,
+            "kind": "variable",
+            "name": "_SECRET",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Point",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Point.norm",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.tags",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.x",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.y",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": false,
+            "kind": "function",
+            "name": "_trim",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "clean",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "clean",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_b.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_files": [
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "lonely",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "EXACT_48",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "LONG_49",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          }
+        ],
+        "waived_files": [
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          }
+        ],
+        "waived_symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "old_call",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          }
+        ]
+      },
+      "documents": {
+        "flags": {
+          "fingerprint": "618e310a51271673",
+          "fingerprint_tiers": {
+            "composite": "618e310a51271673",
+            "signature": "618e310a51271673"
+          },
+          "path": "docs/flags.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {
+                  "action": "enable",
+                  "comment": "skip the slow checks"
+                },
+                "kind": "record",
+                "name": "--fast"
+              },
+              {
+                "fields": {
+                  "action": "disable"
+                },
+                "kind": "record",
+                "name": "--safe"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        },
+        "mixed-records": {
+          "fingerprint": "28b2632d436612f1",
+          "fingerprint_tiers": {
+            "composite": "28b2632d436612f1",
+            "signature": "28b2632d436612f1"
+          },
+          "path": "docs/mixed-records.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {
+                  "action": "",
+                  "default": "reports/a-deliberately-long-default-output-path/that-runs-well-past-the-eight...",
+                  "help": "Where to write the report."
+                },
+                "kind": "option",
+                "name": "--output"
+              },
+              {
+                "fields": {
+                  "action": "store_true",
+                  "default": "",
+                  "help": "Talk more."
+                },
+                "kind": "option",
+                "name": "--verbose"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--output"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--verbose"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-q"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-v"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        },
+        "multi-entry": {
+          "fingerprint": "fbe4421883bc200f",
+          "fingerprint_tiers": {
+            "composite": "fbe4421883bc200f",
+            "docstring": "c2c267e77b64284a",
+            "signature": "a18cc9d0bc2a1d01"
+          },
+          "path": "docs/multi-entry.md",
+          "region_anchors": {
+            "symbols": [
+              "065d8e6c0bf74a69",
+              "74e0c83f8c7ccc87",
+              "758d61f26a444483",
+              "7d6b36b03d9d471c",
+              "91216f48b4d961ec",
+              "d08e0253144cb6b9"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Router",
+                "class",
+                "class Router"
+              ],
+              [
+                "Router.dispatch",
+                "method",
+                "def dispatch(self, request: str, context: dict[str, str]) -> str"
+              ],
+              [
+                "Router.on_delete",
+                "method",
+                "def on_delete(self, request: str) -> str"
+              ],
+              [
+                "Router.on_post",
+                "method",
+                "def on_post(self, request: str) -> str"
+              ],
+              [
+                "on_get",
+                "function",
+                "def on_get(request: str) -> str"
+              ],
+              [
+                "ping",
+                "function",
+                "def ping(request: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "065d8e6c0bf74a69": "1523c0ed54cc9272",
+            "74e0c83f8c7ccc87": "590d1c6d547a9943",
+            "758d61f26a444483": "9e1fe07037a946ed",
+            "7d6b36b03d9d471c": "c0cb16f63669a9c3",
+            "91216f48b4d961ec": "dd30b13be0129bb2",
+            "d08e0253144cb6b9": "bc9624558d7f106e"
+          }
+        },
+        "settings": {
+          "fingerprint": "650a11239c5918ed",
+          "fingerprint_tiers": {
+            "composite": "650a11239c5918ed",
+            "docstring": "27d40ac993c92711",
+            "signature": "040aa4b029bbb55b"
+          },
+          "path": "docs/settings.md",
+          "region_anchors": {
+            "symbols": [
+              "8e89df5fb737c26b",
+              "b6deb0ad66bcad13"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "DEFAULT_TIMEOUT",
+                "variable",
+                "DEFAULT_TIMEOUT = 30"
+              ],
+              [
+                "_SECRET",
+                "variable",
+                "_SECRET = 's3cr3t'"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "8e89df5fb737c26b": "c57216949efc5e80",
+            "b6deb0ad66bcad13": "eb1cb7062144b3d7"
+          }
+        },
+        "shapes": {
+          "fingerprint": "61f5b2a735dcd252",
+          "fingerprint_tiers": {
+            "composite": "61f5b2a735dcd252",
+            "docstring": "9058d1d5ab903ff9",
+            "signature": "8af263a519093162"
+          },
+          "path": "docs/shapes.md",
+          "region_anchors": {
+            "symbols": [
+              "10990a6684f63118",
+              "2fc0c524431a9236",
+              "583158842ade8579",
+              "5d309c0d50f0adb4",
+              "72ac1bc3925871a5"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Point",
+                "class",
+                "class Point"
+              ],
+              [
+                "Point.norm",
+                "method",
+                "def norm(self) -> float"
+              ],
+              [
+                "Point.tags",
+                "variable",
+                "tags: list[str] = field(default_factory=list)"
+              ],
+              [
+                "Point.x",
+                "variable",
+                "x: float"
+              ],
+              [
+                "Point.y",
+                "variable",
+                "y: float = 0.0"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "10990a6684f63118": "93d3c5dc7f178d7c",
+            "2fc0c524431a9236": "3c23a814309591d9",
+            "583158842ade8579": "764dc58e81c873d5",
+            "5d309c0d50f0adb4": "3503b3d796dae12f",
+            "72ac1bc3925871a5": "d5dcd3c17e7ee4f2"
+          }
+        },
+        "shell": {
+          "fingerprint": "5a8df28f661491a1",
+          "fingerprint_tiers": {
+            "composite": "5a8df28f661491a1",
+            "docstring": "473f4a7b8b3eb42b",
+            "signature": "ff1f32fd3813114b"
+          },
+          "path": "docs/shell.md",
+          "region_anchors": {
+            "symbols": [
+              "bc4a71180870f794"
+            ]
+          },
+          "surface": {
+            "records": [
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--dry-run"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--target"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-n"
+              }
+            ],
+            "symbols": [
+              [
+                "package",
+                "function",
+                "package()"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "bc4a71180870f794": "9183c0deded42f74"
+          }
+        },
+        "tie": {
+          "fingerprint": "1c54edad8fe7f4e0",
+          "fingerprint_tiers": {
+            "composite": "1c54edad8fe7f4e0",
+            "signature": "1c54edad8fe7f4e0"
+          },
+          "path": "docs/tie.md",
+          "region_anchors": {
+            "symbols": [
+              "3b066804f6d1d077",
+              "3b066804f6d1d077"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "clean",
+                "function",
+                "def clean(name: str) -> str"
+              ],
+              [
+                "clean",
+                "function",
+                "def clean(name: str, *, upper: bool = False) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "3b066804f6d1d077": "a2638df99ee89687"
+          }
+        },
+        "tooling": {
+          "fingerprint": "5da8afa5570e9ac3",
+          "fingerprint_tiers": {
+            "composite": "5da8afa5570e9ac3",
+            "docstring": "6e78320ab99fb1d3",
+            "signature": "5da8afa5570e9ac3"
+          },
+          "path": "docs/tooling.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-h"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-o"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-out-dir"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-q"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-v"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-verbose"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        }
+      }
+    },
+    "synthetic/body-on": {
+      "codeindex": {
+        "files": [
+          {
+            "content_digest": "12ac0b8dc6913aec",
+            "language": "unknown",
+            "path": "data/flags.json",
+            "symbols": []
+          },
+          {
+            "content_digest": "468fd03b86495316",
+            "language": "python",
+            "path": "pkg/cli_args.py",
+            "symbols": [
+              {
+                "anchor": "8b92e2ea47ccb0d1",
+                "body_digest": "4d030da50ee7910d",
+                "doc_digest": "e6705bbebe9cb9ba",
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 7,
+                "name": "build_parser",
+                "sig_digest": "ffbefd13cbdcf28e",
+                "signature": "def build_parser() -> argparse.ArgumentParser"
+              },
+              {
+                "anchor": "3f6bd64cda20543a",
+                "body_digest": "832ef01334729142",
+                "doc_digest": "487925b73e171290",
+                "end_lineno": 24,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 22,
+                "name": "legacy_quiet",
+                "sig_digest": "266a45704be8c707",
+                "signature": "def legacy_quiet() -> bool"
+              }
+            ]
+          },
+          {
+            "content_digest": "d6c1d8ef557e89a5",
+            "language": "python",
+            "path": "pkg/handlers.py",
+            "symbols": [
+              {
+                "anchor": "065d8e6c0bf74a69",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 12,
+                "name": "Router",
+                "sig_digest": "1523c0ed54cc9272",
+                "signature": "class Router"
+              },
+              {
+                "anchor": "91216f48b4d961ec",
+                "body_digest": "33723306c9b6efe3",
+                "doc_digest": null,
+                "end_lineno": 22,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 21,
+                "name": "Router.dispatch",
+                "sig_digest": "dd30b13be0129bb2",
+                "signature": "def dispatch(self, request: str, context: dict[str, str]) -> str"
+              },
+              {
+                "anchor": "d08e0253144cb6b9",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 19,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 18,
+                "name": "Router.on_delete",
+                "sig_digest": "bc9624558d7f106e",
+                "signature": "def on_delete(self, request: str) -> str"
+              },
+              {
+                "anchor": "74e0c83f8c7ccc87",
+                "body_digest": "70a35c0903ade3bb",
+                "doc_digest": null,
+                "end_lineno": 15,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 13,
+                "name": "Router.on_post",
+                "sig_digest": "590d1c6d547a9943",
+                "signature": "def on_post(self, request: str) -> str"
+              },
+              {
+                "anchor": "7d6b36b03d9d471c",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 9,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 8,
+                "name": "on_get",
+                "sig_digest": "c0cb16f63669a9c3",
+                "signature": "def on_get(request: str) -> str"
+              },
+              {
+                "anchor": "758d61f26a444483",
+                "body_digest": "6ad71f48f3cc5d6a",
+                "doc_digest": null,
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "ping",
+                "sig_digest": "9e1fe07037a946ed",
+                "signature": "def ping(request: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "bd7434204499197f",
+            "language": "python",
+            "path": "pkg/legacy_api.py",
+            "symbols": [
+              {
+                "anchor": "ecdf80a4ee7f8321",
+                "body_digest": "e3b0c44298fc1c14",
+                "doc_digest": "08e70946c817d940",
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "old_call",
+                "sig_digest": "d36f77b7c08374ae",
+                "signature": "def old_call() -> None"
+              }
+            ]
+          },
+          {
+            "content_digest": "a29d30c4b3306faa",
+            "language": "python",
+            "path": "pkg/orphan.py",
+            "symbols": [
+              {
+                "anchor": "1cb0f5a9e3a8e4dd",
+                "body_digest": "4d9e3bd49f1ca0e5",
+                "doc_digest": "8426f2f967730cd4",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "lonely",
+                "sig_digest": "dc810b98719e97a8",
+                "signature": "def lonely() -> int"
+              }
+            ]
+          },
+          {
+            "content_digest": "13bbfebda94c7088",
+            "language": "python",
+            "path": "pkg/settings.py",
+            "symbols": [
+              {
+                "anchor": "b6deb0ad66bcad13",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 3,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 3,
+                "name": "DEFAULT_TIMEOUT",
+                "sig_digest": "eb1cb7062144b3d7",
+                "signature": "DEFAULT_TIMEOUT = 30"
+              },
+              {
+                "anchor": "3072808f082c54aa",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 5,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 5,
+                "name": "EXACT_48",
+                "sig_digest": "2a6f1ec6b163378f",
+                "signature": "EXACT_48 = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'"
+              },
+              {
+                "anchor": "f5d3c58628ea83db",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 6,
+                "name": "LONG_49",
+                "sig_digest": "d175eb05484c3587",
+                "signature": "LONG_49 = ..."
+              },
+              {
+                "anchor": "8e89df5fb737c26b",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 4,
+                "is_public": false,
+                "kind": "variable",
+                "lineno": 4,
+                "name": "_SECRET",
+                "sig_digest": "c57216949efc5e80",
+                "signature": "_SECRET = 's3cr3t'"
+              },
+              {
+                "anchor": "758d61f26a444483",
+                "body_digest": "349214c6e59673c6",
+                "doc_digest": "bc2f27ec0507df48",
+                "end_lineno": 11,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 9,
+                "name": "ping",
+                "sig_digest": "b7ecfc59b42b5e3e",
+                "signature": "def ping() -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "2a126f77a3305321",
+            "language": "python",
+            "path": "pkg/shapes.py",
+            "symbols": [
+              {
+                "anchor": "2fc0c524431a9236",
+                "body_digest": null,
+                "doc_digest": "fdbe42c8852992a5",
+                "end_lineno": 16,
+                "is_public": true,
+                "kind": "class",
+                "lineno": 7,
+                "name": "Point",
+                "sig_digest": "3c23a814309591d9",
+                "signature": "class Point"
+              },
+              {
+                "anchor": "10990a6684f63118",
+                "body_digest": "af7991424c95acd0",
+                "doc_digest": "db2824a0559ab7c3",
+                "end_lineno": 16,
+                "is_public": true,
+                "kind": "method",
+                "lineno": 14,
+                "name": "Point.norm",
+                "sig_digest": "93d3c5dc7f178d7c",
+                "signature": "def norm(self) -> float"
+              },
+              {
+                "anchor": "72ac1bc3925871a5",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 12,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 12,
+                "name": "Point.tags",
+                "sig_digest": "d5dcd3c17e7ee4f2",
+                "signature": "tags: list[str] = field(default_factory=list)"
+              },
+              {
+                "anchor": "5d309c0d50f0adb4",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 10,
+                "name": "Point.x",
+                "sig_digest": "3503b3d796dae12f",
+                "signature": "x: float"
+              },
+              {
+                "anchor": "583158842ade8579",
+                "body_digest": null,
+                "doc_digest": null,
+                "end_lineno": 11,
+                "is_public": true,
+                "kind": "variable",
+                "lineno": 11,
+                "name": "Point.y",
+                "sig_digest": "764dc58e81c873d5",
+                "signature": "y: float = 0.0"
+              }
+            ]
+          },
+          {
+            "content_digest": "318c282fada47078",
+            "language": "python",
+            "path": "pkg/text_a.py",
+            "symbols": [
+              {
+                "anchor": "adffe4438783a651",
+                "body_digest": "7300f7b05fd65618",
+                "doc_digest": null,
+                "end_lineno": 10,
+                "is_public": false,
+                "kind": "function",
+                "lineno": 9,
+                "name": "_trim",
+                "sig_digest": "e10157e28abde794",
+                "signature": "def _trim(name: str) -> str"
+              },
+              {
+                "anchor": "3b066804f6d1d077",
+                "body_digest": "0ed35c6b1a69668a",
+                "doc_digest": "d83ff25fa33d2025",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "clean",
+                "sig_digest": "acf71edfd176a89e",
+                "signature": "def clean(name: str) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "e86112a0ef490ac9",
+            "language": "python",
+            "path": "pkg/text_b.py",
+            "symbols": [
+              {
+                "anchor": "3b066804f6d1d077",
+                "body_digest": "ddcee235b90d705e",
+                "doc_digest": "5245316a19cd9e5b",
+                "end_lineno": 6,
+                "is_public": true,
+                "kind": "function",
+                "lineno": 4,
+                "name": "clean",
+                "sig_digest": "a2638df99ee89687",
+                "signature": "def clean(name: str, *, upper: bool = False) -> str"
+              }
+            ]
+          },
+          {
+            "content_digest": "edd1d621d283a76d",
+            "language": "unknown",
+            "path": "tools/build.sh",
+            "symbols": []
+          },
+          {
+            "content_digest": "c279c250c23af49f",
+            "language": "unknown",
+            "path": "tools/deploy.sh",
+            "symbols": []
+          },
+          {
+            "content_digest": "aa0bd0d44430a805",
+            "language": "unknown",
+            "path": "tools/opts.sh",
+            "symbols": []
+          }
+        ],
+        "schema_version": "1.0.0"
+      },
+      "coverage": {
+        "files": [
+          {
+            "language": "unknown",
+            "owners": [
+              "flags"
+            ],
+            "path": "data/flags.json",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          },
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "language": "python",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_b.py",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "shell"
+            ],
+            "path": "tools/build.sh",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "shell"
+            ],
+            "path": "tools/deploy.sh",
+            "waived_reason": null
+          },
+          {
+            "language": "unknown",
+            "owners": [
+              "tooling"
+            ],
+            "path": "tools/opts.sh",
+            "waived_reason": null
+          }
+        ],
+        "percent_files": 90.9090909090909,
+        "percent_public_symbols": 80.0,
+        "suggestions": [
+          {
+            "is_new_doc": true,
+            "name": "lonely",
+            "path": "pkg/orphan.py",
+            "reason": "no doc references pkg/orphan.py",
+            "suggested_doc_id": "pkg-orphan"
+          },
+          {
+            "is_new_doc": false,
+            "name": "EXACT_48",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          },
+          {
+            "is_new_doc": false,
+            "name": "LONG_49",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          },
+          {
+            "is_new_doc": false,
+            "name": "ping",
+            "path": "pkg/settings.py",
+            "reason": "sibling symbols already in settings",
+            "suggested_doc_id": "settings"
+          }
+        ],
+        "symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "build_parser",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "legacy_quiet",
+            "owners": [
+              "mixed-records"
+            ],
+            "path": "pkg/cli_args.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Router",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.dispatch",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.on_delete",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Router.on_post",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "on_get",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [
+              "multi-entry"
+            ],
+            "path": "pkg/handlers.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "old_call",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "lonely",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "DEFAULT_TIMEOUT",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "EXACT_48",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "LONG_49",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": false,
+            "kind": "variable",
+            "name": "_SECRET",
+            "owners": [
+              "settings"
+            ],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "class",
+            "name": "Point",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "method",
+            "name": "Point.norm",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.tags",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.x",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "Point.y",
+            "owners": [
+              "shapes"
+            ],
+            "path": "pkg/shapes.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": false,
+            "kind": "function",
+            "name": "_trim",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "clean",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_a.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "clean",
+            "owners": [
+              "tie"
+            ],
+            "path": "pkg/text_b.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_files": [
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          }
+        ],
+        "undocumented_symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "lonely",
+            "owners": [],
+            "path": "pkg/orphan.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "EXACT_48",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "variable",
+            "name": "LONG_49",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          },
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "ping",
+            "owners": [],
+            "path": "pkg/settings.py",
+            "waived_reason": null
+          }
+        ],
+        "waived_files": [
+          {
+            "language": "python",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          }
+        ],
+        "waived_symbols": [
+          {
+            "is_public": true,
+            "kind": "function",
+            "name": "old_call",
+            "owners": [],
+            "path": "pkg/legacy_api.py",
+            "waived_reason": "deprecated shim"
+          }
+        ]
+      },
+      "documents": {
+        "flags": {
+          "fingerprint": "618e310a51271673",
+          "fingerprint_tiers": {
+            "composite": "618e310a51271673",
+            "signature": "618e310a51271673"
+          },
+          "path": "docs/flags.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {
+                  "action": "enable",
+                  "comment": "skip the slow checks"
+                },
+                "kind": "record",
+                "name": "--fast"
+              },
+              {
+                "fields": {
+                  "action": "disable"
+                },
+                "kind": "record",
+                "name": "--safe"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        },
+        "mixed-records": {
+          "fingerprint": "28b2632d436612f1",
+          "fingerprint_tiers": {
+            "composite": "28b2632d436612f1",
+            "signature": "28b2632d436612f1"
+          },
+          "path": "docs/mixed-records.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {
+                  "action": "",
+                  "default": "reports/a-deliberately-long-default-output-path/that-runs-well-past-the-eight...",
+                  "help": "Where to write the report."
+                },
+                "kind": "option",
+                "name": "--output"
+              },
+              {
+                "fields": {
+                  "action": "store_true",
+                  "default": "",
+                  "help": "Talk more."
+                },
+                "kind": "option",
+                "name": "--verbose"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--output"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--verbose"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-q"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-v"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        },
+        "multi-entry": {
+          "fingerprint": "fc4df6f2303cb14b",
+          "fingerprint_tiers": {
+            "body": "caa2cfb1bacc7ccc",
+            "composite": "fc4df6f2303cb14b",
+            "docstring": "c2c267e77b64284a",
+            "signature": "a18cc9d0bc2a1d01"
+          },
+          "path": "docs/multi-entry.md",
+          "region_anchors": {
+            "symbols": [
+              "065d8e6c0bf74a69",
+              "74e0c83f8c7ccc87",
+              "758d61f26a444483",
+              "7d6b36b03d9d471c",
+              "91216f48b4d961ec",
+              "d08e0253144cb6b9"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Router",
+                "class",
+                "class Router"
+              ],
+              [
+                "Router.dispatch",
+                "method",
+                "def dispatch(self, request: str, context: dict[str, str]) -> str"
+              ],
+              [
+                "Router.on_delete",
+                "method",
+                "def on_delete(self, request: str) -> str"
+              ],
+              [
+                "Router.on_post",
+                "method",
+                "def on_post(self, request: str) -> str"
+              ],
+              [
+                "on_get",
+                "function",
+                "def on_get(request: str) -> str"
+              ],
+              [
+                "ping",
+                "function",
+                "def ping(request: str) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "065d8e6c0bf74a69": "1523c0ed54cc9272",
+            "74e0c83f8c7ccc87": "590d1c6d547a9943",
+            "758d61f26a444483": "9e1fe07037a946ed",
+            "7d6b36b03d9d471c": "c0cb16f63669a9c3",
+            "91216f48b4d961ec": "dd30b13be0129bb2",
+            "d08e0253144cb6b9": "bc9624558d7f106e"
+          }
+        },
+        "settings": {
+          "fingerprint": "650a11239c5918ed",
+          "fingerprint_tiers": {
+            "composite": "650a11239c5918ed",
+            "docstring": "27d40ac993c92711",
+            "signature": "040aa4b029bbb55b"
+          },
+          "path": "docs/settings.md",
+          "region_anchors": {
+            "symbols": [
+              "8e89df5fb737c26b",
+              "b6deb0ad66bcad13"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "DEFAULT_TIMEOUT",
+                "variable",
+                "DEFAULT_TIMEOUT = 30"
+              ],
+              [
+                "_SECRET",
+                "variable",
+                "_SECRET = 's3cr3t'"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "8e89df5fb737c26b": "c57216949efc5e80",
+            "b6deb0ad66bcad13": "eb1cb7062144b3d7"
+          }
+        },
+        "shapes": {
+          "fingerprint": "5cfaf9ca785e93c7",
+          "fingerprint_tiers": {
+            "body": "8b1e1a2ca2b75989",
+            "composite": "5cfaf9ca785e93c7",
+            "docstring": "9058d1d5ab903ff9",
+            "signature": "8af263a519093162"
+          },
+          "path": "docs/shapes.md",
+          "region_anchors": {
+            "symbols": [
+              "10990a6684f63118",
+              "2fc0c524431a9236",
+              "583158842ade8579",
+              "5d309c0d50f0adb4",
+              "72ac1bc3925871a5"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "Point",
+                "class",
+                "class Point"
+              ],
+              [
+                "Point.norm",
+                "method",
+                "def norm(self) -> float"
+              ],
+              [
+                "Point.tags",
+                "variable",
+                "tags: list[str] = field(default_factory=list)"
+              ],
+              [
+                "Point.x",
+                "variable",
+                "x: float"
+              ],
+              [
+                "Point.y",
+                "variable",
+                "y: float = 0.0"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "10990a6684f63118": "93d3c5dc7f178d7c",
+            "2fc0c524431a9236": "3c23a814309591d9",
+            "583158842ade8579": "764dc58e81c873d5",
+            "5d309c0d50f0adb4": "3503b3d796dae12f",
+            "72ac1bc3925871a5": "d5dcd3c17e7ee4f2"
+          }
+        },
+        "shell": {
+          "fingerprint": "5a8df28f661491a1",
+          "fingerprint_tiers": {
+            "composite": "5a8df28f661491a1",
+            "docstring": "473f4a7b8b3eb42b",
+            "signature": "ff1f32fd3813114b"
+          },
+          "path": "docs/shell.md",
+          "region_anchors": {
+            "symbols": [
+              "bc4a71180870f794"
+            ]
+          },
+          "surface": {
+            "records": [
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--dry-run"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "--target"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-n"
+              }
+            ],
+            "symbols": [
+              [
+                "package",
+                "function",
+                "package()"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "bc4a71180870f794": "9183c0deded42f74"
+          }
+        },
+        "tie": {
+          "fingerprint": "1c54edad8fe7f4e0",
+          "fingerprint_tiers": {
+            "composite": "1c54edad8fe7f4e0",
+            "signature": "1c54edad8fe7f4e0"
+          },
+          "path": "docs/tie.md",
+          "region_anchors": {
+            "symbols": [
+              "3b066804f6d1d077",
+              "3b066804f6d1d077"
+            ]
+          },
+          "surface": {
+            "records": [],
+            "symbols": [
+              [
+                "clean",
+                "function",
+                "def clean(name: str) -> str"
+              ],
+              [
+                "clean",
+                "function",
+                "def clean(name: str, *, upper: bool = False) -> str"
+              ]
+            ]
+          },
+          "symbol_sigs": {
+            "3b066804f6d1d077": "a2638df99ee89687"
+          }
+        },
+        "tooling": {
+          "fingerprint": "5da8afa5570e9ac3",
+          "fingerprint_tiers": {
+            "composite": "5da8afa5570e9ac3",
+            "docstring": "6e78320ab99fb1d3",
+            "signature": "5da8afa5570e9ac3"
+          },
+          "path": "docs/tooling.md",
+          "region_anchors": {},
+          "surface": {
+            "records": [
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-h"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-o"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-out-dir"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-q"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-v"
+              },
+              {
+                "fields": {},
+                "kind": "switch",
+                "name": "-verbose"
+              }
+            ],
+            "symbols": []
+          },
+          "symbol_sigs": {}
+        }
+      }
+    }
+  }
+}

@@ -226,3 +226,41 @@ features:
     subsystem: server
     modules: [server]
     constraints: [K0, K4, K8, K10]
+
+  - id: FEAT-SERVER-020
+    title: Admin repo-token reset
+    summary: >-
+      POST /admin/repos/{repo_id}/token/reset replaces ONLY the named repo's
+      bearer-token hash through Store.set_repo_token_hash (both stores). It needs
+      the GLOBAL admin token, checked before the repo lookup, and it fails closed
+      (403) when the server has no admin token configured; an unknown repo is a
+      404 before any body check. The body names exactly one intent: a new
+      auth_token, or open true (a strict JSON boolean; 1, "yes" or "on" is a 422)
+      that clears protection. An empty body, a null token, open false, or both at
+      once (an empty token with open true included) is a loud 400, so a reset
+      never opens a repo implicitly. So is a token outside the shared bearer
+      charset (printable ASCII, no whitespace). A reset to the stored value
+      reports changed false, and the token is never echoed. An admin token
+      outside the same charset stops the server (and cdx serve) from starting.
+    subsystem: server
+    modules: [server]
+    constraints: [K6, K7, K8, K10]
+
+  - id: FEAT-SERVER-021
+    title: "`cdx register` token set and rotate"
+    summary: >-
+      cdx register --auth-token-env VAR registers the repo token-protected with
+      the token in $VAR, which must be exactly the token central.auth_env holds
+      (the bearer this config's next register and http sink present), so the
+      config never locks the repo out of those writes. When it does not hold it,
+      the error says why (unset, padded or different) and names both remedies.
+      --rotate-to-env VAR sends the new token while presenting the token
+      central.auth_env holds (the server checks it only when the repo is already
+      protected) and says to update central.auth_env's variable; re-running it
+      after that converges as a verified no-op re-register. The two flags are
+      mutually exclusive. An unset, empty, padded or non-printable-ASCII token is
+      a loud SchemaError, never an open register; a dry run still validates the
+      tokens and redacts the token to "***".
+    subsystem: server
+    modules: [registry, cli]
+    constraints: [K0, K4, K6, K7, K8]

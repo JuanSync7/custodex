@@ -1,0 +1,123 @@
+# The pull-request gate: every PR to main runs the full CLAUDE.md gate. Once
+# branch protection on main requires the checks below (`gate`, `floor`,
+# `frontend`), a red gate blocks the merge; until an admin turns that on, the
+# checks report but do not block.
+#
+# This file is pinned by tests/system/test_ci_workflow.py, which rebuilds the
+# whole workflow from the repo's own sources and requires this file to EQUAL it
+# (a closed set: no extra step, key, trigger or permission passes). Change the
+# gate's source (or the pin) AND this file. Where each value comes from:
+#   - gate interpreter      .gitlab-ci.yml `default.image`
+#   - floor interpreter     pyproject.toml `[project] requires-python` (the floor
+#                           job folds into `gate` once the floor reaches the
+#                           gate's version; drop `floor` from branch protection then)
+#   - pip install           the GitLab gate jobs' `.venv/bin/pip install` line,
+#                           as `python -m pip install ...`
+#   - gate commands         .gitlab-ci.yml `tests:offline` + `docs:gate` scripts,
+#                           then `cdx check` for every shipped config, then
+#                           `cdx index --check`
+#   - action refs, Node     deploy-pages.yml (checkout, setup-node) and
+#                           templates/ci/github-actions.adopter.yml (setup-python)
+#   - npm install, dir      deploy-pages.yml's `npm ci` step and its working-directory
+#   - frontend gates        that directory's package.json `build` + `test:run`
+#                           scripts, one `npx` step per `&&` part
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same PR cancels the run in flight (cost only: a cancelled
+# run is never a success).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Every step after the install carries the same guard: it runs even when an
+# earlier gate step went red, so one push shows every red gate (the job still
+# fails), but never after a failed install or a cancelled run.
+jobs:
+  # The full gate on the GitLab gate's interpreter. The [dev] extra pulls the
+  # [agent], [server] and [mcp] extras so the suite exercises them.
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - id: install
+        run: python -m pip install -e '.[dev]'
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: ruff format --check .
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: ruff check .
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: mypy custodex
+      # Branch coverage; the floor is pyproject's [tool.coverage.report] fail_under.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pytest --cov=custodex --cov-branch
+      # The doc-coverage gate (H-02).
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx coverage --config config/cdmon --fail-under 95
+      # Detect-only doc gates (K1, K4: offline, no LLM).
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx check --config config/cdmon
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx lint --config config/cdmon
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx wiki --check
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx trace --fail-on-gap
+      # Every other shipped config stays drift-free too.
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx check --config demo/config/cdmon
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx check --config examples/external-repo/cdmon.yaml
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx check --config examples/multilang/cdmon.yaml
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cdx index --check
+
+  # The suite on the lowest supported interpreter (pyproject requires-python).
+  # No coverage floor here: coverage is graded once, in `gate`.
+  floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - id: install
+        run: python -m pip install -e '.[dev]'
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pytest
+
+  # The Astro app: type check, build and the vitest suite.
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - id: install
+        run: npm ci
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx astro check
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx astro build
+      - if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npx vitest run

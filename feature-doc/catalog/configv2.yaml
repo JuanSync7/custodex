@@ -236,3 +236,31 @@ features:
     subsystem: configv2
     modules: [config]
     constraints: [K8, K9]
+
+  - id: FEAT-CONFIGV2-019
+    title: One doc formula — the converted lanes name a doc by doc_path(root, path)
+    summary: >-
+      A managed doc's file is normpath(root / path), lexical and never
+      symlink-followed. check, okf, monitor, docdeps, index, the entity lane,
+      cdx build, write-doc, sync_pr, the docs-PR plan and the editor writers
+      all grade, heal, export, render and commit that ONE file, and patch/diff
+      headers name it too, so a dotdot spelling (`x/../docs/g.md`) cannot split
+      them or reach a file outside the repo through a symlink. A committed
+      symlink traversed without `..` is gated by resolve_within once CI-TRUST
+      adopts it. cdx lint, lint --fix, new-doc and onboard are a queued
+      follow-up.
+    subsystem: configv2
+    modules: [config, drift, okf, index, docdeps, workers, entities, build, docwriter, monitor, syncpr, pr, generate]
+    constraints: [K1, K7, K8, K10]
+
+  - id: FEAT-CONFIGV2-020
+    title: resolve_within — fail-closed containment gate for untrusted configs
+    summary: >-
+      resolve_within(root, rel) returns the lexical in-repo path or None, and
+      never raises. It refuses absolute paths, climbs, a root or rel the OS
+      cannot name (NUL, lone surrogate), symlink escapes and loops, the root
+      itself, sibling-prefix tricks and any location it cannot prove. It is the
+      gate writers acting on configs they do not own will call.
+    subsystem: configv2
+    modules: [config]
+    constraints: [K8, K10]

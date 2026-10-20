@@ -25,7 +25,13 @@ from pydantic import BaseModel, ConfigDict
 from . import reviewlog
 from .backends import Backend, BackendResult, FixRequest, make_backend
 from .blocks import expected_region
-from .config import DocumentSpec, MonitorConfig, RegionMode, resolve_repo_root
+from .config import (
+    DocumentSpec,
+    MonitorConfig,
+    RegionMode,
+    doc_path,
+    resolve_repo_root,
+)
 from .docdeps import SuspectStatus, detect_suspect_links, stamp_edges
 from .docstyle import DocStyleMap
 from .drift import Drift, DriftKind, DriftReport, detect, mechanical_docs
@@ -212,11 +218,11 @@ class Monitor:
         # detect() only emits drifts for configured docs, so this is unreachable.
         raise KeyError(doc_id)  # pragma: no cover
 
-    def _doc_text(self, drift: Drift, doc_path: Path) -> str:
+    def _doc_text(self, drift: Drift, doc_file: Path) -> str:
         """Read the doc body, or ``""`` when it is missing (MISSING_DOC)."""
-        if drift.kind is DriftKind.MISSING_DOC or not doc_path.is_file():
+        if drift.kind is DriftKind.MISSING_DOC or not doc_file.is_file():
             return ""
-        return doc_path.read_text(encoding="utf-8")
+        return doc_file.read_text(encoding="utf-8")
 
     def _style_guidance_for(self, drift: Drift, region_mode: RegionMode) -> str | None:
         """The composed writing guidance for an authored-prose region, else None.
@@ -539,7 +545,9 @@ class Monitor:
                 continue
             spec = self._spec_for(drift.doc_id)
             surface = build_document_surface(spec, self.root)
-            doc_path = self.root / spec.path
+            # The file detect graded (X-CONTAIN): the backend's context, the
+            # engine write and the backend write all name ONE file.
+            doc_file = doc_path(self.root, spec.path)
 
             # D-06: a drift matching a promoted rule is resolved by the rule with
             # ZERO backend calls — the learned cost-curve win (K4). Still recorded +
@@ -564,7 +572,7 @@ class Monitor:
                 handled.append(HandledDrift(drift=drift, result=result, applied=False))
                 continue
 
-            doc_text = self._doc_text(drift, doc_path)
+            doc_text = self._doc_text(drift, doc_file)
 
             # RTE-03d: the ENGINE closes what the ENGINE projects — ZERO backend
             # calls. Placed BELOW the D-06 rule check on purpose: a promoted rule
@@ -580,7 +588,7 @@ class Monitor:
                 applied = False
                 if effective_apply and result.fix is not None:
                     applied = apply_fix(
-                        doc_path,
+                        doc_file,
                         result.fix,
                         preserve=self._preserve_for(spec),
                         modes=self._modes_for(spec),
@@ -664,7 +672,7 @@ class Monitor:
                 # locked) and per-region hash stamping; passing the full
                 # region_modes lets apply_fix derive both at the write boundary.
                 applied = apply_fix(
-                    doc_path,
+                    doc_file,
                     result.fix,
                     preserve=self._preserve_for(spec),
                     modes=self._modes_for(spec),

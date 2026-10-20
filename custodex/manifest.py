@@ -3,6 +3,10 @@
 A document is *prose* authored by a human plus zero or more **managed regions**
 delimited by ``<!-- CDM:BEGIN <id> -->`` / ``<!-- CDM:END <id> -->`` markers and
 an optional YAML front matter block holding ``cdm: {fingerprint: <hash>}``.
+Writing a doc back (:func:`render_doc`) splices the new front matter into the
+block the doc already carries, so an engine write rewrites only the entries it
+changed — in practice the ``cdm`` block — and leaves the author's lines alone
+(:func:`render_doc` lists the layouts it re-dumps instead).
 
 The region bodies and the fingerprint are derived from the code surface (K2) —
 this module only *parses* and *edits* them, never authoring prose. Region
@@ -13,7 +17,9 @@ file I/O for :func:`parse_doc`; everything else is string-in/string-out.
 
 from __future__ import annotations
 
+import bisect
 import hashlib
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -471,14 +477,275 @@ def stamp_standard_meta(
     return out
 
 
-def render_doc(meta: dict[str, Any], body: str) -> str:
-    """Re-render front matter + body to a single document string.
+def render_doc(meta: dict[str, Any], body: str, *, source: str | None = None) -> str:
+    """Render front matter + body to one document string, splicing into ``source``.
 
-    An empty ``meta`` emits the body verbatim (no fence); otherwise a YAML front
-    matter block is prepended. Used by :mod:`custodex.heal` to write a
-    doc back after refreshing the fingerprint.
+    ``source`` is the full text the writer parsed (front matter included), or
+    ``None`` for a brand-new doc. When ``source`` opens with a front-matter
+    fence, ``meta`` is spliced into that block instead of re-dumping it:
+
+    * a ``meta`` that parses equal to the stored block (exact types, so ``1`` is
+      not ``True``; a tuple matches its list) returns the block byte for byte;
+    * otherwise each top-level entry whose value did not change keeps its exact
+      bytes (comments, quoting, flow style, folding, anchors); a changed entry is
+      re-dumped in its place and loses every comment inside it (its inline
+      comment, and any comment line or nested inline comment between its key
+      and its last value line), while the comment and blank lines after it
+      stay; a new entry is dumped where ``meta`` puts it; an entry missing from
+      ``meta`` is dropped with the lines after it. Entries follow ``meta``'s
+      order. A ``...`` document-end marker and the comment lines after it stay
+      last, so new entries land before it. A re-dumped ``cdm`` block has its
+      keys sorted; a kept one keeps its bytes, in whatever order they are.
+    * two checks decide whether to splice. Before it, the layout must be a
+      column-0 block mapping with no duplicate top-level key, no ``<<`` merge key
+      and no aliased key: those are what lets each entry be cut out by span
+      (``safe_load`` accepts a duplicate key, so the parse-back below cannot
+      catch a mis-cut span on its own). After it, the result must parse back to
+      exactly ``meta``, which refuses an alias into an entry the write changes
+      or drops and a dumped anchor that clashes with a kept one. A layout
+      either check refuses gets the fresh dump below, which is data-exact but
+      not byte-preserving.
+
+    The fresh dump keeps ``meta``'s key order, writes the ``cdm`` block with its
+    keys sorted, writes non-ASCII text literally (``allow_unicode``, falling back
+    to escapes when a character would not round-trip, e.g. U+0085), dumps sets in
+    sorted order and gives every anchor a unique name (K10); a tuple dumps as a
+    list. An empty ``meta`` with no source fence returns the body verbatim (no
+    fence).
+
+    Front matter in ``source`` that is malformed YAML or not a mapping raises
+    :class:`DriftError` (K8), as :func:`parse_text` does on every read.
     """
+    match = _FM_RE.match(source) if source is not None else None
+    if source is not None and match is not None:
+        parsed = parse_text(source).meta
+        spliced = _splice_front_matter(match.group(1) or "", meta, parsed)
+        if spliced is not None:
+            return f"---\n{spliced}---\n{body}"
     if not meta:
         return body
-    fm = yaml.safe_dump(meta, sort_keys=True, default_flow_style=False)
-    return f"---\n{fm}---\n{body}"
+    return f"---\n{_dump_mapping(_with_sorted_cdm(meta))}---\n{body}"
+
+
+# --- front-matter splice + deterministic dump (FM-SPLICE) -------------------
+
+_CDM_KEY = "cdm"
+_MERGE_TAG = "tag:yaml.org,2002:merge"
+# Tokens that close a structure or the stream rather than spell an entry's value:
+# they sit at the next key (or past the trailing comments), never on the value.
+# (A ``...`` marker is cut off as the trailer before the entries are scanned.)
+_NON_CONTENT_TOKENS = (yaml.BlockEndToken, yaml.StreamEndToken)
+
+
+class _FrontMatterDumper(yaml.SafeDumper):
+    """SafeDumper whose output does not depend on the hash seed (K10)."""
+
+
+def _represent_set(dumper: yaml.SafeDumper, data: Any) -> yaml.Node:
+    try:
+        members = sorted(data)
+    except TypeError:
+        members = sorted(data, key=repr)
+    return dumper.represent_mapping(
+        "tag:yaml.org,2002:set", {member: None for member in members}
+    )
+
+
+_FrontMatterDumper.add_representer(set, _represent_set)
+
+
+def _same(a: Any, b: Any, seen: set[tuple[int, int]] | None = None) -> bool:
+    """Data equality as YAML sees it: exact scalar types, NaN equals NaN.
+
+    ``1 == True`` and ``1 == 1.0`` in Python, but they spell different YAML, so
+    scalars must also match in type; a tuple equals the list it dumps as.
+    Container pairs are memoised by identity, so shared aliases cost one visit
+    and self-references terminate (a pair already in progress counts as equal).
+    """
+    if seen is None:
+        seen = set()
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        pair = (id(a), id(b))
+        if pair in seen:
+            return True
+        seen.add(pair)
+        return len(a) == len(b) and all(
+            _same(x, y, seen) for x, y in zip(a, b, strict=True)
+        )
+    if isinstance(a, dict) and isinstance(b, dict):
+        pair = (id(a), id(b))
+        if pair in seen:
+            return True
+        seen.add(pair)
+        return a.keys() == b.keys() and all(_same(a[k], b[k], seen) for k in a)
+    if type(a) is not type(b):
+        return False
+    if isinstance(a, float) and math.isnan(a):
+        return math.isnan(b)
+    return bool(a == b)
+
+
+def _sorted_tree(value: Any, memo: dict[int, Any] | None = None) -> Any:
+    """A copy of ``value`` with every mapping's keys sorted (cycle-safe).
+
+    Mappings whose keys do not sort keep their order; shared sub-trees stay
+    shared in the copy, so the dump still anchors them.
+    """
+    if memo is None:
+        memo = {}
+    if id(value) in memo:
+        return memo[id(value)]
+    if isinstance(value, dict):
+        out: dict[Any, Any] = {}
+        memo[id(value)] = out
+        try:
+            keys = sorted(value)
+        except TypeError:
+            keys = list(value)
+        for key in keys:
+            out[key] = _sorted_tree(value[key], memo)
+        return out
+    if isinstance(value, list | tuple):
+        items: list[Any] = []
+        memo[id(value)] = items
+        items.extend(_sorted_tree(item, memo) for item in value)
+        return items
+    return value
+
+
+def _with_sorted_cdm(meta: dict[str, Any]) -> dict[str, Any]:
+    return {k: _sorted_tree(v) if k == _CDM_KEY else v for k, v in meta.items()}
+
+
+def _dump_mapping(mapping: dict[str, Any]) -> str:
+    """Dump ``mapping`` in its own order, non-ASCII literal when it round-trips."""
+    text: str = yaml.dump(
+        mapping,
+        Dumper=_FrontMatterDumper,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=True,
+    )
+    if _same(yaml.safe_load(text), mapping):
+        return text
+    # A character such as U+0085 (NEL) is written raw under allow_unicode and
+    # YAML reads it back as a line break; escaped output round-trips.
+    escaped: str = yaml.dump(
+        mapping,
+        Dumper=_FrontMatterDumper,
+        sort_keys=False,
+        default_flow_style=False,
+        allow_unicode=False,
+    )
+    return escaped
+
+
+def _entry_spans(
+    fm_text: str, root: yaml.MappingNode
+) -> tuple[str, dict[Any, tuple[int, int, int]]] | None:
+    """Locate each top-level entry: ``(start, content_end, end)`` by key.
+
+    An entry runs from its key's line to the next key's line; its content ends
+    at the end of the line holding its last token, and the rest (blank and
+    comment lines) is its tail. Returns ``None`` for a layout the splice cannot
+    address byte-exactly (a key off column 0, a ``<<`` merge key, an aliased
+    key, whose node sits earlier in the text than its own line: an earlier key
+    or a node inside an earlier value; or a duplicate key, whose dead earlier
+    text has no place to stay). These bails are part of the splice contract,
+    not a convenience: the parse-back cannot see a mis-cut span, because
+    ``safe_load`` accepts the duplicate key such a cut leaves behind.
+    """
+    keys: list[Any] = []
+    starts: list[int] = []
+    constructor = yaml.SafeLoader("")
+    for key_node, _value in root.value:
+        # A non-scalar key never gets here: parse_text already refused it as an
+        # unhashable key.
+        if key_node.tag == _MERGE_TAG or key_node.start_mark.column != 0:
+            return None
+        if starts and key_node.start_mark.index <= starts[-1]:
+            return None  # an aliased key: its node lies before its own line
+        key = constructor.construct_object(key_node)
+        if key in keys:
+            return None  # a duplicate key: YAML keeps only the last one
+        keys.append(key)
+        starts.append(key_node.start_mark.index)
+    last_token = list(starts)
+    for token in yaml.scan(fm_text, Loader=yaml.SafeLoader):
+        if isinstance(token, _NON_CONTENT_TOKENS):
+            continue
+        # The scanner queues tokens in source order with nondecreasing end
+        # marks, so the latest token of an entry is its last one. A token
+        # before the first key gets entry -1 and writes the LAST entry's slot,
+        # which that entry's own key token (always scanned later) overwrites;
+        # ``starts`` is never empty here (a block mapping has an entry).
+        entry = bisect.bisect_right(starts, token.start_mark.index) - 1
+        last_token[entry] = token.end_mark.index
+    spans: dict[Any, tuple[int, int, int]] = {}
+    for i, key in enumerate(keys):
+        end = starts[i + 1] if i + 1 < len(starts) else len(fm_text)
+        content = len(fm_text[: last_token[i]].rstrip())
+        newline = fm_text.find("\n", content, end)
+        content_end = end if newline < 0 else newline + 1
+        spans[key] = (starts[i], content_end, end)
+    return fm_text[: starts[0]] if starts else fm_text, spans
+
+
+def _splice_front_matter(
+    fm_text: str, meta: dict[str, Any], parsed: dict[str, Any]
+) -> str | None:
+    """Splice ``meta`` into the front-matter text ``fm_text`` (parsed: ``parsed``).
+
+    Returns ``None`` when the layout cannot be spliced or the result would not
+    parse back to exactly ``meta``; the caller then dumps the block fresh.
+    """
+    if _same(meta, parsed):
+        return fm_text
+    fm_text, trailer = _split_document_end(fm_text)
+    root = yaml.compose(fm_text, Loader=yaml.SafeLoader)
+    if root is None:
+        located: tuple[str, dict[Any, tuple[int, int, int]]] | None = (fm_text, {})
+    elif not isinstance(root, yaml.MappingNode) or root.flow_style:
+        return None
+    else:
+        located = _entry_spans(fm_text, root)
+    if located is None:
+        return None
+    head, spans = located
+    out = [head]
+    for key, value in meta.items():
+        span = spans.get(key)
+        if span is None:
+            out.append(_dump_entry(key, value))
+            continue
+        start, content_end, end = span
+        if _same(value, parsed[key]):
+            out.append(fm_text[start:end])
+        else:
+            out.append(_dump_entry(key, value) + fm_text[content_end:end])
+    spliced = "".join(out) + trailer
+    try:
+        back = yaml.safe_load(spliced)
+    except yaml.YAMLError:
+        return None  # e.g. clashing anchors, or new entries after a ``...``
+    if not _same({} if back is None else back, meta):
+        return None
+    return spliced
+
+
+def _split_document_end(fm_text: str) -> tuple[str, str]:
+    """Split ``fm_text`` at a ``...`` marker: ``(entries, marker + what follows)``.
+
+    Only comments can follow the marker (more content would be a second
+    document, which :func:`parse_text` already refused), so the trailer is kept
+    verbatim after the spliced entries.
+    """
+    for token in yaml.scan(fm_text, Loader=yaml.SafeLoader):
+        if isinstance(token, yaml.DocumentEndToken):
+            cut = token.start_mark.index
+            return fm_text[:cut], fm_text[cut:]
+    return fm_text, ""
+
+
+def _dump_entry(key: Any, value: Any) -> str:
+    return _dump_mapping({key: _sorted_tree(value) if key == _CDM_KEY else value})

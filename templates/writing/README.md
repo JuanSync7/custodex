@@ -35,11 +35,7 @@ templates tell an author to avoid.
 
 Two rules a template must not state, because the mechanism forbids them:
 
-- **Front matter.** The `cdm:` block is machine-managed. Every other top-level
-  key keeps its YAML value, but `cdx lint --fix` and heal re-render the whole
-  block: keys come back sorted, and quoting, list style and line folding can
-  change. A template that tells an author to write or order front matter is
-  telling it to fight the healer.
+- **Front matter.** The `cdm:` block is machine-managed: when an engine write (`cdx lint --fix`, an engine heal, docdeps edge stamps, a mirror re-sync) rewrites it, it is re-dumped key-sorted and any comment inside it is lost. Every other top-level key keeps its exact bytes (quoting, list style, folding, comments) when the block is a column-0 block mapping without duplicate, `<<` or aliased top-level keys. Any other layout is re-dumped data-exact (see `manifest.render_doc`). A backend's whole-document fix is written as the backend returned it. A template that tells an author to write or edit the `cdm:` block is telling it to fight the healer.
 - **History of the document.** Regions are re-authored from scratch, so anything
   that depends on remembering an earlier version cannot survive. Rules that
   *forbid* narrating history do belong here — the authoring prompt includes the
