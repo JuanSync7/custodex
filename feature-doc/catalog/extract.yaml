@@ -65,3 +65,62 @@ features:
     subsystem: extract
     modules: [extract]
     constraints: [K0, K1, K3, K4]
+
+  - id: FEAT-EXTRACT-007
+    title: Decorator fidelity — a property is no longer documented as a callable method
+    summary: >-
+      RTE-02a. Extraction never inspected `decorator_list`, so the projection LIED about
+      every decorated symbol BEFORE any model saw it: `@property def net(self) -> int`
+      rendered as `def net(self) -> int` and told the reader to CALL an attribute;
+      `@staticmethod def make()` rendered as a method with no `self` (reads as broken); and
+      `@classmethod def blank(cls)` exposed `cls` as a caller-supplied argument. This was
+      already SHIPPED in Custodex's own dogfood docs — `docs/api/coverage-system.md`
+      documented five consecutive `@property` attributes as methods — which makes it the
+      concrete refutation of "an LLM won't misunderstand the code": the loss happened in
+      the extractor, with no model involved. `Symbol.decorators` now carries the dotted
+      decorator names in SOURCE order (order is semantic — `@property` over
+      `@abstractmethod` differs from the reverse — and source order is already
+      deterministic, which is what K10 actually requires), and `_func_signature` PREFIXES
+      them, because the signature is the cell a reader acts on. A `Call` decorator
+      contributes only its callee (`@app.command("run")` -> `app.command`), so an
+      unrelated literal can never manufacture drift; an unnameable form (a subscript or
+      lambda decorator) is SKIPPED rather than fatal, since K8 loudness is for malformed
+      input and losing a whole file's surface over one un-nameable decorator would be
+      strictly worse. `kind` is deliberately NOT changed to `property` here:
+      `_symbols_for_ref` selects `arg_signature` refs on `kind in ("function","method")`,
+      so promoting the kind would silently drop every property from that selection (that
+      selector moves with the kind in RTE-02b). Because `kind`+`signature` feed the
+      per-symbol digest and the signature tier, every eng-guide doc covering decorated
+      code drifts and grades BREAKING — so the RTE-01 router routes them all to a human,
+      which is correct: existing prose may say `.net()`.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K1, K2, K6, K9, K10]
+
+  - id: FEAT-EXTRACT-008
+    title: Class and pydantic fields enter the documented surface
+    summary: >-
+      RTE-02b. `_extract_python_symbols` walked `tree.body` and, inside a ClassDef,
+      descended ONLY into function children — the `Assign | AnnAssign` branch was
+      module-level only, so every annotated class field extracted as NOTHING (1039 of them
+      across custodex's own 71 files). For a pydantic-heavy codebase that is most of the
+      configurable API: `MonitorConfig.apply_default`, the single most important fact an
+      adopter needs, appeared in no document and in no coverage denominator.
+      `_variable_symbols` now takes a `qualifier`, so a field becomes `Class.field` exactly
+      as a method becomes `Class.method`, while the SIGNATURE keeps the bare
+      `field: type = default` form. (`is_public` is passed the bare name as a style
+      choice, not a correctness requirement: `_is_public` already strips a dotted
+      qualifier via `name.rsplit(".", 1)[-1]`, which is how `Class._method` has always
+      been classified.) Fields reach the rendered TABLE,
+      not only the surface, and that coupling is pinned by a test: `resolve_coverage`
+      counts a symbol as documented iff a `code_ref` SELECTS it, so "documented" means
+      matched by a config glob rather than described anywhere — a surface-only field would
+      count as documented while appearing in NO document, making the completeness number
+      less trustworthy rather than more. The dogfood tables grow ~66% (1033 -> 1715 rows);
+      that cost was an explicit human decision, not an engine default. Because the change
+      only ADDS symbols (`+281/-0` on the largest doc), it grades ADDITIVE and the RTE-01
+      router auto-routes 11 of 12 documents — the exact complement of RTE-02a, which moved
+      existing signatures, graded BREAKING, and escalated all 9.
+    subsystem: extract
+    modules: [extract]
+    constraints: [K1, K2, K6, K9, K10]

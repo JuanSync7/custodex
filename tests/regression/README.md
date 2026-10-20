@@ -36,6 +36,16 @@ unlisted-engine-module-is-a-gap case).
 | `test_loop_safety_doc_only_commit_does_not_resync` | **[C-04]** | `should_sync` False for a doc-only commit; separator-normalized truth table (break-it documented) |
 | `test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched` | **[B-06]** | a `mode: llm` no-renderer region is AUTHORED prose end-to-end: a code move surfaces a healable REGION drift, `--apply` re-authors its prose from the current surface, a second `--apply` is a clean no-op, and an adjacent `human` region stays byte-identical (break-it documented) |
 
+### `test_anchor_collision.py` — same-name anchor collisions under `--tiered`
+| Case | Lesson | Invariant |
+|------|--------|-----------|
+| `test_tiered_never_closes_a_break_hidden_under_a_collided_anchor[shadowed-signature-change]` | **[jarvis-contribution-key-identity]** | a signature change of a SHADOWED same-name symbol (its `symbol_sigs` digest overwritten by the last writer) plus an addition is BREAKING and held: `monitor --apply --tiered` writes nothing and claims no closure (break-it documented) |
+| `test_tiered_never_closes_a_break_hidden_under_a_collided_anchor[shadowed-deletion]` | **[jarvis-contribution-key-identity]** | deleting one of two same-name symbols is a REMOVAL (multiset anchor delta), so delete + add is never ADDITIVE (break-it documented) |
+| `test_tiered_never_closes_a_break_hidden_under_a_collided_anchor[shadowed-signature-change-pre-dig01]` | **[jarvis-contribution-key-identity]** | the same shadowed break on a doc stamped WITHOUT `cdm.symbol_sigs` (DIG-01's lazy-rollout shape) is still held: the collision proof needs only the stored tiers (break-it documented) |
+| `test_tiered_never_closes_a_break_hidden_under_a_collided_anchor[grown-only-shadowed-break]` | **[jarvis-contribution-key-identity]** | a GROWN-ONLY addition (a second `main` above the shadowed a.main, which also breaks; no wholly-new name) is held: the collision proof runs for any addition, not only one that adds a new name (break-it documented) |
+| `test_tiered_still_closes_a_pure_addition_beside_a_collision` | **[jarvis-contribution-key-identity]** | control: a pure addition beside a collision still closes mechanically, and a second run is a no-op (K7) |
+| `test_tiered_still_closes_after_a_same_name_deletion_left_the_stamp_over_counting` | **[jarvis-contribution-key-identity]** | liveness: after a real same-name deletion is resolved on a doc whose declared `symbols` region is absent, the anchor stamp over-counts; the stored signature tier proves it stale, so a later pure addition still closes mechanically (no phantom "-1") and a second run is a no-op (K7) (break-it documented) |
+
 ### `test_corpus_contracts.py` — schema / transport / learning contracts
 | Case | Lesson | Invariant |
 |------|--------|-----------|
@@ -78,6 +88,27 @@ documented in each case's docstring:
 - **[B-06]** pure-`llm` no-renderer authoring — reverting the `drift.py` B-06
   branch so a no-renderer `llm` region falls back to `UNHEALABLE` reds the
   re-author step of `test_pure_llm_no_renderer_authored_reauthor_idempotent_human_untouched`.
+
+- **[jarvis-contribution-key-identity]** anchor collisions — turning the
+  multiset anchor delta in `drift.detect` back into a SET makes the
+  shadowed-deletion case ADDITIVE again, and dropping rule 2b
+  (`if sigs_ambiguous: return BREAKING`) from `classify_change_severity` makes
+  the shadowed-signature-change case ADDITIVE again; either way tiered mode
+  closes and rewrites the doc, so
+  `test_tiered_never_closes_a_break_hidden_under_a_collided_anchor` reds.
+  Gating the collision guard on the doc carrying `cdm.symbol_sigs` (e.g. adding
+  `and stored_sig_map is not None` to its condition) makes the
+  `-pre-dig01` row ADDITIVE and closed again, and consulting it only when a
+  wholly-new name was added (e.g. `and not set(anchors_added) <= set(stored_counts)`)
+  does the same to the `grown-only-shadowed-break` row. The
+  same case also pins the evidence the human reads in the ReviewRecord's
+  `drift_detail`: it must describe the failed PROOF ("the additions alone do not
+  reproduce the stored signature tier; N same-name anchor(s) could hide a
+  change"), never name a culprit. Swapping or dropping that wording reds it.
+  Dropping the stale-stamp discharge (`_stale_stamp_overcounts`) from
+  `drift.detect` holds the addition in
+  `test_tiered_still_closes_after_a_same_name_deletion_left_the_stamp_over_counting`
+  with a phantom "+1/-1" and no closure, so that case reds.
 
 ## Notes on stale / superseded lessons
 

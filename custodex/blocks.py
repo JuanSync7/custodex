@@ -115,8 +115,21 @@ def expected_region(
     A ``template`` (from config) takes precedence and is rendered against the
     surface. Otherwise the built-in ``"symbols"`` id maps to :func:`symbol_table`
     and any other id returns ``None`` (the caller treats it as unhealable).
+
+    RTE-03a: a ``source='index'`` template also returns ``None``. An index table
+    is not a function of ONE surface — it is a table over the config's *other*
+    documents — so this selector cannot render it and must not pretend to.
+    Before this, it fell through :func:`render_template`'s records branch and
+    returned a header-only table, which is why :func:`custodex.heal._corrected`
+    silently DELETED every row of a live index region (reproduced on this repo's
+    own ``docs/api/index.md``: 16 lines → 2). Declining lets heal hit its
+    existing ``if expected is None: continue`` and skip the region instead.
+    ``drift.detect`` and ``MockBackend`` are unaffected: both branch on
+    ``source == "index"`` and call the index-aware layer BEFORE reaching here.
     """
     if template is not None:
+        if template.source == "index":
+            return None
         return render_template(template, surface)
     if region_id == "symbols":
         return symbol_table(surface)

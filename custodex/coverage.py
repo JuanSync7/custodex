@@ -161,6 +161,19 @@ class CoverageReport(BaseModel):
         return len(self.documented_files) / universe * 100
 
     @property
+    def public_universe(self) -> tuple[OwnedSymbol, ...]:
+        """The public, non-waived symbols :attr:`percent_public_symbols` divides by.
+
+        Exposed (RTE-02c) so a caller can tell **"100% of many" from "100% of
+        nothing"** — the two cases the percentage deliberately cannot distinguish,
+        because it reports vacuous truth rather than raising on an empty universe.
+        That is the right answer for a property and for a report; it is the wrong
+        answer for a ``--fail-under`` GATE, which would otherwise read a mis-scoped
+        include glob as perfect coverage. Sorted exactly as ``symbols`` is (K10).
+        """
+        return tuple(s for s in self.symbols if s.is_public and s.waived_reason is None)
+
+    @property
     def percent_public_symbols(self) -> float:
         """``100 * documented_public / (public - waived)``; ``100.0`` if universe empty.
 

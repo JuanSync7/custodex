@@ -4074,3 +4074,681 @@ revisited):
   worse than the re-extract it saves. Pinned here so the deferral is a decision,
   not an omission.
 
+## EPIC RTE — the apply-tier router  (`drift.py` additions — K0/K1/K2/K3/K10/K11)
+
+**The problem.** Custodex can detect drift and propose a fix, but *every* fix needs
+a human before it lands (`apply_default: false`). On a codebase with real technical
+debt that human never arrives, so the docs stay stale — the tool is correct and
+useless. The goal: spend human attention ONLY where the code cannot answer the
+question, and close everything else unattended.
+
+**The insight (⟨R⟩).** "How confident is the model?" is the wrong question — a
+self-reported score is exactly the signal that fails where it matters, and K11 bans
+a bare float outright. The right question is **provenance**: *what authority closes
+this drift?* Where the answer derives from the extracted surface there is **no model
+to trust** — `expected_region`/`render_corrected` are pure projections, and
+`heal.py:157-158` already states "a backend FIX and an engine heal agree". That
+collapses confidence from an ESTIMATION problem into a CLASSIFICATION problem over
+signals `detect` already captures: pure, offline, clock-free, testable with a
+backend that raises on call.
+
+**The tier vocabulary** — the fourth instance of a shape already pinned three times
+(`kgraph.EdgeTier`, `docmap.SuggestionTier`, `drift.ChangeSeverity`): a provenance
+name, never a magnitude.
+
+```python
+class ApplyTier(str, Enum):
+    CODE_DERIVED = "code-derived"   # an engine projection of the surface; NO model consulted
+    DELEGATED    = "delegated"      # model-authored into a region a human declared `mode: llm`
+    NEEDS_INTENT = "needs-intent"   # closing it needs a WHY the code cannot supply
+
+    @property
+    def is_auto(self) -> bool: ...  # route is DERIVED from the tier, never stored twice
+
+
+def classify_apply_tier(
+    kind: DriftKind,
+    change_severity: ChangeSeverity,
+    *,
+    healable: bool,
+    region_id: str | None = None,
+    region_mode: RegionMode = RegionMode.GENERATED,
+    renderer_backed: bool = False,
+) -> tuple[ApplyTier, tuple[str, ...]]:
+    """Pure, clock-free, no backend, no audience term (K1/K3/K10)."""
+
+
+def auto_routable_docs(report: DriftReport) -> frozenset[str]:
+    """Doc ids whose every ACTIONABLE drift routes AUTO (pure, K10)."""
+```
+
+`Drift` gains two additive fields appended LAST (the P2/P4/DIG-01/P5 precedent):
+`apply_tier: ApplyTier = ApplyTier.NEEDS_INTENT` and `tier_evidence: tuple[str, ...] = ()`.
+**The default is the DENY value** — a `Drift` built outside `detect` is never
+auto-applied, so a forgotten construction site fails safe.
+
+### The decision table  (ordered, first match wins, deny-by-default)
+
+| # | Predicate | Tier | Evidence |
+|---|---|---|---|
+| 1 | `kind is SUSPECT_LINK` | NEEDS_INTENT | `("doc-doc-edge",)` |
+| 2 | `kind is MISSING_DOC` | NEEDS_INTENT | `("no-document-yet",)` |
+| 3 | `kind is UNHEALABLE` | NEEDS_INTENT | `("no-renderer",)` |
+| 4 | `not healable` | NEEDS_INTENT | `("human-owned",)` |
+| 5 | `region_mode in (HUMAN, LLM_SEEDED)` | NEEDS_INTENT | `("human-owned-region",)` |
+| 6 | `kind is REGION and renderer_backed` | CODE_DERIVED | `("mechanical-render", "region:<id>")` |
+| 7 | `kind is REGION and region_mode is LLM` | DELEGATED | `("delegated-prose", "region:<id>")` |
+| 8 | `kind is REGION` | NEEDS_INTENT | `("authored-prose",)` |
+| 9 | `kind is HASH and severity is BREAKING` | NEEDS_INTENT | `("severity:breaking",)` |
+| 10 | `kind is HASH and severity is UNKNOWN` | NEEDS_INTENT | `("severity:unknown",)` |
+| 11 | `kind is HASH and severity in (COSMETIC, ADDITIVE)` | CODE_DERIVED | `("surface-refresh", "severity:<v>")` |
+| 12 | anything else | NEEDS_INTENT | `("unclassified",)` |
+
+⟨R⟩ **Kind rules precede the `healable` rule.** The reverse order (as first drafted)
+makes rules 1 and 3 dead code, because `SUSPECT_LINK` and `UNHEALABLE` are ALWAYS
+constructed `healable=False` — they would collapse into one undifferentiated
+`("unhealable",)` and lose the evidence a reviewer needs. Rule 4 then carries its
+true meaning: a human-owned REGION whose code moved.
+
+⟨R⟩ **Rule 5 denies `LLM_SEEDED` wholesale, on purpose.** An unlocked `llm-seeded`
+region IS engine-owned and IS healed mechanically (`heal.py:63-65`), so it *could*
+be CODE_DERIVED — but the classifier is not given the lock state, only the mode.
+**A rule must not decide what its inputs cannot evaluate**, so it denies the mode it
+cannot fully see. Rule 4 already catches the locked case with better evidence.
+
+⟨R⟩ **Why BREAKING escalates and COSMETIC/ADDITIVE do not.** The argument is about
+prose OUTSIDE the managed regions, which the engine can neither see nor repair.
+COSMETIC ⇒ same symbols, same signatures: no sentence anywhere can have been
+falsified. ADDITIVE ⇒ nothing removed: the doc is now *incomplete*, not *wrong*, and
+a refreshed table is strictly better than a stale one. BREAKING ⇒ a documented symbol
+was removed/renamed or a survivor's signature moved: prose naming it is now FALSE.
+
+⟨R⟩ **No audience clause, deliberately.** K3 is enforced UPSTREAM inside the
+fingerprint (`extract.py:208-209`: `include_docstrings = audience is ENG_GUIDE`), so a
+user-guide's `drifted_tiers` can only ever be `("signature",)` and COSMETIC is
+structurally unreachable there. The severity axis has ALREADY made the rule stricter
+for user guides; a hand-written clause would double-count K3.
+
+### The per-document unit rule  (the safety-critical part)
+
+A document is auto-routable **only if EVERY actionable drift on it routes AUTO. One
+NEEDS_INTENT drift holds the whole document and nothing on it is written.**
+
+⟨R⟩ This is not a refinement, it is the CORRECTNESS CONDITION. `heal._corrected`
+skips a no-renderer region (`heal.py:112-113`) but still stamps the fingerprint
+(`heal.py:134-136`), and the ONLY staleness trigger for such a region is
+`stored != current` (`drift.py:352-353`). So applying a doc's HASH fix while
+escalating its sibling prose region **destroys the escalation's own trigger**: the
+prose goes permanently stale, `remaining` comes back empty, `cdx check` is green, and
+the next cycle detects nothing — forever. That is the exact inversion of "nothing is
+missed", and it fires on this repo's own config (`config/cdmon/core.yaml` declares
+`overview: llm` with `api-index` the only region template).
+
+⟨R⟩ **Actionable EXCLUDES `SUSPECT_LINK`**: `monitor.run` `continue`s past those
+(`monitor.py:315`) and handles them in a pass that never calls `apply_fix`, so they
+can neither be applied nor blessed — a suspect link must not veto its document. A doc
+whose ONLY drifts are suspect links is vacuously auto-routable and harmless (nothing
+on it reaches the apply gate).
+
+### Slice plan
+
+- **RTE-01** — classify + report; change nothing. `ApplyTier`, `classify_apply_tier`,
+  `auto_routable_docs`, the two additive `Drift` fields, the six `detect`
+  construction points, one additive `summary()` routing line. NO config flag, NO
+  monitor change, NO schema bump.  ← **BUILT**
+- **RTE-02** — extraction fidelity: decorators (`@property`/`@staticmethod`), class +
+  pydantic fields, module docstrings; `symbol_context` feeds decorators + docstring
+  into the prompt behind a defaulted flag. **Prerequisite to recommending
+  `apply_tiered: true`** — today `docs/api/coverage-system.md` documents five
+  `@property` attributes as callable methods, with no model involved.
+- **RTE-03** — mechanical auto-apply goes live, opt-in (`apply_tiered`), zero backend
+  calls on the CODE_DERIVED path, plus the `ClosureRecord` alarm.
+- **RTE-04** — DELEGATED prose + the containment guards (`unmanaged_prose_delta` at
+  the heal write boundary, `ungrounded_identifiers`). **Carries a genuine K11 widening
+  that needs explicit human ratification.**
+- **RTE-05** — the docs loop: `target_key`/`stamped_key` (heal- AND backend-invariant),
+  `PRQuery.find_open`, the `SyncDecision` tri-state, `cdx inflight`.
+
+### RTE-02 — extraction fidelity  (SPLIT into 02a/02b/02c)
+
+⟨R⟩ **The pinned RTE-02 bundled four changes with very different blast radii**
+(decorators; class/pydantic fields; module docstrings; prompt enrichment). Fields
+alone would add hundreds of symbols to every surface AND change the coverage
+DENOMINATOR, so bundling them makes the required repo-wide reheal
+un-attributable: if a doc comes back wrong, which change caused it? Split so each
+reheal has exactly one cause.
+
+- **RTE-02a — decorator fidelity** (the shipped bug). ← *this slice*
+- **RTE-02b** — class + pydantic FIELDS enter the surface and the rendered table.
+- **RTE-02c** — the module docstring as a `module`-kind symbol; promote `property`
+  into `SymbolKind` TOGETHER with the `_symbols_for_ref` selector that depends on it.
+- **RTE-02d** — `symbol_context` feeds decorators + the docstring first line into
+  the backend prompt behind a defaulted `rich_surface: bool = False` on
+  `FixRequest`. No fingerprint change.
+
+#### RTE-02b — fields, and why they must reach the TABLE, not just the surface
+
+**Measured, not estimated:** `1039` annotated class fields across 71 files extract
+as **nothing**. `_extract_python_symbols` walks `tree.body` and, inside a
+`ClassDef`, descends only into `FunctionDef`/`AsyncFunctionDef` children — the
+`Assign | AnnAssign` branch is MODULE-level only. For a pydantic-heavy codebase
+that is most of the configurable API: `MonitorConfig.apply_default`, the single
+most important fact an adopter needs, is invisible to the docs today.
+
+⟨R⟩ **Fields must enter the SURFACE and the rendered TABLE together.** Verified in
+`coverage.py:205-216`: *"a symbol is owned iff some `code_ref` on that file
+SELECTS it"*, and `documented = sum(1 for s in universe if s.owners)`. So
+"documented" means **matched by a config glob**, not *described anywhere*. Adding
+fields to the surface while filtering them out of the table would therefore mark
+all 682 as documented while they appear in NO document — inflating the very
+completeness number the epic exists to make trustworthy. Coupled, `selected ⇒
+listed` holds and the number keeps its meaning. A test pins the coupling.
+
+**Cost, accepted deliberately:** the dogfood tables grow ~66% (`server` 194→429,
+`foundation` 132→308, total 1033→1715). That is the price of "nothing is missed",
+and it was an explicit human decision, not an engine default.
+
+**Shape:** `_variable_symbols(node, *, qualifier: str = "")` gains a qualifier so a
+class field becomes `Class.field` (mirroring `Class.method`), while the SIGNATURE
+keeps the bare `field: type = default` form (mirroring `display_name` for methods).
+
+⟨R-CORRECTED⟩ An earlier draft justified passing the BARE name to `_is_public` by
+claiming a qualified name would look public. **That was wrong**, and mutation
+testing proved it: `_is_public` already does `leaf = name.rsplit(".", 1)[-1]`
+(`extract.py:296`), so it strips the qualifier itself — which is exactly how
+`Class._method` has always been classified. Passing the bare name is therefore a
+harmless style choice, NOT a correctness requirement, and the two mutations that
+pass the qualified name instead are EQUIVALENT MUTANTS that no test can kill.
+The visibility test is still worth keeping (it pins that a private field stays
+private), but it defends the OUTCOME, not this rationale.
+
+#### RTE-02a — the defect, verified by running the extractor
+
+`grep -c decorator custodex/extract.py` is **0**: extraction never inspects
+`decorator_list`. Probing `extract_file` on a fixture:
+
+| source | extracted as | harm |
+|---|---|---|
+| `@property def net(self) -> int` | `Order.net \| method \| def net(self) -> int` | the reader is told to **call an attribute** |
+| `@staticmethod def make() -> "Order"` | `Order.make \| method \| def make() -> 'Order'` | a method with no `self` — reads as broken |
+| `@classmethod def blank(cls)` | `method \| def blank(cls) -> 'Order'` | `cls` shown as a caller-supplied arg |
+
+This is **already shipped in this repo's own generated docs**:
+`docs/api/coverage-system.md` documents FIVE consecutive `@property` attributes
+(`percent_files`, `percent_public_symbols`, `documented_symbols`,
+`undocumented_files`, `undocumented_symbols`) as callable methods — produced with
+**no model involved at all**. It is the concrete refutation of "the LLM won't
+misunderstand the code": the projection was lossy before any model saw it.
+
+**The change (one choke point).** Every function/method Symbol is built by
+`_func_symbol` (`extract.py:396`, called from exactly two sites), so:
+
+```python
+Symbol.decorators: tuple[str, ...] = ()   # additive, SOURCE order (deterministic, K10)
+
+def _decorator_names(node) -> tuple[str, ...]:
+    """Dotted decorator names in source order — `property`, `functools.cache`,
+    `app.command` (a Call decorator contributes its callee name, no arguments)."""
+
+def _func_signature(node, display_name) -> str:   # now decorator-prefixed
+    # "@property\ndef net(self) -> int"  ->  rendered inline in a table cell
+```
+
+⟨R⟩ **`kind` is deliberately NOT changed to `"property"` in this slice.**
+`_symbols_for_ref` (`extract.py:1037`) selects `arg_signature` refs with
+`s.kind in ("function", "method")`, so promoting properties to a new kind would
+**silently drop every property from that selection** — a regression invisible to
+the symbol table. Carrying the decorator in the SIGNATURE fixes the demonstrated
+harm (the reader now sees `@property` and writes `obj.net`) with zero consumer
+breakage. Promoting the kind is RTE-02b, where that selector is updated with it.
+
+⟨R⟩ **Decorators are kept in SOURCE order, not sorted.** Decorator order is
+semantic (`@property` over `@abstractmethod` differs from the reverse), so sorting
+would destroy meaning. Source order is already deterministic, which is what K10
+actually requires — "sorted" is the usual means, not the end.
+
+**Expected blast radius (the point of its own slice):** `kind`+`signature` feed the
+per-symbol digest and the signature tier, so every eng-guide doc covering decorated
+code drifts. Under RTE-01 those grade **BREAKING** (a survivor's signature moved)
+and therefore route **NEEDS_INTENT** — correctly, since prose may say `.net()`.
+The reheal is expected to be repo-wide and is committed with the slice.
+
+#### RTE-02c — coverage-gate honesty: an EMPTY universe is not 100% covered
+
+**Reproduced, not asserted:** `CoverageReport(files=(), symbols=())` returns
+`percent_public_symbols == 100.0`, and `cli.py:1285` gates on
+`report.percent_public_symbols < fail_under` — so `cdx coverage --fail-under 95`
+against a MIS-SCOPED config (an include glob matching nothing) prints 100.0 and
+**exits 0**. The strictest available gate passes on a repo Custodex never looked
+at. For an epic whose goal is "nothing is missed", a completeness metric that
+reports perfection for measuring nothing is the worst possible failure: it is
+silent, it is green, and it is maximally confident.
+
+⟨R⟩ **`percent_public_symbols` itself is NOT changed.** Its docstring's reading —
+*"a repo with zero public, non-waived symbols is vacuously 100% covered (no
+zero-division)"* — is defensible, it is public API, and other callers (the JSON
+payload, the manifest, the server view) legitimately want a number rather than an
+exception. Vacuous truth is the right answer for a PROPERTY; it is the wrong answer
+for a GATE. So the fix belongs at the gate, not in the arithmetic.
+
+```python
+class CoverageReport(BaseModel):
+    @property
+    def public_universe(self) -> tuple[OwnedSymbol, ...]:
+        """The public, non-waived symbols the percentage is computed OVER.
+
+        Exposed so a caller can tell "100% of many" from "100% of nothing" — the
+        two cases `percent_public_symbols` deliberately cannot distinguish.
+        """
+```
+
+`cdx coverage --fail-under N` then refuses an empty universe LOUDLY (K8) instead of
+passing it: a gate asked to enforce a threshold over nothing has been mis-configured,
+and that is malformed INPUT, which is exactly what K8 loudness is for.
+
+**Not in this slice:** redefining what "documented" MEANS (today: "some `code_ref`
+selects it", i.e. a glob matched — not "described anywhere"). That is a genuine
+product change with adopter-visible consequences and deserves its own decision.
+
+### RTE-03 — mechanical auto-apply goes live  (SPLIT into 03a/03b/03c/03d)
+
+⟨R⟩ **The pinned one-slice RTE-03 was refuted by a 60-agent adversarial design
+review before a line was written** (8 blockers, every one reproduced first-hand).
+Three of them are structural, not cosmetic: the write path corrupts an
+`index`-sourced region, the config knob leaks into six call sites that never opted
+in, and the alarm as specced fires on runs where no write was ever attempted. The
+slice is therefore split so each has ONE validable goal and ONE attributable
+reheal.
+
+#### The bug RTE-03 exists to fix (reproduced, not asserted)
+
+A `HalfBackend` that FIXes the HASH and ESCALATEs the prose — i.e. exactly what a
+real LLM does when it will not invent a WHY — against a doc with a renderer-backed
+`symbols` region and a no-renderer `mode: llm` region:
+
+```
+handled guide HASH   [needs-intent] -> FIX      applied=True     <- fingerprint stamped
+handled guide REGION [delegated]    -> ESCALATE applied=False    <- a human must author this
+remaining after run: []
+NEXT CYCLE (fresh detect, nothing changed):  clean — no drift detected
+the prose still says: 'Prose a model authored about alpha.'
+```
+
+The escalation's own staleness trigger is destroyed by its sibling's apply. `cdx
+check` is green forever and the human is never asked again. This is the exact
+inversion of "nothing is missed", it is reachable today with `--apply`, and it is
+the reason the fold is per-DOCUMENT.
+
+#### RTE-03a — ONE renderer, not two  (a shipped data-loss defect)
+
+**Reproduced on this repo's own `docs/api/index.md`:**
+
+```
+render_index (what detect expects) -> 16 lines | expected_region (what heal writes) -> 2 lines
+heal.regenerate_regions changed=True   api-index rows: 16 -> 2   (14 rows deleted)
+```
+
+`drift.detect` renders an `index`-sourced region with the index-aware layer
+(`drift.py:596-600`), but `heal._corrected` has only `expected_region`
+(`heal.py:115`), which falls through `render_template`'s records branch and emits a
+header-only table — **despite `render_template`'s own docstring saying
+`source='index'` is "rendered by the index-aware layer … not here"**. It is
+reachable today, unattended, through `generate.apply_edits_to_disk` →
+`regenerate_regions` (`generate.py:459`).
+
+**The fix is one choke point:** `expected_region` returns `None` for a
+`source: index` template. `heal._corrected` then hits its existing
+`if expected is None: continue` (`heal.py:116-117`) and SKIPS the region instead of
+corrupting it.
+
+⟨R⟩ **Skipping does not bless it.** The per-document fold exists because heal
+stamps the fingerprint even when it skips a region — but an index region's
+staleness trigger is NOT the fingerprint: `detect` compares `render_index(...)`
+against the body UNCONDITIONALLY (`drift.py:601`), not gated on `stored != current`
+the way the `mode: llm` no-renderer branch is (`drift.py:576`). So a skipped index
+region still drifts on the very next `cdx check`.
+
+⟨R⟩ **`expected_region`, not `render_template`.** `render_template`'s contract is
+"render a table FROM A SURFACE"; an index table is not a function of one surface, so
+the honest place to decline is the selector. Blast radius is nil at the other three
+call sites: `drift.py:600` and `backends.py:459` are both already inside an
+`else` branch of an explicit `source == "index"` test, and `layout.py:520` passes no
+template at all.
+
+#### RTE-03b — the three-way routing tally + the fold primitives
+
+```python
+AUTO_TIERS: frozenset[ApplyTier]   # = frozenset(t for t in ApplyTier if t.is_auto) — DERIVED
+
+def docs_closable_by(
+    report: DriftReport,
+    tiers: Collection[ApplyTier],
+    *,
+    require_actionable: bool = False,
+) -> frozenset[str]:
+    """Doc ids whose every ACTIONABLE drift carries a tier in ``tiers`` (pure, K10)."""
+
+def auto_routable_docs(report: DriftReport) -> frozenset[str]:
+    """Unchanged contract — now a delegate to docs_closable_by(report, AUTO_TIERS)."""
+
+def mechanical_docs(report: DriftReport) -> frozenset[str]:
+    """= docs_closable_by(report, {CODE_DERIVED}, require_actionable=True)."""
+```
+
+⟨R⟩ **`require_actionable` exists because the vacuous member is harmless for
+routing and dangerous for closing.** A doc whose ONLY drift is a `SUSPECT_LINK` is
+vacuously a member of the fold (`drift.py:366-371` blocks, it never requires).
+That is documented as harmless for `auto_routable_docs` — nothing reaches the apply
+gate. But RTE-03d turns the same set into the CLOSURE set, and a phantom
+`ClosureRecord(verified=True)` would print a GREEN line for a document whose
+suspect link is still open and was just ESCALATE'd. So the closing set requires at
+least one qualifying actionable drift; the routing set keeps its vacuous truth and
+its byte-identical output.
+
+⟨R⟩ **`mechanical_docs` is strictly NARROWER than `auto_routable_docs`.**
+`DELEGATED` is auto-routable but is model-authored prose — RTE-04, and it carries
+the K11 widening that needs explicit human ratification. RTE-03 closes only what
+the engine projects itself.
+
+`summary()`'s routing line becomes a three-way tally (`N mechanical / M delegated /
+K need human intent`) — still ONE appended line, so every pre-RTE-01 substring
+assertion still holds (K9).
+
+#### RTE-03c — the restraint (`apply_tiered`): where `--tiered` may write
+
+`MonitorConfig.apply_tiered: bool = False` (+ the `IndexFile` mirror + the merge
+lift — the three places `fingerprint_body_tier` occupies, `config.py:592/984/1242`),
+`Monitor.run(*, apply=None, tiered=None)`, `cdx monitor --tiered/--no-tiered`.
+
+When `effective_tiered` is true, a document NOT in `mechanical_docs` is still sent
+to the backend (the human gets a `ReviewRecord` carrying a proposed fix, K5) but
+**nothing on it is written** — `apply_fix` is not called. That restraint alone
+fixes the reproduced bug above, with no engine-authored write anywhere in the
+slice.
+
+⟨R-CORRECTED⟩ **`--tiered` is NOT a subset of `--apply`, and an earlier draft of
+this epic claimed it was — in six places.** It is a REPLACEMENT of authority on the
+mechanical path and a RESTRAINT everywhere else. Reproduced against a backend that
+declines:
+
+```
+--apply            backend verdict=['INVALIDATE']  WROTE=False
+--apply --tiered   backend verdict=['FIX']         WROTE=True
+```
+
+Held documents are strictly narrower (nothing is written where `--apply` would apply
+a backend FIX). Mechanical documents are DIFFERENT: no backend is consulted at all,
+so a backend that would have declined never gets the chance. That is the epic's
+thesis working as designed — on the CODE_DERIVED path there is no model judgement to
+defer to — but it means an adopter whose backend is deliberately conservative can see
+`--tiered` write where `--apply` did not. Default OFF, and stated rather than claimed
+away. K3 is not at risk: it is enforced upstream in the fingerprint, so a user-guide
+never gets a HASH drift for a docstring/private change in the first place.
+
+⟨R⟩ **`tiered` must be passed EXPLICITLY at every call site that is not `cdx
+monitor`.** `effective_tiered = config.apply_tiered if tiered is None else tiered`
+mirrors `apply`, but `apply`'s own discipline is stricter off the CLI, and MCP-02
+ratified it in writing (`mcp/tools.py:905-910`): *"`apply` passed THROUGH
+EXPLICITLY so a repo's `apply_default: true` can NEVER be triggered implicitly by a
+remote agent"*. Six sites inherit by omission — `syncpr.py:119`, reached from
+`cli.py:667` (`sync-pr`), `cli.py:756` (`open-docs-pr`), `server/app.py:1869` (on a
+CLONED, untrusted repo's own config) and `mcp/tools.py:1100`; plus
+`mcp/tools.py:921` (`custodex_remediate`) and `cli.py:2075` (`onboard`). Every one
+passes `tiered=False`, each pinned by its own leak test. `sync_pr` gains a
+`tiered: bool = False` parameter so the choice is visible in the code, not implied
+by an omission.
+
+⟨R⟩ **The suspect-link edge baseline is a deliberate carve-out.** `--tiered` says
+"no managed-region or fingerprint write on a held document"; `_handle_suspect_links`
+→ `stamp_edges` (`docdeps.py:437`) writes `cdm.upstream_hashes` on a held doc even
+so. It is kept, because it touches neither a managed region nor `cdm.fingerprint`
+and therefore destroys no code↔doc staleness trigger — establishing a baseline is
+not blessing a change. Stated here and pinned by a byte-level test rather than left
+for whichever behaviour the implementer happened to write. (RTE-01's rationale
+above says the pass "never calls `apply_fix`" — true, but not the same as "never
+writes"; read it with this paragraph.)
+
+#### RTE-03d — zero backend calls on the mechanical path + the closure alarm
+
+The engine builds the fix itself, **mirroring `MockBackend`'s two shapes exactly**
+(`backends.py` rules 1 and 3) — one `ProposedFix` per DRIFT, not per document:
+
+| mechanical drift | fix shape | body |
+|---|---|---|
+| `REGION` | region-scoped (`region_id` + `new_region_body`) | the SAME index-aware selector `detect` uses (`render_index` when `template.source == "index"`, else `expected_region`) |
+| `HASH` | whole-doc (`new_doc_text`) | `render_corrected(doc_text, surface, region_templates, include_body=...)` |
+
+⟨R⟩ **The fix SHAPE must not widen.** Collapsing both into one whole-doc
+`render_corrected` per document would (a) make a REGION close rewrite front-matter
+it never touches today — `set_fingerprint` / `set_fingerprint_tiers` /
+`set_symbol_sigs` (`heal.py:134-140`) — which on a legacy composite-only doc
+silently ADDS the P2/DIG-01 digests that `classify_change_severity` needs to move a
+FUTURE HASH drift from `UNKNOWN` (NEEDS_INTENT) to `COSMETIC` (CODE_DERIVED): the
+unattended write would widen what it may next write unattended; (b) label every
+REGION ticket `"whole-doc"` (`ticket.py:119-127`); and (c) put one whole-doc blob on
+every record of the document. Keeping the shapes preserves the handled/records
+lockstep `mcp/tools.py:927` zips `strict=True`.
+
+⟨R⟩ **`preserve`/`modes` go to `apply_fix` ONLY, never to `render_corrected`** —
+proven a byte-level no-op there, and one enforcement point means a future
+B-02/B-03/RTE-04 guard is added once. This is exactly what `MockBackend` +
+`monitor.py:409-417` already do.
+
+⟨R⟩ **The D-06 promoted-rule check keeps its precedence.** `rule_for` is evaluated
+BEFORE the tiered branch, so a verdict humans reached ≥K times can never be
+overridden by an engine write. A rule match does NOT remove the document from
+`mechanical_docs`, because with the region-scoped shape above a mechanical REGION
+close does not stamp `cdm.fingerprint` and so cannot bless anything the rule held.
+
+`ClosureRecord` lives in `monitor.py` beside `HandledDrift`/`MonitorResult` — it is
+an in-process result detail, NOT a public schema artifact, so `cdx schema` (which
+emits `ReviewRecord` alone, `cli.py:2956`) is untouched and no `schema_version`
+bump is implied (K6).
+
+```python
+class ClosureRecord(BaseModel):
+    doc_id: str
+    doc_path: str
+    record_id: str                 # SINGULAR — see ⟨R⟩ below
+    drift_kinds: tuple[str, ...]   # sorted + deduped (K10)
+    evidence: tuple[str, ...]      # sorted set-union over the doc's drifts (K10)
+    attempted: bool                # the write path was ENTERED (effective_apply was true)
+    wrote: bool                    # apply_fix actually changed bytes
+    verified: bool                 # the recheck shows no remaining ACTIONABLE drift on this doc
+```
+
+⟨R⟩ **`record_id` is singular because `new_record_id` collides by construction.**
+It hashes `(doc_id, surface_hash, detected_at)` (`schema.py:162-170`) — no drift
+kind, no region — so N drifts closed on one document in one run with one injected
+timestamp share ONE id. A `record_ids: tuple[str, ...]` would be a tuple of
+duplicates pretending to be a set. Widening `new_record_id` is NOT the fix: it would
+change every existing record id and break the doc-grain `cdx resolve` /
+`custodex_resolve` contract MCP-01 pinned.
+
+⟨R⟩ **The alarm fires on `attempted and not verified`, never on `wrote`.**
+`apply_fix` returns `False` for an ATTEMPTED write it declined — a preserved id
+(`heal.py:297-298`) or a B-03 locked region (`heal.py:277-280`). So
+`wrote=False, verified=False` is precisely the shape of *"the router promised
+mechanical closure and the write boundary silently refused"*, which is the case the
+alarm exists to catch; gating on `wrote` would hide every one. Under
+`not effective_apply` the records are emitted with `attempted=False` and labelled
+PREVIEW — never "did not converge", because auto-apply never ran.
+
+⟨R⟩ **The alarm adds NO new exit code.** `verified` is derived from the same
+recheck that already drives `cli.py:633-638`'s exit 1, and
+`tests/system/test_cli.py:120-125` pins that contract, so a second `typer.Exit`
+would be redundant and a claimed "exit 0 under `--tiered --no-apply`" would be a K9
+regression. The alarm's deliverable is the MESSAGE — a verbatim stderr marker that
+NAMES the pathology (`did not converge` vs `the write boundary declined`) — printed
+before the existing `remaining` block. The test asserts the marker, so it is
+killable.
+
+**Ordering, K10:** `MonitorResult.closures` sorted by `doc_id`; `drift_kinds` and
+`evidence` sorted and deduped; nothing iterates a `frozenset` into output.
+
+**Known interaction, not fixed here:** under `docdeps.baseline: body` every
+mechanical closure invalidates its downstreams' edges, so an unattended run
+converges to open suspect links. That is today's behaviour under `--apply` and is
+RTE-05's problem, not a regression introduced here.
+
+⟨R-CORRECTED⟩ **Three further rationales were refuted by the post-implementation
+review, all verified first-hand before changing anything.**
+
+1. **`--tiered` is not a subset of `--apply`** — it REPLACES the authority on the
+   mechanical path. Reproduced: `--apply` with a declining backend writes nothing;
+   `--apply --tiered` writes. Corrected in six places.
+2. **A promoted D-06 rule needs the whole document withdrawn from the mechanical
+   set.** The original ⟨R⟩ argued a region-scoped close cannot bless anything a rule
+   held — true, and irrelevant: the HASH close is WHOLE-DOC and regenerates every
+   known region, including the rule-held one. Reproduced (`rule-held region body
+   survived? False`). The first design review recommended exactly this and was
+   declined on that incomplete argument.
+3. **`ClosureRecord.record_id` had to become `record_ids`.** The claim "N drifts on
+   one document share ONE id" holds only under a FIXED injected clock; under
+   `_default_now`'s microsecond precision the ids are DISTINCT and a singular field
+   silently named the first of N.
+
+Plus two defects that were not rationale errors:
+
+4. **The fold must block by `doc_path`, not `doc_id`.** `MonitorConfig` accepts two
+   documents on one file; closing the mechanical one rewrote the held one and
+   stamped its fingerprint. Blocking by path SUBSUMES blocking by id (every drift
+   carries its own document's path), so the separate id set was an equivalent
+   mutant and was removed.
+5. **`cdx sync-pr` / `open-docs-pr` must honour the operator's OWN `apply_tiered`.**
+   Forcing `tiered=False` at every non-`cdx monitor` site left the docs-PR loop with
+   no protection at all. The leak worth closing was config arriving BY OMISSION where
+   the config is not the operator's — a remote agent's tool call, and the server's
+   route over a CLONED repo. Those still force it off. **The distinction is whose
+   config it is, not which function is called.**
+
+⟨R-CORRECTED, second pass⟩ **The narrowing claim was pinned in TEN places, not six.**
+The first correction pass missed four, including the two that matter most: the
+scaffolded `config/cdmon/index.yaml` body in `templates_v2.py` — the ONLY
+adopter-visible copy, and the comment someone reads before enabling the knob in CI —
+and the `MonitorConfig.apply_tiered` field comment itself. Also corrected: the
+`mcp/tools.py` parenthetical (its CONCLUSION survives — forcing tiered off keeps MCP
+on the backend-authored path, which is never broader — only its premise was wrong)
+and a test section header. The guard now covers BOTH declining verdicts, because
+`INVALIDATE` ("does not affect this audience", K3) and `ESCALATE` ("a human must
+decide") are different real cases and neither can hold the write once the engine
+stops asking.
+
+The adopter-facing text also said "NOTHING on it is written" for a held document,
+which the suspect-link edge baseline contradicts. Corrected to name the exception and
+why it is safe.
+
+⟨REFUTED⟩ **"`cdx generate` now leaves a permanent `TODO: content for <id>` in an
+index region."** Not permanent: `cdx monitor --apply` fills it correctly through the
+index-aware path (verified — `TODO: content for 'idx'` → `| [Sib](sib.md) |`). Before
+RTE-03a the scaffold path wrote a *wrong* table there instead; an honest TODO until
+the first monitor run is strictly better than a silent lie that looks right.
+
+#### RTE-03g — anchor collisions (CKI-1a): a name-keyed identity counted as a multiset
+
+**The defect (review finding jarvis-contribution-key-identity).** `anchor_id` hashes
+the qualified name only, so same-name symbols — `main` in two code_refs, an
+`@overload` stack, a property getter and setter — share ONE anchor. DIG-01's
+`cdm.symbol_sigs` is keyed by anchor, so it keeps only the LAST writer, and the P4
+anchor delta was a SET. A break or deletion of a SHADOWED symbol plus any addition
+in the same edit therefore graded `ADDITIVE` → `CODE_DERIVED` (rule 11), and
+`--tiered` closed it unattended with `resolved_by=engine`.
+
+`classify_change_severity(drifted_tiers, anchors_added, anchors_removed,
+sigs_changed=(), sigs_ambiguous=())` gains a fifth parameter. **Rule 2b:** a
+non-empty `sigs_ambiguous` ⇒ `BREAKING`, whatever tiers moved — after rule 2
+(`sigs_changed`) and ABOVE the addition rule. `detect` computes `anchors_added` /
+`anchors_removed` as `collections.Counter` MULTISET deltas (sorted `.elements()`),
+merging the stamps of a doc's region keys with `|` (max — idempotent, so a key the
+config lists twice never doubles a count). A count-only decrease the stored
+signature tier proves stale is dropped from `anchors_removed`. `Drift` gains, after
+`sigs_changed`:
+
+```python
+    sigs_ambiguous: tuple[str, ...] = ()  # CKI-1a: STAMPED anchors now shared by 2+ same-name
+                                          # symbols that could hide a sig move — candidates,
+                                          # not culprits; non-empty ⇒ BREAKING (rule 2b)
+```
+
+and `anchors_added`/`anchors_removed` now read: anchor_ids present now but not in
+the stored MULTISET / vice-versa — one entry per same-name symbol, a count-only
+decrease the stored signature tier proves stale dropped, only as current as the
+anchor stamp. Private helpers, all pure (K1/K10):
+
+```python
+def _signature_reproduced(surface: DocumentSurface, set_aside: Collection[str], stored_tiers: SurfaceFingerprint) -> bool
+# True iff the SIGNATURE tier re-derived (the engine's own fingerprint(), records kept) with every
+# symbol under a set_aside anchor removed == stored_tiers.signature. Shared by the two proofs below.
+
+def _stale_stamp_overcounts(surface, current_counts: Counter[str], stored_counts: Counter[str], stored_tiers: SurfaceFingerprint | None, drifted_tiers: Sequence[str]) -> frozenset[str]
+# shrunk = {a : 0 < current[a] < stored[a]}; frozenset() if none or no stored tier;
+# shrunk if "signature" not in drifted_tiers (P1) or _signature_reproduced(surface, current - stored, tiers) (P2);
+# else frozenset(). A wholly-removed name (current 0) is never discharged.
+
+def _ambiguous_sig_anchors(surface, current_counts: Counter[str], stored_counts: Counter[str], stored_tiers: SurfaceFingerprint | None, drifted_tiers: Sequence[str]) -> tuple[str, ...]
+# called only when anchors_added and not anchors_removed and not sigs_changed — for ANY addition,
+# a grown-only one included; reads the anchor stamp + stored tiers only (never symbol_sigs, so a
+# pre-DIG-01 doc is protected too); candidates = anchors with current count > 1 AND stamped;
+# () if no candidate / signature tier unmoved / _signature_reproduced(surface, added, tiers);
+# else the sorted candidates. A wholly-new same-name group is never a candidate.
+```
+
+Detail suffix: `" (unproven: the additions alone do not reproduce the stored
+signature tier; N same-name anchor(s) could hide a change)"`, or `"(unproven: no
+stored signature tier to check the additions against; …)"` when no tier is stored.
+It describes the proof that failed, never a culprit, and it is ABSENT whenever
+`sigs_ambiguous` is empty; the discharge adds no text. No hash, stamp or schema
+change and no re-baseline (`cdx schema` emits `ReviewRecord`, not `Drift`).
+
+⟨R⟩ **Prove innocence from stored data; never infer it.** The per-anchor digest
+cannot say WHICH same-name symbol moved, but the stored signature tier lists every
+occurrence, name-sorted. If the tier re-derived with the additions set aside
+reproduces the stored digest byte-for-byte, the additions explain the whole move;
+anything else denies. The SIGNATURE tier, not the composite: the composite also
+moves on a docstring or body edit, so it would hold every such addition.
+
+⟨R⟩ **The stale-stamp discharge, and the writer premise it binds.** Under the
+multiset an OVER-counting stale stamp — one of two `main`s deleted on a doc whose
+`symbols` region is preserved (`mode: human`, B-03-locked) or absent from the body,
+so heal re-stamps `fingerprint_tiers` + `symbol_sigs` but not `region_anchors` —
+was a PERMANENT phantom removal: every later drift on the doc BREAKING with a false
+"-1", a docstring-only edit included. The stored tier arbitrates, because **every
+writer that stamps `cdm.region_anchors` also stamps `cdm.fingerprint_tiers` from
+the same surface in the same write** (today `heal._corrected` and
+`layout.scaffold_doc`). That premise is BINDING on every future writer: one that
+completes `region_anchors` alone would make a stale tier look newer, and the
+discharge would then launder a real same-name deletion (measured: an anchors-only
+completion after a whole-doc fix grades DEL+ADD `ADDITIVE`, mechanical). A genuine
+deletion against a current tier always moves the signature payload, identical
+signatures included, so neither proof passes and the removal stands.
+
+**Known costs** (all conservative holds, never an unattended write):
+
+- Until slice 1b (a lineno-free tie key): same-name ties are ordered by `(name,
+  lineno)`, so a pure addition travelling with an edit that reorders 3+ same-name
+  colliders while the last writer stays last is held (dogfood: insertion 25/344, a
+  lower bound; removal 6/110; appending 0/43).
+- Until slice 2 (per-occurrence identity): a GROWN collision is always held. Alone
+  that is the pre-fix verdict (rule 4); in the same edit as another addition it is
+  newly held.
+- Until S1-E4 (the anchor stamp completed on every write): an UNDER-counting stale
+  stamp over-holds later additions — a label change for a preserved region, whose
+  review advisory already fires, and a routing change after a hand-deleted
+  declared region or a backend whole-doc FIX — and still hides a same-name
+  deletion (delete + add ⇒ `ADDITIVE`, closable under `--tiered`), pre-existing on
+  both engines. After a backend whole-doc FIX (`heal.apply_fix`) the tiers are
+  stale too: the over-count phantom removal is kept, and with IDENTICAL-signature
+  colliders a later pure addition grades `BREAKING` where the pre-fix engine said
+  `ADDITIVE`.
+
+**Binding on the step-1 slices** (S1-E4 and S1-RULE11 are drafted outside this
+file; carry this into them when they pin). A stale region stamp errs BOTH ways —
+the premise "a stale region stamp can only err toward holding" is false. An
+UNDER-count hides a same-name deletion (pinned by
+`test_a_stale_anchor_stamp_still_hides_a_same_name_deletion`) and over-holds
+additions; an OVER-count is discharged when the stored tiers are current and kept
+as a phantom removal when they are stale. Its writers are `heal._corrected`
+skipping a preserved region, `heal._corrected` stamping only regions present in
+the body, and `heal.apply_fix`'s whole-doc branch (a live-LLM FIX). Any completion
+of `region_anchors` — S1-E4's third writer included — must complete anchors +
+`fingerprint_tiers` + `symbol_sigs` ATOMICALLY, never anchors alone.

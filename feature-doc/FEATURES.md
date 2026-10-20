@@ -2,7 +2,7 @@
 
 Generated from `feature-doc/catalog/*.yaml` — **do not hand-edit**. Run `cdx wiki` (R-08) to regenerate. Each row's Demos/Tests columns trace the feature to its demo case(s) and test(s).
 
-**256 features** across 35 subsystems.
+**268 features** across 35 subsystems.
 
 ## agent
 
@@ -120,6 +120,7 @@ A FixRequest carries additive authoring inputs — `context_refs` glance-through
 | `FEAT-CLI-020` | Layout lint (cdx lint) | cli | K1, K8, K10 | — | — | implemented |
 | `FEAT-CLI-021` | Doc scaffold (cdx new-doc) | cli | K8 | — | — | implemented |
 | `FEAT-CLI-022` | Schema export (cdx schema) | cli | K6 | — | — | implemented |
+| `FEAT-CLI-023` | cdx monitor --tiered, and the routing tally on cdx check | cli | K9 | — | — | implemented |
 
 ### `FEAT-CLI-001` — Config scaffold (cdx init)
 
@@ -208,6 +209,10 @@ A FixRequest carries additive authoring inputs — `context_refs` glance-through
 ### `FEAT-CLI-022` — Schema export (cdx schema)
 
 `cdx schema` emits the public review-record JSON schema (`review_record_schema`) to stdout, or to `--out FILE` — one source of truth for the record contract (K6).
+
+### `FEAT-CLI-023` — cdx monitor --tiered, and the routing tally on cdx check
+
+`cdx monitor --tiered/--no-tiered` overrides the config's `apply_tiered`, exactly as `--apply` overrides `apply_default`. On a held document it writes nothing and still exits 1 through the pre-existing remaining-drift gate, so the exit-code contract is unchanged (K9) — the deliverable is the restraint, not a new exit code. `cdx check` reports the three-way routing tally so an adopter can read off how much unattended mode would close before switching it on.
 
 ## codeindex
 
@@ -310,6 +315,7 @@ errors.py defines a single CodeDocMonitorError base carrying a human message plu
 | `FEAT-CONFIGV2-015` | Index-source region rendering | index | K0, K2, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-016` | README / narrative-document monitoring | config, drift, layout | K0, K2, K3, K5, K10 | — | — | implemented |
 | `FEAT-CONFIGV2-017` | Test → test-doc mirror | config, extract, heal | K0, K2, K5, K7, K10 | — | — | implemented |
+| `FEAT-CONFIGV2-018` | Every index global is lifted onto MonitorConfig | config | K8, K9 | — | — | implemented |
 
 ### `FEAT-CONFIGV2-001` — Multi-file config/cdmon directory layout
 
@@ -379,6 +385,10 @@ A narrative Markdown document such as README.md is a first-class monitored docum
 
 Test files are monitored exactly like source files: a config/cdmon unit whose code_refs point at tests/** and whose documents live under a top-level test-docs/ directory maps each test file 1:1 to a test-doc carrying a managed symbols region that lists the file's test_* functions. It is the SAME engine as source -> docs with no new code — a test file is just a .py file (K0), so the extractor, drift detector, healer, and coverage resolver all work unchanged. The test file is the source of truth and the test-doc is graded against it, never the reverse (K2); editing or renaming a test drifts its test-doc and records a ReviewRecord for a human (K5), and monitor --apply heals it idempotently (K7). The demo maps all four of its test files to test-docs 1:1, and cdx dogfoods the pattern on its own tests/smoke boundary; the console surfaces test-docs in a dedicated Test docs section on the Documents, Drift, and Mapping pages.
 
+### `FEAT-CONFIGV2-018` — Every index global is lifted onto MonitorConfig
+
+The merge lift is the one silent plumbing step in the config directory form: a new global declared on the index file but never carried into MonitorConfig loads without error and is simply ignored — the knob exists in the schema, the adopter sets it, and nothing happens. A guard asserts that every index-file field except the four that are structurally index-only names a real MonitorConfig field, so the next global cannot be half-plumbed.
+
 ## coverage
 
 | ID | Feature | Modules | Constraints | Demos | Tests | Status |
@@ -393,6 +403,7 @@ Test files are monitored exactly like source files: a config/cdmon unit whose co
 | `FEAT-COVERAGE-008` | Coverage waivers with justifications | coverage | K0, K1, K10 | — | — | implemented |
 | `FEAT-COVERAGE-009` | Gap-to-suggested-owner heuristic | coverage | K0, K10 | — | — | implemented |
 | `FEAT-COVERAGE-010` | JSON-safe coverage snapshot | coverage | K0, K1, K10 | — | — | implemented |
+| `FEAT-COVERAGE-011` | An empty coverage universe cannot pass a `--fail-under` gate | coverage, cli | K1, K6, K8, K9, K10 | — | — | implemented |
 
 ### `FEAT-COVERAGE-001` — Repo code-file discovery with glob scoping
 
@@ -433,6 +444,10 @@ suggest_owners emits a deterministic OwnerSuggestion for every public, unowned, 
 ### `FEAT-COVERAGE-010` — JSON-safe coverage snapshot
 
 coverage_snapshot projects a CoverageReport into the deterministic, JSON-safe wire shape the central server stores and the dashboard reads — the file/symbol percentages, file basket counts, a per-file list with documented/undocumented/waived status and owners, plus a back-compat `ratio` (percent_public_symbols / 100).
+
+### `FEAT-COVERAGE-011` — An empty coverage universe cannot pass a `--fail-under` gate
+
+RTE-02c. `percent_public_symbols` returns 100.0 when the universe is empty (vacuous truth, avoiding zero-division), and `cdx coverage --fail-under N` gated purely on that number — so a MIS-SCOPED `coverage.include` glob printed "100.0% documented (0/0)" and exited 0. The strictest gate Custodex offers passed on a repo it never looked at. For a completeness metric that is the worst possible failure mode: silent, green, and maximally confident. `CoverageReport.public_universe` now exposes the public, non-waived symbols the percentage divides by, so a caller can distinguish "100% of many" from "100% of nothing" — the two cases the percentage deliberately cannot tell apart. The arithmetic is UNCHANGED and so is the reporting path (K9): vacuous truth is the right answer for a property and for a report, and other callers (the JSON payload, the manifest, the server view) legitimately want a number rather than an exception. It is only wrong as a GATE verdict, so only the gate changed — `--fail-under` now refuses an empty universe loudly (K8), naming the likely cause, because a gate asked to enforce a threshold over nothing is mis-configured input.
 
 ## docdeps
 
@@ -535,6 +550,8 @@ docwriter.draft_document renders the full written document: the mechanical scaff
 | `FEAT-DRIFT-010` | Report aggregation and human summary | drift | K1 | — | — | implemented |
 | `FEAT-DRIFT-011` | Breaking-change severity classification | drift, schema, monitor | K6, K10 | — | — | implemented |
 | `FEAT-DRIFT-012` | Per-symbol signature digests close the masked breaking-change case | extract, manifest, heal, drift | K6, K8, K10 | — | — | implemented |
+| `FEAT-DRIFT-013` | The apply-tier router — which authority can close a drift | drift | K1, K2, K3, K6, K9, K10, K11 | — | — | implemented |
+| `FEAT-DRIFT-014` | The mechanical fold — which documents the ENGINE alone can close | drift | K1, K9, K10, K11 | — | — | implemented |
 
 ### `FEAT-DRIFT-001` — Detect-only drift grading
 
@@ -558,7 +575,7 @@ On a HASH drift, when the doc carries stored per-tier digests, detect names whic
 
 ### `FEAT-DRIFT-006` — Anchor-identity change classification
 
-On a HASH drift, detect compares the documented symbol anchor_ids against the stamped region anchor set and records Drift.anchors_added / anchors_removed — both empty means the SAME symbols changed internally (a re-bind/move), while a nonempty delta means a symbol was added, removed or renamed (a structural change). Empty when the doc predates anchor stamping.
+On a HASH drift, detect compares the documented symbol anchor_ids against the stamped region anchor MULTISET (one entry per same-name symbol, so deleting one of two `main`s is a removal; a count-only decrease the stored signature tier proves stale is not) and records Drift.anchors_added / anchors_removed — both empty means the SAME symbols changed internally (a re-bind/move), while a nonempty delta means a symbol was added, removed or renamed (a structural change). Empty when the doc predates anchor stamping.
 
 ### `FEAT-DRIFT-007` — Region ownership and lockability
 
@@ -582,7 +599,15 @@ On a HASH drift, detect classifies a Griffe-style ChangeSeverity purely from the
 
 ### `FEAT-DRIFT-012` — Per-symbol signature digests close the masked breaking-change case
 
-DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive, survives later heals via the cdm-map copy, K7), with manifest stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes `sigs_changed` — the SURVIVING documented symbols whose signature digest moved (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a non-empty sigs_changed ABOVE the addition rule, closing the former masked false-negative where an in-place signature change was hidden as ADDITIVE whenever a symbol was also added in the same edit. A pure addition (no survivor moved) stays ADDITIVE and a docstring/body-only move stays COSMETIC (no over-fire); a doc that predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
+DIG-01 stores a per-symbol signature digest map (`cdm.symbol_sigs`, keyed by the stable anchor_id, hashing ONLY the name/kind/signature/is_public payload) — added to SurfaceFingerprint.sig_by_anchor in extract (not part of any hashed payload, so the composite stays byte-identical), stamped by heal AFTER set_fingerprint (additive, survives later heals via the cdm-map copy, K7), with manifest stored_symbol_sigs/set_symbol_sigs mirroring region_anchors. detect computes `sigs_changed` — the SURVIVING documented symbols whose signature digest moved (current ∩ stored, diffed) — and classify_change_severity returns BREAKING on a non-empty sigs_changed ABOVE the addition rule, closing the former masked false-negative where an in-place signature change was hidden as ADDITIVE whenever a symbol was also added in the same edit. A pure addition (no survivor moved) stays ADDITIVE — unless a STAMPED anchor now repeats and the additions cannot be proven to reproduce the stored signature tier, when rule 2b (CKI-1a, Drift.sigs_ambiguous) grades it BREAKING — and a docstring/body-only move stays COSMETIC; a doc that predates DIG-01 (no stored digests) degrades to the aggregate behaviour and never crashes (K6/K8). No schema bump — `change_severity` is simply more accurate.
+
+### `FEAT-DRIFT-013` — The apply-tier router — which authority can close a drift
+
+RTE-01 classifies every Drift with the AUTHORITY that could close it, so human attention can be spent only where the code cannot answer the question. `ApplyTier` is a provenance name, never a magnitude (K11 bans a bare confidence float — and a float is also the wrong model, because on the code-derived path there is no model judgement to be confident about: the bytes are the engine's own projection of the surface, produced by the same functions heal calls). CODE_DERIVED = a renderer-backed region body or a symbol-table refresh whose ChangeSeverity proves no sentence was falsified; DELEGATED = prose a model authors into a region a HUMAN declared `mode: llm`; NEEDS_INTENT = closing it needs a WHY the code cannot supply. `classify_apply_tier` is a pure, clock-free, backend-free ordered precedence chain (12 rules, first match wins, DENY BY DEFAULT) returning the tier plus sorted evidence naming the rule that fired; it CONSUMES classify_change_severity and never re-tunes it (K9). Kind rules precede the healable rule so SUSPECT_LINK/UNHEALABLE keep distinct evidence instead of collapsing into one string; LLM_SEEDED is denied wholesale because the classifier is given the region MODE but not the LOCK state, and a rule must not decide what its inputs cannot evaluate. There is deliberately NO audience term — K3 is already enforced upstream inside the fingerprint, so a user-guide's drifted_tiers can only ever be ("signature",) and COSMETIC is structurally unreachable there; a hand-written clause would double-count K3. `auto_routable_docs` folds the per-DRIFT tiers to a per-DOCUMENT verdict: ONE NEEDS_INTENT drift holds the WHOLE document. That grain is the correctness condition, not a refinement — heal skips a region it cannot render but still stamps the doc fingerprint, and that stamp is the ONLY staleness trigger such a region has, so per-drift routing would let a mechanical HASH refresh bless its own sibling prose region into PERMANENT staleness with `cdx check` green forever. SUSPECT_LINK is excluded from the fold (Monitor never applies or blesses one, so a doc↔doc edge must not veto its document). Detect-only and byte-identical in behaviour: the tier is reported in `DriftReport.summary()` and nothing is applied differently (the `apply_tiered` gate is RTE-03).
+
+### `FEAT-DRIFT-014` — The mechanical fold — which documents the ENGINE alone can close
+
+RTE-01 answered "could this drift close itself?"; RTE-03b answers the strictly narrower question an unattended write actually depends on — "could the ENGINE close this DOCUMENT, with no model consulted at all?". `docs_closable_by` generalises the per-document fold over any set of tiers, `AUTO_TIERS` is DERIVED from `is_auto` rather than restated as a literal, `auto_routable_docs` becomes a one-line delegate whose output is unchanged, and `mechanical_docs` folds over CODE_DERIVED alone. DELEGATED is deliberately excluded: it is auto-routable but is prose a model authors, which carries a K11 widening needing explicit human ratification. The closing fold additionally requires at least one qualifying ACTIONABLE drift, because the fold is otherwise "nothing blocks" and a document whose only drift is a doc-to-doc suspect link is a member by vacuous truth — harmless for routing, where nothing reaches the apply gate, but a phantom closure when the same set decides what gets written. `DriftReport.summary` reports the three-way tally (mechanical / delegated / need human intent) over the documents that have something to close, so `cdx check` answers "how much of this would unattended mode close?" as a number rather than an argument.
 
 ## entities
 
@@ -614,6 +639,8 @@ entities.build_registry constructs the closed resolution universe — managed-do
 | `FEAT-EXTRACT-004` | Tiered fingerprint (signature / docstring / body) | extract | K6, K10 | — | — | implemented |
 | `FEAT-EXTRACT-005` | Symbol anchor identity | extract | K10 | — | — | implemented |
 | `FEAT-EXTRACT-006` | Shell extractor (sh/bash) | extract | K0, K1, K3, K4 | — | — | implemented |
+| `FEAT-EXTRACT-007` | Decorator fidelity — a property is no longer documented as a callable method | extract | K1, K2, K6, K9, K10 | — | — | implemented |
+| `FEAT-EXTRACT-008` | Class and pydantic fields enter the documented surface | extract | K1, K2, K6, K9, K10 | — | — | implemented |
 
 ### `FEAT-EXTRACT-001` — Audience-aware code surface
 
@@ -638,6 +665,14 @@ anchor_id(name) is a lineno-free sha256[:16] of a symbol's qualified name, stabl
 ### `FEAT-EXTRACT-006` — Shell extractor (sh/bash)
 
 ShellExtractor statically parses sh/bash function definitions (`name() {…}` and `function name {…}`) via the stdlib re module only, registered by default for .sh/.bash — proving a new language is a registration, never an engine edit. Never sources or executes the script.
+
+### `FEAT-EXTRACT-007` — Decorator fidelity — a property is no longer documented as a callable method
+
+RTE-02a. Extraction never inspected `decorator_list`, so the projection LIED about every decorated symbol BEFORE any model saw it: `@property def net(self) -> int` rendered as `def net(self) -> int` and told the reader to CALL an attribute; `@staticmethod def make()` rendered as a method with no `self` (reads as broken); and `@classmethod def blank(cls)` exposed `cls` as a caller-supplied argument. This was already SHIPPED in Custodex's own dogfood docs — `docs/api/coverage-system.md` documented five consecutive `@property` attributes as methods — which makes it the concrete refutation of "an LLM won't misunderstand the code": the loss happened in the extractor, with no model involved. `Symbol.decorators` now carries the dotted decorator names in SOURCE order (order is semantic — `@property` over `@abstractmethod` differs from the reverse — and source order is already deterministic, which is what K10 actually requires), and `_func_signature` PREFIXES them, because the signature is the cell a reader acts on. A `Call` decorator contributes only its callee (`@app.command("run")` -> `app.command`), so an unrelated literal can never manufacture drift; an unnameable form (a subscript or lambda decorator) is SKIPPED rather than fatal, since K8 loudness is for malformed input and losing a whole file's surface over one un-nameable decorator would be strictly worse. `kind` is deliberately NOT changed to `property` here: `_symbols_for_ref` selects `arg_signature` refs on `kind in ("function","method")`, so promoting the kind would silently drop every property from that selection (that selector moves with the kind in RTE-02b). Because `kind`+`signature` feed the per-symbol digest and the signature tier, every eng-guide doc covering decorated code drifts and grades BREAKING — so the RTE-01 router routes them all to a human, which is correct: existing prose may say `.net()`.
+
+### `FEAT-EXTRACT-008` — Class and pydantic fields enter the documented surface
+
+RTE-02b. `_extract_python_symbols` walked `tree.body` and, inside a ClassDef, descended ONLY into function children — the `Assign | AnnAssign` branch was module-level only, so every annotated class field extracted as NOTHING (1039 of them across custodex's own 71 files). For a pydantic-heavy codebase that is most of the configurable API: `MonitorConfig.apply_default`, the single most important fact an adopter needs, appeared in no document and in no coverage denominator. `_variable_symbols` now takes a `qualifier`, so a field becomes `Class.field` exactly as a method becomes `Class.method`, while the SIGNATURE keeps the bare `field: type = default` form. (`is_public` is passed the bare name as a style choice, not a correctness requirement: `_is_public` already strips a dotted qualifier via `name.rsplit(".", 1)[-1]`, which is how `Class._method` has always been classified.) Fields reach the rendered TABLE, not only the surface, and that coupling is pinned by a test: `resolve_coverage` counts a symbol as documented iff a `code_ref` SELECTS it, so "documented" means matched by a config glob rather than described anywhere — a surface-only field would count as documented while appearing in NO document, making the completeness number less trustworthy rather than more. The dogfood tables grow ~66% (1033 -> 1715 rows); that cost was an explicit human decision, not an engine default. Because the change only ADDS symbols (`+281/-0` on the largest doc), it grades ADDITIVE and the RTE-01 router auto-routes 11 of 12 documents — the exact complement of RTE-02a, which moved existing signatures, graded BREAKING, and escalated all 9.
 
 ## gitsync
 
@@ -682,6 +717,7 @@ The clone-on-demand sync + docs-PR flow is repo-agnostic — it works against AN
 | `FEAT-HEAL-007` | One-shared-truth fingerprint stamping | heal | K6, K10 | — | — | implemented |
 | `FEAT-HEAL-008` | Structurally-typed proposed fix with whole-doc precedence | heal | K7 | — | — | implemented |
 | `FEAT-HEAL-009` | Pure whole-doc correction for backend FIX parity | heal | K2, K10 | — | — | implemented |
+| `FEAT-HEAL-010` | Heal declines a region only the index-aware layer can render | blocks, heal | K2, K7, K8 | — | — | implemented |
 
 ### `FEAT-HEAL-001` — Idempotent region-only heal
 
@@ -718,6 +754,10 @@ apply_fix accepts any ProposedFixLike (a Protocol exposing region_id / new_regio
 ### `FEAT-HEAL-009` — Pure whole-doc correction for backend FIX parity
 
 render_corrected returns the corrected full document text (regions plus fingerprint) from a document string without any I/O, reusing the same region and fingerprint logic as regenerate_regions so a backend's whole-doc FIX for a HASH drift and an in-engine heal agree byte-for-byte; preserve and modes drive the same B-02 lock and B-03 hash stamping.
+
+### `FEAT-HEAL-010` — Heal declines a region only the index-aware layer can render
+
+expected_region returns None for a source index region template, because an index table is a function of the config's other documents and not of the one surface this selector is given. Heal then hits its existing skip guard and leaves the region byte-identical instead of authoring a header-only table over it, which is what silently deleted every row of a live index region. Declining is safe because detect grades an index region against the index-aware renderer unconditionally, so a skipped index region still drifts on the very next check rather than being blessed by the fingerprint stamp.
 
 ## kgraph
 
@@ -892,6 +932,9 @@ The opt-in `[mcp]` extra + `custodex/mcp/` subpackage that stands up a Model Con
 | `FEAT-MONITOR-007` | Opt-in promoted-rule resolution (zero backend calls) | monitor | K4, K5, K6 | — | — | implemented |
 | `FEAT-MONITOR-008` | Opt-in few-shot exemplar retrieval | monitor | K4, K6 | — | — | implemented |
 | `FEAT-MONITOR-009` | Region-authority-aware fix request | monitor | K6 | — | — | implemented |
+| `FEAT-MONITOR-010` | Tiered apply — never write a document that needs human intent | monitor, config | K5, K6, K7, K9, K11 | — | — | implemented |
+| `FEAT-MONITOR-011` | The apply_tiered leak gate — the knob is passed explicitly off the CLI | monitor, syncpr, mcp | K5, K11 | — | — | implemented |
+| `FEAT-MONITOR-012` | The engine closes the mechanical path itself — zero backend calls | monitor, heal, blocks | K2, K4, K5, K7, K8, K10 | — | — | implemented |
 
 ### `FEAT-MONITOR-001` — End-to-end drift orchestration loop
 
@@ -928,6 +971,18 @@ When use_exemplars is on, run reads the review log and resolutions log ONCE up f
 ### `FEAT-MONITOR-009` — Region-authority-aware fix request
 
 run builds each FixRequest with the drifted region's authority mode (RegionMode, defaulting to GENERATED for a whole-doc drift), an index_body for an index-sourced region, opt-in writing style_guidance for a no-renderer llm region via _style_guidance_for, and the document's context_refs + repo_root — so a backend authors prose vs renders mechanically as the region dictates.
+
+### `FEAT-MONITOR-010` — Tiered apply — never write a document that needs human intent
+
+`Monitor.run(tiered=...)` (overriding `apply_tiered`, default OFF) confines the write to the documents the ENGINE alone could close — every actionable drift on them code-derived, per `drift.mechanical_docs`. A document carrying any drift that needs human intent is still sent to the backend, so the reviewer receives a ReviewRecord with both the drift and a proposed fix (K5), but nothing on it is applied. On the mechanical path no backend is consulted at all, so tiered mode REPLACES the authority there rather than merely narrowing it: it can write a document a declining backend would have left alone. On every other document it is strictly narrower. The restraint is the point: applying a document's HASH fix while its sibling prose region is ESCALATED destroys the ONLY staleness trigger that region has, because heal stamps the fingerprint even when it skips the region — so the recheck comes back empty, `cdx check` is green forever, and the human is never asked again. Default OFF keeps run byte-identical.
+
+### `FEAT-MONITOR-011` — The apply_tiered leak gate — the knob is passed explicitly off the CLI
+
+`tiered=None` resolves to the repo's `apply_tiered`, which means every call site that omits it opts in BY OMISSION. MCP-02 ratified the opposite rule in writing for `apply` (a repo's config must never implicitly trigger a write for a remote agent), and the server's docs-PR route loads the config of a CLONED, untrusted repo — an adopter's own config must not decide the server's authoring authority. So `syncpr.sync_pr` takes an explicit `tiered` parameter defaulting to OFF (which covers sync-pr, open-docs-pr, the server route and the MCP sync tool in one place), the MCP remediation tool forces it OFF, and onboarding's arrive-green self-validation forces the FULL apply. A source-level guard asserts that no `Monitor.run(apply=...)` outside those sites omits `tiered=`, because a leak is invisible at runtime — the call simply inherits the knob.
+
+### `FEAT-MONITOR-012` — The engine closes the mechanical path itself — zero backend calls
+
+Under tiered mode a document whose every actionable drift is code-derived is closed by the ENGINE with no backend consulted at all: there is no model judgement to be confident about, because the bytes are the engine's own projection of the surface produced by the same functions heal calls. The fix SHAPES mirror the mock backend's two rules exactly — region-scoped for a REGION, whole-doc for a HASH — and the region body comes from the SAME index-aware selector detect grades against, so an index region is rendered by the index-aware layer rather than written wrong. Keeping the shapes apart matters: one whole-doc fix per document would make a REGION close rewrite front matter it never touches today, which on a legacy composite-only doc silently adds the per-tier and per-symbol digests the severity classifier needs to move a FUTURE HASH drift from unknown to cosmetic — the unattended write would widen what it may next write unattended. The promoted-rule layer keeps its precedence, so a verdict humans reached repeatedly is never overwritten by an engine write, and a drift routing called mechanical that the engine cannot render becomes a loud ESCALATE rather than a silent FIX carrying no fix.
 
 ## okf
 
@@ -1131,6 +1186,7 @@ Each Check carries a CheckStatus where only FAIL fails the gate: a merely absent
 | `FEAT-RECORD-011` | Offline-default sinks | sinks | K0, K4 | — | — | implemented |
 | `FEAT-RECORD-012` | Resilient HTTP sink with outbox | sinks | K0, K4, K6 | — | — | implemented |
 | `FEAT-RECORD-013` | Config-resolved sink factory | sinks | K4, K8 | — | — | implemented |
+| `FEAT-RECORD-014` | ClosureRecord — the alarm for an unattended close that did not close | monitor, cli | K5, K6, K8, K10 | — | — | implemented |
 
 ### `FEAT-RECORD-001` — Public versioned review record
 
@@ -1183,6 +1239,10 @@ HttpSink POSTs an IngestEnvelope with an injected stdlib-only client (no request
 ### `FEAT-RECORD-013` — Config-resolved sink factory
 
 make_sink resolves a CentralConfig to the right sink (none / file / http), raising a loud SchemaError on a missing required field (file path, http url, or repo_id) and building the RepoIdentity with config-or-CI_COMMIT_SHA commit precedence.
+
+### `FEAT-RECORD-014` — ClosureRecord — the alarm for an unattended close that did not close
+
+Every document the engine closes unattended produces a ClosureRecord naming the drift kinds and routing evidence it closed, the review record it is joinable to, and three booleans: whether the write path was entered, whether bytes changed, and whether the post-run recheck shows the document actually clean. The alarm gates on ATTEMPTED, never on whether bytes were written, because apply_fix returns False for an attempted write it declined — a preserved id or a locked region — which is precisely the "routing promised mechanical closure and the write boundary silently refused" case the alarm exists to catch. With no apply requested the records are previews and never report a non-convergence, so the most common invocation cannot raise a false alarm. No new exit code is introduced: verified derives from the same recheck that already drives the remaining-drift gate, so the deliverable is the message naming the pathology. The record id is singular because the review-record id is per document and run, so a tuple of them would be duplicates pretending to be a set. Sorted by document, with sorted and deduped facets.
 
 ## reference
 

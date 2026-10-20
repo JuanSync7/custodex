@@ -4,6 +4,7 @@ Features: FEAT-MONITOR-001, FEAT-MONITOR-002, FEAT-MONITOR-003, FEAT-MONITOR-004
 Features: FEAT-MONITOR-005, FEAT-MONITOR-006, FEAT-MONITOR-007, FEAT-MONITOR-008
 Features: FEAT-PR-009, FEAT-DRIFT-005, FEAT-RECORD-005, FEAT-RECORD-007
 Features: FEAT-LEARN-001, FEAT-LEARN-003, FEAT-LEARN-006
+Features: FEAT-MONITOR-010
 """
 
 from __future__ import annotations
@@ -19,9 +20,11 @@ from custodex.config import (
     CodeRef,
     DocumentSpec,
     MonitorConfig,
+    RegionMode,
 )
-from custodex.drift import DriftKind
+from custodex.drift import Drift, DriftKind
 from custodex.extract import build_document_surface
+from custodex.heal import regenerate_regions
 from custodex.monitor import Monitor
 from custodex.reviewlog import read_all
 from custodex.schema import Verdict
@@ -603,3 +606,798 @@ def test_record_carries_breaking_for_masked_add_plus_inplace_signature(
     assert hash_recs, "expected a HASH record for the masked edit"
     # Without per-symbol digests this would be 'additive' (masked); DIG-01 → 'breaking'.
     assert hash_recs[0].change_severity == "breaking"
+
+
+# ---------------------------------------------------------------------------
+# RTE-03c — `--tiered` restrains `--apply`: never write a document that
+# needs human intent. Feature: FEAT-MONITOR-010
+# ---------------------------------------------------------------------------
+
+CODE_MOVED = '''\
+"""A tiny module."""
+
+
+def public_fn(x: int) -> int:
+    """Double x, carefully."""
+    return x * 2
+
+
+class Widget:
+    """A widget."""
+
+    def spin(self) -> None:
+        """Spin it."""
+'''
+
+
+def _mixed_fixture(
+    tmp_path: Path, *, with_prose: bool
+) -> tuple[MonitorConfig, Path, Path]:
+    """A doc synced to the code, then the code moves — HASH + REGION drift.
+
+    ``with_prose`` adds a no-renderer ``mode: llm`` region, which classifies
+    DELEGATED and therefore HOLDS the whole document under `--tiered`. Without it
+    every actionable drift is CODE_DERIVED and the document is mechanical.
+    """
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    doc_path = tmp_path / "guide.md"
+    region_keys = ("symbols", "overview") if with_prose else ("symbols",)
+    spec = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=region_keys,
+        region_modes={"overview": RegionMode.LLM} if with_prose else {},
+    )
+    prose = (
+        "<!-- CDM:BEGIN overview -->\nProse a model authored.\n"
+        "<!-- CDM:END overview -->\n\n"
+        if with_prose
+        else ""
+    )
+    doc_path.write_text(
+        f"# Guide\n\n{prose}<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n",
+        encoding="utf-8",
+    )
+    # Stamp it the way a real run leaves it — the tiered digests and per-symbol
+    # signatures included. A doc carrying only a COMPOSITE fingerprint classifies
+    # UNKNOWN (and so NEEDS_INTENT) by design, which would mask what this fixture
+    # is here to exercise.
+    regenerate_regions(
+        doc_path,
+        build_document_surface(spec, tmp_path),
+        modes={rid: spec.mode_for(rid) for rid in spec.region_keys},
+    )
+    # Now move the code: a DOCSTRING-only edit, so the symbol table is untouched
+    # and the change grades COSMETIC -> CODE_DERIVED.
+    (tmp_path / "code.py").write_text(CODE_MOVED, encoding="utf-8")
+    return MonitorConfig(root=".", documents=(spec,)), tmp_path, doc_path
+
+
+def _run(config, cfg_dir, **kw):
+    return Monitor(config, cfg_dir, now=_now, sink=NullSink()).run(**kw)
+
+
+def test_tiered_holds_a_document_that_needs_human_intent(tmp_path: Path) -> None:
+    """The bug this epic exists to fix, reproduced and then closed.
+
+    Applying a doc's mechanical HASH fix while its sibling prose region is
+    ESCALATED destroys the ONLY staleness trigger that prose region has: heal
+    stamps the fingerprint even when it skips the region, so the next `cdx check`
+    is green FOREVER and the human is never asked again. `--tiered` refuses to
+    write the document at all.
+    """
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=True)
+    before = doc_path.read_bytes()
+
+    result = _run(config, cfg_dir, apply=True, tiered=True)
+
+    assert doc_path.read_bytes() == before  # nothing written
+    assert not any(h.applied for h in result.handled)
+    assert result.remaining  # the drift is STILL reported next cycle
+
+
+def test_tiered_still_records_a_held_document_for_the_human(tmp_path: Path) -> None:
+    """K5: holding the WRITE never means dropping the record.
+
+    The human must still receive a ReviewRecord carrying BOTH the original drift
+    and a proposed fix — that is the whole point of routing to them.
+    """
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=True)
+
+    result = _run(config, cfg_dir, apply=True, tiered=True)
+
+    assert result.records
+    assert any(r.fix is not None for r in result.records)
+    assert len(result.handled) == len(result.records)  # the MCP zip lockstep
+
+
+def test_tiered_still_writes_a_fully_mechanical_document(tmp_path: Path) -> None:
+    """The foil: with no prose region every drift is CODE_DERIVED, so it closes."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    before = doc_path.read_bytes()
+
+    result = _run(config, cfg_dir, apply=True, tiered=True)
+
+    assert doc_path.read_bytes() != before
+    assert result.remaining == ()
+
+
+def test_tiered_off_writes_the_held_document_exactly_as_today(tmp_path: Path) -> None:
+    """DEFAULT OFF is byte-identical to today — this slice is opt-in (K6/K9)."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=True)
+    before = doc_path.read_bytes()
+
+    _run(config, cfg_dir, apply=True)
+
+    assert doc_path.read_bytes() != before
+
+
+def test_tiered_defaults_to_the_config_knob(tmp_path: Path) -> None:
+    """`tiered=None` resolves to `config.apply_tiered`, mirroring `apply`."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=True)
+    tiered_cfg = config.model_copy(update={"apply_tiered": True})
+    before = doc_path.read_bytes()
+
+    _run(tiered_cfg, cfg_dir, apply=True)
+
+    assert doc_path.read_bytes() == before
+
+
+def test_tiered_never_writes_without_apply(tmp_path: Path) -> None:
+    """`--tiered` narrows `--apply`; it can never turn a dry run into a write."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    before = doc_path.read_bytes()
+
+    _run(config, cfg_dir, apply=False, tiered=True)
+
+    assert doc_path.read_bytes() == before
+
+
+# ---------------------------------------------------------------------------
+# RTE-03c — the `apply_tiered` LEAK gate. Feature: FEAT-MONITOR-011
+#
+# `tiered=None` resolves to `config.apply_tiered`, mirroring `apply` — which
+# means every call site that does not pass it inherits the repo's knob BY
+# OMISSION. MCP-02 ratified the opposite rule in writing for `apply`
+# (`mcp/tools.py`: "passed THROUGH EXPLICITLY so a repo's `apply_default: true`
+# can NEVER be triggered implicitly by a remote agent"), and `server/app.py`
+# loads the config of a CLONED, untrusted repo. So every non-`cdx monitor` site
+# passes `tiered=False` explicitly, and each one is pinned here.
+# ---------------------------------------------------------------------------
+
+
+def _tiered_leak_fixture(tmp_path: Path) -> tuple[MonitorConfig, Path, Path]:
+    """A HELD document (one DELEGATED drift) in a repo whose config says tiered."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=True)
+    return config.model_copy(update={"apply_tiered": True}), cfg_dir, doc_path
+
+
+def test_sync_pr_does_not_inherit_apply_tiered_from_config(tmp_path: Path) -> None:
+    """`cdx sync-pr` / `open-docs-pr` / the server docs-PR route / MCP sync_docs.
+
+    All four reach `syncpr.sync_pr`, which heals in place with `apply=True`. A
+    cloned remote's `apply_tiered` must not decide the server's authoring
+    authority, so `sync_pr` defaults `tiered=False` and the choice is visible in
+    the signature rather than implied by an omission.
+    """
+    from custodex.syncpr import sync_pr
+
+    config, cfg_dir, doc_path = _tiered_leak_fixture(tmp_path)
+    before = doc_path.read_bytes()
+
+    sync_pr(Monitor(config, cfg_dir, now=_now, sink=NullSink()))
+
+    assert doc_path.read_bytes() != before  # full-apply semantics, unchanged
+
+
+def test_sync_pr_can_be_asked_for_tiered_explicitly(tmp_path: Path) -> None:
+    """The foil: the parameter exists, so a caller CAN opt in deliberately."""
+    from custodex.syncpr import sync_pr
+
+    config, cfg_dir, doc_path = _tiered_leak_fixture(tmp_path)
+    before = doc_path.read_bytes()
+
+    sync_pr(Monitor(config, cfg_dir, now=_now, sink=NullSink()), tiered=True)
+
+    assert doc_path.read_bytes() == before
+
+
+def test_monitor_run_tiered_is_explicit_at_every_non_cli_call_site() -> None:
+    """Static gate: no `Monitor.run(` outside `cli.monitor` may omit `tiered=`.
+
+    A leak here is invisible at runtime — the call simply inherits the knob — so
+    the guard is on the SOURCE. `cdx monitor` is the one site that resolves the
+    config (that is what the knob is for); `syncpr.sync_pr` forwards its own
+    explicit parameter.
+    """
+    import re
+
+    root = Path(__file__).resolve().parents[2] / "custodex"
+    allowed = {"cli.py", "syncpr.py"}
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        if path.name == "monitor.py":
+            continue
+        text = path.read_text(encoding="utf-8")
+        for match in re.finditer(r"\.run\(\s*apply=[^)]*\)", text):
+            call = match.group(0)
+            if "tiered=" in call:
+                continue
+            if path.name in allowed:
+                continue
+            line = text[: match.start()].count("\n") + 1
+            offenders.append(f"{path.name}:{line} {call}")
+    assert not offenders, f"Monitor.run without an explicit tiered=: {offenders}"
+
+
+# ---------------------------------------------------------------------------
+# RTE-03d — the ENGINE closes the mechanical path itself: ZERO backend calls,
+# plus the closure alarm. Feature: FEAT-MONITOR-012, FEAT-RECORD-014
+# ---------------------------------------------------------------------------
+
+
+class ExplodingBackend:
+    """Any call is a failure: the mechanical path must never consult a backend."""
+
+    def propose(self, req):  # noqa: ANN001, ANN201
+        raise AssertionError(
+            f"backend consulted for a CODE_DERIVED drift: {req.drift.doc_id} "
+            f"{req.drift.kind.value} [{req.drift.apply_tier.value}]"
+        )
+
+
+def _engine_run(config, cfg_dir, **kw):
+    return Monitor(
+        config, cfg_dir, backend=ExplodingBackend(), now=_now, sink=NullSink()
+    ).run(**kw)
+
+
+def test_a_mechanical_document_closes_with_zero_backend_calls(tmp_path: Path) -> None:
+    """The cost claim, instrumented — not asserted.
+
+    On the CODE_DERIVED path there is no model to be confident about: the bytes
+    are the engine's own projection of the surface, produced by the same functions
+    heal calls. So the backend is not consulted at all, and a backend that raises
+    on any call proves it.
+    """
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    before = doc_path.read_bytes()
+
+    result = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    assert doc_path.read_bytes() != before
+    assert result.remaining == ()
+    assert all(h.result.verdict is Verdict.FIX for h in result.handled)
+
+
+def test_engine_closure_is_recorded_as_engine_sourced(tmp_path: Path) -> None:
+    """K5: an unattended close is still fully auditable, and says who closed it."""
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=False)
+
+    result = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    assert result.records
+    for rec in result.records:
+        assert rec.verdict is Verdict.FIX
+        assert rec.fix is not None  # BOTH the drift and the proposed fix (K5)
+        assert rec.config_snapshot["resolved_by"] == "engine"  # mirrors D-06 "rule"
+
+
+def test_engine_fix_keeps_the_backend_fix_SHAPE(tmp_path: Path) -> None:
+    """A REGION close stays region-scoped; only a HASH close is whole-doc.
+
+    Collapsing both into one whole-doc `render_corrected` would make a REGION close
+    rewrite front-matter it never touches today — `fingerprint_tiers` and
+    `symbol_sigs` — which on a legacy composite-only doc silently ADDS the digests
+    `classify_change_severity` needs to move a FUTURE HASH drift from UNKNOWN
+    (NEEDS_INTENT) to COSMETIC (CODE_DERIVED). The unattended write would widen
+    what it may next write unattended.
+    """
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    # Make the symbol table stale too, so BOTH shapes appear in one run.
+    text = doc_path.read_text(encoding="utf-8").replace("| public_fn", "| STALE_fn")
+    doc_path.write_text(text, encoding="utf-8")
+
+    result = _engine_run(config, cfg_dir, apply=False, tiered=True)
+
+    by_kind = {h.drift.kind: h.result.fix for h in result.handled}
+    assert by_kind[DriftKind.REGION].region_id == "symbols"
+    assert by_kind[DriftKind.REGION].new_doc_text is None
+    assert by_kind[DriftKind.HASH].region_id is None
+    assert by_kind[DriftKind.HASH].new_doc_text is not None
+
+
+def test_engine_close_is_idempotent(tmp_path: Path) -> None:
+    """K7: a second tiered run on the closed doc writes nothing and records nothing."""
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    _engine_run(config, cfg_dir, apply=True, tiered=True)
+    after_first = doc_path.read_bytes()
+
+    second = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    assert doc_path.read_bytes() == after_first
+    assert second.records == () and second.closures == ()
+
+
+def test_promoted_rule_still_wins_over_the_engine(tmp_path: Path) -> None:
+    """D-06 keeps its precedence: a learned human verdict is never overwritten.
+
+    A promoted rule is a verdict humans reached >=K times. A CODE_DERIVED HASH
+    drift is exactly the shape a repo would promote an INVALIDATE rule for, so if
+    the engine branch sat above `rule_for`, that learned verdict would silently
+    become an engine WRITE — the learning loop inverted.
+    """
+    from custodex.promotion import PromotionRule
+
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    rule = PromotionRule(
+        doc_id="guide",
+        drift_kind=DriftKind.HASH.value,
+        audience=Audience.ENG_GUIDE,
+        verdict=Verdict.INVALIDATE,
+    )
+    monitor = Monitor(
+        config,
+        cfg_dir,
+        backend=ExplodingBackend(),
+        now=_now,
+        sink=NullSink(),
+        rules=(rule,),
+    )
+
+    result = monitor.run(apply=True, tiered=True)
+
+    hash_records = [r for r in result.records if r.drift_kind == DriftKind.HASH.value]
+    assert hash_records
+    assert all(r.verdict is Verdict.INVALIDATE for r in hash_records)
+    assert all(r.config_snapshot["resolved_by"] == "rule" for r in hash_records)
+
+
+# --- the ClosureRecord alarm ------------------------------------------------
+
+
+def test_closure_record_describes_a_converged_close(tmp_path: Path) -> None:
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=False)
+
+    result = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    assert len(result.closures) == 1
+    closure = result.closures[0]
+    assert closure.doc_id == "guide"
+    assert closure.attempted and closure.wrote and closure.verified
+    assert closure.drift_kinds == ("HASH",)
+    assert closure.evidence == ("severity:cosmetic", "surface-refresh")
+    assert closure.record_ids  # joinable to the review log
+
+
+def test_closure_is_a_preview_when_apply_was_never_requested(tmp_path: Path) -> None:
+    """`attempted=False` — the alarm must never report a write that never ran."""
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=False)
+
+    result = _engine_run(config, cfg_dir, apply=False, tiered=True)
+
+    assert len(result.closures) == 1
+    assert not result.closures[0].attempted
+    assert not result.closures[0].wrote
+    assert not result.closures[0].verified
+
+
+def test_closure_alarms_when_the_write_boundary_declines(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """`wrote=False, verified=False` is the case gating on `wrote` would HIDE.
+
+    `apply_fix` returns False for an ATTEMPTED write it declined — a preserved id,
+    or a B-03 locked region. That is precisely "routing promised mechanical closure
+    and the write boundary silently refused", so the alarm gates on `attempted`,
+    never on `wrote`.
+    """
+    import custodex.monitor as monitor_mod
+
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=False)
+    monkeypatch.setattr(monitor_mod, "apply_fix", lambda *a, **k: False)
+
+    result = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    closure = result.closures[0]
+    assert closure.attempted and not closure.wrote and not closure.verified
+
+
+def test_no_closure_for_a_document_that_was_held(tmp_path: Path) -> None:
+    """A held document is not a closure — it is an escalation."""
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=True)
+
+    result = Monitor(config, cfg_dir, now=_now, sink=NullSink()).run(
+        apply=True, tiered=True
+    )
+
+    assert result.closures == ()
+
+
+def test_closures_are_absent_when_tiered_is_off(tmp_path: Path) -> None:
+    """Default OFF stays byte-identical to today, closures included (K6)."""
+    config, cfg_dir, _doc = _mixed_fixture(tmp_path, with_prose=False)
+
+    result = Monitor(config, cfg_dir, now=_now, sink=NullSink()).run(apply=True)
+
+    assert result.closures == ()
+
+
+def test_closures_are_sorted_by_doc_id(tmp_path: Path) -> None:
+    """K10: nothing iterates a frozenset into the result."""
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    specs = []
+    for doc_id in ("zulu", "alpha", "mike"):
+        spec = DocumentSpec(
+            id=doc_id,
+            path=f"{doc_id}.md",
+            audience=Audience.ENG_GUIDE,
+            code_refs=(CodeRef(path="code.py"),),
+            region_keys=("symbols",),
+        )
+        (tmp_path / spec.path).write_text(
+            "# D\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n",
+            encoding="utf-8",
+        )
+        regenerate_regions(
+            tmp_path / spec.path,
+            build_document_surface(spec, tmp_path),
+            modes={"symbols": RegionMode.GENERATED},
+        )
+        specs.append(spec)
+    (tmp_path / "code.py").write_text(CODE_MOVED, encoding="utf-8")
+    config = MonitorConfig(root=".", documents=tuple(specs))
+
+    result = _engine_run(config, tmp_path, apply=True, tiered=True)
+
+    assert [c.doc_id for c in result.closures] == ["alpha", "mike", "zulu"]
+
+
+def test_engine_renders_an_index_region_with_the_INDEX_aware_layer(
+    tmp_path: Path,
+) -> None:
+    """[RTE-03d] The engine's close uses the SAME selector `detect` grades against.
+
+    An `index` region is a table over the config's OTHER documents, so it is not a
+    function of this document's surface. `expected_region` declines it (RTE-03a);
+    the engine must branch to `render_index` exactly as `drift.detect` does. Drop
+    that branch and the unattended close writes a header-only table over a live
+    landing page — silent data loss, on the one path with no human watching.
+    """
+    from custodex.config import RegionColumn, RegionTemplate
+    from custodex.index import render_index
+
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    sibling = DocumentSpec(
+        id="guide",
+        path="guide.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols",),
+    )
+    index_spec = DocumentSpec(
+        id="api-index",
+        path="index.md",
+        audience=Audience.ENG_GUIDE,
+        region_keys=("api-index",),
+    )
+    template = RegionTemplate(
+        source="index",
+        kind="eng-guide",
+        columns=(
+            RegionColumn(header="Document", field="title"),
+            RegionColumn(header="What it covers", field="summary"),
+        ),
+    )
+    config = MonitorConfig(
+        root=".",
+        documents=(index_spec, sibling),
+        region_templates={"api-index": template},
+    )
+    (tmp_path / "guide.md").write_text(
+        "# Guide\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "index.md").write_text(
+        "# Index\n\n<!-- CDM:BEGIN api-index -->\n<!-- CDM:END api-index -->\n",
+        encoding="utf-8",
+    )
+    # Stamp both docs the way a real run leaves them, THEN break only the index
+    # body — so the sole drift is the REGION the engine must render index-aware.
+    for spec in (sibling, index_spec):
+        regenerate_regions(
+            tmp_path / spec.path,
+            build_document_surface(spec, tmp_path),
+            config.region_templates,
+            modes={rid: spec.mode_for(rid) for rid in spec.region_keys},
+        )
+    from custodex.manifest import set_region
+
+    stale, _ = set_region(
+        (tmp_path / "index.md").read_text(encoding="utf-8"), "api-index", "STALE"
+    )
+    (tmp_path / "index.md").write_text(stale, encoding="utf-8")
+
+    result = _engine_run(config, tmp_path, apply=True, tiered=True)
+
+    from custodex.manifest import parse_doc, regions
+
+    body = regions(parse_doc(tmp_path / "index.md"))["api-index"]
+    assert body == render_index(template, index_spec, config, tmp_path)
+    assert "| guide |" in body or "guide" in body  # the sibling row survived
+    assert any(c.doc_id == "api-index" and c.verified for c in result.closures)
+
+
+def test_engine_escalates_when_it_cannot_render_what_routing_promised(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """[RTE-03d] The router and the renderer disagreeing is LOUD, never a silent FIX.
+
+    A `FIX` verdict carrying no fix would look handled in the log while nothing
+    was written — the exact silence the alarm exists to break (K8).
+    """
+    # A REGION-only drift (the fingerprint already matches), so nothing else can
+    # close the document behind the failing renderer.
+    config, cfg_dir, _doc, _spec = _make_fixture(tmp_path)
+    monkeypatch.setattr(Monitor, "_region_body", lambda *a, **k: None)
+
+    result = _engine_run(config, cfg_dir, apply=True, tiered=True)
+
+    region = next(h for h in result.handled if h.drift.kind is DriftKind.REGION)
+    assert region.result.verdict is Verdict.ESCALATE
+    assert region.result.fix is None
+    assert "router and the renderer disagree" in region.result.cause
+    assert result.closures[0].attempted and not result.closures[0].verified
+
+
+def test_closure_facets_are_sorted_not_encounter_ordered(tmp_path: Path) -> None:
+    """[RTE-03d] K10: `drift_kinds` and `evidence` are sorted, not in arrival order.
+
+    Exercised directly on the fold with facts supplied in REVERSE-sorted encounter
+    order, so any implementation that preserves arrival order (the mutation a
+    refactor actually introduces) is killed deterministically — a fixture with one
+    kind and one evidence string cannot defend sortedness at all.
+    """
+    from custodex.monitor import ClosureRecord
+
+    facts = [
+        (
+            Drift(
+                kind=DriftKind.REGION,
+                doc_id="d",
+                doc_path="d.md",
+                detail="x",
+                audience=Audience.ENG_GUIDE,
+                healable=True,
+                tier_evidence=("region:symbols", "mechanical-render"),
+            ),
+            "rec1",
+            True,
+            True,
+        ),
+        (
+            Drift(
+                kind=DriftKind.HASH,
+                doc_id="d",
+                doc_path="d.md",
+                detail="x",
+                audience=Audience.ENG_GUIDE,
+                healable=True,
+                tier_evidence=("surface-refresh", "severity:cosmetic"),
+            ),
+            "rec1",
+            True,
+            True,
+        ),
+    ]
+
+    out = Monitor._closures({"d": facts}, ())
+
+    assert isinstance(out[0], ClosureRecord)
+    assert out[0].drift_kinds == ("HASH", "REGION")  # not ("REGION", "HASH")
+    assert out[0].evidence == (
+        "mechanical-render",
+        "region:symbols",
+        "severity:cosmetic",
+        "surface-refresh",
+    )
+
+
+def test_closure_names_every_record_under_a_MOVING_clock(tmp_path: Path) -> None:
+    """[RTE-03d] `record_ids` is a tuple because of the CLOCK, not for symmetry.
+
+    `new_record_id` hashes `(doc_id, surface_hash, detected_at)`, so under a FIXED
+    injected clock N drifts on one document collapse to ONE id and a singular field
+    looks correct. Under the production clock each `_record_for` stamps a different
+    instant, the ids are DISTINCT, and a singular field would silently name only
+    the first — losing the audit trail for every other drift on the document. This
+    injects a MOVING clock, which is what production actually looks like.
+    """
+    from custodex.manifest import set_region
+
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    stale, _ = set_region(doc_path.read_text(encoding="utf-8"), "symbols", "STALE")
+    doc_path.write_text(stale, encoding="utf-8")  # a HASH *and* a REGION drift
+    ticks = iter(f"2026-06-01T00:00:0{i}+00:00" for i in range(9))
+
+    result = Monitor(
+        config,
+        cfg_dir,
+        backend=ExplodingBackend(),
+        now=lambda: next(ticks),
+        sink=NullSink(),
+    ).run(apply=True, tiered=True)
+
+    written = {rec.record_id for rec in result.records}
+    assert len(written) == 2, "the moving clock must produce DISTINCT record ids"
+    closure = result.closures[0]
+    assert set(closure.record_ids) == written  # every record is named
+    assert closure.record_ids == tuple(sorted(closure.record_ids))  # K10
+
+
+def test_tiered_replaces_the_authority_it_does_not_merely_narrow_it(
+    tmp_path: Path,
+) -> None:
+    """[RTE-03c ⟨R-CORRECTED⟩] `--tiered` is NOT a subset of `--apply`.
+
+    An earlier draft of this epic claimed it was, in six places. On the mechanical
+    path no backend is consulted AT ALL, so a backend that would have DECLINED never
+    gets the chance: `--apply` writes nothing, `--apply --tiered` writes. That is the
+    epic's thesis working as designed — on the code-derived path there is no model
+    judgement to defer to — but it is a real, adopter-visible semantic for anyone
+    whose backend is deliberately conservative, so it is pinned rather than claimed
+    away. On every document that is NOT mechanical, tiered IS strictly narrower.
+    """
+
+    class Declining:
+        """A backend that declines — both shapes a real LLM actually returns."""
+
+        def __init__(self, verdict: Verdict) -> None:
+            self.verdict = verdict
+
+        def propose(self, req):  # noqa: ANN001, ANN201
+            from custodex.backends import BackendResult
+
+            return BackendResult(verdict=self.verdict, cause="declined", fix=None)
+
+    # BOTH declining verdicts, because they are different real cases: INVALIDATE is
+    # "this change does not affect this audience" (K3), ESCALATE is "a human must
+    # decide". Neither can hold the write once the engine stops asking.
+    for verdict in (Verdict.INVALIDATE, Verdict.ESCALATE):
+        outcomes = {}
+        for tiered in (False, True):
+            case = tmp_path / f"{verdict.value}-{int(tiered)}"
+            config, cfg_dir, doc_path = _mixed_fixture(case, with_prose=False)
+            before = doc_path.read_bytes()
+            result = Monitor(
+                config, cfg_dir, backend=Declining(verdict), now=_now, sink=NullSink()
+            ).run(apply=True, tiered=tiered)
+            outcomes[tiered] = (doc_path.read_bytes() != before, bool(result.remaining))
+
+        assert outcomes[False] == (False, True), verdict  # declined; drift remains
+        assert outcomes[True] == (True, False), verdict  # engine closed it unasked
+
+
+def test_a_rule_held_region_is_not_overwritten_by_a_sibling_HASH_close(
+    tmp_path: Path,
+) -> None:
+    """[RTE-03d ⟨R-CORRECTED⟩] A promoted rule holds the WHOLE document.
+
+    An earlier draft argued a rule match need not remove the document from
+    `mechanical_docs`, because a region-scoped close does not stamp
+    `cdm.fingerprint`. That reasoning covered only the REGION direction. The HASH
+    close is WHOLE-DOC (`render_corrected`), and it regenerates every known region —
+    including the one the rule just held. Reproduced: the rule INVALIDATEd the
+    REGION drift and the engine's sibling HASH write overwrote the body anyway,
+    inverting the learning loop silently.
+    """
+    from custodex.promotion import PromotionRule
+
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=False)
+    from custodex.manifest import set_region
+
+    held, _ = set_region(
+        doc_path.read_text(encoding="utf-8"), "symbols", "HELD BY A PROMOTED RULE"
+    )
+    doc_path.write_text(held, encoding="utf-8")
+    rule = PromotionRule(
+        doc_id="guide",
+        drift_kind=DriftKind.REGION.value,
+        audience=Audience.ENG_GUIDE,
+        verdict=Verdict.INVALIDATE,
+    )
+
+    # The default (mock) backend: the point is that NOTHING is written, not that
+    # no backend was called — a held document legitimately consults one (K5).
+    result = Monitor(config, cfg_dir, now=_now, sink=NullSink(), rules=(rule,)).run(
+        apply=True, tiered=True
+    )
+
+    body = doc_path.read_text(encoding="utf-8")
+    assert "HELD BY A PROMOTED RULE" in body  # the learned verdict stands
+    assert result.closures == ()  # and the document was never a closure
+
+
+def test_two_specs_on_one_FILE_hold_each_other(tmp_path: Path) -> None:
+    """[RTE-03b ⟨R-CORRECTED⟩] The fold keys on doc_id; the WRITE keys on doc_path.
+
+    `MonitorConfig` accepts two documents that share a `path`. If one is mechanical
+    and the other needs human intent, closing the first REWRITES the second's file
+    and stamps its fingerprint — blessing the held document, with `cdx check` green
+    and no alarm. So a blocked drift blocks every document sharing its FILE, not
+    only its id.
+    """
+    (tmp_path / "code.py").write_text(CODE, encoding="utf-8")
+    doc_path = tmp_path / "shared.md"
+    mech = DocumentSpec(
+        id="mech",
+        path="shared.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("symbols",),
+    )
+    held = DocumentSpec(
+        id="held",
+        path="shared.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path="code.py"),),
+        region_keys=("prose",),  # no renderer -> UNHEALABLE -> NEEDS_INTENT
+    )
+    doc_path.write_text(
+        "# S\n\n<!-- CDM:BEGIN symbols -->\n<!-- CDM:END symbols -->\n\n"
+        "<!-- CDM:BEGIN prose -->\nhand-written\n<!-- CDM:END prose -->\n",
+        encoding="utf-8",
+    )
+    regenerate_regions(
+        doc_path,
+        build_document_surface(mech, tmp_path),
+        modes={"symbols": RegionMode.GENERATED},
+    )
+    # Move the code so `mech` genuinely has a CODE_DERIVED drift of its own —
+    # otherwise it is absent from every set and the test passes vacuously.
+    (tmp_path / "code.py").write_text(CODE_MOVED, encoding="utf-8")
+    config = MonitorConfig(root=".", documents=(mech, held))
+    before = doc_path.read_bytes()
+    from custodex.drift import detect, mechanical_docs
+
+    report = detect(config, tmp_path)
+    assert any(
+        d.doc_id == "mech" and d.apply_tier.value == "code-derived"
+        for d in report.drifts
+    ), "the fixture must give `mech` a real mechanical drift"
+    assert mechanical_docs(report) == frozenset()  # held by its FILE-mate
+
+    result = Monitor(config, tmp_path, now=_now, sink=NullSink()).run(
+        apply=True, tiered=True
+    )
+
+    assert doc_path.read_bytes() == before  # neither document was written
+    assert result.closures == ()
+
+
+def test_local_sync_pr_honours_the_repo_s_own_apply_tiered(tmp_path: Path) -> None:
+    """[RTE-03c ⟨R-CORRECTED⟩] Forcing `tiered=False` everywhere went too far.
+
+    The leak that had to be closed was CONFIG arriving by OMISSION on paths where
+    the config is not the operator's — a remote agent's tool call, and the server's
+    docs-PR route on a CLONED repo. `cdx sync-pr` / `cdx open-docs-pr` run against
+    the operator's OWN checkout, so refusing to honour their own `apply_tiered`
+    re-opened the exact permanent-staleness bug RTE-03 exists to fix on the docs-PR
+    path. The distinction is whose config it is, not which function is called.
+    """
+    from custodex.syncpr import sync_pr
+
+    config, cfg_dir, doc_path = _mixed_fixture(tmp_path, with_prose=True)
+    tiered_cfg = config.model_copy(update={"apply_tiered": True})
+    before = doc_path.read_bytes()
+
+    # What `cli.sync_pr_cmd` now does: pass the repo's own knob EXPLICITLY.
+    sync_pr(
+        Monitor(tiered_cfg, cfg_dir, now=_now, sink=NullSink()),
+        tiered=tiered_cfg.apply_tiered,
+    )
+
+    assert doc_path.read_bytes() == before  # the held document is protected

@@ -97,11 +97,19 @@ def _diff_one(path: str, before: str, after: str) -> str:
     return "".join(lines)
 
 
-def sync_pr(monitor: Monitor, *, dry_run: bool = False) -> SyncResult:
+def sync_pr(
+    monitor: Monitor, *, dry_run: bool = False, tiered: bool = False
+) -> SyncResult:
     """Heal the docs and return a unified-diff patch of exactly the changed docs.
 
     ``dry_run`` computes the same patch but restores the document tree to its
     starting bytes (K1) — including DELETING any file the run newly created.
+
+    ``tiered`` (RTE-03c) is passed THROUGH EXPLICITLY and defaults to OFF, so a
+    repo's ``apply_tiered`` can never reach this path by omission. That matters
+    most for the server's docs-PR route, which loads the config of a CLONED,
+    untrusted repo (``server/app.py``): an adopter's own config must not decide
+    the server's authoring authority. Mirrors the MCP-02 discipline for ``apply``.
     """
     specs = monitor.config.documents
     # Snapshot BEFORE: repo-relative POSIX path -> current text, or None if missing.
@@ -116,7 +124,7 @@ def sync_pr(monitor: Monitor, *, dry_run: bool = False) -> SyncResult:
         )
 
     # Heal in place via the existing pipeline (honors B-02/B-03 authority, K5/K7).
-    monitor.run(apply=True)
+    monitor.run(apply=True, tiered=tiered)
 
     diffs: list[str] = []
     changed: list[str] = []

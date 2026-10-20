@@ -24,12 +24,13 @@ from pydantic import BaseModel, ConfigDict
 
 from . import reviewlog
 from .backends import Backend, BackendResult, FixRequest, make_backend
+from .blocks import expected_region
 from .config import DocumentSpec, MonitorConfig, RegionMode, resolve_repo_root
 from .docdeps import SuspectStatus, detect_suspect_links, stamp_edges
 from .docstyle import DocStyleMap
-from .drift import Drift, DriftKind, DriftReport, detect
+from .drift import Drift, DriftKind, DriftReport, detect, mechanical_docs
 from .extract import DocumentSurface, build_document_surface
-from .heal import apply_fix
+from .heal import apply_fix, render_corrected
 from .index import render_index
 from .promotion import PromotionRule, rule_for
 from .schema import ProposedFix, ResolutionRecord, ReviewRecord, Verdict, new_record_id
@@ -37,7 +38,13 @@ from .similar import Exemplar, rank_similar
 from .sinks import Sink, make_sink
 from .ticket import build_ticket
 
-__all__ = ["HandledDrift", "MonitorResult", "Monitor", "DEFAULT_LOG_PATH"]
+__all__ = [
+    "HandledDrift",
+    "ClosureRecord",
+    "MonitorResult",
+    "Monitor",
+    "DEFAULT_LOG_PATH",
+]
 
 #: Default review-log location, relative to the config directory.
 DEFAULT_LOG_PATH = Path(".cdmon") / "review-log.jsonl"
@@ -49,6 +56,11 @@ DEFAULT_EXEMPLAR_TOP_N = 3
 #: record as RULE-sourced (no backend was consulted) for a human auditor; the
 #: machine-readable marker also lands in ``config_snapshot["resolved_by"] = "rule"``.
 RULE_CAUSE_PREFIX = "promoted rule"
+
+#: Prefix on the synthesized ``cause`` of an ENGINE-closed drift (RTE-03d). Marks
+#: the record as engine-sourced — no backend, no model — for a human auditor; the
+#: machine-readable marker lands in ``config_snapshot["resolved_by"] = "engine"``.
+ENGINE_CAUSE_PREFIX = "code-derived"
 
 # Frozen + extra="forbid": results are immutable snapshots of one run.
 _MODEL_CONFIG = ConfigDict(extra="forbid", frozen=True)
@@ -64,6 +76,59 @@ class HandledDrift(BaseModel):
     applied: bool
 
 
+class ClosureRecord(BaseModel):
+    """One DOCUMENT the engine closed (or previewed closing) unattended (RTE-03d).
+
+    The alarm for tiered mode. An unattended write that does not actually close
+    the drift is the failure that must never be silent: the document looks handled,
+    the next run re-applies forever, and nobody is told.
+
+    Deliberately an in-process ``MonitorResult`` detail, **not** a public schema
+    artifact — ``cdx schema`` emits :class:`~custodex.schema.ReviewRecord` alone, so
+    nothing here implies a ``schema_version`` bump (K6). The durable audit trail is
+    the ``ReviewRecord`` this closure names in ``record_id``.
+
+    ``record_ids`` is a TUPLE, and the reason is the CLOCK.
+    :func:`~custodex.schema.new_record_id` hashes ``(doc_id, surface_hash,
+    detected_at)`` — no drift kind, no region — so under a FIXED injected clock N
+    drifts closed on one document in one run collapse to ONE id, and a singular
+    field looks right. Under the production clock (:func:`_default_now`, microsecond
+    precision) each ``_record_for`` call stamps a different instant, so the ids are
+    DISTINCT and a singular field would silently name only the first — losing the
+    audit trail for every other drift on the document. Sorted + deduped, so both
+    worlds are correct. Widening ``new_record_id`` itself is NOT the fix: it would
+    change every existing record id and break the doc-grain ``cdx resolve`` contract.
+    """
+
+    model_config = _MODEL_CONFIG
+
+    doc_id: str
+    doc_path: str
+    #: The review record(s) this closure is joinable to — sorted + deduped.
+    record_ids: tuple[str, ...]
+    #: Sorted + deduped drift kinds closed on this document (K10).
+    drift_kinds: tuple[str, ...]
+    #: Sorted union of the routing evidence across those drifts (K10).
+    evidence: tuple[str, ...]
+    #: The write path was ENTERED (``apply`` was effectively on). The alarm gates on
+    #: this, never on ``wrote``, so that "routing promised mechanical closure and
+    #: nothing was written" is still reported.
+    #:
+    #: ⟨R-CORRECTED⟩ An earlier draft justified this with ``apply_fix`` declining a
+    #: preserved id or a B-03 locked region. Those are unreachable HERE, and the
+    #: fold is why: a ``human`` or locked ``llm-seeded`` region drift is built
+    #: ``healable=False`` and classifies ``NEEDS_INTENT``, so its document is never
+    #: mechanical in the first place. The branch IS reachable, by the case that
+    #: actually matters — :meth:`Monitor._engine_result` returning ``ESCALATE``
+    #: because the ENGINE could not render what routing called mechanical (the
+    #: router and the renderer disagreeing). Gating on ``wrote`` would hide it.
+    attempted: bool
+    #: ``apply_fix`` actually changed bytes.
+    wrote: bool
+    #: The post-run recheck shows no remaining ACTIONABLE drift on this document.
+    verified: bool
+
+
 class MonitorResult(BaseModel):
     """The outcome of one :meth:`Monitor.run`: handled, remaining, recorded."""
 
@@ -72,6 +137,10 @@ class MonitorResult(BaseModel):
     handled: tuple[HandledDrift, ...]
     remaining: tuple[Drift, ...]
     records: tuple[ReviewRecord, ...]
+    #: RTE-03d: what tiered mode closed unattended, sorted by ``doc_id`` (K10).
+    #: Appended LAST and defaulted, so every pre-RTE-03d construction still
+    #: validates (additive, K6). Empty unless ``tiered`` was effectively on.
+    closures: tuple[ClosureRecord, ...] = ()
 
 
 def _default_now() -> str:
@@ -183,6 +252,114 @@ class Monitor:
         templates_root = repo_root / "templates" / "writing"
         return read_style_guidance(selection, templates_root)
 
+    def _preserve_for(self, spec: DocumentSpec) -> frozenset[str]:
+        """Human-owned region ids the engine must never author (B-02).
+
+        The guarantee is enforced at the heal WRITE boundary, not in the backend,
+        so even a whole-doc fix cannot clobber them. Shared by the backend path and
+        the RTE-03d engine path — one enforcement point, so a future B-02/B-03/
+        RTE-04 guard is added once.
+        """
+        return frozenset(
+            rid for rid in spec.region_keys if spec.mode_for(rid) is RegionMode.HUMAN
+        )
+
+    def _modes_for(self, spec: DocumentSpec) -> dict[str, RegionMode]:
+        """Per-region authority, carrying the B-03 lock + per-region hash stamping."""
+        return {rid: spec.mode_for(rid) for rid in spec.region_keys}
+
+    def _region_body(
+        self, region_id: str, spec: DocumentSpec, surface: DocumentSurface
+    ) -> str | None:
+        """The body a managed region should hold — the SAME selector ``detect`` uses.
+
+        An ``index`` region is a table over the config's OTHER documents, so it is
+        not a function of this surface and :func:`~custodex.blocks.expected_region`
+        declines it (RTE-03a). Mirroring ``drift.detect``'s branch here is what
+        keeps the engine's own close byte-identical to what detect grades against —
+        the two renderers must never diverge again.
+        """
+        template = self.config.region_templates.get(region_id)
+        if template is not None and template.source == "index":
+            return render_index(template, spec, self.config, self.root)
+        return expected_region(region_id, surface, template)
+
+    def _engine_result(
+        self,
+        drift: Drift,
+        spec: DocumentSpec,
+        surface: DocumentSurface,
+        doc_text: str,
+    ) -> BackendResult:
+        """Close a CODE_DERIVED drift with the ENGINE — no backend, no model (RTE-03d).
+
+        The fix SHAPES mirror :class:`~custodex.backends.MockBackend` rules 1 and 3
+        exactly: region-scoped for a ``REGION``, whole-doc for a ``HASH``. Keeping
+        them apart matters — one whole-doc fix per document would make a REGION
+        close rewrite front-matter it never touches today (``fingerprint_tiers``,
+        ``symbol_sigs``), which on a legacy composite-only doc silently ADDS the
+        digests ``classify_change_severity`` needs to move a FUTURE HASH drift from
+        ``UNKNOWN`` (NEEDS_INTENT) to ``COSMETIC`` (CODE_DERIVED). The unattended
+        write would widen what it may next write unattended.
+
+        A ``None`` body is NOT silently skipped: routing called this mechanical, so
+        the engine failing to render it is a contradiction a human must see (K8) —
+        it becomes an ESCALATE whose closure trips the alarm.
+        """
+        if drift.kind is DriftKind.REGION and drift.region_id is not None:
+            body = self._region_body(drift.region_id, spec, surface)
+            if body is not None:
+                return BackendResult(
+                    verdict=Verdict.FIX,
+                    cause=(
+                        f"{ENGINE_CAUSE_PREFIX}: managed region "
+                        f"{drift.region_id!r} is a projection of the current code "
+                        "surface — regenerated by the engine (no backend consulted)"
+                    ),
+                    fix=ProposedFix(
+                        region_id=drift.region_id,
+                        new_region_body=body,
+                        new_doc_text=None,
+                        rationale=(
+                            "regenerated the managed region from the code surface "
+                            "(the single source of truth); no model was involved, "
+                            "so there is nothing to be confident about"
+                        ),
+                    ),
+                )
+        elif drift.kind is DriftKind.HASH:
+            return BackendResult(
+                verdict=Verdict.FIX,
+                cause=(
+                    f"{ENGINE_CAUSE_PREFIX}: the code surface changed and the "
+                    "severity proves no documented sentence was falsified — "
+                    "regenerating regions and fingerprint (no backend consulted)"
+                ),
+                fix=ProposedFix(
+                    region_id=None,
+                    new_region_body=None,
+                    new_doc_text=render_corrected(
+                        doc_text,
+                        surface,
+                        self.config.region_templates,
+                        include_body=self.config.fingerprint_body_tier,
+                    ),
+                    rationale=(
+                        "rewrote the document from the current code surface; "
+                        "regions + fingerprint refreshed by the engine itself"
+                    ),
+                ),
+            )
+        return BackendResult(
+            verdict=Verdict.ESCALATE,
+            cause=(
+                f"{ENGINE_CAUSE_PREFIX}: routing classified this drift "
+                f"{drift.apply_tier.value!r} but the engine could not render it — "
+                "the router and the renderer disagree; a human must look"
+            ),
+            fix=None,
+        )
+
     def _record_for(
         self,
         drift: Drift,
@@ -190,6 +367,7 @@ class Monitor:
         surface: DocumentSurface,
         *,
         rule_sourced: bool = False,
+        engine_sourced: bool = False,
     ) -> ReviewRecord:
         stamp = self._now()
         surface_hash = surface.surface_hash(
@@ -205,6 +383,11 @@ class Monitor:
         }
         if rule_sourced:
             config_snapshot["resolved_by"] = "rule"
+        # RTE-03d: an ENGINE close consulted no backend either — same audit marker
+        # shape as D-06's "rule" so a human (and the central server) can tell an
+        # unattended mechanical close from a model verdict.
+        if engine_sourced:
+            config_snapshot["resolved_by"] = "engine"
         # P-01: a record self-describes which fingerprint derivation produced its
         # surface_hash, so the body tier is auditable. Only recorded when ON ⇒
         # every pre-P-01 / flag-OFF snapshot is byte-identical (additive, K6).
@@ -283,7 +466,9 @@ class Monitor:
             rank_similar(target, records, resolutions, top_n=self._exemplar_top_n)
         )
 
-    def run(self, *, apply: bool | None = None) -> MonitorResult:
+    def run(
+        self, *, apply: bool | None = None, tiered: bool | None = None
+    ) -> MonitorResult:
         """Detect -> per-drift backend verdict -> record + emit -> (apply) -> recheck.
 
         ``apply`` overrides ``config.apply_default`` (``None`` -> use the config).
@@ -291,9 +476,43 @@ class Monitor:
         verdict is recorded and emitted regardless. ``remaining`` is the result
         of a fresh detect after any applies (so FIX'd drift drops out and
         ESCALATE/unapplied drift persists).
+
+        ``tiered`` (RTE-03c) overrides ``config.apply_tiered`` the same way, and is
+        a **RESTRAINT on apply, not merely a subset of it**: when it is effectively
+        true, only a document the ENGINE alone could close — every actionable drift
+        on it ``CODE_DERIVED``, per :func:`~custodex.drift.mechanical_docs` — may be
+        written. A document carrying any ``NEEDS_INTENT`` (or, for now,
+        ``DELEGATED``) drift is still sent to the backend, so the human receives a
+        ``ReviewRecord`` with a proposed fix (K5), but nothing on it is applied.
+
+        On the mechanical path no backend is consulted at all, so ``--tiered`` can
+        write a document a declining backend would have left alone — it REPLACES
+        the authority there rather than narrowing it. On every other document it is
+        strictly narrower than ``apply``.
+
+        That restraint is the point. Applying a document's mechanical HASH fix
+        while its sibling prose region is ESCALATED destroys the ONLY staleness
+        trigger that region has — ``heal._corrected`` stamps the fingerprint even
+        when it skips the region — so ``remaining`` comes back empty, ``cdx check``
+        is green forever, and the human is never asked again.
         """
         report = self.check()
         effective_apply = self.config.apply_default if apply is None else apply
+        effective_tiered = self.config.apply_tiered if tiered is None else tiered
+        # The set an unattended write may touch. Computed ONCE from the opening
+        # report so the fold is a property of the run, not of the write order.
+        mechanical = mechanical_docs(report) if effective_tiered else None
+        if mechanical is not None and self._rules:
+            # D-06 holds the WHOLE document, not just its own drift. A rule-matched
+            # drift is recorded and never applied — but the engine's HASH close is
+            # WHOLE-DOC (`render_corrected`) and regenerates every known region,
+            # including the one the rule just held. Reproduced: a rule INVALIDATEd a
+            # REGION drift and the sibling HASH write overwrote the body anyway,
+            # inverting the learning loop silently. So a rule match withdraws its
+            # document from the mechanical set entirely.
+            mechanical -= {
+                d.doc_id for d in report.drifts if rule_for(d, self._rules) is not None
+            }
 
         # D-04: when retrieval is ON, read the substrate ONCE (the review log + the
         # resolutions log) up front — before any new records are appended — so a
@@ -307,6 +526,10 @@ class Monitor:
 
         handled: list[HandledDrift] = []
         records: list[ReviewRecord] = []
+        # RTE-03d: per-DOCUMENT facts about what the engine closed unattended.
+        # (drift, record_id, attempted, wrote) in drift-encounter order, which is
+        # deterministic — `report.drifts` is built in config document order (K10).
+        closed: dict[str, list[tuple[Drift, str, bool, bool]]] = {}
 
         for drift in report.drifts:
             # EPIC B: doc↔doc suspect links never go to the backend (a fix would
@@ -342,6 +565,33 @@ class Monitor:
                 continue
 
             doc_text = self._doc_text(drift, doc_path)
+
+            # RTE-03d: the ENGINE closes what the ENGINE projects — ZERO backend
+            # calls. Placed BELOW the D-06 rule check on purpose: a promoted rule
+            # is a verdict humans reached >=K times, and a CODE_DERIVED HASH drift
+            # is exactly the shape a repo promotes an INVALIDATE rule for, so the
+            # engine must never overwrite it.
+            if mechanical is not None and drift.doc_id in mechanical:
+                result = self._engine_result(drift, spec, surface, doc_text)
+                record = self._record_for(drift, result, surface, engine_sourced=True)
+                reviewlog.append(self._log_path, record)
+                self._sink.emit(record)
+                records.append(record)
+                applied = False
+                if effective_apply and result.fix is not None:
+                    applied = apply_fix(
+                        doc_path,
+                        result.fix,
+                        preserve=self._preserve_for(spec),
+                        modes=self._modes_for(spec),
+                    )
+                closed.setdefault(drift.doc_id, []).append(
+                    (drift, record.record_id, effective_apply, applied)
+                )
+                handled.append(
+                    HandledDrift(drift=drift, result=result, applied=applied)
+                )
+                continue
 
             index_body: str | None = None
             if drift.region_id is not None:
@@ -395,8 +645,15 @@ class Monitor:
             records.append(record)
 
             applied = False
+            # RTE-03c/03d: under `--tiered` this is the HELD path — every
+            # mechanically-closable document was already closed above without a
+            # backend call, so anything reaching here needs human intent. It is
+            # still RECORDED for the reviewer (K5) and never written, because
+            # applying its mechanical half would destroy the escalation's own
+            # staleness trigger (see `mechanical_docs`).
             if (
                 effective_apply
+                and mechanical is None
                 and result.verdict is Verdict.FIX
                 and result.fix is not None
             ):
@@ -406,14 +663,11 @@ class Monitor:
                 # carries the B-03 lock (a human-edited llm-seeded region becomes
                 # locked) and per-region hash stamping; passing the full
                 # region_modes lets apply_fix derive both at the write boundary.
-                preserve = frozenset(
-                    rid
-                    for rid in spec.region_keys
-                    if spec.mode_for(rid) is RegionMode.HUMAN
-                )
-                modes = {rid: spec.mode_for(rid) for rid in spec.region_keys}
                 applied = apply_fix(
-                    doc_path, result.fix, preserve=preserve, modes=modes
+                    doc_path,
+                    result.fix,
+                    preserve=self._preserve_for(spec),
+                    modes=self._modes_for(spec),
                 )
 
             handled.append(HandledDrift(drift=drift, result=result, applied=applied))
@@ -432,6 +686,37 @@ class Monitor:
             handled=tuple(handled),
             remaining=remaining,
             records=tuple(records),
+            closures=self._closures(closed, remaining),
+        )
+
+    @staticmethod
+    def _closures(
+        closed: dict[str, list[tuple[Drift, str, bool, bool]]],
+        remaining: tuple[Drift, ...],
+    ) -> tuple[ClosureRecord, ...]:
+        """Fold the per-drift closure facts into one record per DOCUMENT (RTE-03d).
+
+        ``verified`` is graded against the post-run recheck and ignores
+        ``SUSPECT_LINK``: a doc↔doc edge is handled by a pass that never applies a
+        fix, so it can legitimately remain open on a document whose code↔doc drift
+        closed cleanly. Sorted by ``doc_id``, with sorted+deduped kinds and evidence
+        — nothing here iterates a set into the result (K10).
+        """
+        unclosed = {d.doc_id for d in remaining if d.kind is not DriftKind.SUSPECT_LINK}
+        return tuple(
+            ClosureRecord(
+                doc_id=doc_id,
+                doc_path=facts[0][0].doc_path,
+                record_ids=tuple(sorted({rid for _, rid, _, _ in facts})),
+                drift_kinds=tuple(sorted({d.kind.value for d, _, _, _ in facts})),
+                evidence=tuple(
+                    sorted({e for d, _, _, _ in facts for e in d.tier_evidence})
+                ),
+                attempted=any(attempted for _, _, attempted, _ in facts),
+                wrote=any(wrote for _, _, _, wrote in facts),
+                verified=doc_id not in unclosed,
+            )
+            for doc_id, facts in sorted(closed.items())
         )
 
     def _handle_suspect_links(

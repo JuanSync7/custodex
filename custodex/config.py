@@ -582,6 +582,19 @@ class MonitorConfig(BaseModel):
     agent: AgentConfig = AgentConfig()  # runtime for backend.kind == "agent"
     central: CentralConfig = CentralConfig()
     apply_default: bool = False  # monitor auto-applies FIX by default?
+    # RTE-03c: restrain `--apply` to the documents the ENGINE alone can close.
+    # DEFAULT OFF ⇒ `run()` is byte-identical to today. ON, a document carrying any
+    # NEEDS_INTENT drift is still sent to the backend (the human gets a ReviewRecord
+    # with a proposed fix, K5) but no managed region or fingerprint on it is written
+    # — the ONE exception being a brand-new doc↔doc edge baseline, which touches only
+    # `cdm.upstream_hashes` and so consumes no code↔doc staleness trigger.
+    #
+    # It is not simply a narrowing. It narrows WHICH documents may be written AND
+    # REPLACES the verdict authority on them: the engine closes those itself with
+    # zero backend calls, so an ESCALATE/INVALIDATE the backend would have returned
+    # no longer holds the write. Strictly a narrowing only for a backend that FIXes
+    # every code-derived drift — which is exactly what the offline mock does.
+    apply_tiered: bool = False
     coverage: CoverageConfig = CoverageConfig()  # A-04: scan scope + waivers (additive)
     staleness: StalenessConfig = StalenessConfig()  # EPIC SLA: review SLA (additive)
     docdeps: DocDepsConfig = DocDepsConfig()  # EPIC B: doc↔doc policy (additive)
@@ -973,6 +986,7 @@ class IndexFile(BaseModel):
     root: str = "../.."
     version: str = CDMON_CONFIG_VERSION
     apply_default: bool = False
+    apply_tiered: bool = False  # RTE-03c: mirrors MonitorConfig (lifted in merge)
     backend: BackendConfig = BackendConfig()
     agent: AgentConfig = AgentConfig()
     central: CentralConfig = CentralConfig()
@@ -1235,6 +1249,7 @@ def load_bundle(config_dir: Path) -> ConfigBundle:
             agent=index.agent,
             central=index.central,
             apply_default=index.apply_default,
+            apply_tiered=index.apply_tiered,
             coverage=index.coverage,
             staleness=index.staleness,
             docdeps=index.docdeps,

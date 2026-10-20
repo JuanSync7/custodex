@@ -6,6 +6,7 @@ implementation (K9, TDD).
 
 Features: FEAT-EXTRACT-001, FEAT-EXTRACT-002, FEAT-EXTRACT-003
 Features: FEAT-EXTRACT-004, FEAT-EXTRACT-005, FEAT-EXTRACT-006
+Features: FEAT-EXTRACT-007, FEAT-EXTRACT-008
 """
 
 from __future__ import annotations
@@ -1123,3 +1124,240 @@ def test_anchor_id_survives_a_code_move(tmp_path: Path) -> None:
     sb = _by_name(extract_file(b))["foo"]
     assert sa.lineno != sb.lineno  # it genuinely moved
     assert sa.anchor_id == sb.anchor_id  # but the identity is stable (P4)
+
+
+# --------------------------------------------------------------------------- #
+# RTE-02a: decorator fidelity. Extraction never inspected `decorator_list`, so   #
+# the projection LIED about decorated symbols before any model saw it — the      #
+# concrete refutation of "an LLM won't misunderstand the code".                  #
+#                                                                                #
+# Feature: FEAT-EXTRACT-007                                                       #
+# --------------------------------------------------------------------------- #
+DECORATED = '''\
+import functools
+from abc import abstractmethod
+
+
+class Order:
+    """An order."""
+
+    @property
+    def net(self) -> int:
+        """Net total."""
+        return 1
+
+    @staticmethod
+    def make() -> "Order":
+        return Order()
+
+    @classmethod
+    def blank(cls) -> "Order":
+        return cls()
+
+    @functools.cache
+    def cached(self, x: int) -> int:
+        return x
+
+    @staticmethod
+    @abstractmethod
+    def contract() -> int:
+        """Two decorators whose source order != sorted order."""
+
+    def plain(self, x: int) -> int:
+        return x
+'''
+
+
+def test_property_is_not_documented_as_a_callable_method(tmp_path: Path) -> None:
+    """THE shipped defect: a reader must not be told to call an attribute.
+
+    `docs/api/coverage-system.md` documents five consecutive @property attributes
+    as callable methods — generated with NO model involved. The signature is the
+    cell a reader acts on, so the decorator has to appear there.
+    """
+    syms = _by_name(extract_file(_write(tmp_path, DECORATED)))
+    net = syms["Order.net"]
+    assert net.decorators == ("property",)
+    assert net.signature.startswith("@property")
+    assert "def net(self) -> int" in net.signature
+
+
+def test_decorators_are_captured_in_source_order(tmp_path: Path) -> None:
+    """Decorator ORDER is semantic, so it is preserved, never sorted (K10).
+
+    K10 requires determinism; sorting is the usual MEANS, not the end. Source
+    order is already deterministic, and reordering would change meaning.
+    """
+    syms = _by_name(extract_file(_write(tmp_path, DECORATED)))
+    assert syms["Order.make"].decorators == ("staticmethod",)
+    assert syms["Order.blank"].decorators == ("classmethod",)
+    # a DOTTED decorator resolves to its full dotted name.
+    assert syms["Order.cached"].decorators == ("functools.cache",)
+    # an undecorated symbol keeps the empty default (additive, K6).
+    assert syms["Order.plain"].decorators == ()
+    assert syms["Order.plain"].signature == "def plain(self, x: int) -> int"
+
+
+def test_multiple_decorators_keep_source_order_and_are_never_sorted(
+    tmp_path: Path,
+) -> None:
+    """Decorator ORDER is semantic, so it must survive extraction unchanged.
+
+    `@staticmethod` over `@abstractmethod` is not the same declaration as the
+    reverse, so sorting would silently rewrite meaning. Pinned with a pair whose
+    source order (staticmethod, abstractmethod) differs from sorted order
+    (abstractmethod, staticmethod) — with any single-decorator fixture, sorting is
+    a no-op and this decision is undefended.
+    """
+    sym = _by_name(extract_file(_write(tmp_path, DECORATED)))["Order.contract"]
+    assert sym.decorators == ("staticmethod", "abstractmethod")
+    assert sym.decorators != tuple(sorted(sym.decorators))  # the mutation this kills
+    assert sym.signature == "@staticmethod\n@abstractmethod\ndef contract() -> int"
+
+
+def test_staticmethod_signature_no_longer_reads_as_a_broken_method(
+    tmp_path: Path,
+) -> None:
+    """`def make() -> 'Order'` with no `self` reads as a bug.
+
+    The decorator is what explains it, so it has to reach the signature cell.
+    """
+    syms = _by_name(extract_file(_write(tmp_path, DECORATED)))
+    assert syms["Order.make"].signature.startswith("@staticmethod")
+    assert syms["Order.blank"].signature.startswith("@classmethod")
+
+
+def test_call_decorator_contributes_its_callee_not_its_arguments(
+    tmp_path: Path,
+) -> None:
+    """`@app.command("x")` is the FACT `app.command`; the arguments are not surface.
+
+    Including call arguments would make the signature move whenever an unrelated
+    literal changed, manufacturing drift with no API meaning.
+    """
+    src = "import app\n\n\n@app.command('run', help='x')\ndef go() -> None:\n    pass\n"
+    syms = _by_name(extract_file(_write(tmp_path, src)))
+    assert syms["go"].decorators == ("app.command",)
+    assert syms["go"].signature == "@app.command\ndef go() -> None"
+
+
+def test_exotic_decorator_does_not_break_extraction_of_the_file(
+    tmp_path: Path,
+) -> None:
+    """An unresolvable decorator form is SKIPPED, never fatal (K8 proportionality).
+
+    Being loud is for malformed INPUT; a lambda/subscript decorator is valid
+    Python we merely cannot name, and losing the whole file's surface over it
+    would be worse than losing one decorator name.
+    """
+    src = (
+        "reg = {}\n\n\n@reg['k']\ndef weird() -> None:\n    pass\n\n\n"
+        "def normal() -> int:\n    return 1\n"
+    )
+    syms = _by_name(extract_file(_write(tmp_path, src)))
+    assert syms["weird"].decorators == ()  # unnameable -> skipped
+    assert syms["normal"].signature == "def normal() -> int"  # file still extracted
+
+
+def test_decorator_extraction_is_deterministic(tmp_path: Path) -> None:
+    """Same source in, same tuple out — no set/dict ordering leaks (K10)."""
+    a = _by_name(extract_file(_write(tmp_path, DECORATED)))
+    b = _by_name(extract_file(_write(tmp_path, DECORATED)))
+    assert [s.decorators for s in a.values()] == [s.decorators for s in b.values()]
+
+
+# --------------------------------------------------------------------------- #
+# RTE-02b: class + pydantic FIELDS enter the surface AND the rendered table.     #
+# 1039 annotated class fields extracted as NOTHING — for a pydantic-heavy        #
+# codebase that is most of the configurable API.                                 #
+#                                                                                #
+# Feature: FEAT-EXTRACT-008                                                       #
+# --------------------------------------------------------------------------- #
+FIELDS = '''\
+MODULE_LEVEL: int = 7
+
+
+class Config:
+    """A settings model."""
+
+    apply_default: bool = False
+    root: str
+    _secret: int = 0
+    PLAIN = 1
+
+    def method(self) -> None:
+        pass
+'''
+
+
+def test_annotated_class_fields_enter_the_surface(tmp_path: Path) -> None:
+    """A pydantic/dataclass field is API — and was previously invisible.
+
+    `MonitorConfig.apply_default` is the single most important fact an adopter
+    needs, and before this it appeared in no document and no coverage denominator.
+    """
+    syms = _by_name(extract_file(_write(tmp_path, FIELDS)))
+    assert syms["Config.apply_default"].kind == "variable"
+    assert syms["Config.apply_default"].signature == "apply_default: bool = False"
+    # an annotation with no default keeps the bare annotated form.
+    assert syms["Config.root"].signature == "root: str"
+
+
+def test_plain_class_attribute_is_captured_too(tmp_path: Path) -> None:
+    """`PLAIN = 1` in a class body is a class attribute, i.e. surface."""
+    syms = _by_name(extract_file(_write(tmp_path, FIELDS)))
+    assert syms["Config.PLAIN"].signature == "PLAIN = 1"
+
+
+def test_field_visibility_uses_the_bare_name_not_the_qualified_one(
+    tmp_path: Path,
+) -> None:
+    """A private field stays private, and a public one stays public.
+
+    NOTE (corrected by mutation testing): this defends the OUTCOME, not a
+    bare-vs-qualified rule. `_is_public` already strips a dotted qualifier
+    (`name.rsplit(".", 1)[-1]`), so passing it the qualified name is an EQUIVALENT
+    mutation that no test can kill. An earlier docstring here claimed otherwise.
+    """
+    syms = _by_name(extract_file(_write(tmp_path, FIELDS)))
+    assert syms["Config._secret"].is_public is False
+    assert syms["Config.apply_default"].is_public is True
+
+
+def test_module_level_variables_stay_unqualified(tmp_path: Path) -> None:
+    """Regression guard: the qualifier must apply ONLY inside a class body."""
+    syms = _by_name(extract_file(_write(tmp_path, FIELDS)))
+    assert "MODULE_LEVEL" in syms
+    assert syms["MODULE_LEVEL"].signature == "MODULE_LEVEL: int = 7"
+
+
+def test_fields_reach_the_rendered_table_not_only_the_surface(
+    tmp_path: Path,
+) -> None:
+    """Surface and table must move TOGETHER, or coverage silently inflates.
+
+    `coverage.resolve_coverage` counts a symbol as documented iff some code_ref
+    SELECTS it — "documented" means matched by a config glob, not described
+    anywhere. So a field that entered the surface but was filtered out of the
+    rendered table would count as documented while appearing in NO document,
+    making the completeness number less trustworthy rather than more. This test
+    pins the coupling that keeps `selected => listed` true.
+    """
+    from custodex.blocks import symbol_table
+
+    src = _write(tmp_path, FIELDS)
+    spec = DocumentSpec(
+        id="cfg",
+        path="cfg.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(CodeRef(path=src.name),),
+    )
+    table = symbol_table(build_document_surface(spec, tmp_path))
+    assert "Config.apply_default" in table
+    assert "apply_default: bool = False" in table
+
+
+def test_field_extraction_is_deterministic(tmp_path: Path) -> None:
+    a = extract_file(_write(tmp_path, FIELDS))
+    b = extract_file(_write(tmp_path, FIELDS))
+    assert [(s.name, s.signature) for s in a] == [(s.name, s.signature) for s in b]

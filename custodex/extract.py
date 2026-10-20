@@ -87,6 +87,12 @@ class Symbol(BaseModel):
     # the OPT-IN body tier of ``surface_hash`` (P-01); insensitive to comments,
     # formatting and the docstring, so it moves only on an implementation change.
     body_hash: str | None = None
+    # RTE-02a: dotted decorator names in SOURCE order (``@property``,
+    # ``@functools.cache``, ``@app.command(...)`` -> ``app.command``). NOT sorted:
+    # decorator order is semantic (``@property`` over ``@abstractmethod`` differs
+    # from the reverse), and source order is already deterministic — which is what
+    # K10 actually requires. Empty for undecorated symbols and for classes/variables.
+    decorators: tuple[str, ...] = ()
 
     @property
     def anchor_id(self) -> str:
@@ -342,15 +348,55 @@ def _format_args(args: ast.arguments) -> str:
     return ", ".join(parts)
 
 
+def _decorator_name(node: ast.expr) -> str | None:
+    """The dotted name of ONE decorator expression, or ``None`` if unnameable.
+
+    A ``Call`` contributes its CALLEE only — ``@app.command("run", help="x")`` is
+    the surface fact ``app.command``. Including the arguments would move the
+    signature whenever an unrelated literal changed, manufacturing drift with no
+    API meaning. Exotic forms (a subscript, a lambda) return ``None``.
+    """
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        base = _decorator_name(node.value)
+        return f"{base}.{node.attr}" if base is not None else None
+    return None
+
+
+def _decorator_names(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[str, ...]:
+    """Nameable decorators in SOURCE order (RTE-02a).
+
+    An unnameable decorator is SKIPPED rather than fatal: K8 loudness is for
+    malformed INPUT, and a subscript decorator is valid Python we merely cannot
+    name — losing the whole file's surface over it would be strictly worse than
+    losing one decorator name.
+    """
+    named = (_decorator_name(d) for d in node.decorator_list)
+    return tuple(n for n in named if n is not None)
+
+
 def _func_signature(
-    node: ast.FunctionDef | ast.AsyncFunctionDef, display_name: str
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    display_name: str,
+    decorators: tuple[str, ...] = (),
 ) -> str:
-    """Build ``def name(args) -> ret`` (or ``async def ...``) for a function."""
+    """Build ``[@decorator ...] def name(args) -> ret`` for a function.
+
+    RTE-02a: the decorators PREFIX the signature, because the signature is the
+    cell a reader acts on. Without it ``@property def net(self) -> int`` rendered
+    as ``def net(self) -> int`` and told the reader to CALL an attribute — a
+    falsehood produced with no model involved. Newline-separated; the table
+    renderer collapses newlines to spaces (``blocks._cell``), so a cell reads
+    ``@property def net(self) -> int`` while the raw signature keeps source form.
+    """
     prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
     sig = f"{prefix} {display_name}({_format_args(node.args)})"
     if node.returns is not None:
         sig += f" -> {ast.unparse(node.returns)}"
-    return sig
+    return "".join(f"@{d}\n" for d in decorators) + sig
 
 
 def _class_signature(node: ast.ClassDef) -> str:
@@ -400,16 +446,18 @@ def _func_symbol(
     display_name: str,
     kind: SymbolKind,
 ) -> Symbol:
+    decorators = _decorator_names(node)
     return Symbol(
         name=name,
         kind=kind,
-        signature=_func_signature(node, display_name),
+        signature=_func_signature(node, display_name, decorators),
         lineno=node.lineno,
         end_lineno=node.end_lineno or node.lineno,
         is_public=_is_public(name),
         docstring=ast.get_docstring(node),
         arg_names=_positional_names(node.args),
         body_hash=_body_ast_hash(node),
+        decorators=decorators,
     )
 
 
@@ -434,10 +482,24 @@ def _value_repr(node: ast.expr) -> str:
 
 def _variable_symbols(
     node: ast.Assign | ast.AnnAssign,
+    *,
+    qualifier: str = "",
 ) -> list[Symbol]:
-    """Build variable Symbols for a module-level (annotated) assignment."""
+    """Build variable Symbols for a module-level or CLASS-BODY assignment.
+
+    RTE-02b: ``qualifier`` names the enclosing class, so a field becomes
+    ``Class.field`` exactly as a method becomes ``Class.method``. The SIGNATURE
+    keeps the bare ``field: type = default`` form (mirroring ``display_name`` for
+    methods), and ``is_public`` is computed from the BARE name — qualifying first
+    would make every ``Class._private`` field look public, since
+    ``"Class._private"`` does not start with an underscore.
+    """
     out: list[Symbol] = []
     end = node.end_lineno or node.lineno
+
+    def qualified(bare: str) -> str:
+        return f"{qualifier}.{bare}" if qualifier else bare
+
     if isinstance(node, ast.AnnAssign):
         if not isinstance(node.target, ast.Name):
             return out
@@ -449,7 +511,7 @@ def _variable_symbols(
             sig = f"{name}: {ann}"
         out.append(
             Symbol(
-                name=name,
+                name=qualified(name),
                 kind="variable",
                 signature=sig,
                 lineno=node.lineno,
@@ -466,7 +528,7 @@ def _variable_symbols(
             continue
         out.append(
             Symbol(
-                name=target.id,
+                name=qualified(target.id),
                 kind="variable",
                 signature=f"{target.id} = {value}",
                 lineno=node.lineno,
@@ -532,6 +594,14 @@ def _extract_python_symbols(path: Path) -> list[Symbol]:
                             kind="method",
                         )
                     )
+                elif isinstance(child, ast.Assign | ast.AnnAssign):
+                    # RTE-02b: a class/pydantic FIELD is surface — for a pydantic
+                    # codebase it is most of the configurable API. Extracted into
+                    # the surface AND therefore the rendered table: `coverage`
+                    # counts a symbol as documented iff a code_ref SELECTS it, so
+                    # a surface-only field would count as documented while
+                    # appearing in no document at all.
+                    symbols.extend(_variable_symbols(child, qualifier=node.name))
         elif isinstance(node, ast.Assign | ast.AnnAssign):
             symbols.extend(_variable_symbols(node))
 

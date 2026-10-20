@@ -7,7 +7,7 @@ before the implementation (K9, TDD). Deterministic sorted output (K10), reuses
 ``extract._select`` for selection (K0), ignores audience for ownership.
 
 Features: FEAT-COVERAGE-006, FEAT-COVERAGE-007, FEAT-COVERAGE-008
-Features: FEAT-COVERAGE-009, FEAT-COVERAGE-010
+Features: FEAT-COVERAGE-009, FEAT-COVERAGE-011
 """
 
 from __future__ import annotations
@@ -718,3 +718,69 @@ def test_proposed_doc_id_leaves_non_python_path_suffix_intact() -> None:
     # so the scheme stays total over any file the owner-suggester is handed.
     assert _proposed_doc_id("scripts/run.sh") == "scripts-run.sh"
     assert _proposed_doc_id("Makefile") == "Makefile"
+
+
+# --------------------------------------------------------------------------- #
+# RTE-02c: an EMPTY universe is not 100% covered. `percent_public_symbols`      #
+# reports vacuous truth (right for a property), which a --fail-under GATE must  #
+# not read as success.                                                           #
+#                                                                                #
+# Feature: FEAT-COVERAGE-011                                                      #
+# --------------------------------------------------------------------------- #
+def test_public_universe_distinguishes_100_of_many_from_100_of_nothing() -> None:
+    """The percentage alone cannot tell the two apart — that is the whole bug.
+
+    A mis-scoped include glob yields zero symbols, `percent_public_symbols`
+    returns 100.0 (no zero-division), and a strict gate reads perfection. The
+    universe has to be inspectable so a caller can tell WHAT the 100% is over.
+    """
+    empty = CoverageReport(files=(), symbols=())
+    assert empty.percent_public_symbols == 100.0  # UNCHANGED (K9)
+    assert empty.public_universe == ()
+
+    covered = CoverageReport(
+        files=(),
+        symbols=(
+            OwnedSymbol(
+                path="m.py",
+                name="f",
+                kind="function",
+                is_public=True,
+                owners=("d",),
+            ),
+        ),
+    )
+    assert covered.percent_public_symbols == 100.0  # same number...
+    assert len(covered.public_universe) == 1  # ...over a real universe
+
+
+def test_public_universe_excludes_private_and_waived() -> None:
+    """The universe is exactly what the percentage divides by."""
+    report = CoverageReport(
+        files=(),
+        symbols=(
+            OwnedSymbol(
+                path="m.py",
+                name="pub",
+                kind="function",
+                is_public=True,
+                owners=(),
+            ),
+            OwnedSymbol(
+                path="m.py",
+                name="_priv",
+                kind="function",
+                is_public=False,
+                owners=(),
+            ),
+            OwnedSymbol(
+                path="m.py",
+                name="waived",
+                kind="function",
+                is_public=True,
+                owners=(),
+                waived_reason="gone soon",
+            ),
+        ),
+    )
+    assert [s.name for s in report.public_universe] == ["pub"]

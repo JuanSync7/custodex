@@ -6,6 +6,7 @@ whole-doc fix shapes. TDD (K9).
 
 Features: FEAT-HEAL-001, FEAT-HEAL-002, FEAT-HEAL-004, FEAT-HEAL-005
 Features: FEAT-HEAL-006, FEAT-HEAL-007, FEAT-HEAL-008, FEAT-HEAL-009
+Features: FEAT-HEAL-010
 """
 
 from __future__ import annotations
@@ -19,11 +20,14 @@ from custodex.config import (
     CodeRef,
     DocumentSpec,
     MonitorConfig,
+    RegionColumn,
     RegionMode,
+    RegionTemplate,
 )
-from custodex.drift import detect
+from custodex.drift import DriftKind, detect
 from custodex.extract import build_document_surface
 from custodex.heal import apply_fix, regenerate_regions, render_corrected
+from custodex.index import render_index
 from custodex.manifest import (
     parse_doc,
     parse_text,
@@ -542,3 +546,99 @@ def test_apply_fix_whole_doc_never_blanks_llm_region(tmp_path: Path) -> None:
     apply_fix(doc_path, fix, preserve=preserve, modes=modes)
     after = regions(parse_doc(doc_path))
     assert after["overview"] == llm_body  # llm prose preserved through the heal
+
+
+# ---------------------------------------------------------------------------
+# RTE-03a — heal must never author a region only the index-aware layer can render
+# ---------------------------------------------------------------------------
+
+
+def _index_fixture(tmp_path: Path) -> tuple[Path, DocumentSpec, MonitorConfig, str]:
+    """A landing-page doc whose only region is `source: index`, plus a sibling.
+
+    Mirrors this repo's own `docs/api/index.md` shape (`config/cdmon/index.yaml`
+    declares `api-index: {source: index}`; `core.yaml` gives it no `code_refs`).
+    """
+    root, sibling = _setup(tmp_path)
+    index_spec = DocumentSpec(
+        id="api-index",
+        path="docs/index.md",
+        audience=Audience.ENG_GUIDE,
+        code_refs=(),
+        region_keys=("api-index",),
+    )
+    template = RegionTemplate(
+        source="index",
+        kind="eng-guide",
+        columns=(
+            RegionColumn(header="Document", field="title"),
+            RegionColumn(header="What it covers", field="summary"),
+        ),
+    )
+    config = MonitorConfig(
+        root="repo",
+        documents=(index_spec, sibling),
+        region_templates={"api-index": template},
+    )
+    (root / sibling.path).write_text(_synced_text(sibling, root), encoding="utf-8")
+    body = render_index(template, index_spec, config, root)
+    doc = "# Index\n\n<!-- CDM:BEGIN api-index -->\n<!-- CDM:END api-index -->\n"
+    doc, _ = set_region(doc, "api-index", body)
+    surface = build_document_surface(index_spec, root)
+    (root / index_spec.path).write_text(
+        render_doc(set_fingerprint({}, surface.surface_hash()), doc), encoding="utf-8"
+    )
+    return root, index_spec, config, body
+
+
+def test_regenerate_regions_never_corrupts_an_index_region(tmp_path: Path) -> None:
+    """[RTE-03a] `regenerate_regions` leaves an index region byte-identical.
+
+    Reproduced on this repo's own `docs/api/index.md` before the fix:
+    `render_index` -> 16 lines, `expected_region` -> 2, and
+    `regenerate_regions` deleted all 14 document rows. That write path is live
+    today via `generate.apply_edits_to_disk` (`generate.py:459`).
+    """
+    root, index_spec, config, body = _index_fixture(tmp_path)
+    doc_path = root / index_spec.path
+    surface = build_document_surface(index_spec, root)
+
+    regenerate_regions(doc_path, surface, config.region_templates)
+
+    assert regions(parse_doc(doc_path))["api-index"] == body
+
+
+def test_render_corrected_never_corrupts_an_index_region(tmp_path: Path) -> None:
+    """[RTE-03a] The whole-doc shape declines it too (the RTE-03d write path)."""
+    root, index_spec, config, body = _index_fixture(tmp_path)
+    doc_path = root / index_spec.path
+    surface = build_document_surface(index_spec, root)
+
+    out = render_corrected(
+        doc_path.read_text(encoding="utf-8"), surface, config.region_templates
+    )
+
+    assert regions(parse_text(out))["api-index"] == body
+
+
+def test_skipping_an_index_region_does_not_bless_it(tmp_path: Path) -> None:
+    """[RTE-03a] Declining is safe: `detect` still reports a stale index region.
+
+    The per-document fold exists because heal stamps the fingerprint even when it
+    SKIPS a region — but an index region's staleness trigger is not the
+    fingerprint: `detect` grades it against `render_index` unconditionally. So a
+    skipped index region still drifts on the very next check (the foil to the
+    `mode: llm` no-renderer region, whose only trigger IS the fingerprint).
+    """
+    root, index_spec, config, _body = _index_fixture(tmp_path)
+    doc_path = root / index_spec.path
+    text, _ = set_region(doc_path.read_text(encoding="utf-8"), "api-index", "STALE")
+    doc_path.write_text(text, encoding="utf-8")
+
+    regenerate_regions(
+        doc_path, build_document_surface(index_spec, root), config.region_templates
+    )
+
+    assert regions(parse_doc(doc_path))["api-index"] == "STALE"  # skipped, not authored
+    drifts = [d for d in detect(config, tmp_path).drifts if d.doc_id == "api-index"]
+    assert [d.kind for d in drifts] == [DriftKind.REGION]  # still caught

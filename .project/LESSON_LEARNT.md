@@ -2467,6 +2467,305 @@ artifact self-invalidates on every commit and K7 dies. Golden fingerprints
 were captured from `main` BEFORE any code change (the P-01 capture) and are
 pinned in `tests/regression/test_fingerprint_stability_codeindex.py`.
 
+## [RTE-01] Order rules by SPECIFICITY, or your general guard eats the specific ones
+
+The apply-tier chain was first drafted with `not healable` as rule 1 — the
+broadest, safest-looking guard. It would have made the `SUSPECT_LINK` and
+`UNHEALABLE` rules **dead code**, because both kinds are ALWAYS constructed
+`healable=False`: three distinct reasons ("this is a doc↔doc edge", "there is no
+renderer", "a human owns this region") would have collapsed into one
+undifferentiated `("unhealable",)`. The chain's *verdict* would have been
+identical, so no test asserting the tier would have caught it — only the EVIDENCE
+degrades, and evidence is the whole point of a routing decision a human has to
+audit. **Put the specific predicates above the general one**, and assert the
+evidence string, not just the tier.
+
+Three more durable ones from the same slice:
+
+1. **A rule must not decide what its inputs cannot evaluate.** An unlocked
+   `llm-seeded` region IS engine-owned and IS healed mechanically, so it "should"
+   be CODE_DERIVED — but `classify_apply_tier` is handed the region MODE and not
+   the LOCK state. Rather than guess, it denies the whole mode. If you want the
+   finer verdict, widen the inputs; do not let a rule infer what it cannot see.
+2. **A deny-by-default terminal over a closed enum is unreachable, so it is
+   untested by construction** — and it is the most safety-relevant line in the
+   function. Cover it by simulating the future mistake it exists to catch (a new
+   `DriftKind` reaching a classifier nobody updated), not by deleting it. The
+   first draft of that test was named `..._denies_by_default` but actually hit
+   rule 2 — a green test asserting the wrong thing, caught only by the coverage
+   report flagging the terminal line as unreached.
+4. **A "nothing is unclassified" guard test only covers the construction points its
+   FIXTURE reaches.** `test_detect_never_leaves_a_drift_on_the_deny_default` asserts
+   every emitted drift carries non-empty evidence — but its config declares no
+   doc-deps, so it never produces a `SUSPECT_LINK` and a mutation deleting the
+   classification at that site SURVIVED. Worse, the surviving mutation is invisible
+   to any tier-only assertion: the unclassified drift still routes NEEDS_INTENT (the
+   safe default), so only the EVIDENCE distinguishes "the router denied this" from
+   "no rule ran". Enumerate construction points explicitly and assert each one's
+   distinct evidence string; a blanket "all of them" assertion silently means "all
+   of the ones this fixture happens to build".
+
+3. **The routing grain is per-DOCUMENT, and that is a correctness condition, not
+   a refinement.** `heal._corrected` skips a region it cannot render but still
+   stamps the doc fingerprint, and that stamp is the ONLY staleness trigger such
+   a region has. Per-drift routing would let a mechanical HASH refresh bless its
+   own sibling prose region into PERMANENT staleness — `remaining` empty,
+   `cdx check` green, next cycle silent, forever. Whenever a partial write also
+   updates the state that detects the un-written part, the write unit must be the
+   whole thing.
+
+## [RTE-01/ops] NEVER give a review agent `git checkout --` on UNCOMMITTED work
+
+The RTE-01 adversarial-review workflow included a mutation-testing lens, told to
+flip a rule, run the suite, then "restore it with `git checkout -- <file>`". The
+agent did exactly that — and because the slice was **not yet committed**,
+`git checkout --` restored `custodex/drift.py` to HEAD and silently deleted all 218
+lines of the implementation. The tests survived (a different file), so the loss
+looked at first like a mysterious coverage collapse (`drift.py` 100% → 92% with
+whole blocks of `detect` suddenly unreached) rather than an obvious deletion.
+
+Three rules, in priority order:
+
+1. **`git checkout --` is not an undo — it is "restore to HEAD".** On uncommitted
+   work those are opposite operations. Any instruction containing it must be
+   preceded by a commit, or it is a delete instruction wearing a restore costume.
+2. **Mutation testing needs an isolated copy**, not the live worktree: run it in a
+   `git worktree`/temp clone, or have the agent snapshot the file's bytes and write
+   them back — never a VCS-relative restore. Review agents should be READ-ONLY by
+   default; write authority has to be argued for, per-lens.
+3. **Do not run a mutating workflow concurrently with the validation gate.** The
+   repo already had the rule "don't edit repo files while the full suite runs"
+   (flaky wiki-idempotency); this is the same hazard with teeth — the gate was
+   measuring a tree the reviewer was actively mutating, so both the coverage number
+   and the failure list were meaningless.
+
+Recovery was possible only because every edit was reproducible from the session
+transcript. Belt and braces regardless: when a branch carries someone else's
+in-flight uncommitted work (so a protective commit would misattribute it), snapshot
+your own changed files OUTSIDE git before authorising any agent to touch the tree.
+
+## [RTE-02a] Every ⟨R⟩ decision needs the test that fails if you REVERSE it
+
+Twice in one epic a mutation survived for the same reason, and both times the
+surviving mutation attacked a decision that had been carefully argued in
+ARCHITECTURE and left completely undefended by tests:
+
+- RTE-01: dropping the classification at the `SUSPECT_LINK` construction point
+  survived, because the guard test's fixture declared no doc-deps.
+- RTE-02a: **sorting** the decorator tuple survived, because every symbol in the
+  fixture had exactly ONE decorator — with a single-element tuple, `sorted()` is a
+  no-op, so the pinned "source order is semantic, never sort" decision had zero
+  defending evidence.
+
+The pattern: **a fixture that does not VARY the dimension under test makes the
+assertion vacuous**, and vacuous assertions look identical to real ones in a green
+suite. Coverage does not catch it either — the line runs, it just cannot fail.
+
+The rule this gives us: whenever a design decision earns an ⟨R⟩ paragraph, write
+the test that would go RED if the decision were reversed, and make the fixture
+exercise the distinction (two decorators whose source order differs from sorted
+order; a config that actually builds the drift kind you claim to classify). If you
+cannot construct an input where the reversed decision behaves differently, the
+decision is not load-bearing and the ⟨R⟩ paragraph is overclaiming.
+
+Corollary for the extractor specifically: `_decorator_name` returning `None` for an
+unnameable form is a *proportionality* judgement, not a K8 exemption — K8 loudness
+is for malformed INPUT, and a subscript decorator is valid Python we merely cannot
+name. Losing a whole file's surface over one un-nameable decorator would be
+strictly worse than losing the name; the test pins that the rest of the file still
+extracts.
+
+## [RTE-02a/ops] "Reheal the dogfood" means EVERY config in the tree, not `config/cdmon`
+
+RTE-02a's gate came back with 12 failures after `cdx check --config config/cdmon`
+reported **clean**. Every one was the `demo/` fixture: `demo/` is an authentic
+standalone repo with its OWN `demo/config/cdmon` monitoring its own code, and
+`cdx monitor --apply --config config/cdmon` does not touch it. This tree has FOUR
+monitored configs — `config/cdmon`, `demo/config/cdmon`,
+`examples/external-repo/cdmon.yaml`, `examples/multilang/cdmon.yaml` — and
+CLAUDE.md's reheal rule names only the first.
+
+So any slice that changes the EXTRACTED SURFACE (extract.py, blocks.py, manifest
+stamping) must reheal all of them, and the cheap way to find out is to run
+`cdx check` against each before running the 4-minute suite:
+
+```bash
+for c in config/cdmon demo/config/cdmon examples/external-repo/cdmon.yaml \
+         examples/multilang/cdmon.yaml; do cdx check --config "$c"; done
+```
+
+The examples happened to be clean here only because their fixture code has no
+decorators — that is luck, not a guarantee, and it will not hold for RTE-02b
+(fields), which touches every class.
+
+Related: when judging whether a coverage change is YOURS, compare the missing-line
+COUNT and the shift, not the line numbers. `extract.py` reported 9 missing / 5
+partial both before and after, with every miss displaced by exactly +48 — the size
+of the addition — which proves the new code is fully covered and the remainder is
+pre-existing. Reading the raw line numbers alone would have looked like a
+regression.
+
+## [RTE-02b] A surviving mutant may be EQUIVALENT — which means your rationale is wrong
+
+Two RTE-02b mutations survived: passing `_is_public` the QUALIFIED name instead of
+the bare one, in both the `AnnAssign` and plain-`Assign` branches. The reflex is to
+call that a test gap and write another test. It was not a gap — it was an
+**equivalent mutant**, and it was evidence that a claim I had already pinned in
+ARCHITECTURE, the feature catalog, the slice spec AND a test docstring was FALSE.
+
+The pinned claim: *"`is_public` is computed from the BARE name — qualifying first
+would make every `Class._private` field look public."* The reality
+(`extract.py:296`): `_is_public` starts with `leaf = name.rsplit(".", 1)[-1]`, so
+it strips the qualifier itself — which is precisely how `Class._method` has been
+classified since long before this slice. The bare-name choice is harmless style,
+not the correctness guard I claimed, and no test can ever kill that mutation.
+
+The rule: **when a mutation survives, first ask whether it changes behaviour at
+all.** If it cannot, do not write a test to chase it — go back and fix the
+justification that said it mattered, because a design doc asserting a false
+mechanism is worse than one that stays silent: the next person will preserve a
+constraint that was never real, and may build on it. Correct it everywhere it was
+copied (four places here — the ⟨R⟩ paragraph propagates further than you expect).
+
+The complementary rule, from the same run: **a no-op mutation reports SURVIVED and
+looks exactly like a real one.** My first P3 attempt inserted a comment rather than
+changing the expression, and dutifully reported a survivor. Before believing a
+survivor, confirm the mutated file actually differs in a way that could change
+behaviour — `git diff`, or assert the mutated source parses to a different AST.
+
+## [RTE-03] Review the DESIGN against the code before writing any of it
+
+RTE-03 was pinned in ARCHITECTURE as one slice with a clear shape. Before writing a
+line, a 60-agent adversarial review attacked that brief against the real source.
+It returned **8 blockers, every one reproduced first-hand**, and three of them were
+structural rather than cosmetic:
+
+- the write path **corrupted an `index`-sourced region** — 16 rows to 2 on this
+  repo's own `docs/api/index.md`, and reachable *today*, unattended, through
+  `generate.apply_edits_to_disk`. A defect I owned and had never seen;
+- `tiered=None → config` leaked the new knob into **six call sites that never
+  opted in**, including the MCP surface whose docstring promises the opposite and
+  a server route that loads a *cloned, untrusted* repo's config;
+- the alarm as specced **fired on every run where no write was attempted** — a
+  false alarm on the most common invocation.
+
+Cost: one workflow. Benefit: the one-slice plan became four, one blocker turned
+into its own shipped bug fix (RTE-03a), and none of it was discovered by a user.
+
+The rule: **when a slice's blast radius is "the tool now writes files with no
+human in the loop", the design review comes before the TDD loop, not after.** A
+design brief is cheap to attack and expensive to unpick once tests encode it.
+
+Corollary, learned the same way: **a reviewer's recommendation can be right about
+the defect and wrong about the fix.** The verifier that confirmed the false-alarm
+blocker also refuted its own reviewer's proposed remedy — gating on `wrote` would
+have hidden the *declined write*, the exact failure the alarm exists for. Verify
+the fix, not just the finding.
+
+## [RTE-03] A fixture whose facets are singletons cannot defend an ordering
+
+Three times in one epic a mutation survived for the same reason:
+
+| slice | mutation | why it survived |
+|---|---|---|
+| RTE-02a | sort the decorators | every fixture symbol had exactly ONE decorator |
+| RTE-03b | swap the `mechanical`/`delegated` tally counts | both counts were 1 |
+| RTE-03d | emit closure facets in encounter order | one drift kind, one evidence string |
+
+A test that pins an ORDER must supply at least two elements whose natural arrival
+order differs from the asserted order. Otherwise the assertion is vacuous and the
+decision it claims to defend is undefended.
+
+Two practical notes. **Reverse-sorted input is the right shape** — it kills the
+mutation a refactor actually introduces (arrival order, `dict.fromkeys`)
+*deterministically*. And **testing the fold directly beats testing it end-to-end**
+when the ordering is the point: an integration fixture rarely produces the awkward
+order you need. A plain `tuple(set)` mutation can only ever be killed
+probabilistically, because `str` hashing is randomized — worth stating in the
+slice rather than pretending to a determinism you do not have.
+
+## [RTE-03] "Never calls apply_fix" is not "never writes"
+
+RTE-01 justified excluding `SUSPECT_LINK` from the per-document fold on the
+grounds that the suspect-link pass *"never calls `apply_fix`"*. True — and not the
+same claim. `_handle_suspect_links` calls `stamp_edges`, which writes the
+downstream document's front matter directly. So under `--tiered`, a document the
+fold deliberately HELD still gets written.
+
+That turned out to be safe, for a reason worth writing down: the baseline touches
+only `cdm.upstream_hashes` — never a managed region, never `cdm.fingerprint` — so
+it destroys no code↔doc staleness trigger. Establishing a baseline is not blessing
+a change.
+
+The rule: **when a guarantee is about WRITES, audit every writer, not every caller
+of the obvious write function.** And once you have decided a carve-out is safe,
+pin it with a byte-level test — otherwise the next reader cannot tell a deliberate
+exception from an oversight, and whichever behaviour the implementer happened to
+write becomes the spec.
+
+## [RTE-03] A doc carrying only a COMPOSITE fingerprint is not a synced doc
+
+Three fixtures in this epic were wrong in the same way: they wrote
+`cdm.fingerprint` by hand and nothing else. `detect` then finds no
+`fingerprint_tiers` and no `symbol_sigs`, grades the change `UNKNOWN`, and routes
+it `NEEDS_INTENT` — so the test that meant to exercise the *mechanical* path
+exercised the *held* path and passed for the wrong reason.
+
+The rule: **build a "synced" fixture by running the real writer**
+(`regenerate_regions`, or `cdx monitor --apply`), not by hand-writing the state you
+think it produces. Hand-written front matter encodes what you *remember* the
+format to be; the writer encodes what it *is*. This is the same class as the
+demo-fixture lesson — a test is only as honest as the state it starts from.
+
+## [RTE-03] Validate a rationale in PRODUCTION shape before pinning it
+
+Five ⟨R⟩ paragraphs were refuted across RTE-02b and RTE-03. Every one failed the
+same way: the reasoning was checked against **the environment it was tested in**,
+not the one it ships to.
+
+| pinned claim | why it was false |
+|---|---|
+| `is_public` from the bare name stops `Class._private` looking public | `_is_public` already strips the qualifier (RTE-02b) |
+| `--tiered` writes only a SUBSET of what `--apply` writes | true of the MOCK backend; a declining backend makes it a widening |
+| N drifts on one document share ONE `record_id` | true of a FIXED injected clock; production stamps microseconds |
+| a rule match need not withdraw its document from `mechanical_docs` | covered the REGION direction only; the HASH close is whole-doc |
+| the alarm's `attempted`-over-`wrote` case is a preserved/locked region | the fold makes those unreachable; the real case is the renderer declining |
+
+⟨R⟩ paragraphs are load-bearing *because* they get pinned in many places at once —
+ARCHITECTURE, the slice spec, the feature catalog, a docstring, `--help` text an
+adopter reads, STATUS, memory. A wrong one costs six edits to retract and, worse,
+teaches the next reader something false with full confidence.
+
+The rule: **before pinning a rationale, reproduce it in the shape it ships in.**
+Swap the mock for a backend that declines. Inject a MOVING clock, not a fixed one.
+Check both directions of a claim, not the one your fixture happens to exercise. If
+the claim cannot be reproduced, it is a hypothesis — write it as one, or leave it out.
+
+Corollary: **a survivor may mean the CODE is redundant, not that a test is
+missing.** `blocked_ids` alongside `blocked_paths` was an equivalent mutant — every
+drift carries its own document's path, so the id set could never block anything the
+path set did not. The right response was to delete code, not to add a test. That is
+the second time this epic taught it; see [[mutation-testing-discipline]].
+
+## [RTE-03] Review the design AND the implementation — they catch different things
+
+Two adversarial reviews ran on RTE-03, and the overlap was almost nil.
+
+The **design** review (before any code) found what the plan got wrong: a write path
+that would corrupt an index region, a config knob leaking into six call sites, an
+alarm specced to fire when no write was attempted. All are properties of the *plan*.
+
+The **implementation** review (after the gate was green) found what only exists once
+code is real: a promoted rule silently overwritten by a sibling's whole-doc write, a
+fold keyed on `doc_id` while the write keys on `doc_path`, a `record_id` that named
+1 of N under the production clock, and a leak fix that had over-corrected until
+`cdx sync-pr` got no protection at all. None of those are visible in a brief.
+
+The rule: **for a slice that writes unattended, budget for both.** And remember the
+second review's most useful habit — it kept refuting itself. One of its own majors
+(an `llm-seeded` index-region lock regression) did not reproduce when tested both
+before and after the change. Verify the finding, then verify the fix.
+
 ## [DOC-STYLE] Generic templates carry generic rules; the adopter's repo carries its own
 
 Two documentation charters were folded into `templates/writing/**`: an external
@@ -2666,3 +2965,42 @@ check it against STATUS before shipping it.** "D-06" was already a DONE slice
 keep (MCP grain (A)) is a STANDING limit pointing at its problem note, not a new
 slice.
 
+## [RTE-03g] An identity keyed by NAME needs multiset arithmetic — and a multiset over a stale stamp needs an arbiter
+
+DIG-01 closed the masked add + in-place-change case only for UNIQUE names. Its
+digest map is keyed by `anchor_id` (the qualified name only), so it keeps just the
+last writer, and the P4 anchor delta was a set: both lose information exactly when
+a name repeats. The fix needed no new stored data — count, don't set, because the
+stamped `region_anchors` already kept the duplicates. Where per-symbol evidence is
+ambiguous, PROVE innocence from data already stored: re-derive the stored
+SIGNATURE tier with the additions set aside, and deny if it does not reproduce.
+The signature tier, not the composite, or every addition travelling with a
+docstring or body edit is held.
+
+The multiset then exposed a failure the set had hidden. An OVER-counting stale
+stamp (one of two `main`s deleted on a doc whose `symbols` region heal does not
+re-render) became a permanent phantom REMOVAL that held every later drift on the
+doc BREAKING, docstring-only edits included — a liveness regression the earlier
+text had described only in the under-count direction. When two stamps come from
+different writers, let the one EVERY writer refreshes (here the tiers) arbitrate,
+and write down the writer invariant it relies on: no writer stamps
+`region_anchors` without the tiers from the same surface. An anchors-only
+completion (the planned S1-E4 writer-3 shortcut) would turn the arbiter into a
+laundering path — a probe graded a real delete-plus-add ADDITIVE and mechanical.
+
+Three smaller rules from the same lane:
+
+- **A stamp is stale in as many ways as it has WRITERS, and staleness cuts BOTH
+  ways.** List every writer — setters AND whole-doc write paths — before claiming
+  which way it errs. "0 dogfood exposure" measured with the mock backend says
+  nothing about the live-LLM whole-doc path.
+- **A guard's ENTRY condition needs a row for every population that reaches it.**
+  Every grown-collision fixture also added a wholly-new name, so a guard narrowed
+  to "a new name was added" survived 609 tests while closing a shadowed break
+  unattended (G05).
+- **A new discharge can MASK an old mutant.** The SUM-merge mutant survived once
+  the discharge absorbed its doubled counts on a pure addition; re-pin such
+  mutants with an edit the discharge cannot prove (a real in-place signature
+  change). Measure a cost over the whole population in both directions, too: the
+  tie-reorder cost went from "~0" on one hand-picked module to 25/344 insertions
+  (a lower bound) and 6/110 removals.

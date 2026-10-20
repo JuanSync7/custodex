@@ -1,8 +1,36 @@
 ---
 cdm:
   audience: user-guide
-  fingerprint: fec57de552599eaa
+  fingerprint: e3154c2bc422fe72
+  fingerprint_tiers:
+    composite: e3154c2bc422fe72
+    signature: e3154c2bc422fe72
+  region_anchors:
+    symbols:
+    - 069d2548e1165eea
+    - 3ba20ece0aae8c4d
+    - 4395084cde593e1c
+    - 4bc74b21357c6cf5
+    - 5736e8582b0bae41
+    - 666b56014eda8817
+    - 7415318241c9b05b
+    - 8e75ebbdb21505d2
+    - f3dd5bbdd5c044ba
+    - fdafe75610dfceb6
+  region_hashes:
+    symbols: 6f6e557697c782a2
   schema_version: 1.0.0
+  symbol_sigs:
+    069d2548e1165eea: f3ee8c6241efded2
+    3ba20ece0aae8c4d: aa65d7bbf1344422
+    4395084cde593e1c: abd488e020796195
+    4bc74b21357c6cf5: 6fc55cf3dc30d9a5
+    5736e8582b0bae41: 048a393b89f92f46
+    666b56014eda8817: d79db7ad66691868
+    7415318241c9b05b: 5e2183514a285efa
+    8e75ebbdb21505d2: 74ba5c824a10a127
+    f3dd5bbdd5c044ba: 7981097afc971095
+    fdafe75610dfceb6: bfb133130cc249a1
   upstream_hashes:
     io-api: 14453e355c0ff9fe
 ---
@@ -53,6 +81,10 @@ straight from the source, so it never drifts from the real signatures:
 | Engine.topological_order | method | def topological_order(self) -> tuple[str, ...] |
 | Task | class | class Task |
 | Task.depends_on | method | def depends_on(self, task_id: str) -> bool |
+| Task.deps | variable | deps: tuple[str, ...] = () |
+| Task.id | variable | id: str |
+| Task.name | variable | name: str |
+| Task.status | variable | status: Status = Status.PENDING |
 <!-- CDM:END symbols -->
 
 ## Where to go next

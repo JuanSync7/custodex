@@ -10,6 +10,8 @@ Features: FEAT-RECORD-009, FEAT-COVERAGE-007, FEAT-COVERAGE-010, FEAT-LEARN-004
 Features: FEAT-PR-001, FEAT-PR-002, FEAT-PR-003, FEAT-PR-004, FEAT-PR-006
 Features: FEAT-PR-007, FEAT-PR-008, FEAT-LAYOUT-001, FEAT-LAYOUT-002
 Features: FEAT-LAYOUT-003, FEAT-LAYOUT-004, FEAT-LAYOUT-007, FEAT-SERVER-017
+Features: FEAT-CLI-023
+Features: FEAT-RECORD-014
 """
 
 from __future__ import annotations
@@ -1226,3 +1228,263 @@ def test_serve_loud_without_config_cdmon_index(tmp_path: Path, monkeypatch) -> N
     result = runner.invoke(app, ["serve"])
     assert result.exit_code == 1
     assert "no config/cdmon/index.yaml" in result.output
+
+
+# --- RTE-02c: an empty universe must not PASS a --fail-under gate -----------
+
+_EMPTY_UNIVERSE_CONFIG = (
+    'version: "1.0.0"\n'
+    'root: "."\n'
+    "documents: []\n"
+    "coverage:\n"
+    '  include: ["src/**/*.py"]\n'  # matches nothing: the mis-scoped glob
+)
+
+
+def _empty_universe_fixture(tmp_path: Path) -> None:
+    (tmp_path / "lib.py").write_text("def f() -> None:\n    pass\n", encoding="utf-8")
+    (tmp_path / "cdmon.yaml").write_text(_EMPTY_UNIVERSE_CONFIG, encoding="utf-8")
+
+
+def test_coverage_empty_universe_fails_the_gate_loudly(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A gate asked to enforce a threshold over NOTHING is mis-configured (K8).
+
+    `percent_public_symbols` returns 100.0 for an empty universe, so
+    `--fail-under 95` used to exit 0 — the strictest gate available passing on a
+    repo Custodex never looked at. For an epic whose goal is "nothing is missed",
+    a metric reporting perfection for measuring nothing is the worst failure
+    mode: silent, green, and maximally confident.
+    """
+    _empty_universe_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["coverage", "--fail-under", "95"])
+    assert result.exit_code != 0, result.output
+    assert "empty" in result.output.lower() or "no public" in result.output.lower()
+
+
+def test_coverage_empty_universe_without_the_gate_still_reports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Without --fail-under the reporting path is UNCHANGED (K9).
+
+    Vacuous truth is the right answer for a property and for a report; it is only
+    wrong as a gate verdict, so only the gate changes.
+    """
+    _empty_universe_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["coverage"])
+    assert result.exit_code == 0, result.output
+
+
+# --- RTE-03c: `cdx monitor --tiered`. Feature: FEAT-CLI-023 -----------------
+
+
+def _tiered_fixture(tmp_path: Path) -> Path:
+    """A doc with a renderer-backed region AND a no-renderer `mode: llm` region.
+
+    The prose region classifies DELEGATED, which HOLDS the whole document under
+    `--tiered` — so the mechanical half is not written either.
+    """
+    (tmp_path / "code.py").write_text(
+        '"""M."""\n\n\ndef alpha(x: int) -> int:\n    """Alpha."""\n    return x\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "cdmon.yaml").write_text(
+        "version: '1.0.0'\nroot: '.'\napply_default: false\ndocuments:\n"
+        "  - id: guide\n    path: guide.md\n    audience: eng-guide\n"
+        "    code_refs:\n      - path: code.py\n"
+        "    region_keys: ['symbols', 'overview']\n"
+        "    region_modes:\n      overview: llm\n",
+        encoding="utf-8",
+    )
+    doc = tmp_path / "guide.md"
+    doc.write_text(
+        "# Guide\n\n<!-- CDM:BEGIN overview -->\nAuthored prose.\n"
+        "<!-- CDM:END overview -->\n\n"
+        "<!-- CDM:BEGIN symbols -->\nSTALE\n<!-- CDM:END symbols -->\n",
+        encoding="utf-8",
+    )
+    return doc
+
+
+def test_monitor_tiered_holds_a_document_needing_human_intent(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """`--tiered` writes nothing on a held document — and still exits 1."""
+    doc = _tiered_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    before = doc.read_bytes()
+
+    result = runner.invoke(app, ["monitor", "--apply", "--tiered"])
+
+    assert doc.read_bytes() == before
+    assert result.exit_code == 1  # the pre-existing remaining-drift gate (K9)
+    assert "remaining" in result.output.lower()
+
+
+def test_monitor_without_tiered_writes_it_exactly_as_today(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The foil: default OFF is byte-identical to today (opt-in, K6/K9)."""
+    doc = _tiered_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    before = doc.read_bytes()
+
+    result = runner.invoke(app, ["monitor", "--apply"])
+
+    assert doc.read_bytes() != before
+    assert result.exit_code == 0, result.stdout
+
+
+def test_check_reports_the_three_way_routing_tally(tmp_path: Path, monkeypatch) -> None:
+    """RTE-03b's tally is readable off the CLI, not just the library."""
+    _tiered_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["check"])
+
+    assert "document(s) mechanical" in result.output
+    assert "delegated" in result.output and "need human intent" in result.output
+
+
+def test_monitor_tiered_reports_a_converged_closure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """[RTE-03d] An unattended close names itself, and says a backend was not used."""
+    (tmp_path / "code.py").write_text(
+        '"""M."""\n\n\ndef alpha(x: int) -> int:\n    """Alpha."""\n    return x\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "cdmon.yaml").write_text(
+        "version: '1.0.0'\nroot: '.'\napply_default: false\ndocuments:\n"
+        "  - id: guide\n    path: guide.md\n    audience: eng-guide\n"
+        "    code_refs:\n      - path: code.py\n    region_keys: ['symbols']\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "guide.md").write_text(
+        "# Guide\n\n<!-- CDM:BEGIN symbols -->\nSTALE\n<!-- CDM:END symbols -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    # Bring the doc to the state a real repo is in — tiered digests stamped. A doc
+    # carrying only a COMPOSITE fingerprint grades UNKNOWN (so NEEDS_INTENT) by
+    # design, which would hold it for the wrong reason.
+    assert runner.invoke(app, ["monitor", "--apply"]).exit_code == 0
+    # A DOCSTRING-only edit: the symbol table is untouched, so this is COSMETIC.
+    (tmp_path / "code.py").write_text(
+        '"""M."""\n\n\ndef alpha(x: int) -> int:\n    """Alpha, carefully."""\n'
+        "    return x\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["monitor", "--apply", "--tiered"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "closed mechanically (no backend)" in result.stdout
+    assert "did not converge" not in result.output
+
+
+def test_monitor_tiered_preview_is_never_reported_as_a_failed_apply(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """[RTE-03d] `--no-apply` must never print "did not converge".
+
+    The alarm reports a write that was ATTEMPTED and did not close. With no apply
+    requested, nothing was attempted — calling that a non-convergence would be a
+    false alarm on the single most common invocation.
+    """
+    _tiered_fixture(tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["monitor", "--no-apply", "--tiered"])
+
+    assert result.exit_code == 1  # the pre-existing remaining-drift gate (K9)
+    assert "did not converge" not in result.output
+
+
+def test_monitor_tiered_alarms_when_the_write_boundary_declines(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """[RTE-03d] `wrote=False, verified=False` prints the ALARM, not a preview.
+
+    `apply_fix` returns False for an ATTEMPTED write it declined (a preserved id, a
+    B-03 locked region). Gating the alarm on `wrote` would print that as a dry-run
+    preview — silently reporting success for a document routing promised to close
+    and the write boundary refused. That is the one outcome the alarm exists for.
+    """
+    import custodex.monitor as monitor_mod
+
+    _tiered_fixture(tmp_path)
+    (tmp_path / "cdmon.yaml").write_text(
+        (tmp_path / "cdmon.yaml")
+        .read_text(encoding="utf-8")
+        .replace(
+            "    region_keys: ['symbols', 'overview']\n",
+            "    region_keys: ['symbols']\n",
+        )
+        .replace("    region_modes:\n      overview: llm\n", ""),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    assert runner.invoke(app, ["monitor", "--apply"]).exit_code == 0
+    (tmp_path / "code.py").write_text(
+        '"""M."""\n\n\ndef alpha(x: int) -> int:\n    """Alpha, carefully."""\n'
+        "    return x\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(monitor_mod, "apply_fix", lambda *a, **k: False)
+
+    result = runner.invoke(app, ["monitor", "--apply", "--tiered"])
+
+    assert result.exit_code == 1
+    assert "mechanical but nothing was written" in result.output
+    assert "closure preview" not in result.output
+
+
+def test_sync_pr_cli_honours_the_repo_s_own_apply_tiered(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """[RTE-03c ⟨R-CORRECTED⟩] `cdx sync-pr` reads the OPERATOR'S OWN config knob.
+
+    Forcing `tiered=False` at every non-`cdx monitor` call site went too far: it
+    left `cdx sync-pr` / `cdx open-docs-pr` — the docs-PR loop an adopter actually
+    runs in CI — with no protection at all, re-opening the permanent-staleness bug
+    RTE-03 exists to fix. The leak that had to be closed was config arriving BY
+    OMISSION on a path where the config is not the operator's (a remote agent's tool
+    call; the server's route over a CLONED repo). Those still force it off. The
+    distinction is WHOSE config it is, not which function is called.
+    """
+    doc = _tiered_fixture(tmp_path)
+    (tmp_path / "cdmon.yaml").write_text(
+        (tmp_path / "cdmon.yaml")
+        .read_text(encoding="utf-8")
+        .replace(
+            "apply_default: false\n", "apply_default: false\napply_tiered: true\n"
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    before = doc.read_bytes()
+
+    result = runner.invoke(app, ["sync-pr"])
+
+    assert result.exit_code == 0, result.stdout
+    assert doc.read_bytes() == before  # the held document was NOT healed
+
+
+def test_sync_pr_cli_still_heals_by_default(tmp_path: Path, monkeypatch) -> None:
+    """The foil: with `apply_tiered` at its default, `cdx sync-pr` heals as before.
+
+    Without this direction, hard-wiring `tiered=True` into the CLI would pass every
+    other test — the knob would look read while being ignored.
+    """
+    doc = _tiered_fixture(tmp_path)  # apply_tiered absent -> default False
+    monkeypatch.chdir(tmp_path)
+    before = doc.read_bytes()
+
+    result = runner.invoke(app, ["sync-pr"])
+
+    assert result.exit_code == 0, result.stdout
+    assert doc.read_bytes() != before  # unchanged pre-RTE-03 behaviour (K6/K9)

@@ -6,7 +6,7 @@ False — they are resolved by ``cdx resolve --edge``, never auto-edited), so
 stays K1 (no stamp is written here); the ``docdeps.enabled`` knob gates whether
 they are computed at all.
 
-Features: FEAT-DOCDEPS-004
+Features: FEAT-DOCDEPS-004, FEAT-DRIFT-013
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from custodex.config import (
     MonitorConfig,
 )
 from custodex.docdeps import stamp_edges
-from custodex.drift import DriftKind, detect
+from custodex.drift import ApplyTier, DriftKind, auto_routable_docs, detect
 from custodex.extract import build_document_surface
 from custodex.manifest import render_doc, set_fingerprint
 
@@ -82,3 +82,34 @@ def test_disabled_docdeps_suppresses_suspect_links(tmp_path: Path) -> None:
     _managed(tmp_path, _API, "# API\ny\n")
     report = detect(_cfg(enabled=False), tmp_path)
     assert all(d.kind is not DriftKind.SUSPECT_LINK for d in report.drifts)
+
+
+def test_suspect_link_carries_routing_evidence_and_never_vetoes_its_doc(
+    tmp_path: Path,
+) -> None:
+    """RTE-01: the SUSPECT_LINK construction point is classified, with its OWN reason.
+
+    Two distinct properties, both of which a mutation survived without:
+
+    1. The drift carries `("doc-doc-edge",)` — not the bare deny DEFAULT. Both route
+       to NEEDS_INTENT, so a tier-only assertion cannot tell them apart; only the
+       EVIDENCE distinguishes "the router considered this and denied it" from "no
+       rule ran at all". A human triaging an escalation needs the reason, and a
+       later construction point added without classification must not hide here.
+    2. It does NOT veto its document in `auto_routable_docs`. `Monitor.run` skips
+       past suspect links and handles them in a pass that never calls `apply_fix`,
+       so a doc↔doc edge can neither be applied nor blessed — letting one block its
+       document would strand every code↔doc drift on that doc forever.
+    """
+    _managed(tmp_path, _OVERVIEW, "# Overview\nupstream content\n")
+    _managed(tmp_path, _API, "# API\ndownstream content\n")
+    cfg = _cfg()
+    stamp_edges(cfg, tmp_path, "api")
+    _managed(tmp_path, _OVERVIEW, "# Overview\nUPSTREAM CHANGED\n")
+
+    report = detect(cfg, tmp_path)
+    (suspect,) = [d for d in report.drifts if d.kind is DriftKind.SUSPECT_LINK]
+    assert suspect.apply_tier is ApplyTier.NEEDS_INTENT
+    assert suspect.tier_evidence == ("doc-doc-edge",)  # NOT the bare default ()
+    # the downstream doc is still auto-routable despite carrying a suspect link.
+    assert "api" in auto_routable_docs(report)
